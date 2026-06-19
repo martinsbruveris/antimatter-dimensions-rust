@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "crates/break_infinity",
+    "crates/ad-core",
+    "crates/ad-gui",
+]
+resolver = "2"

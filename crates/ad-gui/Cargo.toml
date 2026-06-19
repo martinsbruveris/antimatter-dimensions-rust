@@ -1,0 +1,9 @@
+[package]
+name = "ad-gui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ad-core = { path = "../ad-core" }
+break_infinity = { path = "../break_infinity" }
+eframe = "0.31"
