@@ -6,7 +6,6 @@ license = "MPL-2.0"
 description = "Vendored: A library for larger numbers up to 1e9e15 in Rust for Incremental Games"
 
 [features]
-full-range = []
 serde = ["dep:serde"]
 
 [dependencies]

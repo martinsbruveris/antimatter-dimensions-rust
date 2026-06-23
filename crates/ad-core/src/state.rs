@@ -29,8 +29,8 @@ pub struct GameState {
 impl GameState {
     pub fn new() -> Self {
         Self {
-            antimatter: Decimal::new(10.0), // Start with 10 antimatter
-            ad1: DimensionTier::new(Decimal::new(10.0)), // AD1 costs 10
+            antimatter: Decimal::from_float(10.0), // Start with 10 antimatter
+            ad1: DimensionTier::new(Decimal::from_float(10.0)), // AD1 costs 10
         }
     }
 
@@ -38,10 +38,10 @@ impl GameState {
     pub fn buy_ad1(&mut self) -> bool {
         if self.antimatter >= self.ad1.cost {
             self.antimatter = self.antimatter - self.ad1.cost;
-            self.ad1.amount = self.ad1.amount + Decimal::new(1.0);
+            self.ad1.amount = self.ad1.amount + Decimal::from_float(1.0);
             self.ad1.bought += 1;
             // Cost increases by 10x per purchase (simplified)
-            self.ad1.cost = self.ad1.cost * Decimal::new(10.0);
+            self.ad1.cost = self.ad1.cost * Decimal::from_float(10.0);
             true
         } else {
             false

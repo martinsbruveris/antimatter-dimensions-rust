@@ -47,10 +47,7 @@ impl eframe::App for App {
             });
 
             ui.add_space(10.0);
-            ui.label(format!(
-                "Production: {}/s",
-                self.game.ad1.amount
-            ));
+            ui.label(format!("Production: {}/s", self.game.ad1.amount));
         });
 
         // Request continuous repaint (~30fps)
