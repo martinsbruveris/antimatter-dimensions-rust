@@ -71,7 +71,7 @@ impl GameState {
     }
 
     /// Get the per-second production rate for a dimension tier.
-    /// Each dimension produces the tier below it (AD8 produces AD7, ..., AD1 produces 
+    /// Each dimension produces the tier below it (AD8 produces AD7, ..., AD1 produces
     /// antimatter). Production = amount * multiplier * tickspeed_effect
     pub fn dimension_production_per_second(&self, tier: usize) -> Decimal {
         if tier >= 8 || !self.is_dimension_unlocked(tier) {
