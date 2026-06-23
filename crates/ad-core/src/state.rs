@@ -7,6 +7,7 @@ use crate::data::constants::{
 
 /// A single antimatter dimension tier.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DimensionTier {
     /// Current amount of this dimension (can be fractional due
     /// to production).
@@ -32,6 +33,7 @@ impl Default for DimensionTier {
 
 /// Tickspeed state: controls how fast dimensions produce.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TickspeedState {
     /// Number of tickspeed upgrades purchased.
     pub bought: u64,
@@ -59,6 +61,7 @@ impl TickspeedState {
 
 /// Full game state for pre-infinity gameplay.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GameState {
     /// Current antimatter amount.
     pub antimatter: Decimal,

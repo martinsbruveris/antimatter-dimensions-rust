@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antimatter Dimensions</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <div class="header">
+            <div class="antimatter-display">
+                <span class="prefix">You have </span>
+                <span id="antimatter" class="antimatter-value">0</span>
+                <span class="prefix"> antimatter.</span>
+            </div>
+            <div id="antimatter-per-sec" class="per-sec">
+                You are getting 0 antimatter per second.
+            </div>
+            <div class="tickspeed-info">
+                <span id="tickspeed-mult-info"></span>
+                <span id="tickspeed-total-info"></span>
+            </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <!-- Sacrifice & Max All -->
+        <div class="action-bar">
+            <div id="buy10-mult-info" class="info-text"></div>
+            <div class="action-buttons">
+                <button id="btn-sacrifice" class="btn btn-sacrifice" style="display: none;">
+                    Dimensional Sacrifice
+                </button>
+                <button id="btn-max-all" class="btn btn-action" onclick="maxAll()">
+                    Max all (M)
+                </button>
+            </div>
+        </div>
+
+        <!-- Tickspeed row -->
+        <div class="tickspeed-row">
+            <button id="btn-tickspeed" class="btn btn-tickspeed" onclick="buyTickspeed()">
+                Tickspeed Cost: 0
+            </button>
+            <button id="btn-max-tickspeed" class="btn btn-action" onclick="buyMaxTickspeed()">
+                Buy Max
+            </button>
+        </div>
+
+        <div class="separator"></div>
+
+        <!-- Dimensions -->
+        <div id="dimensions" class="dimensions-grid">
+            <!-- Populated by JS -->
+        </div>
+
+        <div class="separator"></div>
+
+        <!-- Prestige rows -->
+        <div class="prestige-section">
+            <div class="prestige-row">
+                <div class="prestige-info">
+                    <span id="dim-boost-info"></span>
+                </div>
+                <button id="btn-dim-boost" class="btn btn-prestige" onclick="buyDimBoost()">
+                    Reset your Dimensions to boost
+                </button>
+            </div>
+            <div class="prestige-row">
+                <div class="prestige-info">
+                    <span id="galaxy-info"></span>
+                </div>
+                <button id="btn-galaxy" class="btn btn-prestige" onclick="buyGalaxy()">
+                    Reset your Dimensions and Boosts to increase Tickspeed power
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>

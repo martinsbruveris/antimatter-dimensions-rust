@@ -3,5 +3,9 @@ name = "ad-core"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+serde = ["dep:serde", "break_infinity/serde"]
+
 [dependencies]
 break_infinity = { path = "../break_infinity" }
+serde = { version = "1.0", optional = true, default-features = false, features = ["derive"] }

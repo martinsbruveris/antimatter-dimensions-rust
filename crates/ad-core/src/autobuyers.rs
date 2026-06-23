@@ -2,6 +2,7 @@ use crate::state::GameState;
 
 /// Autobuyer purchase mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AutobuyerMode {
     /// Buy a single unit each time the autobuyer fires.
     BuySingle,
@@ -11,6 +12,7 @@ pub enum AutobuyerMode {
 
 /// State for a single autobuyer.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Autobuyer {
     /// Whether this autobuyer is enabled.
     pub enabled: bool,
@@ -57,6 +59,7 @@ pub const AUTOBUYER_INITIAL_INTERVAL_MS: f64 = 1000.0;
 
 /// Collection of all autobuyer state.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AutobuyerState {
     /// Autobuyers for each of the 8 antimatter dimension tiers.
     pub dimensions: [Autobuyer; 8],

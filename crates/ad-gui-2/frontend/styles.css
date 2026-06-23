@@ -1,0 +1,247 @@
+/* Dark theme matching the original Antimatter Dimensions game */
+
+:root {
+    --bg: #1e1e1e;
+    --panel-bg: #282828;
+    --text: #b4b4b4;
+    --text-bright: #dcdcdc;
+    --antimatter: #2196f3;
+    --green-accent: #5ac467;
+    --green-dark: #127a20;
+    --btn-bg: #323232;
+    --btn-border: #127a20;
+    --dim-text: #828282;
+    --separator: #464646;
+    --btn-hover-bg: #1a5c28;
+    --btn-active-bg: #5ac467;
+    --disabled-opacity: 0.5;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+#app {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 16px 24px;
+}
+
+/* Header */
+.header {
+    text-align: center;
+    padding: 12px 0;
+}
+
+.antimatter-display {
+    font-size: 16px;
+    color: var(--text-bright);
+}
+
+.antimatter-value {
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--antimatter);
+    animation: antimatter-glow 25s infinite;
+}
+
+@keyframes antimatter-glow {
+    0%, 100% { color: #2196f3; }
+    25% { color: #42a5f5; }
+    50% { color: #1e88e5; }
+    75% { color: #64b5f6; }
+}
+
+.per-sec {
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 4px;
+}
+
+.tickspeed-info {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--dim-text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+/* Separator */
+.separator {
+    height: 1px;
+    background: var(--separator);
+    margin: 10px 20px;
+}
+
+/* Action bar */
+.action-bar {
+    text-align: center;
+    padding: 8px 0;
+}
+
+.info-text {
+    font-size: 12px;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+/* Buttons */
+.btn {
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    color: var(--text-bright);
+    padding: 6px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+    min-height: 28px;
+}
+
+.btn:hover:not(:disabled) {
+    background: var(--btn-hover-bg);
+    border-color: var(--green-accent);
+    color: white;
+}
+
+.btn:active:not(:disabled) {
+    background: var(--btn-active-bg);
+    color: white;
+}
+
+.btn:disabled {
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+    color: var(--dim-text);
+}
+
+.btn-sacrifice {
+    min-width: 320px;
+}
+
+.btn-action {
+    min-width: 100px;
+}
+
+.btn-tickspeed {
+    min-width: 280px;
+}
+
+.btn-prestige {
+    min-width: 300px;
+    min-height: 36px;
+    font-size: 11px;
+}
+
+/* Tickspeed row */
+.tickspeed-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 8px 0;
+}
+
+/* Dimensions grid */
+.dimensions-grid {
+    padding: 8px 0;
+}
+
+.dim-row {
+    display: grid;
+    grid-template-columns: 220px 1fr 140px 180px;
+    align-items: center;
+    padding: 4px 12px;
+    gap: 8px;
+    min-height: 32px;
+}
+
+.dim-row.locked {
+    opacity: 0.35;
+}
+
+.dim-name {
+    font-size: 13px;
+    color: var(--text-bright);
+    white-space: nowrap;
+}
+
+.dim-amount {
+    font-size: 13px;
+    color: var(--text);
+}
+
+.dim-rate {
+    font-size: 11px;
+    color: var(--dim-text);
+}
+
+.dim-buttons {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.btn-dim {
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    color: var(--text-bright);
+    padding: 4px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background-color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+}
+
+.btn-dim:hover:not(:disabled) {
+    background: var(--btn-hover-bg);
+    border-color: var(--green-accent);
+    color: white;
+}
+
+.btn-dim:active:not(:disabled) {
+    background: var(--btn-active-bg);
+    color: white;
+}
+
+.btn-dim:disabled {
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+    color: var(--dim-text);
+}
+
+/* Prestige section */
+.prestige-section {
+    padding: 8px 0;
+}
+
+.prestige-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    gap: 16px;
+}
+
+.prestige-info {
+    font-size: 13px;
+    color: var(--text);
+}
