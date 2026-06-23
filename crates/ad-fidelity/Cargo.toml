@@ -1,0 +1,13 @@
+[package]
+name = "ad-fidelity"
+version = "0.1.0"
+edition = "2021"
+description = "Fidelity test harness comparing Rust ad-core against the original JS game"
+
+[dependencies]
+ad-core = { path = "../ad-core" }
+break_infinity = { path = "../break_infinity" }
+
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

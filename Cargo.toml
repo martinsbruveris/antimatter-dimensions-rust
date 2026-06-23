@@ -3,5 +3,6 @@ members = [
     "crates/break_infinity",
     "crates/ad-core",
     "crates/ad-gui",
+    "crates/ad-fidelity",
 ]
 resolver = "2"

@@ -1,0 +1,1299 @@
+{
+  "_meta": {
+    "generated": "2026-06-23T22:39:13.545Z",
+    "source": "Antimatter Dimensions JS (pre-infinity, fresh game)",
+    "description": "Reference values computed by running the actual game code with all upgrades/effects inactive (pre-infinity state)."
+  },
+  "dimension_costs": [
+    {
+      "tier": 1,
+      "bought": 0,
+      "cost": "10",
+      "log10_cost": 1
+    },
+    {
+      "tier": 1,
+      "bought": 1,
+      "cost": "10",
+      "log10_cost": 1
+    },
+    {
+      "tier": 1,
+      "bought": 9,
+      "cost": "10",
+      "log10_cost": 1
+    },
+    {
+      "tier": 1,
+      "bought": 10,
+      "cost": "10000",
+      "log10_cost": 4
+    },
+    {
+      "tier": 1,
+      "bought": 11,
+      "cost": "10000",
+      "log10_cost": 4
+    },
+    {
+      "tier": 1,
+      "bought": 19,
+      "cost": "10000",
+      "log10_cost": 4
+    },
+    {
+      "tier": 1,
+      "bought": 20,
+      "cost": "10000000",
+      "log10_cost": 7
+    },
+    {
+      "tier": 1,
+      "bought": 30,
+      "cost": "10000000000",
+      "log10_cost": 10
+    },
+    {
+      "tier": 1,
+      "bought": 50,
+      "cost": "10000000000000000",
+      "log10_cost": 16
+    },
+    {
+      "tier": 1,
+      "bought": 80,
+      "cost": "1e+25",
+      "log10_cost": 25
+    },
+    {
+      "tier": 1,
+      "bought": 100,
+      "cost": "1e+31",
+      "log10_cost": 31
+    },
+    {
+      "tier": 2,
+      "bought": 0,
+      "cost": "100",
+      "log10_cost": 2
+    },
+    {
+      "tier": 2,
+      "bought": 1,
+      "cost": "100",
+      "log10_cost": 2
+    },
+    {
+      "tier": 2,
+      "bought": 9,
+      "cost": "100",
+      "log10_cost": 2
+    },
+    {
+      "tier": 2,
+      "bought": 10,
+      "cost": "1000000",
+      "log10_cost": 6
+    },
+    {
+      "tier": 2,
+      "bought": 11,
+      "cost": "1000000",
+      "log10_cost": 6
+    },
+    {
+      "tier": 2,
+      "bought": 19,
+      "cost": "1000000",
+      "log10_cost": 6
+    },
+    {
+      "tier": 2,
+      "bought": 20,
+      "cost": "10000000000",
+      "log10_cost": 10
+    },
+    {
+      "tier": 2,
+      "bought": 30,
+      "cost": "100000000000000",
+      "log10_cost": 14
+    },
+    {
+      "tier": 2,
+      "bought": 50,
+      "cost": "1e+22",
+      "log10_cost": 22
+    },
+    {
+      "tier": 2,
+      "bought": 80,
+      "cost": "1e+34",
+      "log10_cost": 34
+    },
+    {
+      "tier": 2,
+      "bought": 100,
+      "cost": "1e+42",
+      "log10_cost": 42
+    },
+    {
+      "tier": 3,
+      "bought": 0,
+      "cost": "10000",
+      "log10_cost": 4
+    },
+    {
+      "tier": 3,
+      "bought": 1,
+      "cost": "10000",
+      "log10_cost": 4
+    },
+    {
+      "tier": 3,
+      "bought": 9,
+      "cost": "10000",
+      "log10_cost": 4
+    },
+    {
+      "tier": 3,
+      "bought": 10,
+      "cost": "1000000000",
+      "log10_cost": 9
+    },
+    {
+      "tier": 3,
+      "bought": 11,
+      "cost": "1000000000",
+      "log10_cost": 9
+    },
+    {
+      "tier": 3,
+      "bought": 19,
+      "cost": "1000000000",
+      "log10_cost": 9
+    },
+    {
+      "tier": 3,
+      "bought": 20,
+      "cost": "100000000000000",
+      "log10_cost": 14
+    },
+    {
+      "tier": 3,
+      "bought": 30,
+      "cost": "10000000000000000000",
+      "log10_cost": 19
+    },
+    {
+      "tier": 3,
+      "bought": 50,
+      "cost": "1e+29",
+      "log10_cost": 29
+    },
+    {
+      "tier": 3,
+      "bought": 80,
+      "cost": "1e+44",
+      "log10_cost": 44
+    },
+    {
+      "tier": 3,
+      "bought": 100,
+      "cost": "1e+54",
+      "log10_cost": 54
+    },
+    {
+      "tier": 4,
+      "bought": 0,
+      "cost": "1000000",
+      "log10_cost": 6
+    },
+    {
+      "tier": 4,
+      "bought": 1,
+      "cost": "1000000",
+      "log10_cost": 6
+    },
+    {
+      "tier": 4,
+      "bought": 9,
+      "cost": "1000000",
+      "log10_cost": 6
+    },
+    {
+      "tier": 4,
+      "bought": 10,
+      "cost": "1000000000000",
+      "log10_cost": 12
+    },
+    {
+      "tier": 4,
+      "bought": 11,
+      "cost": "1000000000000",
+      "log10_cost": 12
+    },
+    {
+      "tier": 4,
+      "bought": 19,
+      "cost": "1000000000000",
+      "log10_cost": 12
+    },
+    {
+      "tier": 4,
+      "bought": 20,
+      "cost": "1000000000000000000",
+      "log10_cost": 18
+    },
+    {
+      "tier": 4,
+      "bought": 30,
+      "cost": "1e+24",
+      "log10_cost": 24
+    },
+    {
+      "tier": 4,
+      "bought": 50,
+      "cost": "1e+36",
+      "log10_cost": 36
+    },
+    {
+      "tier": 4,
+      "bought": 80,
+      "cost": "1e+54",
+      "log10_cost": 54
+    },
+    {
+      "tier": 4,
+      "bought": 100,
+      "cost": "1e+66",
+      "log10_cost": 66
+    },
+    {
+      "tier": 5,
+      "bought": 0,
+      "cost": "1000000000",
+      "log10_cost": 9
+    },
+    {
+      "tier": 5,
+      "bought": 1,
+      "cost": "1000000000",
+      "log10_cost": 9
+    },
+    {
+      "tier": 5,
+      "bought": 9,
+      "cost": "1000000000",
+      "log10_cost": 9
+    },
+    {
+      "tier": 5,
+      "bought": 10,
+      "cost": "100000000000000000",
+      "log10_cost": 17
+    },
+    {
+      "tier": 5,
+      "bought": 11,
+      "cost": "100000000000000000",
+      "log10_cost": 17
+    },
+    {
+      "tier": 5,
+      "bought": 19,
+      "cost": "100000000000000000",
+      "log10_cost": 17
+    },
+    {
+      "tier": 5,
+      "bought": 20,
+      "cost": "1e+25",
+      "log10_cost": 25
+    },
+    {
+      "tier": 5,
+      "bought": 30,
+      "cost": "1e+33",
+      "log10_cost": 33
+    },
+    {
+      "tier": 5,
+      "bought": 50,
+      "cost": "1e+49",
+      "log10_cost": 49
+    },
+    {
+      "tier": 5,
+      "bought": 80,
+      "cost": "1e+73",
+      "log10_cost": 73
+    },
+    {
+      "tier": 5,
+      "bought": 100,
+      "cost": "1e+89",
+      "log10_cost": 89
+    },
+    {
+      "tier": 6,
+      "bought": 0,
+      "cost": "10000000000000",
+      "log10_cost": 13
+    },
+    {
+      "tier": 6,
+      "bought": 1,
+      "cost": "10000000000000",
+      "log10_cost": 13
+    },
+    {
+      "tier": 6,
+      "bought": 9,
+      "cost": "10000000000000",
+      "log10_cost": 13
+    },
+    {
+      "tier": 6,
+      "bought": 10,
+      "cost": "1e+23",
+      "log10_cost": 23
+    },
+    {
+      "tier": 6,
+      "bought": 11,
+      "cost": "1e+23",
+      "log10_cost": 23
+    },
+    {
+      "tier": 6,
+      "bought": 19,
+      "cost": "1e+23",
+      "log10_cost": 23
+    },
+    {
+      "tier": 6,
+      "bought": 20,
+      "cost": "1e+33",
+      "log10_cost": 33
+    },
+    {
+      "tier": 6,
+      "bought": 30,
+      "cost": "1e+43",
+      "log10_cost": 43
+    },
+    {
+      "tier": 6,
+      "bought": 50,
+      "cost": "1e+63",
+      "log10_cost": 63
+    },
+    {
+      "tier": 6,
+      "bought": 80,
+      "cost": "1e+93",
+      "log10_cost": 93
+    },
+    {
+      "tier": 6,
+      "bought": 100,
+      "cost": "1e+113",
+      "log10_cost": 113
+    },
+    {
+      "tier": 7,
+      "bought": 0,
+      "cost": "1000000000000000000",
+      "log10_cost": 18
+    },
+    {
+      "tier": 7,
+      "bought": 1,
+      "cost": "1000000000000000000",
+      "log10_cost": 18
+    },
+    {
+      "tier": 7,
+      "bought": 9,
+      "cost": "1000000000000000000",
+      "log10_cost": 18
+    },
+    {
+      "tier": 7,
+      "bought": 10,
+      "cost": "1e+30",
+      "log10_cost": 30
+    },
+    {
+      "tier": 7,
+      "bought": 11,
+      "cost": "1e+30",
+      "log10_cost": 30
+    },
+    {
+      "tier": 7,
+      "bought": 19,
+      "cost": "1e+30",
+      "log10_cost": 30
+    },
+    {
+      "tier": 7,
+      "bought": 20,
+      "cost": "1e+42",
+      "log10_cost": 42
+    },
+    {
+      "tier": 7,
+      "bought": 30,
+      "cost": "1e+54",
+      "log10_cost": 54
+    },
+    {
+      "tier": 7,
+      "bought": 50,
+      "cost": "1e+78",
+      "log10_cost": 78
+    },
+    {
+      "tier": 7,
+      "bought": 80,
+      "cost": "1e+114",
+      "log10_cost": 114
+    },
+    {
+      "tier": 7,
+      "bought": 100,
+      "cost": "1e+138",
+      "log10_cost": 138
+    },
+    {
+      "tier": 8,
+      "bought": 0,
+      "cost": "1e+24",
+      "log10_cost": 24
+    },
+    {
+      "tier": 8,
+      "bought": 1,
+      "cost": "1e+24",
+      "log10_cost": 24
+    },
+    {
+      "tier": 8,
+      "bought": 9,
+      "cost": "1e+24",
+      "log10_cost": 24
+    },
+    {
+      "tier": 8,
+      "bought": 10,
+      "cost": "1e+39",
+      "log10_cost": 39
+    },
+    {
+      "tier": 8,
+      "bought": 11,
+      "cost": "1e+39",
+      "log10_cost": 39
+    },
+    {
+      "tier": 8,
+      "bought": 19,
+      "cost": "1e+39",
+      "log10_cost": 39
+    },
+    {
+      "tier": 8,
+      "bought": 20,
+      "cost": "1e+54",
+      "log10_cost": 54
+    },
+    {
+      "tier": 8,
+      "bought": 30,
+      "cost": "1e+69",
+      "log10_cost": 69
+    },
+    {
+      "tier": 8,
+      "bought": 50,
+      "cost": "1e+99",
+      "log10_cost": 99
+    },
+    {
+      "tier": 8,
+      "bought": 80,
+      "cost": "1e+144",
+      "log10_cost": 144
+    },
+    {
+      "tier": 8,
+      "bought": 100,
+      "cost": "1e+174",
+      "log10_cost": 174
+    }
+  ],
+  "buy10_multiplier": [
+    {
+      "bought": 0,
+      "groups": 0,
+      "multiplier": "1"
+    },
+    {
+      "bought": 10,
+      "groups": 1,
+      "multiplier": "2"
+    },
+    {
+      "bought": 20,
+      "groups": 2,
+      "multiplier": "4"
+    },
+    {
+      "bought": 30,
+      "groups": 3,
+      "multiplier": "8"
+    },
+    {
+      "bought": 50,
+      "groups": 5,
+      "multiplier": "32"
+    },
+    {
+      "bought": 100,
+      "groups": 10,
+      "multiplier": "1024"
+    }
+  ],
+  "buy10_multiplier_base": 2,
+  "dimboost_multiplier": [
+    {
+      "boosts": 0,
+      "tier": 1,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 0,
+      "tier": 2,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 0,
+      "tier": 3,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 0,
+      "tier": 4,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 0,
+      "tier": 5,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 0,
+      "tier": 6,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 0,
+      "tier": 7,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 0,
+      "tier": 8,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 1,
+      "tier": 1,
+      "multiplier": "2",
+      "log10_multiplier": 0.3010299956639812
+    },
+    {
+      "boosts": 1,
+      "tier": 2,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 1,
+      "tier": 3,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 1,
+      "tier": 4,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 1,
+      "tier": 5,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 1,
+      "tier": 6,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 1,
+      "tier": 7,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 1,
+      "tier": 8,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 2,
+      "tier": 1,
+      "multiplier": "4",
+      "log10_multiplier": 0.6020599913279624
+    },
+    {
+      "boosts": 2,
+      "tier": 2,
+      "multiplier": "2",
+      "log10_multiplier": 0.3010299956639812
+    },
+    {
+      "boosts": 2,
+      "tier": 3,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 2,
+      "tier": 4,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 2,
+      "tier": 5,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 2,
+      "tier": 6,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 2,
+      "tier": 7,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 2,
+      "tier": 8,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 4,
+      "tier": 1,
+      "multiplier": "16",
+      "log10_multiplier": 1.2041199826559248
+    },
+    {
+      "boosts": 4,
+      "tier": 2,
+      "multiplier": "8",
+      "log10_multiplier": 0.9030899869919435
+    },
+    {
+      "boosts": 4,
+      "tier": 3,
+      "multiplier": "4",
+      "log10_multiplier": 0.6020599913279624
+    },
+    {
+      "boosts": 4,
+      "tier": 4,
+      "multiplier": "2",
+      "log10_multiplier": 0.3010299956639812
+    },
+    {
+      "boosts": 4,
+      "tier": 5,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 4,
+      "tier": 6,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 4,
+      "tier": 7,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 4,
+      "tier": 8,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 5,
+      "tier": 1,
+      "multiplier": "32",
+      "log10_multiplier": 1.505149978319906
+    },
+    {
+      "boosts": 5,
+      "tier": 2,
+      "multiplier": "16",
+      "log10_multiplier": 1.2041199826559248
+    },
+    {
+      "boosts": 5,
+      "tier": 3,
+      "multiplier": "8",
+      "log10_multiplier": 0.9030899869919435
+    },
+    {
+      "boosts": 5,
+      "tier": 4,
+      "multiplier": "4",
+      "log10_multiplier": 0.6020599913279624
+    },
+    {
+      "boosts": 5,
+      "tier": 5,
+      "multiplier": "2",
+      "log10_multiplier": 0.3010299956639812
+    },
+    {
+      "boosts": 5,
+      "tier": 6,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 5,
+      "tier": 7,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 5,
+      "tier": 8,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "boosts": 8,
+      "tier": 1,
+      "multiplier": "256",
+      "log10_multiplier": 2.4082399653118496
+    },
+    {
+      "boosts": 8,
+      "tier": 2,
+      "multiplier": "128",
+      "log10_multiplier": 2.1072099696478683
+    },
+    {
+      "boosts": 8,
+      "tier": 3,
+      "multiplier": "64",
+      "log10_multiplier": 1.806179973983887
+    },
+    {
+      "boosts": 8,
+      "tier": 4,
+      "multiplier": "32",
+      "log10_multiplier": 1.505149978319906
+    },
+    {
+      "boosts": 8,
+      "tier": 5,
+      "multiplier": "16",
+      "log10_multiplier": 1.2041199826559248
+    },
+    {
+      "boosts": 8,
+      "tier": 6,
+      "multiplier": "8",
+      "log10_multiplier": 0.9030899869919435
+    },
+    {
+      "boosts": 8,
+      "tier": 7,
+      "multiplier": "4",
+      "log10_multiplier": 0.6020599913279624
+    },
+    {
+      "boosts": 8,
+      "tier": 8,
+      "multiplier": "2",
+      "log10_multiplier": 0.3010299956639812
+    },
+    {
+      "boosts": 10,
+      "tier": 1,
+      "multiplier": "1024",
+      "log10_multiplier": 3.010299956639812
+    },
+    {
+      "boosts": 10,
+      "tier": 2,
+      "multiplier": "512",
+      "log10_multiplier": 2.709269960975831
+    },
+    {
+      "boosts": 10,
+      "tier": 3,
+      "multiplier": "256",
+      "log10_multiplier": 2.4082399653118496
+    },
+    {
+      "boosts": 10,
+      "tier": 4,
+      "multiplier": "128",
+      "log10_multiplier": 2.1072099696478683
+    },
+    {
+      "boosts": 10,
+      "tier": 5,
+      "multiplier": "64",
+      "log10_multiplier": 1.806179973983887
+    },
+    {
+      "boosts": 10,
+      "tier": 6,
+      "multiplier": "32",
+      "log10_multiplier": 1.505149978319906
+    },
+    {
+      "boosts": 10,
+      "tier": 7,
+      "multiplier": "16",
+      "log10_multiplier": 1.2041199826559248
+    },
+    {
+      "boosts": 10,
+      "tier": 8,
+      "multiplier": "8",
+      "log10_multiplier": 0.9030899869919435
+    },
+    {
+      "boosts": 15,
+      "tier": 1,
+      "multiplier": "32768",
+      "log10_multiplier": 4.515449934959718
+    },
+    {
+      "boosts": 15,
+      "tier": 2,
+      "multiplier": "16384",
+      "log10_multiplier": 4.214419939295737
+    },
+    {
+      "boosts": 15,
+      "tier": 3,
+      "multiplier": "8192",
+      "log10_multiplier": 3.9133899436317554
+    },
+    {
+      "boosts": 15,
+      "tier": 4,
+      "multiplier": "4096",
+      "log10_multiplier": 3.612359947967774
+    },
+    {
+      "boosts": 15,
+      "tier": 5,
+      "multiplier": "2048",
+      "log10_multiplier": 3.3113299523037933
+    },
+    {
+      "boosts": 15,
+      "tier": 6,
+      "multiplier": "1024",
+      "log10_multiplier": 3.010299956639812
+    },
+    {
+      "boosts": 15,
+      "tier": 7,
+      "multiplier": "512",
+      "log10_multiplier": 2.709269960975831
+    },
+    {
+      "boosts": 15,
+      "tier": 8,
+      "multiplier": "256",
+      "log10_multiplier": 2.4082399653118496
+    },
+    {
+      "boosts": 20,
+      "tier": 1,
+      "multiplier": "1048576",
+      "log10_multiplier": 6.020599913279624
+    },
+    {
+      "boosts": 20,
+      "tier": 2,
+      "multiplier": "524288",
+      "log10_multiplier": 5.719569917615643
+    },
+    {
+      "boosts": 20,
+      "tier": 3,
+      "multiplier": "262144",
+      "log10_multiplier": 5.418539921951662
+    },
+    {
+      "boosts": 20,
+      "tier": 4,
+      "multiplier": "131072",
+      "log10_multiplier": 5.11750992628768
+    },
+    {
+      "boosts": 20,
+      "tier": 5,
+      "multiplier": "65536",
+      "log10_multiplier": 4.816479930623699
+    },
+    {
+      "boosts": 20,
+      "tier": 6,
+      "multiplier": "32768",
+      "log10_multiplier": 4.515449934959718
+    },
+    {
+      "boosts": 20,
+      "tier": 7,
+      "multiplier": "16384",
+      "log10_multiplier": 4.214419939295737
+    },
+    {
+      "boosts": 20,
+      "tier": 8,
+      "multiplier": "8192",
+      "log10_multiplier": 3.9133899436317554
+    }
+  ],
+  "dimboost_requirements": [
+    {
+      "current_boosts": 0,
+      "required_tier": 4,
+      "required_amount": 20
+    },
+    {
+      "current_boosts": 1,
+      "required_tier": 5,
+      "required_amount": 20
+    },
+    {
+      "current_boosts": 2,
+      "required_tier": 6,
+      "required_amount": 20
+    },
+    {
+      "current_boosts": 3,
+      "required_tier": 7,
+      "required_amount": 20
+    },
+    {
+      "current_boosts": 4,
+      "required_tier": 8,
+      "required_amount": 20
+    },
+    {
+      "current_boosts": 5,
+      "required_tier": 8,
+      "required_amount": 35
+    },
+    {
+      "current_boosts": 6,
+      "required_tier": 8,
+      "required_amount": 50
+    },
+    {
+      "current_boosts": 10,
+      "required_tier": 8,
+      "required_amount": 110
+    },
+    {
+      "current_boosts": 15,
+      "required_tier": 8,
+      "required_amount": 185
+    },
+    {
+      "current_boosts": 20,
+      "required_tier": 8,
+      "required_amount": 260
+    },
+    {
+      "current_boosts": 50,
+      "required_tier": 8,
+      "required_amount": 710
+    }
+  ],
+  "tickspeed_multiplier": [
+    {
+      "galaxies": 0,
+      "multiplier": "0.8892841262783459",
+      "multiplier_f64": 0.8892841262783459
+    },
+    {
+      "galaxies": 1,
+      "multiplier": "0.8737438005461273",
+      "multiplier_f64": 0.8737438005461273
+    },
+    {
+      "galaxies": 2,
+      "multiplier": "0.8587376394028582",
+      "multiplier_f64": 0.8587376394028582
+    },
+    {
+      "galaxies": 3,
+      "multiplier": "0.829015544041451",
+      "multiplier_f64": 0.829015544041451
+    },
+    {
+      "galaxies": 4,
+      "multiplier": "0.8",
+      "multiplier_f64": 0.8
+    },
+    {
+      "galaxies": 5,
+      "multiplier": "0.7719999999999999",
+      "multiplier_f64": 0.7719999999999999
+    },
+    {
+      "galaxies": 10,
+      "multiplier": "0.6460317568656121",
+      "multiplier_f64": 0.6460317568656121
+    },
+    {
+      "galaxies": 15,
+      "multiplier": "0.5406179156462038",
+      "multiplier_f64": 0.5406179156462038
+    },
+    {
+      "galaxies": 20,
+      "multiplier": "0.45240458787298216",
+      "multiplier_f64": 0.45240458787298216
+    },
+    {
+      "galaxies": 30,
+      "multiplier": "0.316810913632994",
+      "multiplier_f64": 0.316810913632994
+    },
+    {
+      "galaxies": 50,
+      "multiplier": "0.1553625714685281",
+      "multiplier_f64": 0.1553625714685281
+    }
+  ],
+  "galaxy_requirements": [
+    {
+      "galaxies": 0,
+      "required_tier": 8,
+      "required_amount": 80
+    },
+    {
+      "galaxies": 1,
+      "required_tier": 8,
+      "required_amount": 140
+    },
+    {
+      "galaxies": 2,
+      "required_tier": 8,
+      "required_amount": 200
+    },
+    {
+      "galaxies": 5,
+      "required_tier": 8,
+      "required_amount": 380
+    },
+    {
+      "galaxies": 10,
+      "required_tier": 8,
+      "required_amount": 680
+    },
+    {
+      "galaxies": 20,
+      "required_tier": 8,
+      "required_amount": 1280
+    },
+    {
+      "galaxies": 50,
+      "required_tier": 8,
+      "required_amount": 3080
+    },
+    {
+      "galaxies": 99,
+      "required_tier": 8,
+      "required_amount": 6020
+    }
+  ],
+  "sacrifice": {
+    "total_boost": [
+      {
+        "log10_sacrificed": 0,
+        "total_boost": "1",
+        "log10_total_boost": 0
+      },
+      {
+        "log10_sacrificed": 1,
+        "total_boost": "1",
+        "log10_total_boost": 0
+      },
+      {
+        "log10_sacrificed": 10,
+        "total_boost": "1",
+        "log10_total_boost": 0
+      },
+      {
+        "log10_sacrificed": 20,
+        "total_boost": "4",
+        "log10_total_boost": 0.6020599913279624
+      },
+      {
+        "log10_sacrificed": 50,
+        "total_boost": "25",
+        "log10_total_boost": 1.3979400086720375
+      },
+      {
+        "log10_sacrificed": 100,
+        "total_boost": "100",
+        "log10_total_boost": 2
+      },
+      {
+        "log10_sacrificed": 200,
+        "total_boost": "400",
+        "log10_total_boost": 2.6020599913279625
+      },
+      {
+        "log10_sacrificed": 1000,
+        "total_boost": "10000",
+        "log10_total_boost": 4
+      }
+    ],
+    "next_boost": [
+      {
+        "log10_ad1": 20,
+        "log10_sacrificed": 0,
+        "next_boost": "4"
+      },
+      {
+        "log10_ad1": 50,
+        "log10_sacrificed": 0,
+        "next_boost": "25"
+      },
+      {
+        "log10_ad1": 100,
+        "log10_sacrificed": 50,
+        "next_boost": "4"
+      },
+      {
+        "log10_ad1": 200,
+        "log10_sacrificed": 100,
+        "next_boost": "4"
+      },
+      {
+        "log10_ad1": 50,
+        "log10_sacrificed": 100,
+        "next_boost": "1"
+      },
+      {
+        "log10_ad1": 100,
+        "log10_sacrificed": 100,
+        "next_boost": "1"
+      },
+      {
+        "log10_ad1": 300,
+        "log10_sacrificed": 100,
+        "next_boost": "9"
+      }
+    ]
+  },
+  "dimension_multipliers": [
+    {
+      "tier": 1,
+      "boosts": 0,
+      "bought": 0,
+      "galaxies": 0,
+      "multiplier": "1",
+      "log10_multiplier": 0
+    },
+    {
+      "tier": 1,
+      "boosts": 0,
+      "bought": 10,
+      "galaxies": 0,
+      "multiplier": "2",
+      "log10_multiplier": 0.3010299956639812
+    },
+    {
+      "tier": 1,
+      "boosts": 4,
+      "bought": 20,
+      "galaxies": 0,
+      "multiplier": "64",
+      "log10_multiplier": 1.806179973983887
+    },
+    {
+      "tier": 1,
+      "boosts": 10,
+      "bought": 50,
+      "galaxies": 0,
+      "multiplier": "32768",
+      "log10_multiplier": 4.515449934959718
+    },
+    {
+      "tier": 4,
+      "boosts": 4,
+      "bought": 30,
+      "galaxies": 0,
+      "multiplier": "16",
+      "log10_multiplier": 1.2041199826559248
+    },
+    {
+      "tier": 8,
+      "boosts": 10,
+      "bought": 0,
+      "galaxies": 0,
+      "multiplier": "8",
+      "log10_multiplier": 0.9030899869919435
+    },
+    {
+      "tier": 8,
+      "boosts": 10,
+      "bought": 80,
+      "galaxies": 5,
+      "multiplier": "2048",
+      "log10_multiplier": 3.3113299523037933
+    }
+  ]
+}

@@ -67,9 +67,12 @@ impl GameState {
             let tier = 3 + self.dim_boosts as usize;
             (tier, DIM_BOOST_INITIAL_REQUIREMENT)
         } else {
+            // JS: targetResets = purchasedBoosts + 1
+            //     amount = 20 + round((targetResets - 5) * 15)
+            // In our terms: extra = dim_boosts - 4
             let extra = (self.dim_boosts - 4) as u64;
             let required = DIM_BOOST_INITIAL_REQUIREMENT
-                + (extra + 1) * DIM_BOOST_SCALING_REQUIREMENT;
+                + extra * DIM_BOOST_SCALING_REQUIREMENT;
             (7, required)
         }
     }
