@@ -1,31 +1,32 @@
 use break_infinity::Decimal;
 
+use crate::autobuyers::AutobuyerState;
 use crate::data::constants::{
-    AD_BASE_COSTS, AD_COST_MULTIPLIERS, INITIAL_ANTIMATTER, TICKSPEED_BASE_COST,
-    TICKSPEED_COST_MULTIPLIER,
+    INITIAL_ANTIMATTER, TICKSPEED_BASE_COST, TICKSPEED_COST_MULTIPLIER,
 };
 
 /// A single antimatter dimension tier.
 #[derive(Debug, Clone)]
 pub struct DimensionTier {
-    /// Current amount of this dimension (can be fractional due to production).
+    /// Current amount of this dimension (can be fractional due
+    /// to production).
     pub amount: Decimal,
     /// Number of individual purchases made.
     pub bought: u64,
-    /// Current cost to buy the next one.
-    pub cost: Decimal,
-    /// Cost multiplier applied per purchase.
-    pub cost_multiplier: Decimal,
 }
 
 impl DimensionTier {
-    pub fn new(base_cost: Decimal, cost_multiplier: Decimal) -> Self {
+    pub fn new() -> Self {
         Self {
             amount: Decimal::ZERO,
             bought: 0,
-            cost: base_cost,
-            cost_multiplier,
         }
+    }
+}
+
+impl Default for DimensionTier {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -69,20 +70,22 @@ pub struct GameState {
     pub dim_boosts: u32,
     /// Number of antimatter galaxies purchased.
     pub galaxies: u32,
-    /// Total antimatter sacrificed (cumulative across all sacrifices).
+    /// Total antimatter sacrificed (cumulative across all
+    /// sacrifices).
     pub sacrificed: Decimal,
-    /// Whether sacrifice is unlocked (requires 5th dimension to be unlocked).
+    /// Running product of all sacrifice boosts applied to the
+    /// 8th dimension.
+    pub sacrifice_boost: Decimal,
+    /// Whether sacrifice is unlocked (requires 5th dimension
+    /// to be unlocked).
     pub sacrifice_unlocked: bool,
+    /// Autobuyer state for dimensions and tickspeed.
+    pub autobuyers: AutobuyerState,
 }
 
 impl GameState {
     pub fn new() -> Self {
-        let dimensions = std::array::from_fn(|i| {
-            DimensionTier::new(
-                Decimal::from_float(AD_BASE_COSTS[i]),
-                Decimal::from_float(AD_COST_MULTIPLIERS[i]),
-            )
-        });
+        let dimensions = std::array::from_fn(|_| DimensionTier::new());
 
         Self {
             antimatter: Decimal::from_float(INITIAL_ANTIMATTER),
@@ -91,7 +94,9 @@ impl GameState {
             dim_boosts: 0,
             galaxies: 0,
             sacrificed: Decimal::ZERO,
+            sacrifice_boost: Decimal::ONE,
             sacrifice_unlocked: false,
+            autobuyers: AutobuyerState::new(),
         }
     }
 

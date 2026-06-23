@@ -8,6 +8,9 @@ impl GameState {
     /// Production chain: AD[n+1] produces AD[n], AD1 produces antimatter.
     /// All production is scaled by the dimension's multiplier and tickspeed effect.
     pub fn tick(&mut self, dt_ms: f64) {
+        // Run autobuyers before production
+        self.tick_autobuyers(dt_ms);
+
         let dt_seconds = dt_ms / 1000.0;
         let dt = Decimal::from_float(dt_seconds);
 

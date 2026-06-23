@@ -7,7 +7,7 @@ use super::constants::{AD_BASE_COSTS, AD_COST_MULTIPLIERS};
 pub struct DimensionConfig {
     /// Base cost to buy the first of this dimension.
     pub base_cost: Decimal,
-    /// Cost multiplier per purchase (cost *= this after each buy).
+    /// Cost multiplier per 10 purchases.
     pub cost_multiplier: Decimal,
 }
 

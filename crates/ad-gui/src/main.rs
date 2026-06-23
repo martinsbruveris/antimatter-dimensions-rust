@@ -53,7 +53,7 @@ impl App {
                     if ui
                         .button(format!(
                             "Buy ({})",
-                            format_cost(self.game.dimensions[tier].cost)
+                            format_cost(self.game.dimension_cost(tier))
                         ))
                         .clicked()
                     {

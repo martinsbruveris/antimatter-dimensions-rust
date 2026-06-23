@@ -37,8 +37,8 @@ fn test_buy_dimension_spends_antimatter() {
 #[test]
 fn test_cannot_buy_dimension_without_antimatter() {
     let mut game = GameState::new();
-    game.buy_dimension(0); // spend all 10
-    assert!(!game.buy_dimension(0)); // can't afford next (cost 10000)
+    game.buy_dimension(0); // spend 10 AM (now have 0)
+    assert!(!game.buy_dimension(0)); // can't afford (cost still 10, but 0 AM)
 }
 
 #[test]
@@ -50,13 +50,22 @@ fn test_cannot_buy_locked_dimension() {
 }
 
 #[test]
-fn test_cost_increases_after_purchase() {
+fn test_cost_increases_after_10_purchases() {
     let mut game = GameState::new();
-    let cost_before = game.dimensions[0].cost;
-    game.buy_dimension(0);
-    // AD1 cost multiplier is 1e3
-    let expected = cost_before * Decimal::from_float(1e3);
-    assert_eq!(game.dimensions[0].cost, expected);
+    game.antimatter = Decimal::from_float(1e30);
+
+    // AD1 base cost is 10, cost multiplier is 1e3
+    // Purchases 1-10 should all cost 10
+    let cost_first = game.dimension_cost(0);
+    assert_eq!(cost_first, Decimal::from_float(10.0));
+
+    for _ in 0..10 {
+        game.buy_dimension(0);
+    }
+
+    // After 10 purchases, cost should jump to 10 * 1e3 = 10000
+    let cost_after_10 = game.dimension_cost(0);
+    assert_eq!(cost_after_10, Decimal::from_float(10_000.0));
 }
 
 #[test]
@@ -64,7 +73,10 @@ fn test_buy_max_dimension() {
     let mut game = GameState::new();
     game.antimatter = Decimal::from_float(1e6);
     let bought = game.buy_max_dimension(0);
-    assert!(bought >= 2); // Should afford at least 2 (cost 10, then 10000)
+    // With per-10 pricing: first 10 cost 10 each (100 total),
+    // next 10 cost 10000 each (100000 total), etc.
+    // Should buy at least 20
+    assert!(bought >= 20);
     assert_eq!(game.dimensions[0].bought, bought);
 }
 
@@ -173,8 +185,8 @@ fn test_cannot_dim_boost_initially() {
 #[test]
 fn test_dim_boost_unlocks_5th_dimension() {
     let mut game = GameState::new();
-    // Directly set 20 bought on 4th dimension (index 3) to meet requirement
-    game.dimensions[3].bought = 20;
+    // Set 20 amount on 4th dimension (index 3) to meet requirement
+    game.dimensions[3].amount = Decimal::from_float(20.0);
 
     assert!(game.can_dim_boost());
     assert!(game.buy_dim_boost());
@@ -186,8 +198,8 @@ fn test_dim_boost_unlocks_5th_dimension() {
 #[test]
 fn test_dim_boost_resets_dimensions() {
     let mut game = GameState::new();
-    // Set up enough to dim boost
-    game.dimensions[3].bought = 20;
+    // Set up enough to dim boost (need 20 amount of dim 4)
+    game.dimensions[3].amount = Decimal::from_float(20.0);
     game.dimensions[0].bought = 5;
     game.dimensions[0].amount = Decimal::from_float(10.0);
 
@@ -203,17 +215,20 @@ fn test_dim_boost_resets_dimensions() {
 #[test]
 fn test_dim_boost_multiplier_effect() {
     let mut game = GameState::new();
-    // No boosts: multiplier should be 1.0
+    // No boosts: multiplier should be 1.0 for all tiers
     assert_eq!(game.dimension_multiplier(0), Decimal::from_float(1.0));
 
-    // Simulate having 1 boost
+    // 1 boost: AD1 (tier 0) = 2^max(0, 1-0) = 2^1 = 2
     game.dim_boosts = 1;
-    // Should be 2.0 (2^1)
     assert_eq!(game.dimension_multiplier(0), Decimal::from_float(2.0));
+    // AD2 (tier 1) = 2^max(0, 1-1) = 2^0 = 1
+    assert_eq!(game.dimension_multiplier(1), Decimal::from_float(1.0));
 
-    game.dim_boosts = 3;
-    // Should be 8.0 (2^3)
-    assert_eq!(game.dimension_multiplier(0), Decimal::from_float(8.0));
+    // 4 boosts: AD1 = 2^4 = 16, AD4 = 2^1 = 2, AD5 = 2^0 = 1
+    game.dim_boosts = 4;
+    assert_eq!(game.dimension_multiplier(0), Decimal::from_float(16.0));
+    assert_eq!(game.dimension_multiplier(3), Decimal::from_float(2.0));
+    assert_eq!(game.dimension_multiplier(4), Decimal::from_float(1.0));
 }
 
 // ============================================================
@@ -258,7 +273,7 @@ fn test_galaxy_resets_state() {
     let mut game = GameState::new();
     game.antimatter = Decimal::from_float(1e30);
     game.dim_boosts = 5;
-    game.dimensions[7].bought = 80;
+    game.dimensions[7].amount = Decimal::from_float(80.0);
     game.dimensions[0].amount = Decimal::from_float(1000.0);
 
     assert!(game.buy_galaxy());
@@ -310,10 +325,16 @@ fn test_sacrifice_resets_lower_dimensions() {
 #[test]
 fn test_sacrifice_multiplier_increases_with_amount() {
     let mut game = GameState::new();
-    game.sacrificed = Decimal::from_float(100.0);
+    game.sacrifice_unlocked = true;
+
+    // First sacrifice with AD1 = 1e20
+    game.dimensions[0].amount = Decimal::from_float(1e20);
+    game.sacrifice();
     let mult1 = game.sacrifice_multiplier();
 
-    game.sacrificed = Decimal::from_float(10000.0);
+    // Second sacrifice with AD1 = 1e40
+    game.dimensions[0].amount = Decimal::from_float(1e40);
+    game.sacrifice();
     let mult2 = game.sacrifice_multiplier();
 
     assert!(mult2 > mult1);

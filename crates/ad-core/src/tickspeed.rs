@@ -1,8 +1,8 @@
 use break_infinity::Decimal;
 
 use crate::data::constants::{
-    GALAXY_TICKSPEED_REDUCTION, INITIAL_TICKSPEED_MS, TICKSPEED_MULTIPLIER,
-    TICKSPEED_MULTIPLIER_MIN,
+    GALAXY_TICKSPEED_REDUCTION, INITIAL_TICKSPEED_MS, TICKSPEED_BASE_MULTIPLIERS,
+    TICKSPEED_GALAXY_BASE, TICKSPEED_GALAXY_DECAY, TICKSPEED_MULTIPLIER_MIN,
 };
 use crate::state::GameState;
 
@@ -31,24 +31,39 @@ impl GameState {
 
     /// Compute the current tickspeed in milliseconds.
     /// Formula: INITIAL_TICKSPEED_MS * multiplier^bought
-    /// where multiplier = max(TICKSPEED_MULTIPLIER - galaxies * GALAXY_TICKSPEED_REDUCTION,
-    ///                        TICKSPEED_MULTIPLIER_MIN)
     pub fn current_tickspeed_ms(&self) -> f64 {
         let multiplier = self.tickspeed_purchase_multiplier();
         INITIAL_TICKSPEED_MS * multiplier.powi(self.tickspeed.bought as i32)
     }
 
-    /// The per-purchase tickspeed multiplier (fraction retained per purchase).
-    /// Reduced by galaxies.
+    /// The per-purchase tickspeed multiplier (fraction of
+    /// current tickspeed retained per purchase). Uses two
+    /// formulas depending on galaxy count:
+    ///
+    /// Pre-3 galaxies (linear):
+    ///   base_mult[galaxies] - galaxies * 0.02
+    ///
+    /// 3+ galaxies (exponential):
+    ///   0.8 * 0.965^(galaxies - 4)
     pub fn tickspeed_purchase_multiplier(&self) -> f64 {
-        let reduction = self.galaxies as f64 * GALAXY_TICKSPEED_REDUCTION;
-        (TICKSPEED_MULTIPLIER - reduction).max(TICKSPEED_MULTIPLIER_MIN)
+        let galaxies = self.galaxies as f64;
+
+        if self.galaxies < 3 {
+            let base = TICKSPEED_BASE_MULTIPLIERS[self.galaxies as usize];
+            (base - galaxies * GALAXY_TICKSPEED_REDUCTION).max(TICKSPEED_MULTIPLIER_MIN)
+        } else {
+            // adjusted = galaxies - 2, then decay^(adjusted-2)
+            // = decay^(galaxies - 4)
+            let adjusted = galaxies - 2.0;
+            (TICKSPEED_GALAXY_BASE * TICKSPEED_GALAXY_DECAY.powf(adjusted - 2.0))
+                .max(TICKSPEED_MULTIPLIER_MIN)
+        }
     }
 
-    /// Compute the effective production multiplier from tickspeed.
-    /// Production is inversely proportional to tickspeed interval:
-    /// effect = INITIAL_TICKSPEED_MS / current_tickspeed_ms
-    /// This means if tickspeed is 500ms (half of 1000ms), production is 2x.
+    /// Compute the effective production multiplier from
+    /// tickspeed. Production is inversely proportional to
+    /// tickspeed interval:
+    ///   effect = INITIAL_TICKSPEED_MS / current_tickspeed_ms
     pub fn tickspeed_effect(&self) -> Decimal {
         let current = self.current_tickspeed_ms();
         if current <= 0.0 {
