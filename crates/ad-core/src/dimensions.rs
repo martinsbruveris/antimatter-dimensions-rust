@@ -46,6 +46,46 @@ impl GameState {
         count
     }
 
+    /// Buy dimensions until the next group of 10 is complete.
+    /// Returns the number bought.
+    pub fn buy_until_10_dimension(&mut self, tier: usize) -> u64 {
+        if tier >= 8 || !self.is_dimension_unlocked(tier) {
+            return 0;
+        }
+        let remaining = 10 - (self.dimensions[tier].bought % 10);
+        let mut count = 0u64;
+        for _ in 0..remaining {
+            if !self.buy_dimension(tier) {
+                break;
+            }
+            count += 1;
+        }
+        count
+    }
+
+    /// Compute the cost to buy until the next group of 10
+    /// for a dimension tier. Since cost only changes every
+    /// 10 purchases, all remaining buys in this group cost
+    /// the same.
+    pub fn dimension_cost_until_10(&self, tier: usize) -> Decimal {
+        let remaining = 10 - (self.dimensions[tier].bought % 10);
+        self.dimension_cost(tier) * Decimal::from_float(remaining as f64)
+    }
+
+    /// Get the antimatter production per second (from AD1).
+    pub fn antimatter_per_second(&self) -> Decimal {
+        self.dimension_production_per_second(0)
+    }
+
+    /// Buy max of all unlocked dimensions and tickspeed.
+    pub fn max_all(&mut self) {
+        self.buy_max_tickspeed();
+        let unlocked = self.unlocked_dimensions();
+        for tier in 0..unlocked {
+            self.buy_max_dimension(tier);
+        }
+    }
+
     /// Compute the production multiplier for a given dimension
     /// tier (0-indexed). Includes:
     /// - Buy-10 multiplier (2x per 10 purchases)

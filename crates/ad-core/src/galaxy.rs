@@ -71,8 +71,8 @@ impl GameState {
             //     amount = 20 + round((targetResets - 5) * 15)
             // In our terms: extra = dim_boosts - 4
             let extra = (self.dim_boosts - 4) as u64;
-            let required = DIM_BOOST_INITIAL_REQUIREMENT
-                + extra * DIM_BOOST_SCALING_REQUIREMENT;
+            let required =
+                DIM_BOOST_INITIAL_REQUIREMENT + extra * DIM_BOOST_SCALING_REQUIREMENT;
             (7, required)
         }
     }
