@@ -8,71 +8,72 @@
 </head>
 <body>
     <div id="app">
-        <!-- Header -->
-        <div class="header">
-            <div class="antimatter-display">
-                <span class="prefix">You have </span>
-                <span id="antimatter" class="antimatter-value">0</span>
-                <span class="prefix"> antimatter.</span>
-            </div>
-            <div id="antimatter-per-sec" class="per-sec">
+        <!-- Header: Antimatter display -->
+        <div class="c-prestige-button-container">
+            <span>You have
+                <span id="antimatter" class="c-game-header__antimatter">0</span>
+                antimatter.
+            </span>
+            <div id="antimatter-per-sec" class="c-game-header__per-sec">
                 You are getting 0 antimatter per second.
             </div>
-            <div class="tickspeed-info">
+            <div class="c-game-header__tickspeed-row">
                 <span id="tickspeed-mult-info"></span>
                 <span id="tickspeed-total-info"></span>
             </div>
         </div>
 
-        <div class="separator"></div>
+        <div class="c-separator"></div>
 
-        <!-- Sacrifice & Max All -->
-        <div class="action-bar">
-            <div id="buy10-mult-info" class="info-text"></div>
-            <div class="action-buttons">
-                <button id="btn-sacrifice" class="btn btn-sacrifice" style="display: none;">
-                    Dimensional Sacrifice
+        <!-- Sacrifice + Max All row (modes-container) -->
+        <div class="modes-container">
+            <button id="btn-sacrifice" class="o-primary-btn o-primary-btn--sacrifice" style="display: none;">
+                Dimensional Sacrifice
+            </button>
+            <button id="btn-max-all" class="o-primary-btn l-button-container" onclick="maxAll()">
+                Max All (M)
+            </button>
+        </div>
+        <div id="multiplier-text" class="multiplier-text"></div>
+
+        <!-- Tickspeed row -->
+        <div class="l-tickspeed-container">
+            <div class="tickspeed-buttons">
+                <button id="btn-tickspeed" class="o-primary-btn tickspeed-btn" onclick="buyTickspeed()">
+                    Tickspeed Cost: 0
                 </button>
-                <button id="btn-max-all" class="btn btn-action" onclick="maxAll()">
-                    Max all (M)
+                <button id="btn-max-tickspeed" class="o-primary-btn tickspeed-max-btn" onclick="buyMaxTickspeed()">
+                    Buy Max
                 </button>
             </div>
         </div>
 
-        <!-- Tickspeed row -->
-        <div class="tickspeed-row">
-            <button id="btn-tickspeed" class="btn btn-tickspeed" onclick="buyTickspeed()">
-                Tickspeed Cost: 0
-            </button>
-            <button id="btn-max-tickspeed" class="btn btn-action" onclick="buyMaxTickspeed()">
-                Buy Max
-            </button>
-        </div>
-
-        <div class="separator"></div>
+        <div class="c-separator"></div>
 
         <!-- Dimensions -->
-        <div id="dimensions" class="dimensions-grid">
+        <div id="dimensions" class="l-dimensions-container">
             <!-- Populated by JS -->
         </div>
 
-        <div class="separator"></div>
+        <div class="c-separator"></div>
 
-        <!-- Prestige rows -->
-        <div class="prestige-section">
-            <div class="prestige-row">
-                <div class="prestige-info">
-                    <span id="dim-boost-info"></span>
-                </div>
-                <button id="btn-dim-boost" class="btn btn-prestige" onclick="buyDimBoost()">
+        <!-- Prestige: Dim Boost + Galaxy -->
+        <div class="resets-container">
+            <div class="reset-container dimboost">
+                <h4 id="dim-boost-info">Dimension Boost (0)</h4>
+                <span id="dim-boost-req"></span>
+                <button id="btn-dim-boost"
+                    class="o-primary-btn o-primary-btn--new o-primary-btn--dimension-reset"
+                    onclick="buyDimBoost()">
                     Reset your Dimensions to boost
                 </button>
             </div>
-            <div class="prestige-row">
-                <div class="prestige-info">
-                    <span id="galaxy-info"></span>
-                </div>
-                <button id="btn-galaxy" class="btn btn-prestige" onclick="buyGalaxy()">
+            <div class="reset-container galaxy">
+                <h4 id="galaxy-info">Antimatter Galaxies (0)</h4>
+                <span id="galaxy-req"></span>
+                <button id="btn-galaxy"
+                    class="o-primary-btn o-primary-btn--new o-primary-btn--dimension-reset"
+                    onclick="buyGalaxy()">
                     Reset your Dimensions and Boosts to increase Tickspeed power
                 </button>
             </div>

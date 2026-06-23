@@ -12,30 +12,45 @@ const antimatterEl = document.getElementById("antimatter");
 const perSecEl = document.getElementById("antimatter-per-sec");
 const tickspeedMultInfo = document.getElementById("tickspeed-mult-info");
 const tickspeedTotalInfo = document.getElementById("tickspeed-total-info");
-const buy10MultInfo = document.getElementById("buy10-mult-info");
+const multiplierText = document.getElementById("multiplier-text");
 const btnSacrifice = document.getElementById("btn-sacrifice");
 const btnTickspeed = document.getElementById("btn-tickspeed");
 const btnDimBoost = document.getElementById("btn-dim-boost");
 const dimBoostInfo = document.getElementById("dim-boost-info");
+const dimBoostReq = document.getElementById("dim-boost-req");
 const btnGalaxy = document.getElementById("btn-galaxy");
 const galaxyInfo = document.getElementById("galaxy-info");
+const galaxyReq = document.getElementById("galaxy-req");
 const dimensionsContainer = document.getElementById("dimensions");
 
-// --- Build initial dimension rows ---
+// --- Build dimension rows using the original game's 7-column grid layout ---
 function buildDimensionRows() {
     let html = "";
     for (let i = 0; i < 8; i++) {
         html += `
-        <div class="dim-row" id="dim-row-${i}">
-            <div class="dim-name" id="dim-name-${i}"></div>
-            <div class="dim-amount" id="dim-amount-${i}"></div>
-            <div class="dim-rate" id="dim-rate-${i}"></div>
-            <div class="dim-buttons">
-                <button class="btn-dim" id="btn-dim-buy-${i}" onclick="buyDim(${i})">
-                    Cost: 0
-                </button>
-                <button class="btn-dim" id="btn-dim-buy10-${i}" onclick="buyUntil10(${i})">
-                    Until 10: 0
+        <div class="c-dimension-row l-dimension-single-row c-antimatter-dim-row" id="dim-row-${i}">
+            <div class="l-dimension-text-container">
+                <div class="l-dim-row-text-box">
+                    <span class="c-dim-row__name" id="dim-name-${i}">
+                        ${DIM_NAMES[i]} Antimatter Dimension
+                    </span>
+                    <span class="c-dim-row__multiplier" id="dim-mult-${i}"></span>
+                </div>
+                <div class="l-dim-row-text-box">
+                    <span class="c-dim-row__amount" id="dim-amount-${i}"></span>
+                    <span class="c-dim-row__rate" id="dim-rate-${i}"></span>
+                </div>
+            </div>
+            <div class="l-dim-row-multi-button-container">
+                <button class="o-primary-btn o-primary-btn--new" id="btn-dim-${i}" onclick="buyDim(${i})">
+                    <div class="button-content" id="btn-dim-content-${i}">
+                        <div id="btn-dim-prefix-${i}">Buy 1</div>
+                        <div id="btn-dim-cost-${i}">Cost: 0</div>
+                    </div>
+                    <div class="fill" id="btn-dim-fill-${i}">
+                        <div class="fill-purchased" id="btn-dim-fill-purchased-${i}" style="width: 0%"></div>
+                        <div class="fill-possible" id="btn-dim-fill-possible-${i}" style="width: 0%"></div>
+                    </div>
                 </button>
             </div>
         </div>`;
@@ -54,26 +69,26 @@ function render(state) {
 
     const effectPerUpgrade = (1.0 / state.tickspeed_purchase_multiplier).toFixed(3);
     tickspeedMultInfo.textContent =
-        `ADs produce ${effectPerUpgrade}x faster per Tickspeed upgrade`;
+        `${effectPerUpgrade}x faster / upgrade.`;
     tickspeedTotalInfo.textContent =
-        `Total Tickspeed: ${state.tickspeed_effect} / sec`;
+        `Tickspeed: ${state.tickspeed_effect} / sec`;
 
-    // Sacrifice & Max All info
-    let infoText = "Buy 10 Dimension purchase multiplier: 2.00x";
+    // Multiplier text
+    let mText = `Buy 10 Dimension purchase multiplier: ×2.00`;
     if (state.sacrifice_unlocked) {
-        infoText += ` | Dimensional Sacrifice multiplier: ×${state.sacrifice_multiplier}`;
+        mText += ` | Dimensional Sacrifice multiplier: ×${state.sacrifice_multiplier}`;
     }
-    buy10MultInfo.textContent = infoText;
+    multiplierText.textContent = mText;
 
     // Sacrifice button
     if (state.sacrifice_unlocked) {
         btnSacrifice.style.display = "";
         if (state.can_sacrifice) {
-            btnSacrifice.disabled = false;
+            btnSacrifice.classList.remove("o-primary-btn--disabled");
             btnSacrifice.textContent =
                 `Dimensional Sacrifice (×${state.sacrifice_multiplier_if_sacrificed})`;
         } else {
-            btnSacrifice.disabled = true;
+            btnSacrifice.classList.add("o-primary-btn--disabled");
             btnSacrifice.textContent =
                 "Dimensional Sacrifice Disabled (no dimensions)";
         }
@@ -83,7 +98,11 @@ function render(state) {
 
     // Tickspeed
     btnTickspeed.textContent = `Tickspeed Cost: ${state.tickspeed_cost}`;
-    btnTickspeed.disabled = !state.can_buy_tickspeed;
+    if (state.can_buy_tickspeed) {
+        btnTickspeed.classList.remove("o-primary-btn--disabled");
+    } else {
+        btnTickspeed.classList.add("o-primary-btn--disabled");
+    }
 
     // Dimensions
     for (let i = 0; i < 8; i++) {
@@ -92,45 +111,61 @@ function render(state) {
         const unlocked = i < state.unlocked_dimensions;
 
         if (!unlocked) {
-            row.classList.add("locked");
-            document.getElementById(`dim-name-${i}`).textContent =
-                `${DIM_NAMES[i]} Antimatter Dimension`;
+            row.classList.add("c-dim-row--not-reached");
+            document.getElementById(`dim-mult-${i}`).textContent = "";
             document.getElementById(`dim-amount-${i}`).textContent = "";
             document.getElementById(`dim-rate-${i}`).textContent = "";
-            document.getElementById(`btn-dim-buy-${i}`).disabled = true;
-            document.getElementById(`btn-dim-buy-${i}`).textContent = "Locked";
-            document.getElementById(`btn-dim-buy10-${i}`).disabled = true;
-            document.getElementById(`btn-dim-buy10-${i}`).textContent = "Locked";
+            const btn = document.getElementById(`btn-dim-${i}`);
+            btn.classList.add("o-primary-btn--disabled");
+            document.getElementById(`btn-dim-prefix-${i}`).textContent = "Locked";
+            document.getElementById(`btn-dim-cost-${i}`).textContent = "";
+            document.getElementById(`btn-dim-fill-purchased-${i}`).style.width = "0%";
+            document.getElementById(`btn-dim-fill-possible-${i}`).style.width = "0%";
             continue;
         }
 
-        row.classList.remove("locked");
-        document.getElementById(`dim-name-${i}`).textContent =
-            `${DIM_NAMES[i]} Antimatter Dimension  ×${dim.multiplier}`;
+        row.classList.remove("c-dim-row--not-reached");
+        document.getElementById(`dim-mult-${i}`).textContent = `×${dim.multiplier}`;
         document.getElementById(`dim-amount-${i}`).textContent =
             `${dim.amount} (${dim.bought_mod_10})`;
 
         if (i < 7 && dim.rate_percent > 0.01) {
             document.getElementById(`dim-rate-${i}`).textContent =
-                `+${dim.rate_percent.toFixed(2)}%/s`;
+                `(+${dim.rate_percent.toFixed(2)}%/s)`;
         } else {
             document.getElementById(`dim-rate-${i}`).textContent = "";
         }
 
-        const btnBuy = document.getElementById(`btn-dim-buy-${i}`);
-        btnBuy.textContent = `Cost: ${dim.cost}`;
-        btnBuy.disabled = !dim.can_buy;
+        const btn = document.getElementById(`btn-dim-${i}`);
+        const howMany = dim.can_buy_10 ? (10 - dim.bought_mod_10) : (dim.can_buy ? 1 : 0);
 
-        const btnBuy10 = document.getElementById(`btn-dim-buy10-${i}`);
-        btnBuy10.textContent = `Until 10: ${dim.cost_until_10}`;
-        btnBuy10.disabled = !dim.can_buy_10;
+        if (dim.can_buy) {
+            btn.classList.remove("o-primary-btn--disabled");
+        } else {
+            btn.classList.add("o-primary-btn--disabled");
+        }
+
+        document.getElementById(`btn-dim-prefix-${i}`).textContent =
+            `Buy ${howMany}`;
+        document.getElementById(`btn-dim-cost-${i}`).textContent =
+            `Cost: ${dim.cost_until_10} AM`;
+
+        // Fill bars: purchased shows bought_mod_10, possible shows how many can buy
+        document.getElementById(`btn-dim-fill-purchased-${i}`).style.width =
+            `${dim.bought_mod_10 * 10}%`;
+        document.getElementById(`btn-dim-fill-possible-${i}`).style.width =
+            `${howMany * 10}%`;
     }
 
     // Prestige - Dim Boost
-    dimBoostInfo.textContent =
-        `Dimension Boost (${state.dim_boosts}): requires ${state.dim_boost_req_amount} ` +
-        `${DIM_NAMES[state.dim_boost_req_tier]} Antimatter Dimensions`;
-    btnDimBoost.disabled = !state.can_dim_boost;
+    dimBoostInfo.textContent = `Dimension Boost (${state.dim_boosts})`;
+    dimBoostReq.textContent =
+        `Requires: ${state.dim_boost_req_amount} ${DIM_NAMES[state.dim_boost_req_tier]} Antimatter D`;
+    if (state.can_dim_boost) {
+        btnDimBoost.classList.remove("o-primary-btn--disabled");
+    } else {
+        btnDimBoost.classList.add("o-primary-btn--disabled");
+    }
     if (state.dim_boosts < 4) {
         btnDimBoost.textContent =
             `Reset to unlock ${DIM_NAMES[4 + state.dim_boosts]} Antimatter Dimension`;
@@ -139,10 +174,14 @@ function render(state) {
     }
 
     // Prestige - Galaxy
-    galaxyInfo.textContent =
-        `Antimatter Galaxies (${state.galaxies}): requires ` +
-        `${state.galaxy_requirement} 8th Antimatter Dimensions`;
-    btnGalaxy.disabled = !state.can_buy_galaxy;
+    galaxyInfo.textContent = `Antimatter Galaxies (${state.galaxies})`;
+    galaxyReq.textContent =
+        `Requires: ${state.galaxy_requirement} 8th Antimatter D`;
+    if (state.can_buy_galaxy) {
+        btnGalaxy.classList.remove("o-primary-btn--disabled");
+    } else {
+        btnGalaxy.classList.add("o-primary-btn--disabled");
+    }
 }
 
 // --- Game loop ---
