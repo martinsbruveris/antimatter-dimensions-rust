@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cmp::Ordering::{self, *};
 use std::f64::consts::{E, LN_10, LOG2_10, PI};
 use std::fmt;
@@ -47,33 +46,21 @@ fn power_of_10(power: i64) -> f64 {
 }
 
 /// Pads the given string with the fill string to the given max length.
-pub fn pad_end(string: String, max_length: u32, fill_string: &'static str) -> String {
-    if f32::is_nan(max_length as f32) || f32::is_infinite(max_length as f32) {
-        return string;
-    }
-
+pub fn pad_end(string: String, max_length: u32, fill_string: &str) -> String {
     let length = string.chars().count() as u32;
     if length >= max_length {
         return string;
     }
 
-    let mut filled = Cow::Borrowed(fill_string);
-    if filled.is_empty() {
-        filled = Cow::Borrowed(" ");
-    }
-
-    let fill_len = max_length - length;
-    while filled.chars().count() < fill_len as usize {
-        filled = Cow::Owned(format!("{}{}", filled, filled));
-    }
-
-    let truncated = if filled.chars().count() > fill_len as usize {
-        Cow::from(&filled[0..(fill_len as usize)])
+    let fill = if fill_string.is_empty() {
+        " "
     } else {
-        filled
+        fill_string
     };
+    let fill_len = (max_length - length) as usize;
+    let padding: String = fill.chars().cycle().take(fill_len).collect();
 
-    format!("{}{}", string, truncated)
+    format!("{}{}", string, padding)
 }
 
 /// Formats the given number to a string with given number of significant digits.
@@ -86,7 +73,7 @@ pub fn to_f64_fixed(num: f64, places: u32) -> f64 {
     to_str_fixed(num, places).parse::<f64>().unwrap()
 }
 
-/// A struct representing a decimal number, which can reach a maximum of 1e9e15 
+/// A struct representing a decimal number, which can reach a maximum of 1e9e15
 /// instead of `f64`'s maximum of 1.79e308.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -155,10 +142,7 @@ impl Add<Decimal> for Decimal {
         }
 
         Decimal::new(
-            (1e14 * larger.m)
-                + 1e14
-                    * smaller.m
-                    * power_of_10(smaller.e - larger.e),
+            (1e14 * larger.m) + 1e14 * smaller.m * power_of_10(smaller.e - larger.e),
             larger.e - 14,
         )
     }
@@ -923,7 +907,7 @@ impl Decimal {
         }
 
         let mut places = -(self.e as i32);
-        
+
         for i in 0..MAX_SIGNIFICANT_DIGITS {
             let scale = 10.0_f64.powi(i as i32);
             if ((self.m * scale).round() / scale - self.m).abs() <= ROUND_TOLERANCE {
