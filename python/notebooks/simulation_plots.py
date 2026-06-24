@@ -10,7 +10,8 @@ def _():
     import numpy as np
     import matplotlib.pyplot as plt
 
-    return mo, np, plt
+    dim_colors = plt.cm.Greys(np.linspace(1.0, 0.2, 8))
+    return dim_colors, mo, plt
 
 
 @app.cell
@@ -49,12 +50,12 @@ def _():
 
 
 @app.cell
-def _(np, result):
+def _(result):
     trace = result.trace
     time_s = trace.time_ms / 1000.0
     antimatter_log10 = trace.antimatter.e
-    dim_amounts_log10 = np.column_stack([d.amount.e for d in trace.dimensions])
-    dim_bought = np.column_stack([d.bought for d in trace.dimensions])
+    dim_amounts_log10 = trace.dimensions.amount.e
+    dim_bought = trace.dimensions.bought
     dim_boosts = trace.dim_boosts
     galaxies = trace.galaxies
     return (
@@ -73,58 +74,64 @@ def _(
     dim_amounts_log10,
     dim_boosts,
     dim_bought,
+    dim_colors,
     galaxies,
     plt,
     time_s,
 ):
-    fig, axes = plt.subplots(4, 1, figsize=(12, 14), sharex=True)
-
-    # Plot 1: Antimatter (log10)
-    ax = axes[0]
-    ax.plot(time_s, antimatter_log10, color="tab:purple")
-    ax.set_ylabel("log₁₀(antimatter)")
-    ax.set_title("Antimatter")
-    ax.grid(True, alpha=0.3)
-
-    # Plot 2: Dimension amounts (log10)
-    ax = axes[1]
-    for i in range(8):
-        col = dim_amounts_log10[:, i]
-        mask = col > 0
-        if mask.any():
-            ax.plot(time_s[mask], col[mask], label=f"Dim {i + 1}")
-    ax.set_ylabel("log₁₀(amount)")
-    ax.set_title("Dimension Amounts")
-    ax.legend(loc="upper left", ncol=4, fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    # Plot 3: Dimensions bought
-    ax = axes[2]
-    for i in range(8):
-        col = dim_bought[:, i]
-        ax.plot(time_s, col, label=f"Dim {i + 1}")
-    ax.set_ylabel("Bought")
-    ax.set_title("Dimension Purchases")
-    ax.legend(loc="upper left", ncol=4, fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    # Plot 4: Boosts and Galaxies
-    ax = axes[3]
-    ax.plot(time_s, dim_boosts, label="Dim Boosts", color="tab:orange")
-    ax.plot(time_s, galaxies, label="Galaxies", color="tab:blue")
-    ax.set_ylabel("Count")
-    ax.set_xlabel("Game Time (s)")
-    ax.set_title("Dimension Boosts & Galaxies")
-    ax.legend(loc="upper left")
-    ax.grid(True, alpha=0.3)
-
+    plt.figure(figsize=(12, 3))
+    plt.plot(time_s, antimatter_log10, color="k")
+    plt.ylabel("log₁₀(antimatter)")
+    plt.xlabel("Game Time (s)")
+    plt.title("Antimatter")
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    fig
-    return
+    plt.show()
 
+    plt.figure(figsize=(12, 3))
+    for _i in range(7, -1, -1):
+        plt.plot(
+            time_s,
+            dim_amounts_log10[:, _i],
+            label=f"Dim {_i + 1}",
+            color=dim_colors[_i],
+        )
+    plt.ylabel("log₁₀(amount)")
+    plt.xlabel("Game Time (s)")
+    plt.title("Dimension Amounts")
+    _h, _l = plt.gca().get_legend_handles_labels()
+    plt.legend(_h[::-1], _l[::-1], loc="upper left", ncol=4, fontsize=8)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
 
-@app.cell
-def _():
+    plt.figure(figsize=(12, 3))
+    for _i in range(7, -1, -1):
+        plt.plot(
+            time_s,
+            dim_bought[:, _i],
+            label=f"Dim {_i + 1}",
+            color=dim_colors[_i],
+        )
+    plt.ylabel("Bought")
+    plt.xlabel("Game Time (s)")
+    plt.title("Dimension Purchases")
+    _h, _l = plt.gca().get_legend_handles_labels()
+    plt.legend(_h[::-1], _l[::-1], loc="upper left", ncol=4, fontsize=8)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+    plt.figure(figsize=(12, 3))
+    plt.plot(time_s, dim_boosts, label="Dim Boosts", color="k")
+    plt.plot(time_s, galaxies, label="Galaxies", color="k", linestyle="--")
+    plt.ylabel("Count")
+    plt.xlabel("Game Time (s)")
+    plt.title("Dimension Boosts & Galaxies")
+    plt.legend(loc="upper left")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
     return
 
 

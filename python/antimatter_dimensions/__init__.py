@@ -13,7 +13,7 @@ from ._native import (
 from ._native import simulate as _simulate_native
 from .trace import (
     DecimalSeries,
-    DimensionTierTrace,
+    DimensionsTrace,
     TickspeedTrace,
     Trace,
 )
@@ -23,7 +23,7 @@ __all__ = [
     "DecimalArray",
     "DecimalSeries",
     "DimensionTier",
-    "DimensionTierTrace",
+    "DimensionsTrace",
     "GameState",
     "SimulationConfig",
     "SimulationResult",

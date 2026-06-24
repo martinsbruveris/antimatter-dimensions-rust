@@ -27,8 +27,11 @@ class DecimalSeries:
         return f"DecimalSeries(len={len(self)})"
 
 
-class DimensionTierTrace:
-    """Dimension tier vectorized across trace snapshots.
+class DimensionsTrace:
+    """All 8 dimension tiers vectorized across trace snapshots.
+
+    Arrays have shape (N, 8) where N is the number of snapshots
+    and columns are dimension tiers 1-8.
 
     Attributes:
         amount: Dimension amounts over time.
@@ -82,7 +85,7 @@ class Trace:
         tick: Tick numbers (uint64).
         time_ms: Game time in milliseconds (float64).
         antimatter: Antimatter amounts.
-        dimensions: List of 8 dimension tiers.
+        dimensions: All 8 dimension tiers (arrays shape (N, 8)).
         tickspeed: Tickspeed state.
         dim_boosts: Dimension boost counts (uint32).
         galaxies: Galaxy counts (uint32).
@@ -108,19 +111,21 @@ class Trace:
         self.tick = np.array([s.tick for s in snapshots], dtype=np.uint64)
         self.time_ms = np.array([s.time_ms for s in snapshots], dtype=np.float64)
         self.antimatter = _decimal_series(snapshots, lambda s: s.state.antimatter)
-        self.dimensions = [
-            DimensionTierTrace(
-                amount=_decimal_series(
-                    snapshots,
-                    lambda s, i=i: s.state.dimensions[i].amount,
+        self.dimensions = DimensionsTrace(
+            amount=DecimalSeries(
+                m=np.array(
+                    [[d.amount.m for d in s.state.dimensions] for s in snapshots]
                 ),
-                bought=np.array(
-                    [s.state.dimensions[i].bought for s in snapshots],
-                    dtype=np.uint64,
+                e=np.array(
+                    [[d.amount.e for d in s.state.dimensions] for s in snapshots],
+                    dtype=np.int64,
                 ),
-            )
-            for i in range(8)
-        ]
+            ),
+            bought=np.array(
+                [[d.bought for d in s.state.dimensions] for s in snapshots],
+                dtype=np.uint64,
+            ),
+        )
         self.tickspeed = TickspeedTrace(
             bought=np.array(
                 [s.state.tickspeed.bought for s in snapshots],
