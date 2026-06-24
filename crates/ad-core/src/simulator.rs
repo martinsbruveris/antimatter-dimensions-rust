@@ -1,10 +1,45 @@
+use std::time::Instant;
+
 use break_infinity::Decimal;
 
 use crate::data::constants::big_crunch_threshold;
+use crate::observed::ObservedState;
 use crate::state::GameState;
 use crate::strategy::{
     BuyPriority, DimensionOrder, PrestigeMode, PrestigeStep, StrategyConfig,
 };
+
+/// Conditions under which the simulation should stop.
+///
+/// Multiple conditions can be set simultaneously; the simulation
+/// stops as soon as any one is met. If no conditions are set,
+/// the simulation runs until the Big Crunch antimatter threshold
+/// is reached (the default).
+#[derive(Debug, Clone, Default)]
+pub struct StopCondition {
+    /// Stop when antimatter reaches this value.
+    /// Defaults to `big_crunch_threshold()` if `None`.
+    pub score: Option<Decimal>,
+    /// Stop after this many ticks.
+    pub max_ticks: Option<u64>,
+    /// Stop after this much game time (milliseconds).
+    pub max_game_time_ms: Option<f64>,
+    /// Stop after this much wall-clock time (milliseconds).
+    pub max_wall_time_ms: Option<f64>,
+}
+
+/// Indicates which condition caused the simulation to stop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StopReason {
+    /// Antimatter reached the score threshold.
+    ScoreReached,
+    /// The tick limit was reached.
+    MaxTicks,
+    /// The game-time limit was reached.
+    MaxGameTime,
+    /// The wall-clock time limit was reached.
+    MaxWallTime,
+}
 
 /// Configuration for a simulation run.
 #[derive(Debug, Clone)]
@@ -17,6 +52,8 @@ pub struct SimulationConfig {
     /// Actual count will be between this and 2x this.
     /// Set to 0 to disable tracing.
     pub snapshot_count: usize,
+    /// When to stop the simulation.
+    pub stop: StopCondition,
 }
 
 /// Result of a completed simulation.
@@ -26,8 +63,10 @@ pub struct SimulationResult {
     pub total_time_ms: f64,
     /// Number of simulation ticks executed.
     pub total_ticks: u64,
-    /// Final game state at end of simulation.
-    pub final_state: GameState,
+    /// Which condition caused the simulation to stop.
+    pub stop_reason: StopReason,
+    /// Final observed state at end of simulation.
+    pub final_state: ObservedState,
     /// State trace (adaptive resolution).
     pub trace: Vec<Snapshot>,
 }
@@ -37,7 +76,7 @@ pub struct SimulationResult {
 pub struct Snapshot {
     pub tick: u64,
     pub time_ms: f64,
-    pub state: GameState,
+    pub state: ObservedState,
 }
 
 /// Streaming downsampling buffer for state traces.
@@ -76,7 +115,7 @@ impl StateTrace {
         self.buffer.push(Snapshot {
             tick,
             time_ms,
-            state: state.clone(),
+            state: ObservedState::from_game_state(state),
         });
         self.next_record_tick = tick + self.interval;
 
@@ -127,7 +166,12 @@ impl PlanCursor {
     }
 }
 
-/// Run a complete simulation from a fresh game until Big Crunch.
+/// Run a complete simulation from a fresh game.
+///
+/// The simulation runs until one of the configured stop
+/// conditions is met (see [`StopCondition`]). If no conditions
+/// are set, it defaults to stopping at the Big Crunch antimatter
+/// threshold.
 pub fn simulate(config: &SimulationConfig) -> SimulationResult {
     let mut game = GameState::new();
     // Disable autobuyers — the strategy handles all purchases.
@@ -137,20 +181,46 @@ pub fn simulate(config: &SimulationConfig) -> SimulationResult {
     let mut ticks: u64 = 0;
     let mut cursor = PlanCursor::new();
     let mut trace = StateTrace::new(config.snapshot_count);
-    let threshold = big_crunch_threshold();
+
+    let score_threshold = config.stop.score.unwrap_or_else(big_crunch_threshold);
+
+    let wall_start = Instant::now();
 
     loop {
         // 1. Execute strategy (buy everything possible)
         execute_strategy(&mut game, &config.strategy, &mut cursor);
 
-        // 2. Check Big Crunch
-        if game.antimatter >= threshold {
-            return SimulationResult {
-                total_time_ms: time_ms,
-                total_ticks: ticks,
-                final_state: game,
-                trace: trace.into_snapshots(),
-            };
+        // 2. Check stop conditions
+        if game.antimatter >= score_threshold {
+            return make_result(time_ms, ticks, StopReason::ScoreReached, &game, trace);
+        }
+        if let Some(max) = config.stop.max_ticks {
+            if ticks >= max {
+                return make_result(time_ms, ticks, StopReason::MaxTicks, &game, trace);
+            }
+        }
+        if let Some(max) = config.stop.max_game_time_ms {
+            if time_ms >= max {
+                return make_result(
+                    time_ms,
+                    ticks,
+                    StopReason::MaxGameTime,
+                    &game,
+                    trace,
+                );
+            }
+        }
+        if let Some(max) = config.stop.max_wall_time_ms {
+            let elapsed = wall_start.elapsed().as_secs_f64() * 1000.0;
+            if elapsed >= max {
+                return make_result(
+                    time_ms,
+                    ticks,
+                    StopReason::MaxWallTime,
+                    &game,
+                    trace,
+                );
+            }
         }
 
         // 3. Record state (if it's time)
@@ -161,6 +231,22 @@ pub fn simulate(config: &SimulationConfig) -> SimulationResult {
         game.tick(config.tick_ms);
         time_ms += config.tick_ms;
         ticks += 1;
+    }
+}
+
+fn make_result(
+    time_ms: f64,
+    ticks: u64,
+    stop_reason: StopReason,
+    game: &GameState,
+    trace: StateTrace,
+) -> SimulationResult {
+    SimulationResult {
+        total_time_ms: time_ms,
+        total_ticks: ticks,
+        stop_reason,
+        final_state: ObservedState::from_game_state(game),
+        trace: trace.into_snapshots(),
     }
 }
 

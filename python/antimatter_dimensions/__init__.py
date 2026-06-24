@@ -1,6 +1,7 @@
 """Antimatter Dimensions simulation engine (Python bindings)."""
 
 from ._native import (
+    BIG_CRUNCH_THRESHOLD,
     Decimal,
     DecimalArray,
     DimensionTier,
@@ -19,6 +20,7 @@ from .trace import (
 )
 
 __all__ = [
+    "BIG_CRUNCH_THRESHOLD",
     "Decimal",
     "DecimalArray",
     "DecimalSeries",
@@ -42,6 +44,9 @@ class SimulationResult:
     Attributes:
         total_time_s: Total game time in seconds.
         total_ticks: Number of simulation ticks.
+        stop_reason: Which condition stopped the simulation.
+            One of "score_reached", "max_ticks",
+            "max_game_time", "max_wall_time".
         final_state: Full game state at end of simulation.
         trace: Vectorized state trace as numpy arrays.
     """
@@ -49,6 +54,7 @@ class SimulationResult:
     __slots__ = (
         "total_time_s",
         "total_ticks",
+        "stop_reason",
         "final_state",
         "trace",
     )
@@ -57,11 +63,13 @@ class SimulationResult:
         self,
         total_time_s: float,
         total_ticks: int,
+        stop_reason: str,
         final_state: GameState,
         trace: Trace,
     ) -> None:
         self.total_time_s = total_time_s
         self.total_ticks = total_ticks
+        self.stop_reason = stop_reason
         self.final_state = final_state
         self.trace = trace
 
@@ -69,6 +77,7 @@ class SimulationResult:
         return (
             f"SimulationResult(ticks={self.total_ticks}, "
             f"time={self.total_time_s:.1f}s, "
+            f"stop={self.stop_reason}, "
             f"trace_len={len(self.trace)})"
         )
 
@@ -86,6 +95,7 @@ def simulate(config: SimulationConfig) -> SimulationResult:
     return SimulationResult(
         total_time_s=native.total_time_s,
         total_ticks=native.total_ticks,
+        stop_reason=native.stop_reason,
         final_state=native.final_state,
         trace=Trace(native.trace),
     )

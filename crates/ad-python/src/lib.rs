@@ -23,6 +23,10 @@ fn simulate(config: PySimulationConfig) -> PySimulationResult {
 /// Antimatter Dimensions simulation engine.
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add(
+        "BIG_CRUNCH_THRESHOLD",
+        types::PyDecimal::from_big_crunch_threshold(),
+    )?;
     m.add_function(wrap_pyfunction!(simulate, m)?)?;
     m.add_class::<types::PyDecimal>()?;
     m.add_class::<types::PyDecimalArray>()?;

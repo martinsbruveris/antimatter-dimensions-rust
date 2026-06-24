@@ -1,4 +1,6 @@
-use ad_core::simulator::{simulate, SimulationConfig, StateTrace};
+use ad_core::simulator::{
+    simulate, SimulationConfig, StateTrace, StopCondition, StopReason,
+};
 use ad_core::strategy::{
     BuyPriority, DimensionOrder, PrestigeMode, PurchaseConfig, SacrificeConfig,
     StrategyConfig,
@@ -78,12 +80,14 @@ fn test_baseline_auto_reaches_crunch() {
         strategy: StrategyConfig::baseline(),
         tick_ms: 50.0,
         snapshot_count: 100,
+        stop: StopCondition::default(),
     };
 
     let result = simulate(&config);
 
     let threshold = Decimal::new(1.7976931348623157, 308);
     assert!(result.final_state.antimatter >= threshold);
+    assert_eq!(result.stop_reason, StopReason::ScoreReached);
     assert!(result.total_ticks > 0);
     assert!(result.total_time_ms > 0.0);
     // Auto strategy should buy several galaxies
@@ -119,11 +123,13 @@ fn test_cheapest_first_auto_reaches_crunch() {
         },
         tick_ms: 50.0,
         snapshot_count: 0,
+        stop: StopCondition::default(),
     };
 
     let result = simulate(&config);
     let threshold = Decimal::new(1.7976931348623157, 308);
     assert!(result.final_state.antimatter >= threshold);
+    assert_eq!(result.stop_reason, StopReason::ScoreReached);
 }
 
 #[test]
@@ -132,10 +138,110 @@ fn test_simulate_no_trace_when_zero_snapshots() {
         strategy: StrategyConfig::baseline(),
         tick_ms: 50.0,
         snapshot_count: 0,
+        stop: StopCondition::default(),
     };
 
     let result = simulate(&config);
     assert!(result.trace.is_empty());
     let threshold = Decimal::new(1.7976931348623157, 308);
     assert!(result.final_state.antimatter >= threshold);
+    assert_eq!(result.stop_reason, StopReason::ScoreReached);
+}
+
+// ============================================================
+// Stop condition tests
+// ============================================================
+
+#[test]
+fn test_stop_on_max_ticks() {
+    let config = SimulationConfig {
+        strategy: StrategyConfig::baseline(),
+        tick_ms: 50.0,
+        snapshot_count: 0,
+        stop: StopCondition {
+            max_ticks: Some(100),
+            ..StopCondition::default()
+        },
+    };
+
+    let result = simulate(&config);
+    assert_eq!(result.stop_reason, StopReason::MaxTicks);
+    assert_eq!(result.total_ticks, 100);
+    assert!((result.total_time_ms - 5000.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_stop_on_max_game_time() {
+    let config = SimulationConfig {
+        strategy: StrategyConfig::baseline(),
+        tick_ms: 50.0,
+        snapshot_count: 0,
+        stop: StopCondition {
+            max_game_time_ms: Some(2000.0),
+            ..StopCondition::default()
+        },
+    };
+
+    let result = simulate(&config);
+    assert_eq!(result.stop_reason, StopReason::MaxGameTime);
+    // 2000ms / 50ms = 40 ticks, check stops at tick 40
+    assert_eq!(result.total_ticks, 40);
+}
+
+#[test]
+fn test_stop_on_custom_score() {
+    let config = SimulationConfig {
+        strategy: StrategyConfig::baseline(),
+        tick_ms: 50.0,
+        snapshot_count: 0,
+        stop: StopCondition {
+            score: Some(Decimal::new(1.0, 50)),
+            ..StopCondition::default()
+        },
+    };
+
+    let result = simulate(&config);
+    assert_eq!(result.stop_reason, StopReason::ScoreReached);
+    assert!(result.final_state.antimatter >= Decimal::new(1.0, 50));
+    // A score of 1e50 is reached much earlier than Big Crunch
+    assert!(result.total_ticks < 100_000);
+}
+
+#[test]
+fn test_stop_on_wall_time() {
+    let config = SimulationConfig {
+        strategy: StrategyConfig::baseline(),
+        tick_ms: 50.0,
+        snapshot_count: 0,
+        stop: StopCondition {
+            // 0ms wall time — should stop almost immediately
+            max_wall_time_ms: Some(0.0),
+            ..StopCondition::default()
+        },
+    };
+
+    let result = simulate(&config);
+    // Wall time check happens after the first strategy
+    // execution, so at least one iteration runs.
+    assert_eq!(result.stop_reason, StopReason::MaxWallTime);
+}
+
+#[test]
+fn test_first_condition_wins() {
+    // Set both tick limit and game time limit, tick limit
+    // triggers first.
+    let config = SimulationConfig {
+        strategy: StrategyConfig::baseline(),
+        tick_ms: 50.0,
+        snapshot_count: 0,
+        stop: StopCondition {
+            max_ticks: Some(10),
+            max_game_time_ms: Some(1_000_000.0),
+            ..StopCondition::default()
+        },
+    };
+
+    let result = simulate(&config);
+    assert_eq!(result.stop_reason, StopReason::MaxTicks);
+    assert_eq!(result.total_ticks, 10);
 }

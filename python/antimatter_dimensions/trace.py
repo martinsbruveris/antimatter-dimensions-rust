@@ -36,13 +36,28 @@ class DimensionsTrace:
     Attributes:
         amount: Dimension amounts over time.
         bought: Number of purchases over time (uint64).
+        multiplier: Production multipliers over time.
+        production_per_second: Production rates over time.
     """
 
-    __slots__ = ("amount", "bought")
+    __slots__ = (
+        "amount",
+        "bought",
+        "multiplier",
+        "production_per_second",
+    )
 
-    def __init__(self, amount: DecimalSeries, bought: np.ndarray) -> None:
+    def __init__(
+        self,
+        amount: DecimalSeries,
+        bought: np.ndarray,
+        multiplier: DecimalSeries,
+        production_per_second: DecimalSeries,
+    ) -> None:
         self.amount = amount
         self.bought = bought
+        self.multiplier = multiplier
+        self.production_per_second = production_per_second
 
 
 class TickspeedTrace:
@@ -52,19 +67,31 @@ class TickspeedTrace:
         bought: Number of upgrades over time (uint64).
         cost: Cost of next upgrade over time.
         cost_multiplier: Cost multiplier over time.
+        tickspeed_ms: Tickspeed interval in ms (float64).
+        tickspeed_effect: Production multiplier from tickspeed.
     """
 
-    __slots__ = ("bought", "cost", "cost_multiplier")
+    __slots__ = (
+        "bought",
+        "cost",
+        "cost_multiplier",
+        "tickspeed_ms",
+        "tickspeed_effect",
+    )
 
     def __init__(
         self,
         bought: np.ndarray,
         cost: DecimalSeries,
         cost_multiplier: DecimalSeries,
+        tickspeed_ms: np.ndarray,
+        tickspeed_effect: DecimalSeries,
     ) -> None:
         self.bought = bought
         self.cost = cost
         self.cost_multiplier = cost_multiplier
+        self.tickspeed_ms = tickspeed_ms
+        self.tickspeed_effect = tickspeed_effect
 
 
 def _decimal_series(snapshots: list, accessor) -> DecimalSeries:
@@ -125,6 +152,30 @@ class Trace:
                 [[d.bought for d in s.state.dimensions] for s in snapshots],
                 dtype=np.uint64,
             ),
+            multiplier=DecimalSeries(
+                m=np.array(
+                    [[d.multiplier.m for d in s.state.dimensions] for s in snapshots]
+                ),
+                e=np.array(
+                    [[d.multiplier.e for d in s.state.dimensions] for s in snapshots],
+                    dtype=np.int64,
+                ),
+            ),
+            production_per_second=DecimalSeries(
+                m=np.array(
+                    [
+                        [d.production_per_second.m for d in s.state.dimensions]
+                        for s in snapshots
+                    ]
+                ),
+                e=np.array(
+                    [
+                        [d.production_per_second.e for d in s.state.dimensions]
+                        for s in snapshots
+                    ],
+                    dtype=np.int64,
+                ),
+            ),
         )
         self.tickspeed = TickspeedTrace(
             bought=np.array(
@@ -135,6 +186,14 @@ class Trace:
             cost_multiplier=_decimal_series(
                 snapshots,
                 lambda s: s.state.tickspeed.cost_multiplier,
+            ),
+            tickspeed_ms=np.array(
+                [s.state.tickspeed.tickspeed_ms for s in snapshots],
+                dtype=np.float64,
+            ),
+            tickspeed_effect=_decimal_series(
+                snapshots,
+                lambda s: s.state.tickspeed.tickspeed_effect,
             ),
         )
         self.dim_boosts = np.array(

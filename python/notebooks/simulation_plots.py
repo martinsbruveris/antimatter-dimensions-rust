@@ -6,12 +6,16 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
+    import time
+
     import marimo as mo
     import numpy as np
     import matplotlib.pyplot as plt
 
+    import antimatter_dimensions as ad
+
     dim_colors = plt.cm.Greys(np.linspace(1.0, 0.2, 8))
-    return dim_colors, mo, plt
+    return ad, dim_colors, mo, np, plt, time
 
 
 @app.cell
@@ -23,10 +27,7 @@ def _(mo):
 
 
 @app.cell
-def _():
-    import time
-
-    import antimatter_dimensions as ad
+def _(ad, time):
 
     strategy = ad.StrategyConfig()
     config = ad.SimulationConfig(strategy, snapshot_count=5_000)
@@ -58,12 +59,16 @@ def _(result):
     dim_bought = trace.dimensions.bought
     dim_boosts = trace.dim_boosts
     galaxies = trace.galaxies
+    tickspeed_bought = trace.tickspeed.bought
+    tickspeed_effect_log10 = trace.tickspeed.tickspeed_effect.e
     return (
         antimatter_log10,
         dim_amounts_log10,
         dim_boosts,
         dim_bought,
         galaxies,
+        tickspeed_bought,
+        tickspeed_effect_log10,
         time_s,
     )
 
@@ -77,10 +82,15 @@ def _(
     dim_colors,
     galaxies,
     plt,
+    tickspeed_bought,
+    tickspeed_effect_log10,
     time_s,
 ):
+    xlim = (0, time_s[-1] * 1.03)
+
     plt.figure(figsize=(12, 3))
     plt.plot(time_s, antimatter_log10, color="k")
+    plt.xlim(xlim)
     plt.ylabel("log₁₀(antimatter)")
     plt.xlabel("Game Time (s)")
     plt.title("Antimatter")
@@ -96,6 +106,7 @@ def _(
             label=f"Dim {_i + 1}",
             color=dim_colors[_i],
         )
+    plt.xlim(xlim)
     plt.ylabel("log₁₀(amount)")
     plt.xlabel("Game Time (s)")
     plt.title("Dimension Amounts")
@@ -113,6 +124,7 @@ def _(
             label=f"Dim {_i + 1}",
             color=dim_colors[_i],
         )
+    plt.xlim(xlim)
     plt.ylabel("Bought")
     plt.xlabel("Game Time (s)")
     plt.title("Dimension Purchases")
@@ -123,8 +135,27 @@ def _(
     plt.show()
 
     plt.figure(figsize=(12, 3))
+    plt.subplot(1, 2, 1)
+    plt.plot(time_s, tickspeed_effect_log10, color="k")
+    plt.xlim(xlim)
+    plt.ylabel("log₁₀(effect)")
+    plt.xlabel("Game Time (s)")
+    plt.title("Tickspeed Effect")
+    plt.grid(True, alpha=0.3)
+    plt.subplot(1, 2, 2)
+    plt.plot(time_s, tickspeed_bought, color="k")
+    plt.xlim(xlim)
+    plt.ylabel("Bought")
+    plt.xlabel("Game Time (s)")
+    plt.title("Tickspeed Upgrades Bought")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+    plt.figure(figsize=(12, 3))
     plt.plot(time_s, dim_boosts, label="Dim Boosts", color="k")
     plt.plot(time_s, galaxies, label="Galaxies", color="k", linestyle="--")
+    plt.xlim(xlim)
     plt.ylabel("Count")
     plt.xlabel("Game Time (s)")
     plt.title("Dimension Boosts & Galaxies")
@@ -132,6 +163,86 @@ def _(
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.show()
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ## Sacrifice Threshold Sweep
+    """)
+    return
+
+
+@app.cell
+def _(ad, np, plt):
+    thresholds = np.arange(1.5, 100.5, 0.5)
+    times = np.empty_like(thresholds)
+    MAX_TIME_S = 36_000.0
+
+    for _idx, _thresh in enumerate(thresholds):
+        _strategy = ad.StrategyConfig(sacrifice_threshold=_thresh)
+        _config = ad.SimulationConfig(
+            _strategy,
+            snapshot_count=0,
+            stop_score=ad.BIG_CRUNCH_THRESHOLD,
+            stop_max_game_time_s=MAX_TIME_S,
+        )
+        _result = ad.simulate(_config)
+        times[_idx] = _result.total_time_s
+
+    mask = times < MAX_TIME_S
+    thresholds = thresholds[mask]
+    times = times[mask]
+
+    plt.figure(figsize=(12, 4))
+    plt.plot(thresholds, times, color="k", linewidth=0.8)
+    plt.xlabel("Sacrifice Threshold (min gain ratio)")
+    plt.ylabel("Time to Big Crunch (s)")
+    plt.title("Sacrifice Threshold vs Time to Big Crunch")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+    return
+
+
+@app.cell
+def _(ad, np, plt):
+    def _func():
+        thresholds = np.arange(4, 8, 0.01)
+        times = np.empty_like(thresholds)
+        MAX_TIME_S = 36_000.0
+
+        for _idx, _thresh in enumerate(thresholds):
+            _strategy = ad.StrategyConfig(sacrifice_threshold=_thresh)
+            _config = ad.SimulationConfig(
+                _strategy,
+                snapshot_count=0,
+                stop_score=ad.BIG_CRUNCH_THRESHOLD,
+                stop_max_game_time_s=MAX_TIME_S,
+            )
+            _result = ad.simulate(_config)
+            times[_idx] = _result.total_time_s
+
+        mask = times < MAX_TIME_S
+        thresholds = thresholds[mask]
+        times = times[mask]
+
+        plt.figure(figsize=(12, 4))
+        plt.plot(thresholds, times, ".k")
+        plt.xlabel("Sacrifice Threshold (min gain ratio)")
+        plt.ylabel("Time to Big Crunch (s)")
+        plt.title("Sacrifice Threshold vs Time to Big Crunch")
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+    _func()
+    return
+
+
+@app.cell
+def _():
     return
 
 

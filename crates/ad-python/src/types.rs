@@ -1,7 +1,9 @@
 use pyo3::prelude::*;
 
-use ad_core::simulator::{SimulationConfig, SimulationResult};
-use ad_core::state::{DimensionTier, GameState, TickspeedState};
+use ad_core::observed::{ObservedDimensionTier, ObservedState, ObservedTickspeedState};
+use ad_core::simulator::{
+    SimulationConfig, SimulationResult, StopCondition, StopReason,
+};
 use ad_core::strategy::{
     BuyPriority, DimensionOrder, PrestigeMode, PrestigeStep, PurchaseConfig,
     SacrificeConfig, StrategyConfig,
@@ -43,6 +45,11 @@ impl PyDecimal {
             m: d.mantissa(),
             e: d.exponent(),
         }
+    }
+
+    pub fn from_big_crunch_threshold() -> Self {
+        let d = ad_core::data::constants::big_crunch_threshold();
+        Self::from_decimal(&d)
     }
 }
 
@@ -86,7 +93,7 @@ impl PyDecimalArray {
 // Game state types
 // ============================================================
 
-/// A single antimatter dimension tier.
+/// A single antimatter dimension tier with computed fields.
 #[pyclass(name = "DimensionTier")]
 #[derive(Debug, Clone)]
 pub struct PyDimensionTier {
@@ -96,18 +103,26 @@ pub struct PyDimensionTier {
     /// Number of individual purchases made.
     #[pyo3(get)]
     pub bought: u64,
+    /// Current production multiplier for this tier.
+    #[pyo3(get)]
+    pub multiplier: PyDecimal,
+    /// Production rate per second for this tier.
+    #[pyo3(get)]
+    pub production_per_second: PyDecimal,
 }
 
 impl PyDimensionTier {
-    fn from_core(tier: &DimensionTier) -> Self {
+    fn from_core(tier: &ObservedDimensionTier) -> Self {
         Self {
             amount: PyDecimal::from_decimal(&tier.amount),
             bought: tier.bought,
+            multiplier: PyDecimal::from_decimal(&tier.multiplier),
+            production_per_second: PyDecimal::from_decimal(&tier.production_per_second),
         }
     }
 }
 
-/// Tickspeed upgrade state.
+/// Tickspeed state with computed fields.
 #[pyclass(name = "TickspeedState")]
 #[derive(Debug, Clone)]
 pub struct PyTickspeedState {
@@ -120,21 +135,30 @@ pub struct PyTickspeedState {
     /// Cost multiplier per purchase.
     #[pyo3(get)]
     pub cost_multiplier: PyDecimal,
+    /// Current tickspeed interval in milliseconds.
+    #[pyo3(get)]
+    pub tickspeed_ms: f64,
+    /// Production multiplier from tickspeed.
+    #[pyo3(get)]
+    pub tickspeed_effect: PyDecimal,
 }
 
 impl PyTickspeedState {
-    fn from_core(ts: &TickspeedState) -> Self {
+    fn from_core(ts: &ObservedTickspeedState) -> Self {
         Self {
             bought: ts.bought,
             cost: PyDecimal::from_decimal(&ts.cost),
             cost_multiplier: PyDecimal::from_decimal(&ts.cost_multiplier),
+            tickspeed_ms: ts.tickspeed_ms,
+            tickspeed_effect: PyDecimal::from_decimal(&ts.tickspeed_effect),
         }
     }
 }
 
-/// Full game state.
+/// Observed game state with computed fields.
 ///
-/// Contains all mutable game state for pre-infinity gameplay.
+/// Contains all game state fields plus materialised computed
+/// values for analysis.
 #[pyclass(name = "GameState")]
 #[derive(Debug, Clone)]
 pub struct PyGameState {
@@ -144,7 +168,7 @@ pub struct PyGameState {
     /// All 8 antimatter dimension tiers.
     #[pyo3(get)]
     pub dimensions: Vec<PyDimensionTier>,
-    /// Tickspeed upgrade state.
+    /// Tickspeed state with computed fields.
     #[pyo3(get)]
     pub tickspeed: PyTickspeedState,
     /// Number of dimension boosts performed.
@@ -166,7 +190,7 @@ pub struct PyGameState {
 }
 
 impl PyGameState {
-    pub fn from_core(state: &GameState) -> Self {
+    pub fn from_core(state: &ObservedState) -> Self {
         Self {
             antimatter: PyDecimal::from_decimal(&state.antimatter),
             dimensions: state
@@ -338,6 +362,14 @@ fn parse_prestige_step(s: &str) -> PyResult<PrestigeStep> {
 ///     tick_ms: Time step in milliseconds (default 50.0).
 ///     snapshot_count: Approximate number of trace snapshots
 ///         (0 to disable). Actual count is between this and 2x.
+///     stop_score: Stop when antimatter reaches this Decimal
+///         value. None = Big Crunch default.
+///     stop_max_ticks: Stop after this many ticks. None = no
+///         limit.
+///     stop_max_game_time_s: Stop after this much game time in
+///         seconds. None = no limit.
+///     stop_max_wall_time_s: Stop after this much wall-clock
+///         time in seconds. None = no limit.
 #[pyclass(name = "SimulationConfig")]
 #[derive(Debug, Clone)]
 pub struct PySimulationConfig {
@@ -347,17 +379,45 @@ pub struct PySimulationConfig {
     pub tick_ms: f64,
     #[pyo3(get, set)]
     pub snapshot_count: usize,
+    #[pyo3(get, set)]
+    pub stop_score: Option<PyDecimal>,
+    #[pyo3(get, set)]
+    pub stop_max_ticks: Option<u64>,
+    #[pyo3(get, set)]
+    pub stop_max_game_time_s: Option<f64>,
+    #[pyo3(get, set)]
+    pub stop_max_wall_time_s: Option<f64>,
 }
 
 #[pymethods]
 impl PySimulationConfig {
     #[new]
-    #[pyo3(signature = (strategy, tick_ms = 50.0, snapshot_count = 500))]
-    fn new(strategy: PyStrategyConfig, tick_ms: f64, snapshot_count: usize) -> Self {
+    #[pyo3(signature = (
+        strategy,
+        tick_ms = 50.0,
+        snapshot_count = 500,
+        stop_score = None,
+        stop_max_ticks = None,
+        stop_max_game_time_s = None,
+        stop_max_wall_time_s = None,
+    ))]
+    fn new(
+        strategy: PyStrategyConfig,
+        tick_ms: f64,
+        snapshot_count: usize,
+        stop_score: Option<PyDecimal>,
+        stop_max_ticks: Option<u64>,
+        stop_max_game_time_s: Option<f64>,
+        stop_max_wall_time_s: Option<f64>,
+    ) -> Self {
         Self {
             strategy,
             tick_ms,
             snapshot_count,
+            stop_score,
+            stop_max_ticks,
+            stop_max_game_time_s,
+            stop_max_wall_time_s,
         }
     }
 }
@@ -368,6 +428,15 @@ impl PySimulationConfig {
             strategy: self.strategy.to_core(),
             tick_ms: self.tick_ms,
             snapshot_count: self.snapshot_count,
+            stop: StopCondition {
+                score: self
+                    .stop_score
+                    .as_ref()
+                    .map(|d| break_infinity::Decimal::new(d.m, d.e)),
+                max_ticks: self.stop_max_ticks,
+                max_game_time_ms: self.stop_max_game_time_s.map(|s| s * 1000.0),
+                max_wall_time_ms: self.stop_max_wall_time_s.map(|s| s * 1000.0),
+            },
         }
     }
 }
@@ -386,6 +455,9 @@ pub struct PySimulationResult {
     /// Number of simulation ticks.
     #[pyo3(get)]
     pub total_ticks: u64,
+    /// Which condition caused the simulation to stop.
+    #[pyo3(get)]
+    pub stop_reason: String,
     /// Full game state at end of simulation.
     #[pyo3(get)]
     pub final_state: PyGameState,
@@ -396,9 +468,17 @@ pub struct PySimulationResult {
 
 impl PySimulationResult {
     pub fn from_core(result: SimulationResult) -> Self {
+        let stop_reason = match result.stop_reason {
+            StopReason::ScoreReached => "score_reached",
+            StopReason::MaxTicks => "max_ticks",
+            StopReason::MaxGameTime => "max_game_time",
+            StopReason::MaxWallTime => "max_wall_time",
+        }
+        .to_string();
         Self {
             total_time_s: result.total_time_ms / 1000.0,
             total_ticks: result.total_ticks,
+            stop_reason,
             final_state: PyGameState::from_core(&result.final_state),
             trace: result
                 .trace
