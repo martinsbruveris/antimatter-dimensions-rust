@@ -61,6 +61,8 @@ pub const AUTOBUYER_INITIAL_INTERVAL_MS: f64 = 1000.0;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AutobuyerState {
+    /// Global toggle: when false, no autobuyers fire.
+    pub enabled: bool,
     /// Autobuyers for each of the 8 antimatter dimension tiers.
     pub dimensions: [Autobuyer; 8],
     /// Autobuyer for tickspeed upgrades.
@@ -70,6 +72,7 @@ pub struct AutobuyerState {
 impl AutobuyerState {
     pub fn new() -> Self {
         Self {
+            enabled: true,
             dimensions: std::array::from_fn(|_| {
                 Autobuyer::new(AUTOBUYER_INITIAL_INTERVAL_MS)
             }),
@@ -86,7 +89,12 @@ impl Default for AutobuyerState {
 
 impl GameState {
     /// Advance all autobuyers by `dt_ms` and execute any triggered purchases.
+    /// Does nothing if autobuyers are globally disabled.
     pub fn tick_autobuyers(&mut self, dt_ms: f64) {
+        if !self.autobuyers.enabled {
+            return;
+        }
+
         // Process dimension autobuyers
         for tier in 0..8 {
             if self.autobuyers.dimensions[tier].advance(dt_ms) {

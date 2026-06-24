@@ -48,7 +48,7 @@ parameterized — no need for custom Rust code per experiment.
 pub struct StrategyConfig {
     pub sacrifice: SacrificeConfig,
     pub purchase: PurchaseConfig,
-    pub prestige_plan: Vec<PrestigeStep>,
+    pub prestige: PrestigeMode,
 }
 
 /// When to sacrifice dimensions.
@@ -71,7 +71,7 @@ pub struct PurchaseConfig {
 pub enum BuyPriority {
     /// Compare effective costs:
     ///   effective_tickspeed_cost = tickspeed_cost / tickspeed_weight
-    ///   effective_dim_cost = dimension_cost_until_10
+    ///   effective_dim_cost = dimension_cost
     /// Buy whichever is cheaper. Loop until nothing affordable.
     ///
     /// weight > 1 → prefer tickspeed (it appears cheaper)
@@ -87,14 +87,23 @@ pub enum DimensionOrder {
     CheapestFirst, // Buy whichever costs least
 }
 
-/// A step in the prestige plan.
+/// How to handle prestige events (dim boosts and galaxies).
+pub enum PrestigeMode {
+    /// Buy dim boosts and galaxies whenever affordable.
+    /// Galaxy is prioritised over dim boost.
+    Auto,
+    /// Follow a prescribed sequence of prestige events.
+    /// After all steps are exhausted, continue buying until Big Crunch.
+    Plan(Vec<PrestigeStep>),
+}
+
+/// A step in the prestige plan (used with PrestigeMode::Plan).
 pub enum PrestigeStep {
     /// Buy N dimension boosts (accumulating between each).
     DimBoost(u32),
     /// Buy one antimatter galaxy.
     Galaxy,
 }
-// After all steps are exhausted, continue buying until Big Crunch.
 ```
 
 ### Strategy Execution Order (per tick)
@@ -102,11 +111,12 @@ pub enum PrestigeStep {
 Within each tick, the strategy executes in this priority order, looping until nothing
 more can be bought:
 
-1. **Prestige check:** If the current plan step is achievable, execute it (dim boost or
-   galaxy). Advance to next step.
+1. **Prestige check:** In `Auto` mode, buy a galaxy if affordable, else buy a dim boost.
+   In `Plan` mode, execute the current plan step if achievable. Either way, a prestige
+   event restarts the loop from step 1.
 2. **Sacrifice check:** If enabled and gain ratio exceeds threshold, sacrifice.
-3. **Purchase:** Compare tickspeed cost (adjusted by weight) against the cheapest
-   eligible dimension purchase. Buy the cheaper one.
+3. **Purchase:** Compare tickspeed cost (adjusted by weight) against the cheapest eligible
+   dimension purchase. Buy max of the cheaper option.
 4. **Repeat** from step 1 (a dim boost resets dimensions, so new purchases become
    available).
 
@@ -114,9 +124,15 @@ Step 1 is checked first because prestige events reset progress — there's no po
 dimensions if we're about to reset. However, during the "accumulation phase" (building
 toward the next prestige requirement), steps 2-3 do the work.
 
-### Prestige Plan Semantics
+### Prestige Modes
 
-The plan is a flat sequence. A **plan cursor** tracks current position:
+**`PrestigeMode::Auto`** — The baseline mode. Buys galaxies and dim boosts whenever
+affordable, prioritising galaxies (since they provide a permanent tickspeed improvement).
+This is what an optimal idle player would do.
+
+**`PrestigeMode::Plan(steps)`** — A prescribed sequence of prestige events. Useful for
+experiments comparing specific boost/galaxy orderings. The plan is a flat sequence
+tracked by a cursor:
 
 ```
 Plan: [DimBoost(2), Galaxy, DimBoost(3), Galaxy]
@@ -288,8 +304,8 @@ pub fn simulate(config: &SimulationConfig) -> SimulationResult {
         // 3. Record state (if it's time)
         trace.maybe_record(ticks, time_ms, &game);
 
-        // 4. Production only (no autobuyers)
-        game.tick_production(tick_ms);
+        // 4. Advance one tick (autobuyers are disabled, so this is production only)
+        game.tick(config.tick_ms);
         time_ms += config.tick_ms;
         ticks += 1;
     }
@@ -298,9 +314,10 @@ pub fn simulate(config: &SimulationConfig) -> SimulationResult {
 
 ### Required Changes to ad-core
 
-1. **`tick_production()`** — New method on GameState that runs only the production step
-   (no autobuyers). The existing `tick()` calls `tick_autobuyers()` + production; we
-   factor out the production part.
+1. **Autobuyer enable/disable** — Add a mechanism to disable all autobuyers on
+   `GameState`. The simulator creates a fresh `GameState` with autobuyers disabled, then
+   uses the existing `tick()` method (which skips autobuyers when they're disabled). This
+   is also needed for the regular game (players toggle autobuyers on/off).
 
 2. **`BIG_CRUNCH_THRESHOLD`** — New constant: `Decimal::new(1.7976931348623157, 308)` (JS
    `Number.MAX_VALUE`).
@@ -354,7 +371,6 @@ name = "ad_python"
 [dependencies]
 ad-core = { path = "../ad-core" }
 pyo3 = { version = "0.23", features = ["extension-module"] }
-rayon = "1.10"
 ```
 
 ### Python Interface
@@ -364,14 +380,14 @@ import ad_python as ad
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- Single simulation with trace ---
+# --- Baseline: auto-prestige with sacrifice ---
 config = ad.SimulationConfig(
     strategy=ad.StrategyConfig(
         sacrifice_enabled=True,
-        sacrifice_threshold=2.0,
+        sacrifice_threshold=10.0,
         tickspeed_weight=1.0,
         dimension_order="highest_first",
-        prestige_plan=["boost:4", "galaxy", "boost:3", "galaxy"],
+        prestige_mode="auto",
     ),
     tick_ms=50.0,
     snapshot_count=500,  # returns 500–1000 snapshots
@@ -381,6 +397,19 @@ print(f"Time: {result.total_time_s:.1f}s")
 print(f"Galaxies: {result.galaxies}, Dim boosts: {result.dim_boosts}")
 print(f"Trace points: {len(result.trace)}")
 
+# --- Fixed prestige plan ---
+config2 = ad.SimulationConfig(
+    strategy=ad.StrategyConfig(
+        sacrifice_enabled=True,
+        sacrifice_threshold=10.0,
+        tickspeed_weight=1.0,
+        dimension_order="highest_first",
+        prestige_mode=["boost:4", "galaxy", "boost:3", "galaxy"],
+    ),
+    tick_ms=50.0,
+    snapshot_count=500,
+)
+
 # --- Plotting state over time ---
 times = [s.time_ms / 1000 for s in result.trace]
 antimatter = [s.antimatter_log10 for s in result.trace]
@@ -388,47 +417,47 @@ plt.plot(times, antimatter)
 plt.xlabel("Time (s)")
 plt.ylabel("log₁₀(antimatter)")
 
-# --- Batch simulation (parallel via Rayon) ---
-configs = [
-    ad.SimulationConfig(
-        strategy=ad.StrategyConfig(sacrifice_threshold=t, ...),
-        tick_ms=50.0,
-        snapshot_count=0,  # disable trace for sweep (only need final time)
-    )
-    for t in np.logspace(0, 3, 100)
-]
-results = ad.simulate_batch(configs)
-
-# --- Sweep analysis ---
-times = [r.total_time_s for r in results]
-plt.semilogx(thresholds, times)
-plt.xlabel("Sacrifice threshold (multiplier gain)")
-plt.ylabel("Time to Big Crunch (seconds)")
+# --- Batch simulation (future work, parallel via Rayon) ---
+# configs = [
+#     ad.SimulationConfig(
+#         strategy=ad.StrategyConfig(sacrifice_threshold=t, ...),
+#         tick_ms=50.0,
+#         snapshot_count=0,  # disable trace for sweep (only need final time)
+#     )
+#     for t in np.logspace(0, 3, 100)
+# ]
+# results = ad.simulate_batch(configs)
 ```
 
-### Prestige Plan String Format
+### Prestige Mode Format
 
-For ergonomic Python usage, prestige plans are specified as string lists:
+For ergonomic Python usage, the prestige mode is specified as either the string `"auto"`
+or a list of prestige steps:
 
-| String      | Meaning                |
-|-------------|------------------------|
-| `"boost:N"` | Buy N dimension boosts |
-| `"galaxy"`  | Buy one galaxy         |
+| Value       | Meaning                             |
+|-------------|-------------------------------------|
+| `"auto"`    | Auto-buy boosts and galaxies        |
+| `["boost:N", "galaxy", ...]` | Follow a fixed plan |
+
+Within a plan, `"boost:N"` means buy N dimension boosts, `"galaxy"` means buy one
+galaxy.
 
 Example: `["boost:4", "galaxy", "boost:3", "galaxy", "boost:2"]`
 
-### Batch API
+### Batch API (Future Work)
 
-`simulate_batch(configs, tick_ms)` runs all simulations in parallel using Rayon's thread
-pool. Returns a list of `SimulationResult` in the same order as inputs. This is the
-primary API for parameter sweeps.
+`simulate_batch(configs)` will run all simulations in parallel using Rayon's thread pool,
+returning a list of `SimulationResult` in the same order as inputs. This is the planned
+primary API for parameter sweeps. The `simulate()` function is designed to be `Send` +
+pure (no shared mutable state), so parallelizing with Rayon will be straightforward when
+needed.
 
 ## 6. Implementation Plan
 
 ### Phase 1: Strategy + Simulator in ad-core
 
 1. Add `strategy.rs` — strategy config types (all the enums/structs above)
-2. Factor `tick()` into `tick_production()` + autobuyer dispatch
+2. Add autobuyer enable/disable to `GameState` (useful for both simulator and regular game)
 3. Add `BIG_CRUNCH_THRESHOLD` constant
 4. Add `simulator.rs` — `simulate()` function + `execute_strategy()` + `PlanCursor`
 5. Integration tests: verify a known strategy reaches Big Crunch
@@ -437,16 +466,17 @@ primary API for parameter sweeps.
 
 1. Create `crates/ad-python/` with PyO3 boilerplate
 2. Expose `StrategyConfig` with Python-friendly constructors
-3. Expose `simulate()` and `simulate_batch()` (Rayon)
-4. Test from Python: single run + batch sweep
+3. Expose `simulate()`
+4. Test from Python: single run
 
-### Phase 3: Experiment notebooks
+### Phase 3 (Future): Batch simulation + experiment notebooks
 
-1. Sacrifice threshold sweep
-2. Tickspeed weight sweep
-3. Dimension order comparison
-4. Prestige plan comparison (varying boost/galaxy sequences)
-5. 2D sweeps (e.g., sacrifice threshold × tickspeed weight)
+1. Add `rayon` dependency and `simulate_batch()` to ad-python
+2. Sacrifice threshold sweep
+3. Tickspeed weight sweep
+4. Dimension order comparison
+5. Prestige plan comparison (varying boost/galaxy sequences)
+6. 2D sweeps (e.g., sacrifice threshold × tickspeed weight)
 
 ## 7. Design Decisions & Rationale
 
@@ -470,3 +500,62 @@ parameter sweeps are for.
 intuitive: "how much do I value tickspeed relative to dimensions?" A weight of 2.0 means
 "I'd pay up to 2x more for tickspeed." This avoids needing to compute actual
 cost-effectiveness ratios (which depend on game state in complex ways).
+
+## 8. Implementation Notes
+
+Phases 1 and 2 are complete. Key implementation details and lessons learned:
+
+### Files Added/Modified
+
+| File | Change |
+|------|--------|
+| `ad-core/src/strategy.rs` | Strategy config types (new) |
+| `ad-core/src/simulator.rs` | Simulation engine (new) |
+| `ad-core/src/autobuyers.rs` | Global `enabled` flag on `AutobuyerState` |
+| `ad-core/src/data/constants.rs` | `big_crunch_threshold()` function |
+| `ad-core/src/lib.rs` | Module exports |
+| `ad-core/tests/simulator.rs` | 7 tests (StateTrace + simulation) |
+| `crates/ad-python/` | PyO3 crate exposing `simulate()` (new) |
+| `pyproject.toml` | Maturin build config (new) |
+
+### Performance: Buy-Max is Essential
+
+The initial implementation bought one tickspeed or one buy-until-10 per iteration of the
+purchase loop. This caused the simulation to hang: with large antimatter, hundreds of
+tickspeed purchases at 10× cost growth meant thousands of loop iterations per tick.
+
+**Fix:** Use `buy_max_tickspeed()` and `buy_max_dimension(tier)` in the buy loop. After
+buying max of the preferred option, re-evaluate priorities with remaining antimatter.
+This reduced per-tick strategy execution from seconds to microseconds.
+
+### Affordability Check: Unit Cost, Not Cost-Until-10
+
+The `best_dimension()` function must check single-unit cost, not `cost_until_10`. At
+game start with 10 antimatter, AD1 unit cost is 10 (affordable) but cost_until_10 is 100
+(not affordable). Using cost_until_10 caused the simulation to never buy any dimensions,
+leaving antimatter permanently at 10.
+
+### PrestigeMode::Auto as Baseline
+
+A fixed prestige plan requires knowing the correct number of boosts and galaxies in
+advance. Missing even one early boost leads to exponentially longer wait times. The
+`PrestigeMode::Auto` mode (buy galaxy if affordable, else buy dim boost) provides the
+correct baseline — it dynamically determines the right prestige sequence.
+
+### Baseline Result
+
+Configuration: `PrestigeMode::Auto`, sacrifice threshold = 10, tickspeed weight = 1.0,
+dimension order = highest first, tick_ms = 50.
+
+| Metric | Value |
+|--------|-------|
+| Game time to Big Crunch | 8098s (2.2 hours) |
+| Simulation ticks | 161,969 |
+| Wall time (release) | ~0.16s |
+| Final galaxies | 2 |
+| Final dim boosts | 16 |
+| Final antimatter | ~10^308.5 |
+
+This represents an "infinitely fast player" who makes optimal purchases every tick with
+no autobuyer cooldowns. The 2.2-hour game time is the theoretical minimum for reaching
+first infinity with this strategy.

@@ -1,0 +1,12 @@
+[package]
+name = "ad-python"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+name = "ad_python"
+
+[dependencies]
+ad-core = { path = "../ad-core" }
+pyo3 = { version = "0.25", features = ["extension-module"] }
