@@ -22,8 +22,10 @@ fn simulate(config: PySimulationConfig) -> PySimulationResult {
 
 /// Antimatter Dimensions simulation engine.
 #[pymodule]
-fn ad_python(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(simulate, m)?)?;
+    m.add_class::<types::PyDecimal>()?;
+    m.add_class::<types::PyDecimalArray>()?;
     m.add_class::<types::PyStrategyConfig>()?;
     m.add_class::<types::PySimulationConfig>()?;
     m.add_class::<types::PySimulationResult>()?;

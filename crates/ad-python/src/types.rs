@@ -5,6 +5,104 @@ use ad_core::strategy::{
     BuyPriority, DimensionOrder, PrestigeMode, PrestigeStep, PurchaseConfig,
     SacrificeConfig, StrategyConfig,
 };
+use break_infinity::Decimal;
+
+// ============================================================
+// Decimal types
+// ============================================================
+
+/// A single Decimal value exposed as mantissa + exponent.
+///
+/// Represents a number as m × 10^e where m is in [1, 10) or 0.
+#[pyclass(name = "Decimal")]
+#[derive(Debug, Clone)]
+pub struct PyDecimal {
+    /// Mantissa, normalized to [1, 10) or 0.
+    #[pyo3(get)]
+    pub m: f64,
+    /// Integer exponent.
+    #[pyo3(get)]
+    pub e: i64,
+}
+
+#[pymethods]
+impl PyDecimal {
+    fn __repr__(&self) -> String {
+        if self.m == 0.0 {
+            "Decimal(0)".to_string()
+        } else {
+            format!("Decimal({}e{})", self.m, self.e)
+        }
+    }
+
+    /// Return log10 of this value.
+    fn log10(&self) -> f64 {
+        if self.m <= 0.0 {
+            f64::NEG_INFINITY
+        } else {
+            self.m.log10() + self.e as f64
+        }
+    }
+}
+
+impl PyDecimal {
+    fn from_decimal(d: &Decimal) -> Self {
+        Self {
+            m: d.mantissa(),
+            e: d.exponent(),
+        }
+    }
+}
+
+/// A batch of Decimal values stored as parallel arrays.
+///
+/// Stores mantissas and exponents separately for efficient
+/// numpy conversion on the Python side.
+#[pyclass(name = "DecimalArray")]
+#[derive(Debug, Clone)]
+pub struct PyDecimalArray {
+    /// Mantissas (each in [1, 10) or 0).
+    #[pyo3(get)]
+    pub m: Vec<f64>,
+    /// Integer exponents.
+    #[pyo3(get)]
+    pub e: Vec<i64>,
+}
+
+#[pymethods]
+impl PyDecimalArray {
+    /// Return log10 of each value as a list.
+    fn log10(&self) -> Vec<f64> {
+        self.m
+            .iter()
+            .zip(self.e.iter())
+            .map(|(m, e)| {
+                if *m <= 0.0 {
+                    f64::NEG_INFINITY
+                } else {
+                    m.log10() + *e as f64
+                }
+            })
+            .collect()
+    }
+
+    fn __len__(&self) -> usize {
+        self.m.len()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("DecimalArray(len={})", self.m.len())
+    }
+}
+
+impl PyDecimalArray {
+    fn from_decimals(decimals: &[Decimal]) -> Self {
+        Self {
+            m: decimals.iter().map(|d| d.mantissa()).collect(),
+            e: decimals.iter().map(|d| d.exponent()).collect(),
+        }
+    }
+}
 
 // ============================================================
 // StrategyConfig
@@ -214,9 +312,9 @@ pub struct PySimulationResult {
     /// Final dimension boost count.
     #[pyo3(get)]
     pub dim_boosts: u32,
-    /// log10 of final antimatter.
+    /// Final antimatter amount.
     #[pyo3(get)]
-    pub final_antimatter_log10: f64,
+    pub final_antimatter: PyDecimal,
     /// State trace snapshots.
     #[pyo3(get)]
     pub trace: Vec<PySnapshot>,
@@ -229,7 +327,9 @@ impl PySimulationResult {
             total_ticks: result.total_ticks,
             galaxies: result.final_galaxies,
             dim_boosts: result.final_dim_boosts,
-            final_antimatter_log10: result.final_antimatter.log10(),
+            final_antimatter: PyDecimal::from_decimal(
+                &result.final_antimatter,
+            ),
             trace: result
                 .trace
                 .into_iter()
@@ -253,25 +353,37 @@ pub struct PySnapshot {
     /// Game time in milliseconds.
     #[pyo3(get)]
     pub time_ms: f64,
-    /// log10 of antimatter at this point.
+    /// Current antimatter.
     #[pyo3(get)]
-    pub antimatter_log10: f64,
+    pub antimatter: PyDecimal,
     /// Number of dimension boosts.
     #[pyo3(get)]
     pub dim_boosts: u32,
     /// Number of galaxies.
     #[pyo3(get)]
     pub galaxies: u32,
+    /// Dimension amounts (8 tiers).
+    #[pyo3(get)]
+    pub dimension_amounts: PyDecimalArray,
+    /// Number of purchases for each dimension (8 tiers).
+    #[pyo3(get)]
+    pub dimension_bought: Vec<u64>,
 }
 
 impl PySnapshot {
     pub fn from_core(snap: ad_core::simulator::Snapshot) -> Self {
+        let amounts: Vec<Decimal> =
+            snap.state.dimensions.iter().map(|d| d.amount).collect();
+        let dimension_bought =
+            snap.state.dimensions.iter().map(|d| d.bought).collect();
         Self {
             tick: snap.tick,
             time_ms: snap.time_ms,
-            antimatter_log10: snap.state.antimatter.log10(),
+            antimatter: PyDecimal::from_decimal(&snap.state.antimatter),
             dim_boosts: snap.state.dim_boosts,
             galaxies: snap.state.galaxies,
+            dimension_amounts: PyDecimalArray::from_decimals(&amounts),
+            dimension_bought,
         }
     }
 }

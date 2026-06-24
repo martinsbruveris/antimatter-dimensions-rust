@@ -5,8 +5,9 @@ edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]
-name = "ad_python"
+name = "_native"
 
 [dependencies]
 ad-core = { path = "../ad-core" }
+break_infinity = { path = "../break_infinity" }
 pyo3 = { version = "0.25", features = ["extension-module"] }

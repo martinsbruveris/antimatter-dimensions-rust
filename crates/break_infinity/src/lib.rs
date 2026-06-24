@@ -507,6 +507,16 @@ impl Decimal {
         *self
     }
 
+    /// Returns the mantissa (normalized to [1, 10), (-10, -1], or 0).
+    pub fn mantissa(&self) -> f64 {
+        self.m
+    }
+
+    /// Returns the exponent.
+    pub fn exponent(&self) -> i64 {
+        self.e
+    }
+
     /// Converts the Decimal to an f64.
     pub fn to_f64(&self) -> f64 {
         if self.e > F64_EXP_MAX as i64 {
