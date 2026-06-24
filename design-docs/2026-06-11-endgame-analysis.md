@@ -30,13 +30,13 @@
 ## 1. Overview & Comparison with Base Game
 
 The "endgame" repository extends Antimatter Dimensions with substantial post-completion
-content. After the base game's ending (defeating Pelle and reaching the credits), this mod
-adds a new prestige layer called "Endgame" that resets the entire game and introduces a
-cascading system of new mechanics, currencies, and progression paths.
+content. After the base game's ending (defeating Pelle and reaching the credits), this
+mod adds a new prestige layer called "Endgame" that resets the entire game and introduces
+a cascading system of new mechanics, currencies, and progression paths.
 
-The fundamental design philosophy is the same as the base game — cascading prestige resets
-with increasing power — but layered on top of the existing Reality/Celestial system. The new
-content effectively adds a **5th prestige layer** above Reality.
+The fundamental design philosophy is the same as the base game — cascading prestige
+resets with increasing power — but layered on top of the existing Reality/Celestial
+system. The new content effectively adds a **5th prestige layer** above Reality.
 
 ---
 
@@ -52,9 +52,10 @@ content effectively adds a **5th prestige layer** above Reality.
 | Core JS lines | 62,372 | 73,477 | **+11,105 (+18%)** |
 | Secret formula lines | 28,637 | ~29,700 | +1,063 |
 
-**Summary:** The endgame mod adds approximately **11,100 lines of game logic** (18% increase)
-and **54 new Vue components** for the UI. This is a significant but manageable expansion —
-roughly equivalent in scope to adding one and a half celestials' worth of content.
+**Summary:** The endgame mod adds approximately **11,100 lines of game logic** (18%
+increase) and **54 new Vue components** for the UI. This is a significant but manageable
+expansion — roughly equivalent in scope to adding one and a half celestials' worth of
+content.
 
 ### Key File Changes (Lines Added)
 
@@ -98,8 +99,8 @@ roughly equivalent in scope to adding one and a half celestials' worth of conten
 
 **File:** `src/core/endgame.js` (746 lines)
 
-The Endgame is a new prestige layer above Reality. It triggers when antimatter during Pelle
-(the "doomed" state) reaches `1e9e15`:
+The Endgame is a new prestige layer above Reality. It triggers when antimatter during
+Pelle (the "doomed" state) reaches `1e9e15`:
 
 ```javascript
 export function isEndgameAvailable() {
@@ -109,7 +110,8 @@ export function isEndgameAvailable() {
 
 **Reset behavior:** Endgame resets *everything* — all prestige layers, all celestial
 progress, achievements (conditionally), glyphs, Reality upgrades, Imaginary upgrades, and
-more. This is by far the most comprehensive reset in the game (~560 lines of state clearing).
+more. This is by far the most comprehensive reset in the game (~560 lines of state
+clearing).
 
 **What persists across Endgame:**
 - Endgame count (`player.endgames`)
@@ -153,8 +155,9 @@ A **4th type of dimension** (alongside Antimatter, Infinity, and Time Dimensions
 - Production has a softcap with configurable threshold and exponent
 - Hardcapped at 2^1024 purchases per dimension
 
-**Architecture:** Follows the same `DimensionState` base class pattern as other dimensions.
-This is a clean extension of the existing framework — no new paradigms needed.
+**Architecture:** Follows the same `DimensionState` base class pattern as other
+dimensions. This is a clean extension of the existing framework — no new paradigms
+needed.
 
 ### 3.4 Celestial Matter
 
@@ -252,8 +255,8 @@ Passive bonuses unlocked at Endgame counts:
 
 ### 3.9 Break Eternity Upgrades
 
-**File:** `src/core/break-eternity-upgrades.js` (61 lines)
-**Data:** `secret-formula/endgame/break-eternity-upgrades.js` (175 lines)
+**File:** `src/core/break-eternity-upgrades.js` (61 lines) **Data:**
+`secret-formula/endgame/break-eternity-upgrades.js` (175 lines)
 
 A new upgrade layer (analogous to "Break Infinity" for the Eternity mechanic):
 - 10 rebuyable upgrades (max 10 each), purchased with Antimatter:
@@ -274,8 +277,8 @@ A new upgrade layer (analogous to "Break Infinity" for the Eternity mechanic):
 
 ### 3.10 Expansion Packs
 
-**File:** `src/core/expansion-packs.js` (56 lines)
-**Data:** `secret-formula/endgame/expansion-packs.js` (84 lines)
+**File:** `src/core/expansion-packs.js` (56 lines) **Data:**
+`secret-formula/endgame/expansion-packs.js` (84 lines)
 
 Seven Expansion Packs (one per Celestial), unlocked with extreme antimatter amounts:
 
@@ -306,7 +309,8 @@ base = galaxyFactor * celestialMatterFactor * imaginaryFactor / 1e7
 // Then raised to a multi-stage exponent based on galaxy count thresholds
 ```
 
-**8 rewards** unlocked at Galactic Power thresholds (0, 1e10, 1e20, 1e50, 1e100, 1e150, 1e200, MAX_VALUE):
+**8 rewards** unlocked at Galactic Power thresholds (0, 1e10, 1e20, 1e50, 1e100, 1e150,
+1e200, MAX_VALUE):
 - Galaxy strength boost
 - Remote Galaxy scaling delay
 - Remote Galaxy weakening
@@ -331,9 +335,9 @@ gpFactor = (log10(max(galacticPower, MAX_VALUE)) / 308.25)^5
 return cpFactor * singFactor * rmFactor * gpFactor / 1000
 ```
 
-**Cosmic Sectors:** Ethereal Power advances through sectors with increasingly high thresholds
-(`sector^sector`). Each sector provides a **sector boost** of `2^((sector-1)²)` that
-multiplies Celestial Dimension production.
+**Cosmic Sectors:** Ethereal Power advances through sectors with increasingly high
+thresholds (`sector^sector`). Each sector provides a **sector boost** of
+`2^((sector-1)²)` that multiplies Celestial Dimension production.
 
 ### 3.13 Alpha (New Celestial)
 
@@ -342,7 +346,8 @@ multiplies Celestial Dimension production.
 A new 8th Celestial unlocked via Imaginary Upgrade 30:
 - Has a **staged progression** (28 stages) — each stage is a game goal to achieve within
   Alpha's Reality (a heavily nerfed run)
-- Stages progress through the entire game: from "Reach 4th Dimension Boost" to "Reach Reality"
+- Stages progress through the entire game: from "Reach 4th Dimension Boost" to "Reach
+  Reality"
 - Provides a `celestialMatterConversionNerf` that scales with stage progression
 - Currently partially implemented (some code is commented out)
 
@@ -350,8 +355,8 @@ A new 8th Celestial unlocked via Imaginary Upgrade 30:
 
 **File:** `src/core/celestials/pelle/pelle-destruction-upgrades.js` (205 lines)
 
-A new upgrade category within Pelle that "destroys" (sacrifices) previously earned resources
-for bonuses:
+A new upgrade category within Pelle that "destroys" (sacrifices) previously earned
+resources for bonuses:
 - Achievable by sacrificing achievements, upgrades, reality upgrades, imaginary upgrades,
   celestial completions, perks, alchemy resources, and Pelle strikes
 
@@ -398,9 +403,9 @@ The endgame mod makes pervasive changes to existing systems by adding `EndgameMa
 - New Pelle strikes and rift modifications
 
 ### Many Decimal → Decimal conversions
-The endgame mod converts several values that were `Number` type in the base game to `Decimal`
-type (e.g., `player.galaxies`, `player.dimensionBoosts`, `singularities`, `darkEnergy`),
-likely because they can exceed `Number.MAX_VALUE` in the endgame.
+The endgame mod converts several values that were `Number` type in the base game to
+`Decimal` type (e.g., `player.galaxies`, `player.dimensionBoosts`, `singularities`,
+`darkEnergy`), likely because they can exceed `Number.MAX_VALUE` in the endgame.
 
 ---
 
@@ -487,17 +492,18 @@ player = {
 
 ### Concerns
 
-1. **Massive reset function:** `Endgame.resetStuff()` is ~560 lines of direct state mutation
-   with deeply nested conditionals based on which masteries/upgrades/packs are purchased.
-   This is the messiest part of the codebase.
+1. **Massive reset function:** `Endgame.resetStuff()` is ~560 lines of direct state
+   mutation with deeply nested conditionals based on which masteries/upgrades/packs are
+   purchased. This is the messiest part of the codebase.
 
 2. **Number → Decimal conversions:** Several values changed from JS `number` to `Decimal`
-   (galaxies, dimension boosts, singularities, dark energy) which means arithmetic operations
-   on these values changed throughout the codebase.
+   (galaxies, dimension boosts, singularities, dark energy) which means arithmetic
+   operations on these values changed throughout the codebase.
 
-3. **Scattered conditionals:** Endgame effects are checked via `EndgameMastery(N).isBought`,
-   `EndgameUpgrade(N).isBought`, and `ExpansionPack.X.isBought` scattered across existing
-   files, making it harder to trace the full effect of any single upgrade.
+3. **Scattered conditionals:** Endgame effects are checked via
+   `EndgameMastery(N).isBought`, `EndgameUpgrade(N).isBought`, and
+   `ExpansionPack.X.isBought` scattered across existing files, making it harder to trace
+   the full effect of any single upgrade.
 
 4. **Partially implemented features:** Alpha celestial has commented-out code, suggesting
    the mod is still in development.
@@ -508,30 +514,30 @@ player = {
 
 ### Additional Challenges Beyond Base Game
 
-1. **Even Larger Numbers:** The endgame pushes numbers to `1e(1e150)` for Expansion Pack costs
-   and similar extreme values. The `break_infinity.js` Decimal might not suffice; a
-   `break_eternity.js`-style representation (tetration-capable) may be needed. In Rust, this
-   means the number type needs to handle towers of exponents.
+1. **Even Larger Numbers:** The endgame pushes numbers to `1e(1e150)` for Expansion Pack
+   costs and similar extreme values. The `break_infinity.js` Decimal might not suffice; a
+   `break_eternity.js`-style representation (tetration-capable) may be needed. In Rust,
+   this means the number type needs to handle towers of exponents.
 
-2. **4th Dimension Type:** Celestial Dimensions are straightforward to port (same base class)
-   but they add another production chain that runs every tick.
+2. **4th Dimension Type:** Celestial Dimensions are straightforward to port (same base
+   class) but they add another production chain that runs every tick.
 
-3. **Complex Reset Logic:** The Endgame reset (560 lines) has ~50+ conditional branches based
-   on purchased upgrades. In Rust, this could be modeled as a `ResetPolicy` struct that
-   encodes what to preserve, making the logic more maintainable.
+3. **Complex Reset Logic:** The Endgame reset (560 lines) has ~50+ conditional branches
+   based on purchased upgrades. In Rust, this could be modeled as a `ResetPolicy` struct
+   that encodes what to preserve, making the logic more maintainable.
 
-4. **Mastery Tree with Constraints:** The Endgame Mastery tree has path limitations (only N
-   compression paths, only M currency paths). Import/export/validation logic exists. This
-   needs a proper graph data structure in Rust.
+4. **Mastery Tree with Constraints:** The Endgame Mastery tree has path limitations (only
+   N compression paths, only M currency paths). Import/export/validation logic exists.
+   This needs a proper graph data structure in Rust.
 
 5. **Number Type Widening:** Several fields changed from `number` to `Decimal`:
    - `player.galaxies`: was `number`, now `Decimal` (can exceed 2^53)
    - `player.dimensionBoosts`: was `number`, now `Decimal`
    - `player.celestials.laitela.singularities`: was `number`, now `Decimal`
    - `player.celestials.laitela.darkEnergy`: was `number`, now `Decimal`
-   
-   This means in Rust, these should all be the "big number" type from the start, or the
-   type system should allow seamless promotion.
+
+This means in Rust, these should all be the "big number" type from the start, or the type
+system should allow seamless promotion.
 
 6. **Game Speed as Decimal:** Game speed can now exceed `1e300` (milestone at 25 Endgames
    removes the cap), meaning game speed itself needs `Decimal` arithmetic in the endgame.
@@ -545,8 +551,8 @@ new system uses the same framework:
 - Dimensions follow the same `DimensionState` pattern
 - Upgrades follow `BitPurchasableMechanicState` / `RebuyableMechanicState`
 
-This means a Rust rewrite that handles the base game's patterns will naturally accommodate
-the endgame content with just more instances of the same traits/structs.
+This means a Rust rewrite that handles the base game's patterns will naturally
+accommodate the endgame content with just more instances of the same traits/structs.
 
 ### Revised Phase Plan (Including Endgame)
 
@@ -579,8 +585,8 @@ Phase 6 (Endgame Expansion):
 | Number type widening changes | ~500 | Medium |
 | **Total** | **~8,500** | |
 
-The endgame mod represents approximately **14% additional porting effort** beyond the base
-game, primarily due to:
+The endgame mod represents approximately **14% additional porting effort** beyond the
+base game, primarily due to:
 - The massive reset function (needs careful translation)
 - Number type widening (requires early design decisions about numeric types)
 - Integration points with existing systems (many small changes across many files)

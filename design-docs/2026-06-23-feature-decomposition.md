@@ -40,9 +40,8 @@ available.
 production_per_second(tier) = amount * multiplier * tickspeed_effect
 ```
 
-**Buy-10 multiplier:**
-Every 10 purchases of a dimension grants a `2x` multiplier (stacking multiplicatively).
-The buy-10 multiplier is `2^floor(bought/10)`.
+**Buy-10 multiplier:** Every 10 purchases of a dimension grants a `2x` multiplier
+(stacking multiplicatively). The buy-10 multiplier is `2^floor(bought/10)`.
 
 **Status:** ✅ Partially implemented (basic production + purchasing)
 
@@ -82,8 +81,8 @@ buy-10 multiplier bonus. Bulk-buy calculates the maximum affordable quantity usi
 geometric series cost summation.
 
 **Key formulas:**
-- Cost of next 10: geometric series `cost * (r^10 - 1) / (r - 1)` where `r` is the
-  cost multiplier
+- Cost of next 10: geometric series `cost * (r^10 - 1) / (r - 1)` where `r` is the cost
+  multiplier
 - `ExponentialCostScaling` class: given current cost and budget, compute max purchasable
   using `floor(log(budget * (r-1) / cost + 1) / log(r))`
 
@@ -166,8 +165,8 @@ requirement *= 1.002^(galaxies - 799)
 
 **Dependencies:** Feature 1.4 (requires 5th dimension unlocked = 1 boost)
 
-**Scope:** Sacrifice all 1st dimension amount to boost 8th dimension production.
-The multiplier grows with total antimatter sacrificed across all sacrifices.
+**Scope:** Sacrifice all 1st dimension amount to boost 8th dimension production. The
+multiplier grows with total antimatter sacrificed across all sacrifices.
 
 **Pre-infinity formula:**
 ```
@@ -220,8 +219,8 @@ IP = floor(308 / 307.8) = 1  (always exactly 1 IP before break infinity)
 **What resets:** Antimatter, all dimensions, tickspeed, dimension boosts, galaxies,
 sacrifice total.
 
-**What persists:** Infinity Points (cumulative), infinity count, infinity upgrades
-(once purchased), achievements.
+**What persists:** Infinity Points (cumulative), infinity count, infinity upgrades (once
+purchased), achievements.
 
 **Records tracked:**
 - Fastest infinity time
@@ -384,8 +383,8 @@ becomes instant via infinity upgrades).
 **Scope:** 8 harder challenges unlocked by reaching specific antimatter thresholds.
 Completion provides permanent rewards that significantly boost progression.
 
-**Unlock thresholds:** `[1e2000, 1e2700, 1e3200, 1e4500, 1e5500, 1e6500, 1e9000, 1e12000]`
-(These require break infinity since they exceed 1e308.)
+**Unlock thresholds:** `[1e2000, 1e2700, 1e3200, 1e4500, 1e5500, 1e6500, 1e9000,
+1e12000]` (These require break infinity since they exceed 1e308.)
 
 **Key challenge effects and rewards:**
 
@@ -540,8 +539,8 @@ by auto-keeping resources across resets.
 
 **Dependencies:** Feature 4.1, Feature 4.2
 
-**Scope:** 8 tiers of time dimensions purchased with EP. They produce "time shards"
-which provide free tickspeed upgrades.
+**Scope:** 8 tiers of time dimensions purchased with EP. They produce "time shards" which
+provide free tickspeed upgrades.
 
 **Unlock:**
 - TD1-4: Unlocked by eternity milestones (eternities 1-4)
@@ -553,8 +552,8 @@ which provide free tickspeed upgrades.
 ```
 free_tickspeed = floor(log(time_shards + 1) / log(threshold))
 ```
-where `threshold` starts at `3.33e3` and decreases with more free tickspeed upgrades
-(the cost per free upgrade increases).
+where `threshold` starts at `3.33e3` and decreases with more free tickspeed upgrades (the
+cost per free upgrade increases).
 
 **Cost scaling:**
 - Uses `ExponentialCostScaling`
@@ -569,8 +568,8 @@ Reality).
 
 **Dependencies:** Feature 4.1
 
-**Scope:** A tree-shaped system of ~220 upgrades purchased with Time Theorems (TT).
-Time Theorems are purchasable with AM, IP, or EP (each with escalating costs).
+**Scope:** A tree-shaped system of ~220 upgrades purchased with Time Theorems (TT). Time
+Theorems are purchasable with AM, IP, or EP (each with escalating costs).
 
 **Time Theorem costs:**
 - AM: starts at 1e20000, multiplied by 1e20000 each purchase
@@ -749,8 +748,8 @@ celestials)
 - Time: EP multiplier, game speed, eternity count mult
 - Dilation: DT production, galaxies from dilation, AD exponent in dilation
 
-**Glyph level:** Based on Reality stats (EP gained, replicanti, time spent, etc.)
-**Glyph rarity (strength):** Random 1-4 (higher = better effect values)
+**Glyph level:** Based on Reality stats (EP gained, replicanti, time spent, etc.) **Glyph
+rarity (strength):** Random 1-4 (higher = better effect values)
 
 **Combining effects:** Multiple equipped glyphs of the same type have effects combined
 using type-specific rules (additive, multiplicative, or max).
@@ -808,8 +807,7 @@ improvements.
 **Scope:** Two black holes that periodically speed up game time. They pulse on/off with
 configurable intervals.
 
-**Black Hole 1:** Unlocked by RM cost.
-**Black Hole 2:** Unlocked by Reality Upgrade.
+**Black Hole 1:** Unlocked by RM cost. **Black Hole 2:** Unlocked by Reality Upgrade.
 
 **Mechanics:**
 - Active duration: configurable (starts short, upgrades lengthen)
@@ -846,8 +844,8 @@ parser or `nom`/`pest` would work.
 
 ## Phase 7: Celestials
 
-Celestials are seven endgame encounters unlocked after the first Reality. Each provides
-a special "Reality" (a run under modified rules) and progressive unlocks.
+Celestials are seven endgame encounters unlocked after the first Reality. Each provides a
+special "Reality" (a run under modified rules) and progressive unlocks.
 
 ### Feature 7.1: Teresa
 
@@ -908,8 +906,8 @@ targets in constrained runs.
 - Goals include: "Reach X EP with ≤Y time studies", "Complete EC N in <Z time"
 - Hard V-achievements: even harder versions
 
-**Rewards:** V-achievement count unlocks permanent bonuses (dimension multipliers,
-glyph improvements, new features)
+**Rewards:** V-achievement count unlocks permanent bonuses (dimension multipliers, glyph
+improvements, new features)
 
 ---
 
@@ -1034,20 +1032,18 @@ incrementally. Design the `EffectSource` enum and multiplier builder to be exten
 
 ### Challenge Modifiers
 
-Challenges (normal, infinity, eternity, celestial realities) all modify game rules.
-The `ActiveModifiers` struct should be designed to accommodate modifiers from any
-source.
+Challenges (normal, infinity, eternity, celestial realities) all modify game rules. The
+`ActiveModifiers` struct should be designed to accommodate modifiers from any source.
 
 ### Prestige Reset Chain
 
-Each prestige layer triggers resets of lower layers with complex "keep" conditions
-based on milestones, perks, and upgrades. Design the reset system to be configurable
-per-layer.
+Each prestige layer triggers resets of lower layers with complex "keep" conditions based
+on milestones, perks, and upgrades. Design the reset system to be configurable per-layer.
 
 ### Records and Statistics
 
-The game tracks extensive records (best times, best rates, recent runs). These need
-to be updated at prestige events and preserved across appropriate reset boundaries.
+The game tracks extensive records (best times, best rates, recent runs). These need to be
+updated at prestige events and preserved across appropriate reset boundaries.
 
 ### Cost Scaling
 
@@ -1060,8 +1056,8 @@ These should be generic utilities reusable across features.
 
 ### Save/Load
 
-Game state serialization. Can be implemented incrementally as features are added, but
-the `GameState` struct needs to be designed for easy serde support from the start.
+Game state serialization. Can be implemented incrementally as features are added, but the
+`GameState` struct needs to be designed for easy serde support from the start.
 
 ---
 
@@ -1078,8 +1074,8 @@ the `GameState` struct needs to be designed for easy serde support from the star
 | 7 | 7 | 8,000-12,000 | ~20,000 |
 | **Total** | **37** | **~25,000-34,000** | **~51,000** |
 
-The Rust implementation should be more concise than the JS due to stronger typing,
-less boilerplate around effect composition, and no UI code mixed in.
+The Rust implementation should be more concise than the JS due to stronger typing, less
+boilerplate around effect composition, and no UI code mixed in.
 
 ---
 

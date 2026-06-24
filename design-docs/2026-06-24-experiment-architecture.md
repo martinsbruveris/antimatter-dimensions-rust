@@ -2,14 +2,18 @@
 
 ## 1. Problem Statement
 
-We want to measure the time to reach the Big Crunch (first Infinity: antimatter ≥ 1.7977e308) under different buying strategies.
+We want to measure the time to reach the Big Crunch (first Infinity: antimatter ≥
+1.7977e308) under different buying strategies.
 
-**Setup:** An infinitely-fast human player — every game tick, the player can make as many purchases as affordable. No autobuyer cooldowns. The strategic choices to explore:
+**Setup:** An infinitely-fast human player — every game tick, the player can make as many
+purchases as affordable. No autobuyer cooldowns. The strategic choices to explore:
 
 1. **Sacrifice threshold** — At what multiplier gain ratio is sacrifice worthwhile?
-2. **Tickspeed vs dimension priority** — Discount factor when comparing costs: should I save up for tickspeed or buy cheaper dimensions?
+2. **Tickspeed vs dimension priority** — Discount factor when comparing costs: should I
+   save up for tickspeed or buy cheaper dimensions?
 3. **Dimension buy order** — High dimensions first, low first, or cheapest first?
-4. **Prestige plan** — A prescribed sequence of dim boosts and galaxies before the Big Crunch (e.g., "4 boosts → galaxy → 3 boosts → galaxy → crunch").
+4. **Prestige plan** — A prescribed sequence of dim boosts and galaxies before the Big
+   Crunch (e.g., "4 boosts → galaxy → 3 boosts → galaxy → crunch").
 
 ## 2. Architecture Overview
 
@@ -29,11 +33,13 @@ Three layers, matching the existing workspace plan:
 └─────────────────────────────────────────────────────┘
 ```
 
-**Key principle:** All game logic stays in `ad-core`. The Python layer is configuration + results only — no per-tick callbacks across the FFI boundary.
+**Key principle:** All game logic stays in `ad-core`. The Python layer is configuration +
+results only — no per-tick callbacks across the FFI boundary.
 
 ## 3. Strategy Configuration
 
-The strategy is a **config struct**, not a trait. All experiment variations are parameterized — no need for custom Rust code per experiment.
+The strategy is a **config struct**, not a trait. All experiment variations are
+parameterized — no need for custom Rust code per experiment.
 
 ```rust
 // ad-core/src/strategy.rs
@@ -93,14 +99,20 @@ pub enum PrestigeStep {
 
 ### Strategy Execution Order (per tick)
 
-Within each tick, the strategy executes in this priority order, looping until nothing more can be bought:
+Within each tick, the strategy executes in this priority order, looping until nothing
+more can be bought:
 
-1. **Prestige check:** If the current plan step is achievable, execute it (dim boost or galaxy). Advance to next step.
+1. **Prestige check:** If the current plan step is achievable, execute it (dim boost or
+   galaxy). Advance to next step.
 2. **Sacrifice check:** If enabled and gain ratio exceeds threshold, sacrifice.
-3. **Purchase:** Compare tickspeed cost (adjusted by weight) against the cheapest eligible dimension purchase. Buy the cheaper one.
-4. **Repeat** from step 1 (a dim boost resets dimensions, so new purchases become available).
+3. **Purchase:** Compare tickspeed cost (adjusted by weight) against the cheapest
+   eligible dimension purchase. Buy the cheaper one.
+4. **Repeat** from step 1 (a dim boost resets dimensions, so new purchases become
+   available).
 
-Step 1 is checked first because prestige events reset progress — there's no point buying dimensions if we're about to reset. However, during the "accumulation phase" (building toward the next prestige requirement), steps 2-3 do the work.
+Step 1 is checked first because prestige events reset progress — there's no point buying
+dimensions if we're about to reset. However, during the "accumulation phase" (building
+toward the next prestige requirement), steps 2-3 do the work.
 
 ### Prestige Plan Semantics
 
@@ -117,23 +129,32 @@ Execution:
   Phase 5: Buy dims/tickspeed → Big Crunch
 ```
 
-During a DimBoost(N) phase, dim boosts are bought one at a time (each triggers a reset, requiring rebuilding). During a Galaxy phase, no extra dim boosts are bought — only dims/tickspeed to reach the galaxy requirement.
+During a DimBoost(N) phase, dim boosts are bought one at a time (each triggers a reset,
+requiring rebuilding). During a Galaxy phase, no extra dim boosts are bought — only
+dims/tickspeed to reach the galaxy requirement.
 
-**Open question:** Should we allow extra dim boosts during a Galaxy phase? They provide production multipliers that help reach the galaxy requirement faster, but each one triggers a reset. This could be a boolean flag on the Galaxy variant:
+**Open question:** Should we allow extra dim boosts during a Galaxy phase? They provide
+production multipliers that help reach the galaxy requirement faster, but each one
+triggers a reset. This could be a boolean flag on the Galaxy variant:
 
 ```rust
 Galaxy { allow_extra_boosts: bool }
 ```
 
-For now, keep it simple: no extra boosts during galaxy phases. They can be added as explicit DimBoost steps before the Galaxy step.
+For now, keep it simple: no extra boosts during galaxy phases. They can be added as
+explicit DimBoost steps before the Galaxy step.
 
 ## 4. Simulator
 
 ### State Trace (Adaptive Downsampling)
 
-The simulation returns a trace of `GameState` snapshots over time. Since storing every tick is too large, we use an adaptive downsampling algorithm controlled by a single parameter `snapshot_count`:
+The simulation returns a trace of `GameState` snapshots over time. Since storing every
+tick is too large, we use an adaptive downsampling algorithm controlled by a single
+parameter `snapshot_count`:
 
-**Algorithm:** The buffer has capacity `2 * snapshot_count`. When it fills up, we discard every second entry (keeping entries at even indices) and double the recording interval. This ensures:
+**Algorithm:** The buffer has capacity `2 * snapshot_count`. When it fills up, we discard
+every second entry (keeping entries at even indices) and double the recording interval.
+This ensures:
 
 - The returned trace has between `snapshot_count` and `2 * snapshot_count` entries
 - Snapshots are approximately uniformly spaced in time
@@ -206,7 +227,9 @@ impl StateTrace {
 }
 ```
 
-**Example:** With `snapshot_count = 500`, the buffer holds up to 1000 entries. A simulation running 7.2M ticks compacts ~13 times, ending with ~500–1000 snapshots spaced ~7000–14000 ticks apart (~5.8–11.7 minutes of game time at 50ms/tick).
+**Example:** With `snapshot_count = 500`, the buffer holds up to 1000 entries. A
+simulation running 7.2M ticks compacts ~13 times, ending with ~500–1000 snapshots spaced
+~7000–14000 ticks apart (~5.8–11.7 minutes of game time at 50ms/tick).
 
 ### Simulation Loop
 
@@ -275,11 +298,15 @@ pub fn simulate(config: &SimulationConfig) -> SimulationResult {
 
 ### Required Changes to ad-core
 
-1. **`tick_production()`** — New method on GameState that runs only the production step (no autobuyers). The existing `tick()` calls `tick_autobuyers()` + production; we factor out the production part.
+1. **`tick_production()`** — New method on GameState that runs only the production step
+   (no autobuyers). The existing `tick()` calls `tick_autobuyers()` + production; we
+   factor out the production part.
 
-2. **`BIG_CRUNCH_THRESHOLD`** — New constant: `Decimal::new(1.7976931348623157, 308)` (JS `Number.MAX_VALUE`).
+2. **`BIG_CRUNCH_THRESHOLD`** — New constant: `Decimal::new(1.7976931348623157, 308)` (JS
+   `Number.MAX_VALUE`).
 
-3. **`sacrifice_gain_ratio()`** — New query: `sacrifice_multiplier_if_sacrificed() / sacrifice_multiplier()`. Already computable from existing methods.
+3. **`sacrifice_gain_ratio()`** — New query: `sacrifice_multiplier_if_sacrificed() /
+   sacrifice_multiplier()`. Already computable from existing methods.
 
 ### Performance Estimate
 
@@ -289,9 +316,11 @@ pub fn simulate(config: &SimulationConfig) -> SimulationResult {
 | 10 hours  | 720K      | 3.6M       |
 | 100 hours | 7.2M      | 36M        |
 
-Each tick is ~50 arithmetic operations. At ~1ns per op, 7.2M ticks ≈ 0.36s. Even a 100-hour game should simulate in under a second on modern hardware.
+Each tick is ~50 arithmetic operations. At ~1ns per op, 7.2M ticks ≈ 0.36s. Even a
+100-hour game should simulate in under a second on modern hardware.
 
-For parameter sweeps with 1000 configurations, total wall time with sequential execution: ~6 minutes at tick_ms=50. With Rayon parallelism (8 cores): ~45 seconds.
+For parameter sweeps with 1000 configurations, total wall time with sequential execution:
+~6 minutes at tick_ms=50. With Rayon parallelism (8 cores): ~45 seconds.
 
 ### Future Optimization: Adaptive Time-Stepping
 
@@ -306,7 +335,8 @@ let skip = time_to_afford.min(max_skip_ms);
 game.tick_production(skip);
 ```
 
-This would reduce ticks by 10-100x during "waiting" phases. Not needed initially — the tick-based approach is fast enough.
+This would reduce ticks by 10-100x during "waiting" phases. Not needed initially — the
+tick-based approach is fast enough.
 
 ## 5. Python API (ad-python)
 
@@ -389,7 +419,9 @@ Example: `["boost:4", "galaxy", "boost:3", "galaxy", "boost:2"]`
 
 ### Batch API
 
-`simulate_batch(configs, tick_ms)` runs all simulations in parallel using Rayon's thread pool. Returns a list of `SimulationResult` in the same order as inputs. This is the primary API for parameter sweeps.
+`simulate_batch(configs, tick_ms)` runs all simulations in parallel using Rayon's thread
+pool. Returns a list of `SimulationResult` in the same order as inputs. This is the
+primary API for parameter sweeps.
 
 ## 6. Implementation Plan
 
@@ -418,12 +450,23 @@ Example: `["boost:4", "galaxy", "boost:3", "galaxy", "boost:2"]`
 
 ## 7. Design Decisions & Rationale
 
-**Config struct vs trait for strategy:** Config struct. All experiments are parameterized variations of the same decision tree. A trait would require writing Rust code for each experiment. The config is serializable and Python-friendly.
+**Config struct vs trait for strategy:** Config struct. All experiments are parameterized
+variations of the same decision tree. A trait would require writing Rust code for each
+experiment. The config is serializable and Python-friendly.
 
-**Tick-based vs event-driven simulation:** Tick-based (with configurable dt). Simpler to implement, easy to verify against the existing game loop, and fast enough in Rust. Event-driven can be added later as an optimization.
+**Tick-based vs event-driven simulation:** Tick-based (with configurable dt). Simpler to
+implement, easy to verify against the existing game loop, and fast enough in Rust.
+Event-driven can be added later as an optimization.
 
-**No per-tick Python callbacks:** The FFI boundary is crossed only twice per simulation (config in, result out). This keeps the simulation fast (~1M ticks/sec) rather than bottlenecking on Python↔Rust calls.
+**No per-tick Python callbacks:** The FFI boundary is crossed only twice per simulation
+(config in, result out). This keeps the simulation fast (~1M ticks/sec) rather than
+bottlenecking on Python↔Rust calls.
 
-**Prestige plan as flat sequence:** Simple and declarative. The user specifies exactly what prestige events to execute and in what order. No conditional logic — that's what parameter sweeps are for.
+**Prestige plan as flat sequence:** Simple and declarative. The user specifies exactly
+what prestige events to execute and in what order. No conditional logic — that's what
+parameter sweeps are for.
 
-**`BuyPriority::Weighted` with single parameter:** The `tickspeed_weight` parameter is intuitive: "how much do I value tickspeed relative to dimensions?" A weight of 2.0 means "I'd pay up to 2x more for tickspeed." This avoids needing to compute actual cost-effectiveness ratios (which depend on game state in complex ways).
+**`BuyPriority::Weighted` with single parameter:** The `tickspeed_weight` parameter is
+intuitive: "how much do I value tickspeed relative to dimensions?" A weight of 2.0 means
+"I'd pay up to 2x more for tickspeed." This avoids needing to compute actual
+cost-effectiveness ratios (which depend on game state in complex ways).

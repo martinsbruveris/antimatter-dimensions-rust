@@ -1,7 +1,6 @@
 # Break Infinity Code Review
 
-**Date:** 2026-06-19
-**Focus:** Function naming, code style, visible API
+**Date:** 2026-06-19 **Focus:** Function naming, code style, visible API
 
 ## Function Naming
 
@@ -21,46 +20,51 @@
 1. **`Neg for Decimal` (L358–365):** Unnecessary `.clone()` on a `Copy` type. Simplify to
    `Decimal::new_no_normalize(-self.mantissa, self.exponent)`.
 
-2. **`partial_cmp` bug (L402–408):** Second infinity branch is identical to the first (same
-   condition, wrong result). `Greater` is never returned for the infinity case.
+2. **`partial_cmp` bug (L402–408):** Second infinity branch is identical to the first
+   (same condition, wrong result). `Greater` is never returned for the infinity case.
 
-3. **`pad_end` (L46):** Over-engineered for internal use—`Cow`, repeated `format!`, `&'static str`.
-   Standard `format!` width specifiers would suffice.
+3. **`pad_end` (L46):** Over-engineered for internal use—`Cow`, repeated `format!`,
+   `&'static str`. Standard `format!` width specifiers would suffice.
 
-4. **`to_fixed_num` (L81):** Format-to-string then parse-back-to-f64 is wasteful. Use arithmetic
-   rounding instead.
+4. **`to_fixed_num` (L81):** Format-to-string then parse-back-to-f64 is wasteful. Use
+   arithmetic rounding instead.
 
-5. **Dead JS guard (L47):** `f32::is_nan(max_length as u32)` can never be true—`u32` is never NaN.
+5. **Dead JS guard (L47):** `f32::is_nan(max_length as u32)` can never be true—`u32` is
+   never NaN.
 
-6. **`exponent: f64` (L108):** An inherently integer value stored as `f64` forces floating-point
-   comparisons everywhere. Should be `i64`.
+6. **`exponent: f64` (L108):** An inherently integer value stored as `f64` forces
+   floating-point comparisons everywhere. Should be `i64`.
 
-7. **Magic number `3.16227766016838` (L994):** Replace with `10.0_f64.sqrt()` or a named constant.
+7. **Magic number `3.16227766016838` (L994):** Replace with `10.0_f64.sqrt()` or a named
+   constant.
 
 ## Visible API
 
-1. **Public implementation details:** `LENGTH`, `CACHED_POWERS`, `NUMBER_EXP_MIN/MAX`, `pad_end`,
-   `to_fixed`, `to_fixed_num` are internal helpers exposed as `pub`. Should be `pub(crate)`.
+1. **Public implementation details:** `LENGTH`, `CACHED_POWERS`, `NUMBER_EXP_MIN/MAX`,
+   `pad_end`, `to_fixed`, `to_fixed_num` are internal helpers exposed as `pub`. Should be
+   `pub(crate)`.
 
-2. **Game economics functions** (`afford_geometric_series`, `sum_geometric_series`, etc.): Belong in
-   a separate module or behind a feature flag.
+2. **Game economics functions** (`afford_geometric_series`, `sum_geometric_series`,
+   etc.): Belong in a separate module or behind a feature flag.
 
-3. **`Eq` without `Ord`:** `Eq` is implemented but `Ord` is not. Since NaN values exist, `Eq`
-   violates reflexivity (NaN ≠ NaN). Either remove `Eq` or handle NaN canonically and implement
-   `Ord`.
+3. **`Eq` without `Ord`:** `Eq` is implemented but `Ord` is not. Since NaN values exist,
+   `Eq` violates reflexivity (NaN ≠ NaN). Either remove `Eq` or handle NaN canonically
+   and implement `Ord`.
 
-4. **`From<u128>`/`From<i128>`:** Silently loses precision via `as f64`. Violates the `From`
-   contract (lossless). Use `TryFrom` or document precision loss.
+4. **`From<u128>`/`From<i128>`:** Silently loses precision via `as f64`. Violates the
+   `From` contract (lossless). Use `TryFrom` or document precision loss.
 
 5. **No `Ord` implementation:** Users can't sort `Vec<Decimal>` or use it in `BTreeMap`.
 
-6. **Deprecated free constructors (L91–99):** Already deprecated—remove in next breaking release.
+6. **Deprecated free constructors (L91–99):** Already deprecated—remove in next breaking
+   release.
 
 ## Exponent Type: `f64` → `i64` Impact Analysis
 
-The `f64` exponent is a JS-port artifact. The value is conceptually always an integer. Converting
-to `i64` would eliminate NaN/infinity edge cases, enable sound `Eq`/`Ord`, and make comparisons
-faster—at the cost of a breaking API change and some mechanical refactoring.
+The `f64` exponent is a JS-port artifact. The value is conceptually always an integer.
+Converting to `i64` would eliminate NaN/infinity edge cases, enable sound `Eq`/`Ord`, and
+make comparisons faster—at the cost of a breaking API change and some mechanical
+refactoring.
 
 ### Trivial conversions (direct integer arithmetic)
 
@@ -144,13 +148,15 @@ Becomes: `self.exponent + temp_exponent as i64`
 
 ### Verdict
 
-The refactor is safe and mechanical. The only "real" work is in `pow()` and `normalize()`, both of
-which already treat the result as integer. The main cost is the breaking API change.
+The refactor is safe and mechanical. The only "real" work is in `pow()` and
+`normalize()`, both of which already treat the result as integer. The main cost is the
+breaking API change.
 
 ## Priority
 
 1. **Fix the `partial_cmp` bug** — produces incorrect ordering for infinities.
-2. **Fix `Eq` + NaN inconsistency** — unsound, can cause UB in unsafe code relying on `Eq`.
+2. **Fix `Eq` + NaN inconsistency** — unsound, can cause UB in unsafe code relying on
+   `Eq`.
 3. **Hide internal helpers** — reduce public API surface.
 4. **Rename opaque functions** — `dp`, `p_log10`, `to_number`.
 5. **Move game-specific code** out of the core numeric lib.

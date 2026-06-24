@@ -1,7 +1,6 @@
 # Break Eternity Number Representation
 
-**Date:** 2026-06-21
-**Focus:** Rust type design for break_eternity numbers
+**Date:** 2026-06-21 **Focus:** Rust type design for break_eternity numbers
 
 ## Background
 
@@ -21,7 +20,8 @@ The game uses two number libraries with different internal representations:
 
 ## The Layer 1 Mismatch
 
-Layer 1 in break_eternity is **not** numerically equivalent to break_infinity's (mantissa, exponent):
+Layer 1 in break_eternity is **not** numerically equivalent to break_infinity's
+(mantissa, exponent):
 
 | | break_infinity | break_eternity layer 1 |
 |---|---|---|
@@ -59,23 +59,24 @@ pub enum Decimal {
 
 ### Why Enum Over Unified Struct
 
-A unified struct (`sign: i8, layer: u32, mag: f64`) matching break_eternity.js exactly was
-considered. The enum is preferred because:
+A unified struct (`sign: i8, layer: u32, mag: f64`) matching break_eternity.js exactly
+was considered. The enum is preferred because:
 
-1. **Hot-path precision.** The Scientific variant preserves exact mantissa/exponent arithmetic for
-   the common case. Multiplication is `mantissa₁ × mantissa₂` + `exp₁ + exp₂` — no log/pow
-   round-trip needed.
+1. **Hot-path precision.** The Scientific variant preserves exact mantissa/exponent
+   arithmetic for the common case. Multiplication is `mantissa₁ × mantissa₂` + `exp₁ +
+   exp₂` — no log/pow round-trip needed.
 
-2. **Branch prediction.** Since `Tower` is rare in practice (only late endgame), the CPU will
-   predict `Scientific` nearly 100% of the time — no pipeline stalls.
+2. **Branch prediction.** Since `Tower` is rare in practice (only late endgame), the CPU
+   will predict `Scientific` nearly 100% of the time — no pipeline stalls.
 
-3. **Cheap comparison.** Comparing two `Scientific` values: compare exponents first (integer
-   compare), then mantissas. No need to compute differences of logarithms.
+3. **Cheap comparison.** Comparing two `Scientific` values: compare exponents first
+   (integer compare), then mantissas. No need to compute differences of logarithms.
 
-4. **Formatting.** The mantissa is directly available for display without `10^fract(mag)` recovery.
+4. **Formatting.** The mantissa is directly available for display without `10^fract(mag)`
+   recovery.
 
-5. **Compatibility.** The existing break_infinity implementation is preserved as-is for the
-   Scientific variant. Only the Tower path is new code.
+5. **Compatibility.** The existing break_infinity implementation is preserved as-is for
+   the Scientific variant. Only the Tower path is new code.
 
 ### Tradeoffs
 
@@ -91,7 +92,8 @@ considered. The enum is preferred because:
 ### Cross-Variant Operations
 
 When a binary operation involves one `Scientific` and one `Tower` value:
-- Promote the `Scientific` to `Tower`: `mag = log10(|mantissa|) + exponent as f64`, layer = 1
+- Promote the `Scientific` to `Tower`: `mag = log10(|mantissa|) + exponent as f64`, layer
+  = 1
 - Then use the general tower arithmetic (layer comparison, magnitude comparison)
 - This conversion is rare and only happens at the boundary
 
@@ -101,23 +103,23 @@ When a binary operation involves one `Scientific` and one `Tower` value:
 - `Tower`: 1 (i8 sign) + 4 (u32 layer) + 8 (f64 mag) + padding = 16 bytes
 - Enum total: 16 + 8 (discriminant + alignment) = 24 bytes
 
-The 8-byte overhead per value is acceptable. For bulk storage (e.g., save files), values can be
-serialized compactly without the discriminant.
+The 8-byte overhead per value is acceptable. For bulk storage (e.g., save files), values
+can be serialized compactly without the discriminant.
 
 ## Compiler Optimization Analysis
 
 ### What Optimizes Well
 
-**Branch prediction:** If 99%+ of runtime values are `Scientific`, the CPU branch predictor will
-near-perfectly predict the match arm. Cost: ~1 cycle for the correctly-predicted discriminant check.
-Essentially free.
+**Branch prediction:** If 99%+ of runtime values are `Scientific`, the CPU branch
+predictor will near-perfectly predict the match arm. Cost: ~1 cycle for the
+correctly-predicted discriminant check. Essentially free.
 
-**Inlining:** With `#[inline]` on operations, LLVM inlines the match + hot path directly at call
-sites. When the variant is statically known (e.g., `Decimal::Scientific { .. }.add(x)`), LLVM
-eliminates the dead arm entirely via constant propagation.
+**Inlining:** With `#[inline]` on operations, LLVM inlines the match + hot path directly
+at call sites. When the variant is statically known (e.g., `Decimal::Scientific { ..
+}.add(x)`), LLVM eliminates the dead arm entirely via constant propagation.
 
-**Constant folding:** If either operand is a compile-time constant (like `DC.D2`), LLVM can often
-resolve the match at compile time, removing the branch completely.
+**Constant folding:** If either operand is a compile-time constant (like `DC.D2`), LLVM
+can often resolve the match at compile time, removing the branch completely.
 
 ### What Doesn't Optimize Well
 
@@ -130,13 +132,13 @@ for (a, b) in values.iter().zip(multipliers.iter()) {
 }
 ```
 
-A uniform struct would allow SIMD on the `mag` field. In practice this matters less than expected —
-incremental game ticks aren't doing homogeneous bulk math on arrays.
+A uniform struct would allow SIMD on the `mag` field. In practice this matters less than
+expected — incremental game ticks aren't doing homogeneous bulk math on arrays.
 
 **2. Size = 24 bytes (awkward for cache).**
 
-A 64-byte cache line fits 2.67 enums vs 4 uniform structs (16 bytes). Matters for tight loops over
-`Vec<Decimal>`; irrelevant for individual game state fields.
+A 64-byte cache line fits 2.67 enums vs 4 uniform structs (16 bytes). Matters for tight
+loops over `Vec<Decimal>`; irrelevant for individual game state fields.
 
 **3. Match on pairs = 4 arms.**
 
@@ -149,8 +151,8 @@ match (self, other) {
 }
 ```
 
-LLVM emits a nested branch (check self, then check other). Two predicted branches ≈ 2 cycles.
-Negligible vs the f64 arithmetic inside each arm.
+LLVM emits a nested branch (check self, then check other). Two predicted branches ≈ 2
+cycles. Negligible vs the f64 arithmetic inside each arm.
 
 ### Cost Comparison Per Multiply (Hot Path)
 
@@ -160,7 +162,8 @@ Negligible vs the f64 arithmetic inside each arm.
 | Unified struct (layer 1) | f64 add | f64 add latency (~3 cycles) |
 | Enum overhead vs unified | ~2 cycles (branch + discriminant load) | masked by f64 pipeline |
 
-The enum's overhead is **dominated by the arithmetic itself**. The branch cost is in the noise.
+The enum's overhead is **dominated by the arithmetic itself**. The branch cost is in the
+noise.
 
 ### Potential Bottleneck Scenario
 
@@ -174,10 +177,10 @@ for dim in dimensions.iter_mut() {
 ```
 
 Mitigations if profiling shows this is hot:
-- Use `std::hint::unreachable_unchecked()` on Tower arms in inner loops where values are guaranteed
-  to be Scientific
-- Keep a separate `ScientificDecimal` type for hot game state, convert to full `Decimal` only at
-  boundaries (optimization, not redesign)
+- Use `std::hint::unreachable_unchecked()` on Tower arms in inner loops where values are
+  guaranteed to be Scientific
+- Keep a separate `ScientificDecimal` type for hot game state, convert to full `Decimal`
+  only at boundaries (optimization, not redesign)
 
 ### Verdict
 
@@ -185,16 +188,17 @@ The enum approach is efficient for this use case because:
 1. The hot path is a single predictable branch
 2. f64 arithmetic cost >> branch cost
 3. Incremental games don't do bulk homogeneous SIMD math
-4. If profiling later reveals issues, the Scientific path can be extracted into its own type for
-   inner loops without architectural changes
+4. If profiling later reveals issues, the Scientific path can be extracted into its own
+   type for inner loops without architectural changes
 
 ## Open Questions
 
-1. **Should layer 0 be a separate variant?** Layer 0 numbers (mag < 10, stored directly) are
-   uncommon in practice. Keeping them as `Scientific { mantissa: value, exponent: 0 }` is simpler.
+1. **Should layer 0 be a separate variant?** Layer 0 numbers (mag < 10, stored directly)
+   are uncommon in practice. Keeping them as `Scientific { mantissa: value, exponent: 0
+   }` is simpler.
 
 2. **NaN/Infinity handling.** Should these be a third variant, or sentinel values within
    `Scientific`?
 
-3. **The `exponent: i64` assumption.** The existing break_infinity review recommends converting
-   exponent from f64 to i64. This design assumes that refactor has been done.
+3. **The `exponent: i64` assumption.** The existing break_infinity review recommends
+   converting exponent from f64 to i64. This design assumes that refactor has been done.

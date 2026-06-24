@@ -34,10 +34,10 @@
 
 ## 1. Overview
 
-Antimatter Dimensions is an incremental/idle game built as a Vue.js web application. The player
-produces "antimatter" using cascading tiers of dimensions, with each tier producing the tier
-below it. The game features a deep prestige hierarchy (Infinity → Eternity → Reality) and
-extensive endgame content through the Celestials system.
+Antimatter Dimensions is an incremental/idle game built as a Vue.js web application. The
+player produces "antimatter" using cascading tiers of dimensions, with each tier
+producing the tier below it. The game features a deep prestige hierarchy (Infinity →
+Eternity → Reality) and extensive endgame content through the Celestials system.
 
 ### Codebase Size
 
@@ -49,15 +49,16 @@ extensive endgame content through the Celestials system.
 | Secret formula (data)     |    ~50|       28,637 |
 | **Total**                 |  ~679 |     ~119,130 |
 
-The game logic is overwhelmingly in `src/core/` (~62k lines). The Vue components handle only
-presentation and user interaction. This separation is good news for a Rust rewrite — the
-entire game simulation can be extracted independently of the UI.
+The game logic is overwhelmingly in `src/core/` (~62k lines). The Vue components handle
+only presentation and user interaction. This separation is good news for a Rust rewrite —
+the entire game simulation can be extracted independently of the UI.
 
 ---
 
 ## 2. Technology Stack & Repository Structure
 
-**Stack:** Vue 2 + Webpack, with `break_infinity.js` for arbitrary-precision Decimal numbers.
+**Stack:** Vue 2 + Webpack, with `break_infinity.js` for arbitrary-precision Decimal
+numbers.
 
 ```
 antimatter-dimensions/
@@ -140,30 +141,31 @@ The architecture follows a **data-driven game mechanics** pattern:
 ### Core Design Principles
 
 1. **Config-driven mechanics**: Game data (costs, effects, unlock conditions) lives in
-   `secret-formula/`. Runtime classes in `game-mechanics/` wrap these configs into stateful
-   objects with `isUnlocked`, `effectValue`, `purchase()`, etc.
+   `secret-formula/`. Runtime classes in `game-mechanics/` wrap these configs into
+   stateful objects with `isUnlocked`, `effectValue`, `purchase()`, etc.
 
 2. **Effect composition**: Multipliers are composed using helper methods like
-   `timesEffectsOf(...)`, `powEffectsOf(...)`, `plusEffectsOf(...)` which iterate over any
-   number of effect sources and apply them if active.
+   `timesEffectsOf(...)`, `powEffectsOf(...)`, `plusEffectsOf(...)` which iterate over
+   any number of effect sources and apply them if active.
 
-3. **Cache invalidation**: Expensive multiplier calculations are cached in `GameCache` and
-   invalidated each tick before production runs.
+3. **Cache invalidation**: Expensive multiplier calculations are cached in `GameCache`
+   and invalidated each tick before production runs.
 
-4. **Event-driven resets**: Prestige resets dispatch events via `EventHub`, allowing systems
-   to react to resets without tight coupling.
+4. **Event-driven resets**: Prestige resets dispatch events via `EventHub`, allowing
+   systems to react to resets without tight coupling.
 
 ---
 
 ## 4. Number System
 
-The game uses `break_infinity.js`, which represents numbers as `(mantissa, exponent)` pairs
-supporting values up to approximately `1e9e15`. This is exposed globally as `window.Decimal`.
+The game uses `break_infinity.js`, which represents numbers as `(mantissa, exponent)`
+pairs supporting values up to approximately `1e9e15`. This is exposed globally as
+`window.Decimal`.
 
 ### Pre-cached Constants
 
-`src/core/constants.js` defines ~100 frequently-used Decimal values frozen in a `DC` object
-to avoid repeated allocations:
+`src/core/constants.js` defines ~100 frequently-used Decimal values frozen in a `DC`
+object to avoid repeated allocations:
 
 ```javascript
 export const DC = deepFreeze({
@@ -179,8 +181,8 @@ export const DC = deepFreeze({
 ### MathOperations Abstraction
 
 `currency.js` defines a `MathOperations` polymorphism layer with `number` and `decimal`
-backends, so that `Currency` methods work identically whether the underlying value is a JS
-`number` or a `Decimal`:
+backends, so that `Currency` methods work identically whether the underlying value is a
+JS `number` or a `Decimal`:
 
 ```javascript
 class NumberMathOperations extends MathOperations {
@@ -196,8 +198,8 @@ class DecimalMathOperations extends MathOperations {
 ### Custom Math Utilities
 
 `src/core/math.js` (1,489 lines) provides:
-- **`bulkBuyBinarySearch()`** — Binary search for how many items can be bulk-purchased with
-  non-linear pricing
+- **`bulkBuyBinarySearch()`** — Binary search for how many items can be bulk-purchased
+  with non-linear pricing
 - **`ExponentialCostScaling`** — A class modeling exponential cost curves with optional
   super-exponential scaling past a threshold
 - **`LinearCostScaling`** — For simpler linear+exponential cost models
@@ -272,8 +274,9 @@ get productionPerSecond() {
 7. Apply dilation (if active): `dilatedValueOf(multiplier)`
 8. Apply celestial modifiers (Effarig, V nerfs)
 
-**Purchasing:** Dimensions are bought individually or in batches of 10. Every 10 purchases
-triggers the `buy10Multiplier`. Bulk-buying uses `ExponentialCostScaling.getMaxBought()`.
+**Purchasing:** Dimensions are bought individually or in batches of 10. Every 10
+purchases triggers the `buy10Multiplier`. Bulk-buying uses
+`ExponentialCostScaling.getMaxBought()`.
 
 #### Infinity Dimensions
 
@@ -298,8 +301,8 @@ triggers the `buy10Multiplier`. Bulk-buying uses `ExponentialCostScaling.getMaxB
 
 **File:** `src/core/tickspeed.js` (268 lines)
 
-Tickspeed is a global multiplier applied to all Antimatter Dimension production. It starts at
-one "tick per second" and increases via purchases and galaxies.
+Tickspeed is a global multiplier applied to all Antimatter Dimension production. It
+starts at one "tick per second" and increases via purchases and galaxies.
 
 **Galaxy-based tickspeed multiplier:**
 ```javascript
@@ -310,7 +313,8 @@ one "tick per second" and increases via purchases and galaxies.
 // Each galaxy makes the multiplier ~3.5% smaller (faster production)
 ```
 
-The effective galaxy count includes player galaxies + replicanti galaxies + tachyon galaxies.
+The effective galaxy count includes player galaxies + replicanti galaxies + tachyon
+galaxies.
 
 ### 5.3 Dimension Boosts & Galaxies
 
@@ -329,7 +333,8 @@ The effective galaxy count includes player galaxies + replicanti galaxies + tach
 - Cost formula with three scaling regions:
   - **Normal** (galaxies < `costScalingStart`): `baseCost + galaxies * costMult`
   - **Distant** (quadratic scaling): adds `galaxies² + galaxies`
-  - **Remote** (exponential scaling past galaxy 800): multiplied by `1.002^(galaxies - 799)`
+  - **Remote** (exponential scaling past galaxy 800): multiplied by `1.002^(galaxies -
+    799)`
 - Reset: all dimensions, boosts, antimatter, tickspeed purchases
 
 ### 5.4 Sacrifice
@@ -363,7 +368,8 @@ Reality  (resets everything below, grants Reality Machines + Glyphs)
 
 **File:** `src/core/big-crunch.js` + `src/game.js`
 
-**Trigger:** Antimatter reaches `1e308` (Number.MAX_VALUE), or the relevant challenge goal.
+**Trigger:** Antimatter reaches `1e308` (Number.MAX_VALUE), or the relevant challenge
+goal.
 
 **Infinity Points formula:**
 ```javascript
@@ -373,10 +379,11 @@ Reality  (resets everything below, grants Reality Machines + Glyphs)
 // Then multiplied by totalIPMult (many sources)
 ```
 
-**What resets:** Antimatter, all Antimatter Dimensions, tickspeed, dimension boosts, galaxies.
+**What resets:** Antimatter, all Antimatter Dimensions, tickspeed, dimension boosts,
+galaxies.
 
-**What persists:** Infinity Points, infinity upgrades (conditionally), challenge completions,
-achievements.
+**What persists:** Infinity Points, infinity upgrades (conditionally), challenge
+completions, achievements.
 
 ### 6.2 Eternity
 
@@ -446,7 +453,8 @@ function dilatedValueOf(value) {
 // TP = (log10(antimatter) / 400)^1.5 * tachyonGainMultiplier
 ```
 
-**Dilated Time:** Produced passively from Tachyon Particles; used to buy Dilation Upgrades.
+**Dilated Time:** Produced passively from Tachyon Particles; used to buy Dilation
+Upgrades.
 
 **Tachyon Galaxies:** Free galaxies purchased with Dilated Time.
 
@@ -467,10 +475,12 @@ Time Theorems are purchased with AM, IP, or EP (each with escalating costs).
 **Files:** `src/core/glyphs/`, `src/core/glyph-effects.js`
 
 Glyphs are equippable items gained on Reality, each with random effects based on type:
-- **Types:** Power, Infinity, Replication, Time, Dilation, Effarig, Reality, Cursed, Companion
+- **Types:** Power, Infinity, Replication, Time, Dilation, Effarig, Reality, Cursed,
+  Companion
 - Each glyph has a level, rarity (strength), and 1-4 random effects
 - Effects use bitmask storage for compact representation
-- Effects are combined across equipped glyphs using type-specific combiners (add, multiply, etc.)
+- Effects are combined across equipped glyphs using type-specific combiners (add,
+  multiply, etc.)
 - Glyph sacrifice provides Alchemy resources (a late-game system)
 
 ### 7.5 Celestials
@@ -489,8 +499,8 @@ Seven Celestials form the endgame content after the first Reality:
 | **Lai'tela** | Dark Matter Dimensions, entropy, continuum | Dark Matter, Dark Energy, Singularities |
 | **Pelle** | "The Doomed" — final boss, disables most mechanics | Remnants, Reality Shards |
 
-Each Celestial has a "Reality" (a special run with modified rules) and progressive unlocks.
-Pelle is the final content, gating the game's ending.
+Each Celestial has a "Reality" (a special run with modified rules) and progressive
+unlocks. Pelle is the final content, gating the game's ending.
 
 ---
 
@@ -542,8 +552,8 @@ Game speed is a multiplicative factor applied to `diff`. Sources include:
 
 ### Offline/Away Progress
 
-When the game detects a long gap between ticks (>60s), it uses `simulateTime()` to simulate
-the missed time in accelerated ticks, with configurable tick chunking.
+When the game detects a long gap between ticks (>60s), it uses `simulateTime()` to
+simulate the missed time in accelerated ticks, with configurable tick chunking.
 
 ---
 
@@ -757,10 +767,10 @@ Autobuyers automatically perform game actions. They share a common framework:
 
 - **State:** Stored in `player.auto.*` with interval, mode, activation flags
 - **Tick:** `Autobuyers.tick()` runs all active autobuyers each game loop tick
-- **Upgrade path:** Early-game autobuyers have upgradeable intervals; late-game perks make
-  them instant
-- **Types:** Dimension buyers (×8), tickspeed, dimension boost, galaxy, big crunch, eternity,
-  reality, replicanti galaxy, time study, sacrifice, and more
+- **Upgrade path:** Early-game autobuyers have upgradeable intervals; late-game perks
+  make them instant
+- **Types:** Dimension buyers (×8), tickspeed, dimension boost, galaxy, big crunch,
+  eternity, reality, replicanti galaxy, time study, sacrifice, and more
 
 ---
 
@@ -820,9 +830,9 @@ running.
 
 ### 5. Global Mutable State
 
-The entire game state lives in `window.player`. There is no immutability, no state management
-library, and no state transitions — just direct mutation. This is the biggest architectural
-concern for a Rust rewrite.
+The entire game state lives in `window.player`. There is no immutability, no state
+management library, and no state transitions — just direct mutation. This is the biggest
+architectural concern for a Rust rewrite.
 
 ---
 
@@ -831,8 +841,8 @@ concern for a Rust rewrite.
 ### What to Rewrite
 
 The entire `src/core/` directory (62k lines) contains the simulation logic. The Vue
-`src/components/` (52k lines) is presentation-only and would not be rewritten — instead, a
-Rust backend would either:
+`src/components/` (52k lines) is presentation-only and would not be rewritten — instead,
+a Rust backend would either:
 - Compile to WASM and expose an API to a web frontend
 - Run natively with a TUI or egui frontend
 - Run headlessly for numerical analysis
@@ -842,10 +852,12 @@ Rust backend would either:
 1. **Decimal Arithmetic:** `break_infinity.js` needs a Rust equivalent. Options:
    - Port `break_infinity.js` directly (mantissa + exponent representation)
    - Use an existing crate like `num-bigfloat` or write a custom `Decimal` type
-   - For numerical analysis, consider whether `f64` suffices for logarithmic representations
+   - For numerical analysis, consider whether `f64` suffices for logarithmic
+     representations
 
-2. **Effect Composition:** The ~200 effect sources that compose multiplicatively/additively
-   need a systematic representation. A Rust approach could use:
+2. **Effect Composition:** The ~200 effect sources that compose
+   multiplicatively/additively need a systematic representation. A Rust approach could
+   use:
    - An enum of all effect sources
    - Trait objects for the `Effect` interface
    - A compile-time registry of effects per mechanic
@@ -853,39 +865,41 @@ Rust backend would either:
 3. **Global Mutable State:** JavaScript's `window.player` won't work in Rust. Options:
    - A single `GameState` struct passed by `&mut` reference
    - An ECS-like architecture for more modularity
-   - The `player` struct is ~1,100 lines of nested objects — Rust structs would be verbose
+   - The `player` struct is ~1,100 lines of nested objects — Rust structs would be
+     verbose
      but type-safe
 
-4. **Dynamic Dispatch:** JavaScript uses prototype chains and duck typing extensively. The
-   `GameMechanicState → PurchasableMechanicState → ...` hierarchy would map to Rust traits,
-   but the config-driven design (where `effect` is a closure) needs adaptation.
+4. **Dynamic Dispatch:** JavaScript uses prototype chains and duck typing extensively.
+   The `GameMechanicState → PurchasableMechanicState → ...` hierarchy would map to Rust
+   traits, but the config-driven design (where `effect` is a closure) needs adaptation.
 
 5. **Cost Scaling Math:** The `ExponentialCostScaling`, `LinearCostScaling`, and
    `bulkBuyBinarySearch` utilities are pure math and straightforward to port.
 
-6. **Challenge System:** Challenges modify game rules via scattered `if (Challenge.isRunning)`
-   checks throughout the codebase. A Rust rewrite could centralize these as rule modifiers
-   on the game state, making the system more maintainable.
+6. **Challenge System:** Challenges modify game rules via scattered `if
+   (Challenge.isRunning)` checks throughout the codebase. A Rust rewrite could centralize
+   these as rule modifiers on the game state, making the system more maintainable.
 
 7. **Caching:** Rust's borrow checker makes lazy caching patterns more involved than
-   JavaScript's `Lazy`. Consider `OnceCell`, `RefCell`, or a tick-based invalidation system.
+   JavaScript's `Lazy`. Consider `OnceCell`, `RefCell`, or a tick-based invalidation
+   system.
 
 ### Suggested Approach for Numerical Analysis
 
 For analyzing the game's numerical behavior without a full rewrite:
 
-1. **Start with the production pipeline:** Implement just the dimension → currency production
-   chain with static multipliers.
+1. **Start with the production pipeline:** Implement just the dimension → currency
+   production chain with static multipliers.
 
-2. **Add prestige cycles:** Model the Infinity/Eternity/Reality reset loop with simplified
-   gain formulas.
+2. **Add prestige cycles:** Model the Infinity/Eternity/Reality reset loop with
+   simplified gain formulas.
 
-3. **Layer in complexity gradually:** Add challenges, glyphs, celestials as needed for the
-   specific analysis.
+3. **Layer in complexity gradually:** Add challenges, glyphs, celestials as needed for
+   the specific analysis.
 
 4. **Use logarithmic representation internally:** Since most interesting behavior is
-   exponential, working in log-space (storing `log10(value)` instead of `value`) can simplify
-   arithmetic and avoid the need for a full Decimal library for many analyses.
+   exponential, working in log-space (storing `log10(value)` instead of `value`) can
+   simplify arithmetic and avoid the need for a full Decimal library for many analyses.
 
 ### Module Dependency Map
 

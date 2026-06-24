@@ -1,8 +1,8 @@
 # Fidelity Test Plan: Pre-Infinity & Infinity Stages
 
 This document defines test scenarios for the `ad-fidelity` crate to verify that the Rust
-implementation matches the original JavaScript game. Tests cover pre-infinity and infinity
-stages only (Phases 1-3 from the feature decomposition).
+implementation matches the original JavaScript game. Tests cover pre-infinity and
+infinity stages only (Phases 1-3 from the feature decomposition).
 
 ## Testing Methodology
 
@@ -19,13 +19,13 @@ Floating-point arithmetic differs between JS and Rust. Use log-space relative to
 ```
 |log10(rust_value) - log10(js_value)| < epsilon
 ```
-Default epsilon: `1e-10` for exact formula matches.
-For multi-step simulations (accumulated error): `1e-6`.
+Default epsilon: `1e-10` for exact formula matches. For multi-step simulations
+(accumulated error): `1e-6`.
 
 ### Test Data Source
 
-Expected values should be extracted from the JS game by running equivalent scenarios.
-The `ad-fidelity` crate should include a JS runner (via embedded V8 or pre-computed JSON
+Expected values should be extracted from the JS game by running equivalent scenarios. The
+`ad-fidelity` crate should include a JS runner (via embedded V8 or pre-computed JSON
 fixtures) to generate reference data.
 
 ---
@@ -54,7 +54,8 @@ Verify that dimension cost is computed from `floor(bought / 10)`, not per-purcha
 | 8 | 10 | 1e39 (= 1e24 × 1e15) |
 | 8 | 80 | 1e24 × (1e15)^8 = 1e144 |
 
-**Formula:** `cost(tier, bought) = baseCost[tier] × costMultiplier[tier]^floor(bought/10)`
+**Formula:** `cost(tier, bought) = baseCost[tier] ×
+costMultiplier[tier]^floor(bought/10)`
 
 **Static data:**
 ```
@@ -153,8 +154,8 @@ assert: production_per_second(AD1) = 10 × 2 × 1 = 20 AM/s
 
 ### 2.3 Buy-10 Multiplier Upgrade (Infinity Upgrade)
 
-After purchasing the `buy10Mult` infinity upgrade, the buy-10 multiplier becomes
-`2 × InfinityUpgrade.buy10Mult.effect` where the effect is based on dim boosts + galaxies.
+After purchasing the `buy10Mult` infinity upgrade, the buy-10 multiplier becomes `2 ×
+InfinityUpgrade.buy10Mult.effect` where the effect is based on dim boosts + galaxies.
 
 ```
 state: buy10Mult infinity upgrade purchased, dim_boosts = 5, galaxies = 2
@@ -226,8 +227,8 @@ assert: requirement = (tier=8, amount=110)
 
 ### 3.3 Dim Boost Requirement Uses totalAmount
 
-The requirement checks dimension `totalAmount` (not `bought`). For pre-infinity
-with no continuum, `totalAmount ≈ amount` (includes production from higher tiers).
+The requirement checks dimension `totalAmount` (not `bought`). For pre-infinity with no
+continuum, `totalAmount ≈ amount` (includes production from higher tiers).
 
 ```
 state: dim_boosts = 0, AD4 bought = 15, AD4 amount = 22.5 (produced by AD5)
@@ -427,8 +428,8 @@ assert: sacrificed = 0
 
 ### 6.1 Unlock Condition
 
-In the JS, sacrifice requires `DimBoost.purchasedBoosts > 4` (i.e., 5+ boosts).
-The Rust currently unlocks it at 1 boost. This is a discrepancy.
+In the JS, sacrifice requires `DimBoost.purchasedBoosts > 4` (i.e., 5+ boosts). The Rust
+currently unlocks it at 1 boost. This is a discrepancy.
 
 ```
 state: dim_boosts = 4
@@ -681,8 +682,8 @@ assert: timeMult effect = pow(300, 0.15) ≈ 2.454
 
 ### 10.2 Buy-10 Multiplier Upgrade (`buy10Mult`)
 
-The infinity upgrade provides a flat `×1.1` to the buy-10 multiplier base (added to
-the base value of 2):
+The infinity upgrade provides a flat `×1.1` to the buy-10 multiplier base (added to the
+base value of 2):
 ```
 buyTenMultiplier = DC.D2.timesEffectsOf(InfinityUpgrade.buy10Mult, ...)
 // InfinityUpgrade.buy10Mult effect = 1.1 (multiplicative)

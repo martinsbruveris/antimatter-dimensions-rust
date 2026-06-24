@@ -4,8 +4,10 @@
 
 ### Primary Goals
 
-1. **Learn Rust** — the project structure should expose idiomatic Rust patterns (traits, ownership, generics, error handling) rather than being a line-by-line JS translation.
-2. **Fast simulation engine** — enable running thousands of game-hours in seconds for numerical experiments.
+1. **Learn Rust** — the project structure should expose idiomatic Rust patterns (traits,
+   ownership, generics, error handling) rather than being a line-by-line JS translation.
+2. **Fast simulation engine** — enable running thousands of game-hours in seconds for
+   numerical experiments.
 3. **Python bindings** — expose the engine to Python (via PyO3) for data analysis.
 4. **Functional UI** — a playable frontend (not pixel-perfect, but useable).
 5. **Fidelity testing** — automated comparison against the original JS game.
@@ -55,10 +57,10 @@
 | `ad-fidelity` | bin/lib | Fidelity test harness comparing Rust vs JS outputs |
 
 > **Why not a separate `ad-data` crate?** Static configuration (dimension costs, upgrade
-> definitions, effect formulas) is tightly coupled to game state types — effect evaluation
-> needs access to `GameState`. A crate boundary would force either circular dependencies or
-> an awkward shared-types crate. A `data` module inside `ad-core` keeps things organized
-> while allowing direct access to internal types.
+> definitions, effect formulas) is tightly coupled to game state types — effect
+evaluation > needs access to `GameState`. A crate boundary would force either circular
+dependencies or > an awkward shared-types crate. A `data` module inside `ad-core` keeps
+things organized > while allowing direct access to internal types.
 
 ---
 
@@ -87,7 +89,9 @@ pub struct Decimal {
 
 ### Vendoring Strategy
 
-Search for an existing Rust port of `break_infinity.js`. If none exists or is incomplete, write one from scratch (~500–800 lines) based on the JS source. The interface is well-defined (see `break_infinity.d.ts`). Key operations needed by the game:
+Search for an existing Rust port of `break_infinity.js`. If none exists or is incomplete,
+write one from scratch (~500–800 lines) based on the JS source. The interface is
+well-defined (see `break_infinity.d.ts`). Key operations needed by the game:
 
 - Arithmetic: add, sub, mul, div
 - Comparison: eq, lt, gt, cmp
@@ -100,7 +104,8 @@ Search for an existing Rust port of `break_infinity.js`. If none exists or is in
 
 ## 4. Static Game Configuration (`ad-core::data`)
 
-The JS game stores all configuration in `secret-formula/`. We mirror this as a `data` module inside `ad-core` with typed Rust data.
+The JS game stores all configuration in `secret-formula/`. We mirror this as a `data`
+module inside `ad-core` with typed Rust data.
 
 ### Approach: Const Data + Enum-Dispatch Formulas
 
@@ -118,7 +123,8 @@ pub struct DimensionCostConfig {
 pub const ANTIMATTER_DIMENSIONS: [DimensionCostConfig; 8] = [ /* ... */ ];
 ```
 
-For configurations that include closures/formulas (like `effect: () => ...`), we use an enum-dispatch pattern:
+For configurations that include closures/formulas (like `effect: () => ...`), we use an
+enum-dispatch pattern:
 
 ```rust
 /// An effect that can be evaluated given the current game state.
@@ -132,7 +138,9 @@ pub enum EffectFormula {
 }
 ```
 
-This avoids `dyn Fn` closures while remaining data-driven. Each `FormulaId` maps to a pure function in `ad-core` that computes the effect value from game state — trivial when both live in the same crate.
+This avoids `dyn Fn` closures while remaining data-driven. Each `FormulaId` maps to a
+pure function in `ad-core` that computes the effect value from game state — trivial when
+both live in the same crate.
 
 ---
 
@@ -281,7 +289,8 @@ impl EffectSource {
 }
 ```
 
-This is verbose but type-safe and exhaustive — the compiler ensures every effect source is handled.
+This is verbose but type-safe and exhaustive — the compiler ensures every effect source
+is handled.
 
 ### 5.4 Prestige System
 
@@ -304,7 +313,8 @@ impl PrestigeLayer for InfinityPrestige { /* ... */ }
 
 ### 5.5 Challenge System
 
-Challenges modify game rules. Rather than scattering `if challenge.is_running()` checks, we use a modifier struct:
+Challenges modify game rules. Rather than scattering `if challenge.is_running()` checks,
+we use a modifier struct:
 
 ```rust
 /// Active rule modifications from challenges, celestials, etc.
@@ -353,7 +363,9 @@ impl<T> Cache<T> {
 }
 ```
 
-The `GameState` holds a `tick_generation: u64` counter incremented each tick. Cached multipliers recompute only when the generation changes. For headless simulation at max speed, caching can be bypassed entirely since we tick sequentially.
+The `GameState` holds a `tick_generation: u64` counter incremented each tick. Cached
+multipliers recompute only when the generation changes. For headless simulation at max
+speed, caching can be bypassed entirely since we tick sequentially.
 
 ---
 
@@ -361,7 +373,8 @@ The `GameState` holds a `tick_generation: u64` counter incremented each tick. Ca
 
 ### Technology: egui + eframe
 
-[egui](https://github.com/emilk/egui) is an immediate-mode Rust GUI library. Reasons for choosing it:
+[egui](https://github.com/emilk/egui) is an immediate-mode Rust GUI library. Reasons for
+choosing it:
 
 - **Pure Rust** — good for the learning goal, no JS/HTML/CSS
 - **Cross-platform** — native (Windows/Mac/Linux) + compiles to WASM
@@ -406,7 +419,8 @@ impl eframe::App for App {
 | Options | Save/load, settings |
 | Statistics | Production rates, records, graphs |
 
-The UI will be functional but minimal — no animations, no flavour text, just the mechanics.
+The UI will be functional but minimal — no animations, no flavour text, just the
+mechanics.
 
 ---
 
@@ -456,8 +470,8 @@ impl Game {
 
 ### 7.2 Constructing Game State from Python
 
-The key challenge: `GameState` has ~50+ fields across nested layers, but any given experiment
-only needs to set a few. We support three complementary approaches.
+The key challenge: `GameState` has ~50+ fields across nested layers, but any given
+experiment only needs to set a few. We support three complementary approaches.
 
 #### Approach 1: Named Presets
 
@@ -478,9 +492,9 @@ game = ad.Game.preset("first_reality")       # Just reached 1e4000 EP
 game = ad.Game.preset("mid_reality")         # Has glyphs, perks, some celestials
 ```
 
-Presets are defined in Rust as named `GameState` constructors. They're curated to represent
-"interesting starting points" for analysis — not every possible state, but enough to skip
-boring early-game grinding.
+Presets are defined in Rust as named `GameState` constructors. They're curated to
+represent "interesting starting points" for analysis — not every possible state, but
+enough to skip boring early-game grinding.
 
 #### Approach 2: Partial Dict Override (merge with defaults)
 
@@ -550,8 +564,8 @@ game = ad.Game.from_js_save_json({"antimatter": "1e1234", ...})
 ```
 
 This requires implementing the JS save format parser (base64 → JSON → GameState mapping),
-but provides the highest-fidelity starting points for analysis. It also enables the workflow:
-"play the game in browser → export save → analyse in Python."
+but provides the highest-fidelity starting points for analysis. It also enables the
+workflow: "play the game in browser → export save → analyse in Python."
 
 #### State Validation
 
@@ -620,7 +634,8 @@ df.plot(x="time_s", y=["without_ts91", "with_ts91"])
 
 ### Approach: Record & Compare
 
-The fidelity testing system works by running both the JS original and the Rust engine through identical scenarios and comparing their outputs.
+The fidelity testing system works by running both the JS original and the Rust engine
+through identical scenarios and comparing their outputs.
 
 ```
 ┌────────────┐         ┌────────────────┐        ┌──────────────┐
@@ -704,7 +719,8 @@ fn run_scenario(scenario: &Scenario) -> Vec<StateSnapshot> {
 
 ### Comparison with Tolerance
 
-Since floating-point arithmetic between JS and Rust will differ slightly (especially with `break_infinity` reimplementation), comparisons use relative tolerance:
+Since floating-point arithmetic between JS and Rust will differ slightly (especially with
+`break_infinity` reimplementation), comparisons use relative tolerance:
 
 ```rust
 fn values_match(js: &Decimal, rust: &Decimal, tolerance: f64) -> bool {
@@ -716,7 +732,8 @@ fn values_match(js: &Decimal, rust: &Decimal, tolerance: f64) -> bool {
 }
 ```
 
-Default tolerance: 1e-10 (essentially exact for integer operations, loose enough for transcendental functions).
+Default tolerance: 1e-10 (essentially exact for integer operations, loose enough for
+transcendental functions).
 
 ### Randomness Analysis
 
@@ -757,8 +774,8 @@ if the same seed and xorshift32 implementation are used.
 
 #### Implications for Fidelity Testing
 
-1. **Phases 1–4 (pre-Reality) can use exact comparison.** No randomness tolerance
-   needed — only floating-point precision differences from the Decimal implementation.
+1. **Phases 1–4 (pre-Reality) can use exact comparison.** No randomness tolerance needed
+   — only floating-point precision differences from the Decimal implementation.
 
 2. **Glyph generation is reproducible** — supply the same `player.reality.seed` and the
    xorshift32 sequence matches exactly between JS and Rust.
@@ -771,8 +788,8 @@ if the same seed and xorshift32 implementation are used.
    - **Fallback: Statistical tolerance.** Run N trials, compare distributions rather than
      exact values.
 
-   The first strategy covers 99% of real gameplay. The stochastic replicanti path is only
-   active during a brief window of early replicanti growth.
+The first strategy covers 99% of real gameplay. The stochastic replicanti path is only
+active during a brief window of early replicanti growth.
 
 ---
 
@@ -811,30 +828,40 @@ Phase 6 — Reality:
 
 ### 10.1 No ECS
 
-An Entity-Component-System (Bevy, specs) is overkill here. The game has a fixed, well-known set of entities (8 AD tiers, 8 ID tiers, 8 TD tiers, etc.). A plain struct with named fields is simpler, faster, and easier to understand.
+An Entity-Component-System (Bevy, specs) is overkill here. The game has a fixed,
+well-known set of entities (8 AD tiers, 8 ID tiers, 8 TD tiers, etc.). A plain struct
+with named fields is simpler, faster, and easier to understand.
 
 ### 10.2 No `dyn` for Hot Paths
 
-Effect computation runs every tick for every dimension. Using trait objects (`Box<dyn Effect>`) would add indirection and prevent inlining. Instead, `EffectSource` is an enum — match arms compile to a jump table, and the compiler can inline common cases.
+Effect computation runs every tick for every dimension. Using trait objects (`Box<dyn
+Effect>`) would add indirection and prevent inlining. Instead, `EffectSource` is an enum
+— match arms compile to a jump table, and the compiler can inline common cases.
 
 ### 10.3 Immutable Config, Mutable State
 
-`ad-data` is entirely `const`/`static` — game configuration never changes at runtime. `ad-core`'s `GameState` is the only mutable piece. This separation makes it trivial to reason about what can change.
+`ad-data` is entirely `const`/`static` — game configuration never changes at runtime.
+`ad-core`'s `GameState` is the only mutable piece. This separation makes it trivial to
+reason about what can change.
 
 ### 10.4 Deterministic Simulation
 
-The engine must be fully deterministic given the same inputs. No `SystemTime`, no random number generation without a seeded RNG. This enables:
+The engine must be fully deterministic given the same inputs. No `SystemTime`, no random
+number generation without a seeded RNG. This enables:
 - Reproducible numerical experiments
 - Fidelity testing
 - Save/load via state serialization
 
 ### 10.5 Serialization
 
-`GameState` derives `serde::Serialize` + `Deserialize`. Save files are MessagePack (compact, fast). JSON export is available for debugging and Python interop.
+`GameState` derives `serde::Serialize` + `Deserialize`. Save files are MessagePack
+(compact, fast). JSON export is available for debugging and Python interop.
 
 ### 10.6 Frontend as a Thin Shell
 
-The egui frontend owns a `GameState` and calls `tick()` each frame. It reads state for display but never computes game logic itself. This ensures the headless engine is always the source of truth.
+The egui frontend owns a `GameState` and calls `tick()` each frame. It reads state for
+display but never computes game logic itself. This ensures the headless engine is always
+the source of truth.
 
 ---
 
@@ -907,7 +934,8 @@ antimatter-dimensions-rust/
 
 ### Unit Tests (in each crate)
 
-- `break_infinity`: Exhaustive arithmetic tests, edge cases (zero, infinity, very small numbers), comparison with JS implementation output.
+- `break_infinity`: Exhaustive arithmetic tests, edge cases (zero, infinity, very small
+  numbers), comparison with JS implementation output.
 - `ad-core`: Test individual systems in isolation:
   - Data module: validate all configs load, no missing references
   - Dimension production for one tick with known multipliers
@@ -946,8 +974,10 @@ For numerical experiments, the simulation loop must be fast:
 ### Target Performance
 
 The JS game runs at ~30 ticks/second. A Rust engine should achieve:
-- **>100,000 ticks/second** in headless mode (enabling 1 hour of game time per second at 33ms ticks)
-- **>1,000,000 ticks/second** for simplified numerical analysis (no autobuyers, no events)
+- **>100,000 ticks/second** in headless mode (enabling 1 hour of game time per second at
+  33ms ticks)
+- **>1,000,000 ticks/second** for simplified numerical analysis (no autobuyers, no
+  events)
 
 This enables running full game progressions (weeks of game time) in seconds.
 
@@ -968,10 +998,17 @@ This enables running full game progressions (weeks of game time) in seconds.
 
 ## 15. Open Questions
 
-1. **Which `break_infinity` crate to vendor?** — Need to search crates.io/GitHub more thoroughly. If nothing suitable exists, writing one from the JS source is ~1 week of work.
-2. **Save compatibility with original game?** — Probably not worth pursuing, but supporting import of JS save files (JSON) into the Rust engine would enable interesting "pick up where you left off" analysis.
-3. **Automator (scripting language)?** — The original game has a custom scripting language for automation. This is a large, self-contained subsystem. Defer to Phase 6 or later.
-4. **Graph rendering in egui?** — For the statistics tab, egui has `egui_plot` which should suffice for basic time-series.
+1. **Which `break_infinity` crate to vendor?** — Need to search crates.io/GitHub more
+   thoroughly. If nothing suitable exists, writing one from the JS source is ~1 week of
+   work.
+2. **Save compatibility with original game?** — Probably not worth pursuing, but
+   supporting import of JS save files (JSON) into the Rust engine would enable
+   interesting "pick up where you left off" analysis.
+3. **Automator (scripting language)?** — The original game has a custom scripting
+   language for automation. This is a large, self-contained subsystem. Defer to Phase 6
+   or later.
+4. **Graph rendering in egui?** — For the statistics tab, egui has `egui_plot` which
+   should suffice for basic time-series.
 
 ---
 

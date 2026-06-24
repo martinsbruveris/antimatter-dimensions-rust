@@ -69,7 +69,7 @@ cargo fmt                      # Format
 
 ### Code Style
 
-- **Max line width: 89 characters** (configured in `rustfmt.toml`)
+- **Max line width: 89 characters** (configured in `rustfmt.toml`; also applies to prose in `design-docs/`)
 - Use `cargo fmt` before committing
 - Follow standard Rust naming conventions (`snake_case` for functions/variables, `CamelCase` for types)
 - Prefer `i64` for the Decimal exponent (not `f64`—this is an intentional departure from the JS port)

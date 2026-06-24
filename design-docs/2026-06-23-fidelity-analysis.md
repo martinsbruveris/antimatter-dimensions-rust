@@ -1,13 +1,14 @@
 # Fidelity Analysis: Rust Implementation vs Original JavaScript
 
 This document compares the current Rust implementation in `ad-core` against the original
-Antimatter Dimensions JavaScript source code, identifying discrepancies and their severity.
+Antimatter Dimensions JavaScript source code, identifying discrepancies and their
+severity.
 
 ## Summary
 
-The current Rust implementation covers pre-infinity mechanics (dimensions, tickspeed,
-dim boosts, galaxies, sacrifice, autobuyers) but has **6 significant formula
-discrepancies** compared to the original game.
+The current Rust implementation covers pre-infinity mechanics (dimensions, tickspeed, dim
+boosts, galaxies, sacrifice, autobuyers) but has **6 significant formula discrepancies**
+compared to the original game.
 
 | Issue | Severity | Description |
 |-------|----------|-------------|
@@ -64,8 +65,8 @@ than they should be:
 | 10 | 10 | 10^28 |
 | 11 | 10,000 | 10^31 |
 
-**Impact:** The game is ~10^27 times more expensive per dimension in Rust. Progression
-is fundamentally broken.
+**Impact:** The game is ~10^27 times more expensive per dimension in Rust. Progression is
+fundamentally broken.
 
 ### Fix
 
@@ -172,8 +173,8 @@ if self.dim_boosts > 0 {
 Formula: `2^boosts` for all tiers uniformly.
 
 **Impact:** Higher tiers get much more benefit than they should. AD8 gets the same
-multiplier as AD1, when it should get significantly less. This distorts the balance between
-tiers.
+multiplier as AD1, when it should get significantly less. This distorts the balance
+between tiers.
 
 ### Fix
 
@@ -288,7 +289,8 @@ return prePowerSacrificeMult.clampMin(1).pow(this.sacrificeExponent);
 
 Where `sacrificeExponent = 2` (base, modified by achievements).
 
-This means: `sacrifice_mult = max(1, (log10(AD1_amount) / 10) / max(log10(total_sacrificed) / 10, 1))^2`
+This means: `sacrifice_mult = max(1, (log10(AD1_amount) / 10) /
+max(log10(total_sacrificed) / 10, 1))^2`
 
 The key insight: the formula uses `log10` of the CURRENT 1st dimension amount divided by
 `log10` of total sacrificed. Sacrifice only improves when your current AD1 amount
@@ -317,9 +319,10 @@ Formula: `(total_sacrificed / 10)^2`
 3. JS formula means sacrifice is only worthwhile when AD1 >> previous sacrifice. Rust
    formula means more sacrifice always = better.
 
-**Impact:** The gameplay loop is different. In JS, you sacrifice when AD1 has grown enough
-to make the ratio favorable. In Rust, the multiplier always grows. The Rust formula is
-much simpler but doesn't capture the strategic decision of "when to sacrifice."
+**Impact:** The gameplay loop is different. In JS, you sacrifice when AD1 has grown
+enough to make the ratio favorable. In Rust, the multiplier always grows. The Rust
+formula is much simpler but doesn't capture the strategic decision of "when to
+sacrifice."
 
 Also note: the JS sacrifice multiplier (`Sacrifice.totalBoost`) is calculated as the
 **next** boost (comparing new sacrifice to previous), not the **current** total. This is
@@ -449,7 +452,8 @@ tickspeed_effect = INITIAL_TICKSPEED_MS / current_tickspeed_ms
              = 1 / multiplier^bought
 ```
 
-This structure is correct — the issue is only with how `multiplier` is computed (Issue 4).
+This structure is correct — the issue is only with how `multiplier` is computed (Issue
+4).
 
 ---
 
