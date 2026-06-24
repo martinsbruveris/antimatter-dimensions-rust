@@ -28,7 +28,7 @@ function buildDimensionRows() {
     let html = "";
     for (let i = 0; i < 8; i++) {
         html += `
-        <div class="c-dimension-row l-dimension-single-row c-antimatter-dim-row" id="dim-row-${i}">
+        <div class="c-dimension-row l-dimension-single-row l-dimension-row-antimatter-dim c-antimatter-dim-row" id="dim-row-${i}">
             <div class="l-dimension-text-container">
                 <div class="l-dim-row-text-box">
                     <span class="c-dim-row__name" id="dim-name-${i}">
