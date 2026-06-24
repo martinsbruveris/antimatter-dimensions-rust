@@ -83,11 +83,11 @@ fn test_baseline_auto_reaches_crunch() {
     let result = simulate(&config);
 
     let threshold = Decimal::new(1.7976931348623157, 308);
-    assert!(result.final_antimatter >= threshold);
+    assert!(result.final_state.antimatter >= threshold);
     assert!(result.total_ticks > 0);
     assert!(result.total_time_ms > 0.0);
     // Auto strategy should buy several galaxies
-    assert!(result.final_galaxies >= 1);
+    assert!(result.final_state.galaxies >= 1);
     // Trace should have between 100 and 200 entries
     assert!(
         result.trace.len() >= 50,
@@ -123,7 +123,7 @@ fn test_cheapest_first_auto_reaches_crunch() {
 
     let result = simulate(&config);
     let threshold = Decimal::new(1.7976931348623157, 308);
-    assert!(result.final_antimatter >= threshold);
+    assert!(result.final_state.antimatter >= threshold);
 }
 
 #[test]
@@ -137,5 +137,5 @@ fn test_simulate_no_trace_when_zero_snapshots() {
     let result = simulate(&config);
     assert!(result.trace.is_empty());
     let threshold = Decimal::new(1.7976931348623157, 308);
-    assert!(result.final_antimatter >= threshold);
+    assert!(result.final_state.antimatter >= threshold);
 }

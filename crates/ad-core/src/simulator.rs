@@ -26,12 +26,8 @@ pub struct SimulationResult {
     pub total_time_ms: f64,
     /// Number of simulation ticks executed.
     pub total_ticks: u64,
-    /// Final number of galaxies.
-    pub final_galaxies: u32,
-    /// Final number of dimension boosts.
-    pub final_dim_boosts: u32,
-    /// Final antimatter amount.
-    pub final_antimatter: Decimal,
+    /// Final game state at end of simulation.
+    pub final_state: GameState,
     /// State trace (adaptive resolution).
     pub trace: Vec<Snapshot>,
 }
@@ -152,9 +148,7 @@ pub fn simulate(config: &SimulationConfig) -> SimulationResult {
             return SimulationResult {
                 total_time_ms: time_ms,
                 total_ticks: ticks,
-                final_galaxies: game.galaxies,
-                final_dim_boosts: game.dim_boosts,
-                final_antimatter: game.antimatter,
+                final_state: game,
                 trace: trace.into_snapshots(),
             };
         }

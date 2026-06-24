@@ -28,22 +28,21 @@ def _():
     import antimatter_dimensions as ad
 
     strategy = ad.StrategyConfig()
-    config = ad.SimulationConfig(
-        strategy, tick_ms=50.0, snapshot_count=5_000
-    )
+    config = ad.SimulationConfig(strategy, snapshot_count=5_000)
+
     t0 = time.perf_counter()
     result = ad.simulate(config)
     wall_time_ms = (time.perf_counter() - t0) * 1000
 
     print(
-        f"Simulation complete: {result.total_ticks} ticks, "
+        f"Simulation complete: {result.total_ticks:,} ticks, "
         f"{result.total_time_s:.1f}s game time, "
-        f"{len(result.trace)} snapshots"
+        f"{len(result.trace):,} snapshots"
     )
     print(
-        f"Final: {result.dim_boosts} boosts, "
-        f"{result.galaxies} galaxies, "
-        f"antimatter ~1e{result.final_antimatter.log10():.0f}"
+        f"Final: {result.final_state.dim_boosts} boosts, "
+        f"{result.final_state.galaxies} galaxies, "
+        f"antimatter ~1e{result.final_state.antimatter.e:.0f}"
     )
     print(f"Wall time: {wall_time_ms:.1f} ms")
     return (result,)
@@ -52,18 +51,12 @@ def _():
 @app.cell
 def _(np, result):
     trace = result.trace
-    time_s = np.array([s.time_ms / 1000.0 for s in trace])
-    antimatter_log10 = np.array(
-        [s.antimatter.log10() for s in trace]
-    )
-    dim_amounts_log10 = np.array(
-        [s.dimension_amounts.log10() for s in trace]
-    )
-    dim_bought = np.array(
-        [s.dimension_bought for s in trace]
-    )
-    dim_boosts = np.array([s.dim_boosts for s in trace])
-    galaxies = np.array([s.galaxies for s in trace])
+    time_s = trace.time_ms / 1000.0
+    antimatter_log10 = trace.antimatter.e
+    dim_amounts_log10 = np.column_stack([d.amount.e for d in trace.dimensions])
+    dim_bought = np.column_stack([d.bought for d in trace.dimensions])
+    dim_boosts = trace.dim_boosts
+    galaxies = trace.galaxies
     return (
         antimatter_log10,
         dim_amounts_log10,
@@ -81,7 +74,6 @@ def _(
     dim_boosts,
     dim_bought,
     galaxies,
-    np,
     plt,
     time_s,
 ):
@@ -98,11 +90,9 @@ def _(
     ax = axes[1]
     for i in range(8):
         col = dim_amounts_log10[:, i]
-        mask = np.isfinite(col) & (col > -np.inf)
+        mask = col > 0
         if mask.any():
-            ax.plot(
-                time_s[mask], col[mask], label=f"Dim {i + 1}"
-            )
+            ax.plot(time_s[mask], col[mask], label=f"Dim {i + 1}")
     ax.set_ylabel("log₁₀(amount)")
     ax.set_title("Dimension Amounts")
     ax.legend(loc="upper left", ncol=4, fontsize=8)
@@ -112,8 +102,7 @@ def _(
     ax = axes[2]
     for i in range(8):
         col = dim_bought[:, i]
-        if col.max() > 0:
-            ax.plot(time_s, col, label=f"Dim {i + 1}")
+        ax.plot(time_s, col, label=f"Dim {i + 1}")
     ax.set_ylabel("Bought")
     ax.set_title("Dimension Purchases")
     ax.legend(loc="upper left", ncol=4, fontsize=8)

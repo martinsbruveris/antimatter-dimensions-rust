@@ -12,7 +12,20 @@ dependencies = [
     "marimo>=0.13",
 ]
 
+[dependency-groups]
+dev = [
+    "ruff>=0.11",
+    "taskipy>=1.14",
+]
+
 [tool.maturin]
 manifest-path = "crates/ad-python/Cargo.toml"
 python-source = "python"
 module-name = "antimatter_dimensions._native"
+
+[tool.ruff]
+line-length = 89
+
+[tool.taskipy.tasks]
+format = "ruff format python/"
+check-style = "ruff check python/"

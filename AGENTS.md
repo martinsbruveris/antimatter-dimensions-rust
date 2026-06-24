@@ -67,13 +67,32 @@ cargo clippy                   # Lint
 cargo fmt                      # Format
 ```
 
+#### Python
+
+```bash
+uv run task format             # Format Python code (ruff)
+uv run task check-style        # Lint Python code (ruff)
+uv run maturin develop         # Build Python bindings
+```
+
+After editing Python code, always run `uv run task format` first, then `uv run task check-style`.
+
 ### Code Style
+
+#### Rust
 
 - **Max line width: 89 characters** (configured in `rustfmt.toml`; also applies to prose in `design-docs/`)
 - Use `cargo fmt` before committing
 - Follow standard Rust naming conventions (`snake_case` for functions/variables, `CamelCase` for types)
 - Prefer `i64` for the Decimal exponent (not `f64`—this is an intentional departure from the JS port)
 - Comment only where clarification is needed; don't comment obvious code
+
+#### Python
+
+- **Max line width: 89 characters** (configured via `[tool.ruff]` in `pyproject.toml`)
+- Use `uv run task format` (ruff) before committing
+- Follow PEP 8 naming conventions
+- Python source lives in `python/`; the native extension is `antimatter_dimensions._native`
 
 ### Number System (`break_infinity`)
 

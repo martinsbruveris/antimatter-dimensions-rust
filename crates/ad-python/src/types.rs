@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 use ad_core::simulator::{SimulationConfig, SimulationResult};
+use ad_core::state::{DimensionTier, GameState, TickspeedState};
 use ad_core::strategy::{
     BuyPriority, DimensionOrder, PrestigeMode, PrestigeStep, PurchaseConfig,
     SacrificeConfig, StrategyConfig,
@@ -34,15 +35,6 @@ impl PyDecimal {
             format!("Decimal({}e{})", self.m, self.e)
         }
     }
-
-    /// Return log10 of this value.
-    fn log10(&self) -> f64 {
-        if self.m <= 0.0 {
-            f64::NEG_INFINITY
-        } else {
-            self.m.log10() + self.e as f64
-        }
-    }
 }
 
 impl PyDecimal {
@@ -71,21 +63,6 @@ pub struct PyDecimalArray {
 
 #[pymethods]
 impl PyDecimalArray {
-    /// Return log10 of each value as a list.
-    fn log10(&self) -> Vec<f64> {
-        self.m
-            .iter()
-            .zip(self.e.iter())
-            .map(|(m, e)| {
-                if *m <= 0.0 {
-                    f64::NEG_INFINITY
-                } else {
-                    m.log10() + *e as f64
-                }
-            })
-            .collect()
-    }
-
     fn __len__(&self) -> usize {
         self.m.len()
     }
@@ -96,10 +73,113 @@ impl PyDecimalArray {
 }
 
 impl PyDecimalArray {
+    #[allow(dead_code)]
     fn from_decimals(decimals: &[Decimal]) -> Self {
         Self {
             m: decimals.iter().map(|d| d.mantissa()).collect(),
             e: decimals.iter().map(|d| d.exponent()).collect(),
+        }
+    }
+}
+
+// ============================================================
+// Game state types
+// ============================================================
+
+/// A single antimatter dimension tier.
+#[pyclass(name = "DimensionTier")]
+#[derive(Debug, Clone)]
+pub struct PyDimensionTier {
+    /// Current amount (can be fractional due to production).
+    #[pyo3(get)]
+    pub amount: PyDecimal,
+    /// Number of individual purchases made.
+    #[pyo3(get)]
+    pub bought: u64,
+}
+
+impl PyDimensionTier {
+    fn from_core(tier: &DimensionTier) -> Self {
+        Self {
+            amount: PyDecimal::from_decimal(&tier.amount),
+            bought: tier.bought,
+        }
+    }
+}
+
+/// Tickspeed upgrade state.
+#[pyclass(name = "TickspeedState")]
+#[derive(Debug, Clone)]
+pub struct PyTickspeedState {
+    /// Number of tickspeed upgrades purchased.
+    #[pyo3(get)]
+    pub bought: u64,
+    /// Current cost to buy the next tickspeed upgrade.
+    #[pyo3(get)]
+    pub cost: PyDecimal,
+    /// Cost multiplier per purchase.
+    #[pyo3(get)]
+    pub cost_multiplier: PyDecimal,
+}
+
+impl PyTickspeedState {
+    fn from_core(ts: &TickspeedState) -> Self {
+        Self {
+            bought: ts.bought,
+            cost: PyDecimal::from_decimal(&ts.cost),
+            cost_multiplier: PyDecimal::from_decimal(&ts.cost_multiplier),
+        }
+    }
+}
+
+/// Full game state.
+///
+/// Contains all mutable game state for pre-infinity gameplay.
+#[pyclass(name = "GameState")]
+#[derive(Debug, Clone)]
+pub struct PyGameState {
+    /// Current antimatter amount.
+    #[pyo3(get)]
+    pub antimatter: PyDecimal,
+    /// All 8 antimatter dimension tiers.
+    #[pyo3(get)]
+    pub dimensions: Vec<PyDimensionTier>,
+    /// Tickspeed upgrade state.
+    #[pyo3(get)]
+    pub tickspeed: PyTickspeedState,
+    /// Number of dimension boosts performed.
+    #[pyo3(get)]
+    pub dim_boosts: u32,
+    /// Number of antimatter galaxies purchased.
+    #[pyo3(get)]
+    pub galaxies: u32,
+    /// Total antimatter sacrificed (cumulative).
+    #[pyo3(get)]
+    pub sacrificed: PyDecimal,
+    /// Running product of all sacrifice boosts (applied to 8th
+    /// dimension).
+    #[pyo3(get)]
+    pub sacrifice_boost: PyDecimal,
+    /// Whether sacrifice is unlocked.
+    #[pyo3(get)]
+    pub sacrifice_unlocked: bool,
+}
+
+impl PyGameState {
+    pub fn from_core(state: &GameState) -> Self {
+        Self {
+            antimatter: PyDecimal::from_decimal(&state.antimatter),
+            dimensions: state
+                .dimensions
+                .iter()
+                .map(PyDimensionTier::from_core)
+                .collect(),
+            tickspeed: PyTickspeedState::from_core(&state.tickspeed),
+            dim_boosts: state.dim_boosts,
+            galaxies: state.galaxies,
+            sacrificed: PyDecimal::from_decimal(&state.sacrificed),
+            sacrifice_boost: PyDecimal::from_decimal(&state.sacrifice_boost),
+            sacrifice_unlocked: state.sacrifice_unlocked,
         }
     }
 }
@@ -306,15 +386,9 @@ pub struct PySimulationResult {
     /// Number of simulation ticks.
     #[pyo3(get)]
     pub total_ticks: u64,
-    /// Final galaxy count.
+    /// Full game state at end of simulation.
     #[pyo3(get)]
-    pub galaxies: u32,
-    /// Final dimension boost count.
-    #[pyo3(get)]
-    pub dim_boosts: u32,
-    /// Final antimatter amount.
-    #[pyo3(get)]
-    pub final_antimatter: PyDecimal,
+    pub final_state: PyGameState,
     /// State trace snapshots.
     #[pyo3(get)]
     pub trace: Vec<PySnapshot>,
@@ -325,11 +399,7 @@ impl PySimulationResult {
         Self {
             total_time_s: result.total_time_ms / 1000.0,
             total_ticks: result.total_ticks,
-            galaxies: result.final_galaxies,
-            dim_boosts: result.final_dim_boosts,
-            final_antimatter: PyDecimal::from_decimal(
-                &result.final_antimatter,
-            ),
+            final_state: PyGameState::from_core(&result.final_state),
             trace: result
                 .trace
                 .into_iter()
@@ -353,37 +423,17 @@ pub struct PySnapshot {
     /// Game time in milliseconds.
     #[pyo3(get)]
     pub time_ms: f64,
-    /// Current antimatter.
+    /// Full game state at this snapshot.
     #[pyo3(get)]
-    pub antimatter: PyDecimal,
-    /// Number of dimension boosts.
-    #[pyo3(get)]
-    pub dim_boosts: u32,
-    /// Number of galaxies.
-    #[pyo3(get)]
-    pub galaxies: u32,
-    /// Dimension amounts (8 tiers).
-    #[pyo3(get)]
-    pub dimension_amounts: PyDecimalArray,
-    /// Number of purchases for each dimension (8 tiers).
-    #[pyo3(get)]
-    pub dimension_bought: Vec<u64>,
+    pub state: PyGameState,
 }
 
 impl PySnapshot {
     pub fn from_core(snap: ad_core::simulator::Snapshot) -> Self {
-        let amounts: Vec<Decimal> =
-            snap.state.dimensions.iter().map(|d| d.amount).collect();
-        let dimension_bought =
-            snap.state.dimensions.iter().map(|d| d.bought).collect();
         Self {
             tick: snap.tick,
             time_ms: snap.time_ms,
-            antimatter: PyDecimal::from_decimal(&snap.state.antimatter),
-            dim_boosts: snap.state.dim_boosts,
-            galaxies: snap.state.galaxies,
-            dimension_amounts: PyDecimalArray::from_decimals(&amounts),
-            dimension_bought,
+            state: PyGameState::from_core(&snap.state),
         }
     }
 }

@@ -26,6 +26,9 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(simulate, m)?)?;
     m.add_class::<types::PyDecimal>()?;
     m.add_class::<types::PyDecimalArray>()?;
+    m.add_class::<types::PyDimensionTier>()?;
+    m.add_class::<types::PyTickspeedState>()?;
+    m.add_class::<types::PyGameState>()?;
     m.add_class::<types::PyStrategyConfig>()?;
     m.add_class::<types::PySimulationConfig>()?;
     m.add_class::<types::PySimulationResult>()?;
