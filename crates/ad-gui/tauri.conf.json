@@ -4,14 +4,14 @@
   "version": "0.1.0",
   "identifier": "com.antimatter-dimensions.rust",
   "build": {
-    "frontendDist": "./frontend"
+    "beforeBuildCommand": "npm --prefix frontend run build",
+    "frontendDist": "./frontend/dist"
   },
   "app": {
-    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Antimatter Dimensions",
-        "width": 1100,
+        "width": 1400,
         "height": 900,
         "resizable": true,
         "fullscreen": false

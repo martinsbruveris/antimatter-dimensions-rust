@@ -371,6 +371,10 @@ speed, caching can be bypassed entirely since we tick sequentially.
 
 ## 6. `ad-gui` — Frontend
 
+> **Superseded (2026-06-25):** the egui approach described in this section was
+> dropped. The frontend is now Tauri + Vue 3; the egui prototype was removed.
+> See `2026-06-25-frontend-architecture.md` and `crates/ad-gui/AGENTS.md`.
+
 ### Technology: egui + eframe
 
 [egui](https://github.com/emilk/egui) is an immediate-mode Rust GUI library. Reasons for

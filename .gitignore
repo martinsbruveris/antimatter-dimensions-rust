@@ -2,3 +2,12 @@
 *.DS_Store
 .venv/
 *.pyc
+
+# JS dependencies — regenerable via `npm install` from package-lock.json
+node_modules/
+
+# Frontend build output — regenerable via `npm run build`
+crates/ad-gui/frontend/dist/
+
+# Tauri-generated files — regenerated at build time
+crates/ad-gui/gen/

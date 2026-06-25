@@ -18,10 +18,13 @@ The original JS source code is available at `../antimatter-dimensions` and `../a
 antimatter-dimensions-rust/
 ├── Cargo.toml              # Workspace manifest
 ├── design-docs/            # Architecture & analysis documents
+├── python/                 # Python source for the PyO3 bindings
 ├── crates/
 │   ├── break_infinity/     # Vendored big-number library (Decimal type)
 │   ├── ad-core/            # Game simulation engine + static config
-│   └── ad-gui/             # egui-based playable frontend
+│   ├── ad-fidelity/        # Rust-vs-JS fidelity test harness
+│   ├── ad-python/          # PyO3 bindings (antimatter_dimensions._native)
+│   └── ad-gui/             # Tauri + Vue 3 frontend (playable; see its AGENTS.md)
 ```
 
 ### Crate Responsibilities
@@ -30,9 +33,9 @@ antimatter-dimensions-rust/
 |-------|------|---------|
 | `break_infinity` | lib | Decimal type: `mantissa × 10^exponent` arithmetic for numbers up to ~1e9e15 |
 | `ad-core` | lib | Game simulation engine. Pure logic, no IO. Contains a `data` module for static config. |
-| `ad-gui` | bin | egui/eframe frontend. Thin shell that owns a `GameState` and calls `tick()` each frame. |
-
-Future crates (not yet created): `ad-python` (PyO3 bindings), `ad-fidelity` (test harness comparing Rust vs JS outputs).
+| `ad-fidelity` | lib/bin | Scenario-based harness comparing Rust engine outputs against the JS game. |
+| `ad-python` | lib (cdylib) | PyO3 bindings exposing the engine to Python (`antimatter_dimensions._native`). |
+| `ad-gui` | bin | **Playable frontend.** Tauri backend + Vue 3/Vite/Pinia. Rust-authoritative; see `crates/ad-gui/AGENTS.md`. |
 
 ### Key Source Files (ad-core)
 
@@ -62,10 +65,21 @@ cargo build                    # Build all crates
 cargo test                     # Run all tests
 cargo test -p break_infinity   # Test only the number library
 cargo test -p ad-core          # Test only the game engine
-cargo run -p ad-gui            # Run the GUI
 cargo clippy                   # Lint
 cargo fmt                      # Format
 ```
+
+#### Frontend (ad-gui)
+
+```bash
+npm --prefix crates/ad-gui/frontend install   # once
+npm --prefix crates/ad-gui/frontend run build # build the Vue app to dist/
+cargo run -p ad-gui                           # run the Tauri app (serves dist/)
+```
+
+`cargo run` serves the pre-built `dist/` (rebuild the frontend after JS/Vue
+changes — no Rust rebuild needed). See `crates/ad-gui/AGENTS.md` for the
+frontend architecture and how to add a page.
 
 #### Python
 
@@ -142,8 +156,13 @@ Located in `design-docs/`:
 | `2026-06-19-architecture.md` | Rust project architecture, workspace layout, design decisions |
 | `2026-06-19-break-infinity-review.md` | Code review of the vendored break_infinity crate |
 | `2026-06-21-break-eternity-representation.md` | Design for extending Decimal to support break_eternity (tower numbers) |
+| `2026-06-24-ui-framework-analysis.md` | Comparison of GUI framework options for the playable frontend |
+| `2026-06-25-frontend-architecture.md` | `ad-gui` design: Tauri + Vue 3/Vite/Pinia, vendored CSS, Rust-authoritative snapshot |
+| `2026-06-25-number-formatting.md` | Where number formatting lives (Rust now; PyO3 + WASM later) and why |
 
-Read these before making architectural decisions. The architecture doc is the primary reference.
+The table lists key documents; see the `design-docs/` folder for the full,
+date-prefixed set. Read these before making architectural decisions. The
+architecture doc is the primary reference.
 
 ## Testing
 
