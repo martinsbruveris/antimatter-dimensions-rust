@@ -295,18 +295,24 @@ fn test_sacrifice_not_available_initially() {
 }
 
 #[test]
-fn test_sacrifice_requires_ad1_amount() {
+fn test_sacrifice_requires_ad8_and_boost() {
     let mut game = GameState::new();
-    game.sacrifice_unlocked = true;
-    // No AD1 amount, can't sacrifice
+    game.dim_boosts = 5;
+    // AD8 = 0, can't sacrifice even with enough boosts
     assert!(!game.can_sacrifice());
+    // AD8 > 0 but AD1 too small for nextBoost > 1
+    game.dimensions[7].amount = Decimal::from_float(1.0);
+    assert!(!game.can_sacrifice());
+    // AD1 large enough for a meaningful sacrifice
+    game.dimensions[0].amount = Decimal::from_float(1e20);
+    assert!(game.can_sacrifice());
 }
 
 #[test]
 fn test_sacrifice_resets_lower_dimensions() {
     let mut game = GameState::new();
-    game.sacrifice_unlocked = true;
-    game.dimensions[0].amount = Decimal::from_float(100.0);
+    game.dim_boosts = 5;
+    game.dimensions[0].amount = Decimal::from_float(1e20);
     game.dimensions[1].amount = Decimal::from_float(50.0);
     game.dimensions[6].amount = Decimal::from_float(10.0);
     game.dimensions[7].amount = Decimal::from_float(5.0);
@@ -314,26 +320,28 @@ fn test_sacrifice_resets_lower_dimensions() {
     assert!(game.sacrifice());
 
     // Dims 1-7 (indices 0-6) should be reset
-    assert_eq!(game.dimensions[0].amount, Decimal::from_float(0.0));
-    assert_eq!(game.dimensions[6].amount, Decimal::from_float(0.0));
+    assert_eq!(game.dimensions[0].amount, Decimal::ZERO);
+    assert_eq!(game.dimensions[6].amount, Decimal::ZERO);
     // Dim 8 (index 7) should be unchanged
     assert_eq!(game.dimensions[7].amount, Decimal::from_float(5.0));
-    // Sacrificed total should be 100
-    assert_eq!(game.sacrificed, Decimal::from_float(100.0));
+    // Sacrificed total should be 1e20
+    assert_eq!(game.sacrificed, Decimal::from_float(1e20));
 }
 
 #[test]
 fn test_sacrifice_multiplier_increases_with_amount() {
     let mut game = GameState::new();
-    game.sacrifice_unlocked = true;
+    game.dim_boosts = 5;
 
     // First sacrifice with AD1 = 1e20
     game.dimensions[0].amount = Decimal::from_float(1e20);
+    game.dimensions[7].amount = Decimal::from_float(1.0);
     game.sacrifice();
     let mult1 = game.sacrifice_multiplier();
 
     // Second sacrifice with AD1 = 1e40
     game.dimensions[0].amount = Decimal::from_float(1e40);
+    game.dimensions[7].amount = Decimal::from_float(1.0);
     game.sacrifice();
     let mult2 = game.sacrifice_multiplier();
 

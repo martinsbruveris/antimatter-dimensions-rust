@@ -95,7 +95,7 @@ fn build_game_view(game: &GameState) -> GameView {
         galaxies: game.galaxies,
         galaxy_requirement: game.galaxy_requirement(),
         can_buy_galaxy: game.can_buy_galaxy(),
-        sacrifice_unlocked: game.sacrifice_unlocked,
+        sacrifice_unlocked: game.sacrifice_unlocked(),
         can_sacrifice: game.can_sacrifice(),
         sacrifice_multiplier: format_decimal(&game.sacrifice_multiplier()),
         sacrifice_multiplier_if_sacrificed: format_decimal(

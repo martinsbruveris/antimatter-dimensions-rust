@@ -1,40 +1,52 @@
 //! Fidelity tests for sacrifice (Section 6).
 //!
-//! Pre-infinity totalBoost formula:
-//!   prePowerBoost = max(1, log10(total_sacrificed) / 10)
+//! Pre-infinity totalBoost formula (stateless from sacrificed):
+//!   if sacrificed == 0: totalBoost = 1
+//!   prePowerBoost = max(1, log10(sacrificed) / 10)
 //!   totalBoost = prePowerBoost^2
 //!
-//! nextBoost formula:
+//! nextBoost formula (individual gain ratio):
+//!   sacrificed_clamped = max(sacrificed, 1)
 //!   prePowerMult = max(1, (log10(AD1) / 10) /
-//!                       max(log10(total_sacrificed) / 10, 1))
+//!                       max(log10(sacrificed_clamped) / 10, 1))
 //!   nextBoost = prePowerMult^2
 
 use ad_core::{Decimal, GameState};
 use ad_fidelity::tolerance::{assert_approx_eq, EPSILON_EXACT};
 
-/// Verify sacrifice unlock condition (requires dim_boosts >= 5
-/// in JS, but our impl uses sacrifice_unlocked flag set at
-/// boost 1+).
+/// Verify sacrifice unlock condition: requires dim_boosts >= 5.
 #[test]
 fn sacrifice_unlock() {
     let mut state = GameState::new();
 
     // Fresh game: sacrifice not unlocked
     assert!(!state.can_sacrifice());
+    assert!(!state.sacrifice_unlocked());
 
-    // After a dim boost, sacrifice becomes available
-    state.sacrifice_unlocked = true;
-    state.dimensions[0].amount = Decimal::from_float(100.0);
+    // 4 boosts: still not unlocked
+    state.dim_boosts = 4;
+    assert!(!state.sacrifice_unlocked());
+
+    // 5 boosts: unlocked
+    state.dim_boosts = 5;
+    assert!(state.sacrifice_unlocked());
+
+    // But still can't sacrifice without AD8 > 0
+    assert!(!state.can_sacrifice());
+
+    // With AD8 > 0 and a meaningful AD1
+    state.dimensions[7].amount = Decimal::from_float(1.0);
+    state.dimensions[0].amount = Decimal::from_float(1e20);
     assert!(state.can_sacrifice());
 }
 
-/// Verify sacrifice cannot proceed without AD1 amount.
+/// Verify sacrifice requires AD8 amount > 0.
 #[test]
-fn sacrifice_requires_ad1() {
+fn sacrifice_requires_ad8() {
     let mut state = GameState::new();
-    state.sacrifice_unlocked = true;
-    state.dimensions[0].amount = Decimal::ZERO;
-
+    state.dim_boosts = 5;
+    state.dimensions[0].amount = Decimal::from_float(1e20);
+    // AD8 = 0
     assert!(!state.can_sacrifice());
 }
 
@@ -42,7 +54,8 @@ fn sacrifice_requires_ad1() {
 #[test]
 fn sacrifice_next_boost_formula() {
     let mut state = GameState::new();
-    state.sacrifice_unlocked = true;
+    state.dim_boosts = 5;
+    state.dimensions[7].amount = Decimal::from_float(1.0);
 
     // Case: AD1=1e100, total_sacrificed=1e50
     // prePowerMult = (100/10) / max(50/10, 1) = 10/5 = 2
@@ -50,13 +63,12 @@ fn sacrifice_next_boost_formula() {
     state.dimensions[0].amount = Decimal::from_float(1e100);
     state.sacrificed = Decimal::from_float(1e50);
 
-    let expected_total = state.sacrifice_boost * Decimal::from_float(4.0);
-    let actual = state.sacrifice_multiplier_if_sacrificed();
+    let actual = state.next_sacrifice_boost();
     assert_approx_eq(
         actual,
-        expected_total,
+        Decimal::from_float(4.0),
         EPSILON_EXACT,
-        "sacrifice boost: AD1=1e100, sacrificed=1e50",
+        "next_sacrifice_boost: AD1=1e100, sacrificed=1e50",
     );
 
     // Case: AD1=1e200, total_sacrificed=1e100
@@ -64,29 +76,58 @@ fn sacrifice_next_boost_formula() {
     // nextBoost = 4
     state.dimensions[0].amount = Decimal::from_float(1e200);
     state.sacrificed = Decimal::from_float(1e100);
-    state.sacrifice_boost = Decimal::ONE;
 
-    let actual = state.sacrifice_multiplier_if_sacrificed();
+    let actual = state.next_sacrifice_boost();
     assert_approx_eq(
         actual,
         Decimal::from_float(4.0),
         EPSILON_EXACT,
-        "sacrifice boost: AD1=1e200, sacrificed=1e100",
+        "next_sacrifice_boost: AD1=1e200, sacrificed=1e100",
     );
 
     // Case: AD1=1e50, total_sacrificed=1e100
     // prePowerMult = (50/10) / (100/10) = 5/10 = 0.5 → clamped
-    //   to 1 nextBoost = 1 (not worth sacrificing)
+    //   to 1 nextBoost = 1
     state.dimensions[0].amount = Decimal::from_float(1e50);
     state.sacrificed = Decimal::from_float(1e100);
-    state.sacrifice_boost = Decimal::ONE;
 
-    let actual = state.sacrifice_multiplier_if_sacrificed();
+    let actual = state.next_sacrifice_boost();
     assert_approx_eq(
         actual,
         Decimal::from_float(1.0),
         EPSILON_EXACT,
-        "sacrifice boost: AD1=1e50, sacrificed=1e100 (clamped)",
+        "next_sacrifice_boost: AD1=1e50, sacrificed=1e100 (clamped)",
+    );
+}
+
+/// Verify stateless totalBoost formula.
+#[test]
+fn sacrifice_total_boost_stateless() {
+    let mut state = GameState::new();
+    state.dim_boosts = 5;
+    state.dimensions[7].amount = Decimal::from_float(1.0);
+
+    // No sacrifices yet: totalBoost = 1
+    assert_eq!(state.sacrifice_multiplier(), Decimal::ONE);
+
+    // sacrificed = 1e100: prePowerBoost = max(1, 100/10) = 10
+    // totalBoost = 10^2 = 100
+    state.sacrificed = Decimal::from_float(1e100);
+    assert_approx_eq(
+        state.sacrifice_multiplier(),
+        Decimal::from_float(100.0),
+        EPSILON_EXACT,
+        "totalBoost with sacrificed=1e100",
+    );
+
+    // sacrificed = 1e200: prePowerBoost = 200/10 = 20
+    // totalBoost = 20^2 = 400
+    state.sacrificed = Decimal::from_float(1e200);
+    assert_approx_eq(
+        state.sacrifice_multiplier(),
+        Decimal::from_float(400.0),
+        EPSILON_EXACT,
+        "totalBoost with sacrificed=1e200",
     );
 }
 
@@ -94,24 +135,21 @@ fn sacrifice_next_boost_formula() {
 #[test]
 fn sacrifice_first_time() {
     let mut state = GameState::new();
-    state.sacrifice_unlocked = true;
     state.dim_boosts = 5;
     state.dimensions[0].amount = Decimal::from_float(1e20);
     state.dimensions[0].bought = 50;
+    state.dimensions[7].amount = Decimal::from_float(1.0);
 
     // First sacrifice: total_sacrificed=0
-    // With sacrificed=0, log10(0) is undefined.
-    // The JS code: max(log10(sacrificed)/10, 1) — if sacrificed=0,
-    // log10(0)=-inf, so max(-inf/10, 1) = 1
-    // prePowerMult = (20/10) / 1 = 2
-    // nextBoost = 2^2 = 4
+    // After: sacrificed=1e20
+    // totalBoost = max(1, log10(1e20)/10)^2 = (20/10)^2 = 4
     assert!(state.sacrifice());
 
     assert_approx_eq(
-        state.sacrifice_boost,
+        state.sacrifice_multiplier(),
         Decimal::from_float(4.0),
         EPSILON_EXACT,
-        "sacrifice_boost after first sacrifice (AD1=1e20)",
+        "sacrifice_multiplier after first sacrifice (AD1=1e20)",
     );
 
     // total_sacrificed should now be 1e20
@@ -132,7 +170,6 @@ fn sacrifice_first_time() {
 #[test]
 fn sacrifice_reset_behavior() {
     let mut state = GameState::new();
-    state.sacrifice_unlocked = true;
     state.dim_boosts = 5;
 
     // Set up various dimensions
@@ -165,36 +202,39 @@ fn sacrifice_reset_behavior() {
     assert_eq!(state.dimensions[7].bought, 80);
 }
 
-/// Verify cumulative sacrifice multiplier (running product).
+/// Verify cumulative sacrifice multiplier is stateless.
+/// After two sacrifices, totalBoost depends only on total
+/// sacrificed, not the order or individual boosts.
 #[test]
 fn sacrifice_cumulative_boost() {
     let mut state = GameState::new();
-    state.sacrifice_unlocked = true;
     state.dim_boosts = 5;
+    state.dimensions[7].amount = Decimal::from_float(1.0);
 
     // First sacrifice: AD1=1e100
-    // sacrificed=0, prePowerMult=(100/10)/1=10, boost=100
+    // After: sacrificed=1e100
+    // totalBoost = max(1, 100/10)^2 = 100
     state.dimensions[0].amount = Decimal::from_float(1e100);
     assert!(state.sacrifice());
 
     assert_approx_eq(
-        state.sacrifice_boost,
+        state.sacrifice_multiplier(),
         Decimal::from_float(100.0),
         EPSILON_EXACT,
-        "sacrifice_boost after first sacrifice (AD1=1e100)",
+        "sacrifice_multiplier after first sacrifice (AD1=1e100)",
     );
 
     // Second sacrifice: AD1=1e200
-    // sacrificed=1e100, log(sacrificed)/10=10
-    // prePowerMult = (200/10) / 10 = 2, boost = 4
-    // cumulative = 100 × 4 = 400
+    // After: sacrificed ≈ 1e200 (1e100 + 1e200 ≈ 1e200)
+    // totalBoost = max(1, 200/10)^2 = 400
     state.dimensions[0].amount = Decimal::from_float(1e200);
+    state.dimensions[7].amount = Decimal::from_float(1.0);
     assert!(state.sacrifice());
 
     assert_approx_eq(
-        state.sacrifice_boost,
+        state.sacrifice_multiplier(),
         Decimal::from_float(400.0),
         EPSILON_EXACT,
-        "cumulative sacrifice_boost after two sacrifices",
+        "sacrifice_multiplier after two sacrifices",
     );
 }

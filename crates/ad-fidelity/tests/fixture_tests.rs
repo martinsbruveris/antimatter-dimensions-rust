@@ -313,15 +313,13 @@ fn fixture_sacrifice_next_boost() {
     for entry in &fixtures.sacrifice.next_boost {
         let mut state = GameState::new();
         state.dim_boosts = 5;
-        state.sacrifice_unlocked = true;
         state.dimensions[0].amount =
             Decimal::from_float(10.0_f64.powi(entry.log10_ad1 as i32));
         state.sacrificed =
             Decimal::from_float(10.0_f64.powi(entry.log10_sacrificed as i32));
-        state.sacrifice_boost = Decimal::ONE;
 
         let expected = parse_decimal(&entry.next_boost);
-        let actual = state.sacrifice_multiplier_if_sacrificed();
+        let actual = state.next_sacrifice_boost();
 
         assert_approx_eq(
             actual,

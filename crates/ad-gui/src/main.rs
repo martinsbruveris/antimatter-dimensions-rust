@@ -134,7 +134,7 @@ impl App {
         ui.vertical_centered(|ui| {
             // Multiplier info line
             let buy10_mult = 2.0_f64.powi(1); // Always 2x
-            let sacrifice_text = if self.game.sacrifice_unlocked {
+            let sacrifice_text = if self.game.sacrifice_unlocked() {
                 format!(
                     " | Dimensional Sacrifice multiplier: {}",
                     format_multiplier(&self.game.sacrifice_multiplier())
@@ -156,7 +156,7 @@ impl App {
 
             ui.horizontal(|ui| {
                 // Center the buttons
-                let total_width = if self.game.sacrifice_unlocked {
+                let total_width = if self.game.sacrifice_unlocked() {
                     500.0
                 } else {
                     120.0
@@ -164,7 +164,7 @@ impl App {
                 ui.add_space((ui.available_width() - total_width) / 2.0);
 
                 // Sacrifice button
-                if self.game.sacrifice_unlocked {
+                if self.game.sacrifice_unlocked() {
                     let can_sacrifice = self.game.can_sacrifice();
                     let sacrifice_boost = self.game.sacrifice_multiplier_if_sacrificed();
                     let btn_text = if can_sacrifice {

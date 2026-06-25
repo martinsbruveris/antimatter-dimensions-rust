@@ -76,12 +76,6 @@ pub struct GameState {
     /// Total antimatter sacrificed (cumulative across all
     /// sacrifices).
     pub sacrificed: Decimal,
-    /// Running product of all sacrifice boosts applied to the
-    /// 8th dimension.
-    pub sacrifice_boost: Decimal,
-    /// Whether sacrifice is unlocked (requires 5th dimension
-    /// to be unlocked).
-    pub sacrifice_unlocked: bool,
     /// Autobuyer state for dimensions and tickspeed.
     pub autobuyers: AutobuyerState,
 }
@@ -97,8 +91,6 @@ impl GameState {
             dim_boosts: 0,
             galaxies: 0,
             sacrificed: Decimal::ZERO,
-            sacrifice_boost: Decimal::ONE,
-            sacrifice_unlocked: false,
             autobuyers: AutobuyerState::new(),
         }
     }
@@ -115,6 +107,14 @@ impl GameState {
     /// Returns whether a given dimension tier (0-indexed) is unlocked.
     pub fn is_dimension_unlocked(&self, tier: usize) -> bool {
         tier < self.unlocked_dimensions()
+    }
+
+    /// Returns whether dimensional sacrifice is unlocked.
+    /// In JS: requires `DimBoost.purchasedBoosts > 4` (i.e.,
+    /// ≥ 5 boosts, which means all 8 dims are unlocked plus
+    /// one extra boost).
+    pub fn sacrifice_unlocked(&self) -> bool {
+        self.dim_boosts >= 5
     }
 }
 

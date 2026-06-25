@@ -241,8 +241,10 @@ fn production_with_sacrifice_multiplier() {
     let mut state = GameState::new();
     state.dim_boosts = 4; // Unlock all dims
 
-    // Set sacrifice_boost = 100
-    state.sacrifice_boost = Decimal::from_float(100.0);
+    // Set sacrificed so that sacrifice_multiplier = 100
+    // totalBoost = max(1, log10(sacrificed)/10)^2 = 100
+    // → log10(sacrificed)/10 = 10 → sacrificed = 1e100
+    state.sacrificed = Decimal::from_float(1e100);
 
     // AD8: amount=5, bought=0 (buy10=1)
     // dimboost_mult(tier=7) = 2^max(0, 4-7) = 2^0 = 1

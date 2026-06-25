@@ -89,7 +89,6 @@ fn galaxy_reset_behavior() {
     state.tickspeed.bought = 20;
     state.antimatter = Decimal::from_float(1e200);
     state.sacrificed = Decimal::from_float(1e50);
-    state.sacrifice_boost = Decimal::from_float(25.0);
 
     assert!(state.buy_galaxy());
 
@@ -118,7 +117,8 @@ fn galaxy_reset_behavior() {
 
     // Sacrificed reset
     assert_eq!(state.sacrificed, Decimal::ZERO);
-    assert_eq!(state.sacrifice_boost, Decimal::ONE);
+    // sacrifice_multiplier resets to 1 (stateless: no sacrificed)
+    assert_eq!(state.sacrifice_multiplier(), Decimal::ONE);
 }
 
 /// Verify consecutive galaxy purchases increase requirement.

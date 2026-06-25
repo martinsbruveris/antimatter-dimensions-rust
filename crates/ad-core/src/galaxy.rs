@@ -42,9 +42,7 @@ impl GameState {
     fn galaxy_reset(&mut self) {
         self.antimatter = Decimal::from_float(INITIAL_ANTIMATTER);
         self.dim_boosts = 0;
-        self.sacrifice_unlocked = false;
-        self.sacrificed = Decimal::default();
-        self.sacrifice_boost = Decimal::ONE;
+        self.sacrificed = Decimal::ZERO;
 
         for i in 0..8 {
             self.dimensions[i] = DimensionTier::new();
@@ -96,12 +94,6 @@ impl GameState {
         }
 
         self.dim_boosts += 1;
-
-        // Unlock sacrifice when 5th dimension becomes available
-        if self.dim_boosts >= 1 {
-            self.sacrifice_unlocked = true;
-        }
-
         self.dim_boost_reset();
         true
     }
@@ -110,8 +102,7 @@ impl GameState {
     /// all dimensions. Tickspeed and galaxies are kept.
     fn dim_boost_reset(&mut self) {
         self.antimatter = Decimal::from_float(INITIAL_ANTIMATTER);
-        self.sacrificed = Decimal::default();
-        self.sacrifice_boost = Decimal::ONE;
+        self.sacrificed = Decimal::ZERO;
 
         for i in 0..8 {
             self.dimensions[i] = DimensionTier::new();

@@ -96,8 +96,8 @@ impl ObservedState {
             dim_boosts: game.dim_boosts,
             galaxies: game.galaxies,
             sacrificed: game.sacrificed,
-            sacrifice_boost: game.sacrifice_boost,
-            sacrifice_unlocked: game.sacrifice_unlocked,
+            sacrifice_boost: game.sacrifice_multiplier(),
+            sacrifice_unlocked: game.sacrifice_unlocked(),
         }
     }
 }

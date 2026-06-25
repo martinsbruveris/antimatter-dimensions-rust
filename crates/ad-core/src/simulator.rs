@@ -335,6 +335,8 @@ fn try_prestige_plan(
 
 /// Try to sacrifice if the strategy config allows it and the
 /// gain ratio is sufficient.
+/// Matches JS autobuyer: sacrifices when
+/// `nextBoost >= max(multiplier, 1.01)`.
 fn try_sacrifice(
     game: &mut GameState,
     config: &crate::strategy::SacrificeConfig,
@@ -343,16 +345,8 @@ fn try_sacrifice(
         return false;
     }
 
-    let current = game.sacrifice_multiplier();
-    if current <= Decimal::ZERO {
-        // First sacrifice is always worth it
-        return game.sacrifice();
-    }
-
-    let prospective = game.sacrifice_multiplier_if_sacrificed();
-    let ratio = (prospective / current).to_f64();
-
-    if ratio >= config.min_gain_ratio {
+    let next_boost = game.next_sacrifice_boost().to_f64();
+    if next_boost >= config.min_gain_ratio {
         game.sacrifice()
     } else {
         false

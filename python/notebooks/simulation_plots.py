@@ -14,8 +14,7 @@ def _():
 
     import antimatter_dimensions as ad
 
-    dim_colors = plt.cm.Greys(np.linspace(1.0, 0.2, 8))
-    return ad, dim_colors, mo, np, plt, time
+    return ad, mo, np, plt, time
 
 
 @app.cell
@@ -27,8 +26,121 @@ def _(mo):
 
 
 @app.cell
-def _(ad, time):
+def _(ad, np, plt):
+    def plot_trace(result: ad.SimulationResult):
+        dim_colors = plt.cm.Greys(np.linspace(1.0, 0.2, 8))
 
+        trace = result.trace
+        time_s = trace.time_ms / 1000.0
+        antimatter_log10 = trace.antimatter.e
+        dim_amounts_log10 = trace.dimensions.amount.e
+        dim_bought = trace.dimensions.bought
+        dim_boosts = trace.dim_boosts
+        galaxies = trace.galaxies
+        tickspeed_bought = trace.tickspeed.bought
+        tickspeed_effect_log10 = trace.tickspeed.tickspeed_effect.e
+
+        xlim = (0, time_s[-1] * 1.03)
+
+        plt.figure(figsize=(12, 3))
+        plt.plot(time_s, antimatter_log10, color="k")
+        plt.xlim(xlim)
+        plt.ylabel("log₁₀(antimatter)")
+        plt.xlabel("Game Time (s)")
+        plt.title("Antimatter")
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+        plt.figure(figsize=(12, 3))
+        for _i in range(7, -1, -1):
+            plt.plot(
+                time_s,
+                dim_amounts_log10[:, _i],
+                label=f"Dim {_i + 1}",
+                color=dim_colors[_i],
+            )
+        plt.xlim(xlim)
+        plt.ylabel("log₁₀(amount)")
+        plt.xlabel("Game Time (s)")
+        plt.title("Dimension Amounts")
+        _h, _l = plt.gca().get_legend_handles_labels()
+        plt.legend(_h[::-1], _l[::-1], loc="upper left", ncol=4, fontsize=8)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+        plt.figure(figsize=(12, 3))
+        for _i in range(7, -1, -1):
+            plt.plot(
+                time_s,
+                dim_bought[:, _i],
+                label=f"Dim {_i + 1}",
+                color=dim_colors[_i],
+            )
+        plt.xlim(xlim)
+        plt.ylabel("Bought")
+        plt.xlabel("Game Time (s)")
+        plt.title("Dimension Purchases")
+        _h, _l = plt.gca().get_legend_handles_labels()
+        plt.legend(_h[::-1], _l[::-1], loc="upper left", ncol=4, fontsize=8)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+        plt.figure(figsize=(12, 3))
+        plt.plot(time_s, dim_boosts, label="Dim Boosts", color="k")
+        plt.plot(time_s, galaxies, label="Galaxies", color="k", linestyle="--")
+        plt.xlim(xlim)
+        plt.ylabel("Count")
+        plt.xlabel("Game Time (s)")
+        plt.title("Dimension Boosts & Galaxies")
+        plt.legend(loc="upper left")
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+        plt.figure(figsize=(12, 3))
+        plt.subplot(1, 2, 1)
+        plt.plot(time_s, tickspeed_effect_log10, color="k")
+        plt.xlim(xlim)
+        plt.ylabel("log₁₀(effect)")
+        plt.xlabel("Game Time (s)")
+        plt.title("Tickspeed Effect")
+        plt.grid(True, alpha=0.3)
+        plt.subplot(1, 2, 2)
+        plt.plot(time_s, tickspeed_bought, color="k")
+        plt.xlim(xlim)
+        plt.ylabel("Bought")
+        plt.xlabel("Game Time (s)")
+        plt.title("Tickspeed Upgrades Bought")
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+        plt.figure(figsize=(12, 3))
+        plt.subplot(1, 2, 1)
+        plt.plot(time_s, trace.sacrificed.e, color="k")
+        plt.xlim(xlim)
+        plt.ylabel("log₁₀(sacrificed)")
+        plt.xlabel("Game Time (s)")
+        plt.title("Total Sacrificed")
+        plt.grid(True, alpha=0.3)
+        plt.subplot(1, 2, 2)
+        plt.plot(time_s, trace.sacrifice_boost.e, color="k")
+        plt.xlim(xlim)
+        plt.ylabel("log₁₀(boost)")
+        plt.xlabel("Game Time (s)")
+        plt.title("Sacrifice Boost")
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+    return (plot_trace,)
+
+
+@app.cell
+def _(ad, time):
     strategy = ad.StrategyConfig()
     config = ad.SimulationConfig(strategy, snapshot_count=5_000)
 
@@ -51,118 +163,8 @@ def _(ad, time):
 
 
 @app.cell
-def _(result):
-    trace = result.trace
-    time_s = trace.time_ms / 1000.0
-    antimatter_log10 = trace.antimatter.e
-    dim_amounts_log10 = trace.dimensions.amount.e
-    dim_bought = trace.dimensions.bought
-    dim_boosts = trace.dim_boosts
-    galaxies = trace.galaxies
-    tickspeed_bought = trace.tickspeed.bought
-    tickspeed_effect_log10 = trace.tickspeed.tickspeed_effect.e
-    return (
-        antimatter_log10,
-        dim_amounts_log10,
-        dim_boosts,
-        dim_bought,
-        galaxies,
-        tickspeed_bought,
-        tickspeed_effect_log10,
-        time_s,
-    )
-
-
-@app.cell
-def _(
-    antimatter_log10,
-    dim_amounts_log10,
-    dim_boosts,
-    dim_bought,
-    dim_colors,
-    galaxies,
-    plt,
-    tickspeed_bought,
-    tickspeed_effect_log10,
-    time_s,
-):
-    xlim = (0, time_s[-1] * 1.03)
-
-    plt.figure(figsize=(12, 3))
-    plt.plot(time_s, antimatter_log10, color="k")
-    plt.xlim(xlim)
-    plt.ylabel("log₁₀(antimatter)")
-    plt.xlabel("Game Time (s)")
-    plt.title("Antimatter")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.show()
-
-    plt.figure(figsize=(12, 3))
-    for _i in range(7, -1, -1):
-        plt.plot(
-            time_s,
-            dim_amounts_log10[:, _i],
-            label=f"Dim {_i + 1}",
-            color=dim_colors[_i],
-        )
-    plt.xlim(xlim)
-    plt.ylabel("log₁₀(amount)")
-    plt.xlabel("Game Time (s)")
-    plt.title("Dimension Amounts")
-    _h, _l = plt.gca().get_legend_handles_labels()
-    plt.legend(_h[::-1], _l[::-1], loc="upper left", ncol=4, fontsize=8)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.show()
-
-    plt.figure(figsize=(12, 3))
-    for _i in range(7, -1, -1):
-        plt.plot(
-            time_s,
-            dim_bought[:, _i],
-            label=f"Dim {_i + 1}",
-            color=dim_colors[_i],
-        )
-    plt.xlim(xlim)
-    plt.ylabel("Bought")
-    plt.xlabel("Game Time (s)")
-    plt.title("Dimension Purchases")
-    _h, _l = plt.gca().get_legend_handles_labels()
-    plt.legend(_h[::-1], _l[::-1], loc="upper left", ncol=4, fontsize=8)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.show()
-
-    plt.figure(figsize=(12, 3))
-    plt.subplot(1, 2, 1)
-    plt.plot(time_s, tickspeed_effect_log10, color="k")
-    plt.xlim(xlim)
-    plt.ylabel("log₁₀(effect)")
-    plt.xlabel("Game Time (s)")
-    plt.title("Tickspeed Effect")
-    plt.grid(True, alpha=0.3)
-    plt.subplot(1, 2, 2)
-    plt.plot(time_s, tickspeed_bought, color="k")
-    plt.xlim(xlim)
-    plt.ylabel("Bought")
-    plt.xlabel("Game Time (s)")
-    plt.title("Tickspeed Upgrades Bought")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.show()
-
-    plt.figure(figsize=(12, 3))
-    plt.plot(time_s, dim_boosts, label="Dim Boosts", color="k")
-    plt.plot(time_s, galaxies, label="Galaxies", color="k", linestyle="--")
-    plt.xlim(xlim)
-    plt.ylabel("Count")
-    plt.xlabel("Game Time (s)")
-    plt.title("Dimension Boosts & Galaxies")
-    plt.legend(loc="upper left")
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.show()
+def _(plot_trace, result):
+    plot_trace(result)
     return
 
 
@@ -209,7 +211,7 @@ def _(ad, np, plt):
 @app.cell
 def _(ad, np, plt):
     def _func():
-        thresholds = np.arange(4, 8, 0.01)
+        thresholds = np.arange(4, 8, 0.1)
         times = np.empty_like(thresholds)
         MAX_TIME_S = 36_000.0
 
@@ -238,6 +240,32 @@ def _(ad, np, plt):
         plt.show()
 
     _func()
+    return
+
+
+@app.cell
+def _(ad, plot_trace):
+    _strategy = ad.StrategyConfig(sacrifice_threshold=6.0)
+    _config = ad.SimulationConfig(
+        _strategy,
+        snapshot_count=5_000,
+        stop_score=ad.BIG_CRUNCH_THRESHOLD,
+        stop_max_game_time_s=4000,
+    )
+    _result = ad.simulate(_config)
+
+    # print(
+    #     f"Simulation complete: {_result.total_ticks:,} ticks, "
+    #     f"{_result.total_time_s:.1f}s game time, "
+    #     f"{len(_result.trace):,} snapshots"
+    # )
+    # print(
+    #     f"Final: {_result.final_state.dim_boosts} boosts, "
+    #     f"{_result.final_state.galaxies} galaxies, "
+    #     f"antimatter ~1e{_result.final_state.antimatter.e:.0f}"
+    # )
+
+    plot_trace(_result)
     return
 
 

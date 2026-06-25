@@ -1,5 +1,7 @@
 """Type stubs for ad_python native module."""
 
+BIG_CRUNCH_THRESHOLD: Decimal
+
 class Decimal:
     """A single Decimal value: m × 10^e."""
 
@@ -26,6 +28,10 @@ class DimensionTier:
     def amount(self) -> Decimal: ...
     @property
     def bought(self) -> int: ...
+    @property
+    def multiplier(self) -> Decimal: ...
+    @property
+    def production_per_second(self) -> Decimal: ...
 
 class TickspeedState:
     """Tickspeed upgrade state."""
@@ -36,6 +42,10 @@ class TickspeedState:
     def cost(self) -> Decimal: ...
     @property
     def cost_multiplier(self) -> Decimal: ...
+    @property
+    def tickspeed_ms(self) -> float: ...
+    @property
+    def tickspeed_effect(self) -> Decimal: ...
 
 class GameState:
     """Full game state for pre-infinity gameplay."""
@@ -82,12 +92,20 @@ class SimulationConfig:
     strategy: StrategyConfig
     tick_ms: float
     snapshot_count: int
+    stop_score: Decimal | None
+    stop_max_ticks: int | None
+    stop_max_game_time_s: float | None
+    stop_max_wall_time_s: float | None
 
     def __init__(
         self,
         strategy: StrategyConfig,
-        tick_ms: float = 33.0,
-        snapshot_count: int = 1_000,
+        tick_ms: float = 50.0,
+        snapshot_count: int = 500,
+        stop_score: Decimal | None = None,
+        stop_max_ticks: int | None = None,
+        stop_max_game_time_s: float | None = None,
+        stop_max_wall_time_s: float | None = None,
     ) -> None: ...
 
 class Snapshot:
@@ -108,10 +126,12 @@ class SimulationResult:
     @property
     def total_ticks(self) -> int: ...
     @property
+    def stop_reason(self) -> str: ...
+    @property
     def final_state(self) -> GameState: ...
     @property
     def trace(self) -> list[Snapshot]: ...
 
 def simulate(config: SimulationConfig) -> SimulationResult:
-    """Run a simulation from fresh game until Big Crunch."""
+    """Run a simulation from fresh game."""
     ...

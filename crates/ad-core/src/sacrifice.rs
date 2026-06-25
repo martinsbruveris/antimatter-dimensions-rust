@@ -5,69 +5,87 @@ use crate::state::GameState;
 
 impl GameState {
     /// Check if the player can sacrifice dimensions.
-    /// Requires: sacrifice unlocked AND has a non-zero amount
-    /// of 1st dimension.
+    /// Matches JS: requires 5+ dim boosts, AD8 amount > 0,
+    /// and next boost > 1.
     pub fn can_sacrifice(&self) -> bool {
-        self.sacrifice_unlocked && self.dimensions[0].amount > Decimal::from_float(0.0)
+        self.sacrifice_unlocked()
+            && self.dimensions[7].amount > Decimal::ZERO
+            && self.next_sacrifice_boost() > Decimal::ONE
     }
 
-    /// Get the current sacrifice multiplier (running product
-    /// of all past sacrifice boosts).
+    /// Get the current sacrifice multiplier, computed
+    /// statelessly from total sacrificed amount.
+    ///
+    /// JS `Sacrifice.totalBoost`:
+    ///   if sacrificed == 0: return 1
+    ///   prePowerBoost = max(1, log10(sacrificed) / 10)
+    ///   totalBoost = prePowerBoost ^ SACRIFICE_EXPONENT
     pub fn sacrifice_multiplier(&self) -> Decimal {
-        self.sacrifice_boost
+        Self::total_boost(&self.sacrificed)
+    }
+
+    /// Compute the total sacrifice boost from a given
+    /// sacrificed amount.
+    fn total_boost(sacrificed: &Decimal) -> Decimal {
+        if *sacrificed <= Decimal::ZERO {
+            return Decimal::ONE;
+        }
+        let pre_power = (sacrificed.log10() / 10.0).max(1.0);
+        Decimal::from_float(pre_power.powf(SACRIFICE_EXPONENT))
     }
 
     /// Compute the individual boost that the next sacrifice
-    /// would give. Uses the pre-infinity formula:
-    ///   max(1, (log10(AD1) / 10) /
-    ///          max(log10(total_sacrificed) / 10, 1))
-    ///   ^ SACRIFICE_EXPONENT
-    fn next_sacrifice_boost(
-        ad1_amount: &Decimal,
-        total_sacrificed: &Decimal,
-    ) -> Decimal {
-        if *ad1_amount <= Decimal::ONE {
+    /// would give (the gain ratio). Used by the autobuyer to
+    /// decide whether to sacrifice.
+    ///
+    /// JS `Sacrifice.nextBoost`:
+    ///   sacrificed = player.sacrificed.clampMin(1)
+    ///   prePowerMult = max(1, (log10(AD1) / 10)
+    ///                       / max(log10(sacrificed) / 10, 1))
+    ///   nextBoost = prePowerMult ^ SACRIFICE_EXPONENT
+    pub fn next_sacrifice_boost(&self) -> Decimal {
+        let ad1 = &self.dimensions[0].amount;
+        if *ad1 <= Decimal::ONE {
             return Decimal::ONE;
         }
 
-        let log_ad1 = ad1_amount.log10() / 10.0;
-        let log_sacrificed = (total_sacrificed.log10() / 10.0).max(1.0);
+        let sacrificed = if self.sacrificed <= Decimal::ZERO {
+            Decimal::ONE
+        } else {
+            self.sacrificed
+        };
+
+        let log_ad1 = ad1.log10() / 10.0;
+        let log_sacrificed = (sacrificed.log10() / 10.0).max(1.0);
         let ratio = (log_ad1 / log_sacrificed).max(1.0);
 
         Decimal::from_float(ratio.powf(SACRIFICE_EXPONENT))
     }
 
     /// Compute what the total sacrifice multiplier would be
-    /// after sacrificing. Returns the new total multiplier.
+    /// after sacrificing.
     pub fn sacrifice_multiplier_if_sacrificed(&self) -> Decimal {
-        let next_boost =
-            Self::next_sacrifice_boost(&self.dimensions[0].amount, &self.sacrificed);
-        self.sacrifice_boost * next_boost
+        let new_sacrificed = self.sacrificed + self.dimensions[0].amount;
+        Self::total_boost(&new_sacrificed)
     }
 
     /// Perform a dimensional sacrifice.
-    /// Resets dimensions 1-7 amounts (keeps bought count) and
-    /// adds the 1st dimension amount to the sacrifice total.
-    /// The 8th dimension gets a production multiplier from the
-    /// running product of sacrifice boosts.
+    /// Adds AD1 amount to sacrifice total and resets
+    /// dimensions 1-7 amounts (keeps bought counts).
+    /// The 8th dimension multiplier is computed statelessly
+    /// from the sacrifice total.
     /// Returns true if sacrifice was performed.
     pub fn sacrifice(&mut self) -> bool {
         if !self.can_sacrifice() {
             return false;
         }
 
-        let ad1_amount = self.dimensions[0].amount;
-
-        // Compute the individual boost using existing total
-        let next_boost = Self::next_sacrifice_boost(&ad1_amount, &self.sacrificed);
-        self.sacrifice_boost *= next_boost;
-
         // Update total sacrificed
-        self.sacrificed += ad1_amount;
+        self.sacrificed += self.dimensions[0].amount;
 
         // Reset amounts for dimensions 1-7 (indices 0-6)
         for i in 0..7 {
-            self.dimensions[i].amount = Decimal::default();
+            self.dimensions[i].amount = Decimal::ZERO;
         }
 
         true
