@@ -1,14 +1,18 @@
 <script setup>
-import { onMounted, onUnmounted } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 
 import { useGameStore } from "./stores/game";
 import { useUiStore } from "./stores/ui";
 import Sidebar from "./components/Sidebar.vue";
 import GameHeader from "./components/GameHeader.vue";
 import InfoButtons from "./components/InfoButtons.vue";
+import HotkeysModal from "./components/HotkeysModal.vue";
 
 const game = useGameStore();
 const ui = useUiStore();
+
+// Hotkey List popup, toggled with "?" (and closable with Escape).
+const showHotkeys = ref(false);
 
 let raf = null;
 let last = performance.now();
@@ -21,6 +25,14 @@ function loop() {
 }
 
 function onKeydown(e) {
+  if (e.key === "?") {
+    showHotkeys.value = !showHotkeys.value;
+    return;
+  }
+  if (e.key === "Escape" && showHotkeys.value) {
+    showHotkeys.value = false;
+    return;
+  }
   if (e.key === "m" || e.key === "M") game.maxAll();
 }
 
@@ -72,6 +84,11 @@ onUnmounted(() => {
       </div>
     </div>
   </div>
+
+  <HotkeysModal
+    v-if="showHotkeys"
+    @close="showHotkeys = false"
+  />
 </template>
 
 <style scoped>

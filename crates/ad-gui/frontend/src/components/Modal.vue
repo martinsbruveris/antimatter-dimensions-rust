@@ -4,6 +4,10 @@ defineProps({
   // Extra class(es) for the title (e.g. `c-game-header__antimatter` to make
   // the credits title red, matching the original).
   titleClass: { type: String, default: "" },
+  // Size the modal to its content instead of the wide default Information-
+  // modal width. Used by the Hotkey List modal, which is only as wide as
+  // its two columns (matching the original).
+  fitContent: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["close"]);
@@ -17,7 +21,10 @@ const emit = defineEmits(["close"]);
     @click.self="emit('close')"
   >
     <div class="l-modal">
-      <div class="c-modal c-modal-text">
+      <div
+        class="c-modal c-modal-text"
+        :class="{ 'c-modal-text--fit': fitContent }"
+      >
         <div
           class="c-modal__close-btn"
           @click="emit('close')"
@@ -63,6 +70,12 @@ const emit = defineEmits(["close"]);
   max-width: 95vw;
   font-size: 2rem;
   text-align: left;
+}
+
+/* Shrink-to-fit variant: only as wide as the content needs (e.g. the
+   Hotkey List's two columns), defined after the rule above so it wins. */
+.c-modal-text--fit {
+  width: fit-content;
 }
 
 /* Title spans the full width, stays centred, and is larger than the
