@@ -9,6 +9,8 @@ export const useUiStore = defineStore("ui", {
     currentTabKey: "dimensions",
     // Remembers the last-open subtab per tab: { [tabKey]: subtabKey }.
     currentSubtabKey: {},
+    // Dev-only: multiplier applied to wall-clock dt before ticking.
+    speedMultiplier: 1,
   }),
   getters: {
     currentTab(state) {
@@ -30,6 +32,9 @@ export const useUiStore = defineStore("ui", {
     setSubtab(tabKey, subtabKey) {
       this.currentTabKey = tabKey;
       this.currentSubtabKey[tabKey] = subtabKey;
+    },
+    setSpeed(multiplier) {
+      this.speedMultiplier = multiplier;
     },
   },
 });

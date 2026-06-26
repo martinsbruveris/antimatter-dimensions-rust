@@ -13,14 +13,16 @@ egui frontend and a vanilla-JS Tauri frontend — have been removed.)
 ```bash
 npm --prefix frontend install     # once
 npm --prefix frontend run build   # build Vue app -> frontend/dist
-cargo run -p ad-gui               # Tauri serves frontend/dist
+cargo run -p ad-gui               # Tauri serves frontend/dist (dev)
+cargo tauri build                 # release build (.app/.dmg with icon)
 ```
 
 `cargo run` is dev mode and serves `frontend/dist` from disk, so after a
 frontend change just re-run `npm run build` (no Rust rebuild needed). There is
 no `devUrl`/Vite-dev-server wired up — a plain `cargo run` with `devUrl` set
 would show a blank window. `cargo tauri build` (release) bundles the frontend
-via `beforeBuildCommand`.
+via `beforeBuildCommand`. Run from `crates/ad-gui/` (requires
+`cargo install tauri-cli`).
 
 ## Layout
 
@@ -53,10 +55,12 @@ frontend/
   Other commands (`buy_dimension`, `sacrifice`, …) mutate state. Number
   formatting is currently done here (`format_decimal`) — see the formatting doc.
 - **Game loop**: `App.vue` runs a `requestAnimationFrame` loop calling
-  `game.tick(dt)`; the `game` store stores the latest snapshot.
+  `game.tick(dt * speedMultiplier)`; the `game` store stores the latest
+  snapshot. The speed multiplier (1x/10x/60x) is a dev-only UI feature in
+  the `ui` store — it is not part of the game engine.
 - **Stores**: `game` mirrors the Rust snapshot + dispatches actions; `ui` holds
-  navigation state. Components read snapshot fields and call store actions —
-  they never compute game logic.
+  navigation state and dev controls (speed multiplier). Components read
+  snapshot fields and call store actions — they never compute game logic.
 
 ## Multi-page navigation
 
@@ -87,6 +91,11 @@ frontend/
 - **Reuse original markup**: mirror the original Modern components' `<template>`
   and class names; rewrite only the `<script>` to read the snapshot instead of
   the JS engine globals. Original source: `../../../antimatter-dimensions/src`.
+- **Tooltips.** Use the vendored `c-tooltip-content`, `c-tooltip-arrow`, and
+  `c-tooltip--left` (or `--top`/`--right`/`--bottom`) classes for tooltips.
+  Place them as siblings of the trigger element inside a `position: relative`
+  wrapper and toggle visibility on `:hover`. See `DimensionRow.vue` for an
+  example.
 
 ## Known follow-ups
 

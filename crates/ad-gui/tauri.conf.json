@@ -7,6 +7,13 @@
     "beforeBuildCommand": "npm --prefix frontend run build",
     "frontendDist": "./frontend/dist"
   },
+  "bundle": {
+    "icon": [
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ]
+  },
   "app": {
     "windows": [
       {

@@ -59,35 +59,44 @@ function buy() {
       </div>
     </div>
     <div class="l-dim-row-multi-button-container">
-      <button
-        class="o-primary-btn o-primary-btn--new"
-        :class="{ 'o-primary-btn--disabled': !unlocked || !dim.can_buy }"
-        :title="unlocked ? `Purchased ${dim.bought} times` : ''"
-        @click="buy"
-      >
-        <div class="button-content l-modern-buy-ad-text">
-          <div>{{ unlocked ? `Buy ${howMany}` : "Locked" }}</div>
+      <div class="dim-buy-wrapper">
+        <button
+          class="o-primary-btn o-primary-btn--new"
+          :class="{ 'o-primary-btn--disabled': !unlocked || !dim.can_buy }"
+          @click="buy"
+        >
+          <div class="button-content l-modern-buy-ad-text">
+            <div>{{ unlocked ? `Buy ${howMany}` : "Locked" }}</div>
+            <div
+              v-if="unlocked"
+              :class="{ 'l-dim-row-small-text': hasLongText }"
+            >
+              {{ costText }}
+            </div>
+          </div>
           <div
             v-if="unlocked"
-            :class="{ 'l-dim-row-small-text': hasLongText }"
+            class="fill"
           >
-            {{ costText }}
+            <div
+              class="fill-purchased"
+              :style="{ width: dim.bought_mod_10 * 10 + '%' }"
+            />
+            <div
+              class="fill-possible"
+              :style="{ width: howMany * 10 + '%' }"
+            />
           </div>
-        </div>
-        <div
+        </button>
+        <span
           v-if="unlocked"
-          class="fill"
-        >
-          <div
-            class="fill-purchased"
-            :style="{ width: dim.bought_mod_10 * 10 + '%' }"
-          />
-          <div
-            class="fill-possible"
-            :style="{ width: howMany * 10 + '%' }"
-          />
-        </div>
-      </button>
+          class="c-tooltip-content c-tooltip-content--dark c-tooltip--left dim-tooltip"
+        >Purchased {{ dim.bought }} times</span>
+        <span
+          v-if="unlocked"
+          class="c-tooltip-arrow c-tooltip-arrow--dark c-tooltip--left dim-tooltip"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -134,5 +143,35 @@ function buy() {
 .l-modern-buy-ad-text {
   display: flex;
   flex-direction: column;
+}
+
+/* Tooltip anchored to the left of the button, shown on hover. */
+.dim-buy-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.dim-tooltip {
+  top: 50%;
+  right: calc(100% + 0.5rem);
+  left: auto;
+  bottom: auto;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  width: auto;
+  font-size: 1.1rem;
+}
+
+.dim-buy-wrapper .c-tooltip-arrow.dim-tooltip {
+  right: calc(100% - 0.1rem);
+  transform: translateY(-50%);
+  border-top-color: transparent;
+  border-right: 0;
+  border-bottom-color: transparent;
+}
+
+.dim-buy-wrapper:hover .dim-tooltip {
+  visibility: visible;
+  opacity: 1;
 }
 </style>

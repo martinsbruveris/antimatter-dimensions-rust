@@ -14,7 +14,7 @@ let last = performance.now();
 
 function loop() {
   const now = performance.now();
-  game.tick(now - last);
+  game.tick((now - last) * ui.speedMultiplier);
   last = now;
   raf = requestAnimationFrame(loop);
 }
@@ -38,6 +38,16 @@ onUnmounted(() => {
 <template>
   <Sidebar />
   <div class="game-container">
+    <div class="speed-controls">
+      <button
+        v-for="s in [1, 10, 60]"
+        :key="s"
+        :class="['speed-btn', { active: ui.speedMultiplier === s }]"
+        @click="ui.setSpeed(s)"
+      >
+        {{ s }}x
+      </button>
+    </div>
     <div class="tab-container">
       <GameHeader />
       <!-- Matches ModernUi.vue: an (empty pre-infinity) information-header
@@ -57,3 +67,29 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.speed-controls {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.3rem;
+  z-index: 10;
+}
+
+.speed-btn {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border: 1px solid var(--color-accent, #5f9948);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text, #cccccc);
+}
+
+.speed-btn.active {
+  background: var(--color-accent, #5f9948);
+  color: #000;
+}
+</style>

@@ -75,11 +75,14 @@ cargo fmt                      # Format
 npm --prefix crates/ad-gui/frontend install   # once
 npm --prefix crates/ad-gui/frontend run build # build the Vue app to dist/
 cargo run -p ad-gui                           # run the Tauri app (serves dist/)
+cd crates/ad-gui && cargo tauri build         # release build (.app/.dmg)
 ```
 
 `cargo run` serves the pre-built `dist/` (rebuild the frontend after JS/Vue
-changes — no Rust rebuild needed). See `crates/ad-gui/AGENTS.md` for the
-frontend architecture and how to add a page.
+changes — no Rust rebuild needed). `cargo tauri build` produces a bundled
+macOS `.app` with the custom icon (requires `cargo install tauri-cli`).
+See `crates/ad-gui/AGENTS.md` for the frontend architecture and how to add
+a page.
 
 #### Python
 
