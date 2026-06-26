@@ -162,9 +162,9 @@ fn sacrifice_disabled_condition(game: &GameState) -> String {
 }
 
 #[tauri::command]
-fn tick_and_get_state(dt_ms: f64, state: State<'_, Mutex<GameState>>) -> GameView {
+fn tick_and_get_state(dt_ms: f64, repeats: u32, state: State<'_, Mutex<GameState>>) -> GameView {
     let mut game = state.lock().unwrap();
-    game.tick(dt_ms);
+    game.ticks(dt_ms, repeats);
     build_game_view(&game)
 }
 

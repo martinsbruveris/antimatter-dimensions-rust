@@ -10,8 +10,11 @@ export const useGameStore = defineStore("game", {
     buyUntil10: true,
   }),
   actions: {
-    async tick(dtMs) {
-      this.snapshot = await invoke("tick_and_get_state", { dtMs });
+    // Advance the engine by `repeats` discrete ticks of `dtMs` each (the dev
+    // game-speed control passes the multiplier as `repeats`), returning a
+    // single snapshot. Looping in Rust avoids one IPC round-trip per tick.
+    async tick(dtMs, repeats = 1) {
+      this.snapshot = await invoke("tick_and_get_state", { dtMs, repeats });
     },
     toggleBuyMode() {
       this.buyUntil10 = !this.buyUntil10;

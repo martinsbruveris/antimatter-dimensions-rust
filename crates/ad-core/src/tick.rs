@@ -37,6 +37,17 @@ impl GameState {
         }
     }
 
+    /// Advance the game by `repeats` discrete steps of `dt_ms` each.
+    ///
+    /// Used by the dev game-speed control: running N real-sized ticks is more
+    /// faithful than a single `dt_ms * N` step, which would lump discrete
+    /// per-tick effects (e.g. autobuyers) into one and lose precision.
+    pub fn ticks(&mut self, dt_ms: f64, repeats: u32) {
+        for _ in 0..repeats {
+            self.tick(dt_ms);
+        }
+    }
+
     /// Run the simulation for `total_ms` of real time, using `tick_size_ms` per step.
     pub fn simulate(&mut self, total_ms: f64, tick_size_ms: f64) {
         let steps = (total_ms / tick_size_ms) as u64;

@@ -17,7 +17,9 @@ let last = performance.now();
 
 function loop() {
   const now = performance.now();
-  game.tick((now - last) * ui.speedMultiplier);
+  // The speed multiplier runs the engine as N discrete ticks of the real
+  // frame dt (looped in Rust), not a single dt * N step.
+  game.tick(now - last, ui.speedMultiplier);
   last = now;
   raf = requestAnimationFrame(loop);
 }
@@ -44,7 +46,7 @@ onUnmounted(() => {
     <div class="top-right-controls">
       <div class="speed-controls">
         <button
-          v-for="s in [1, 10, 60]"
+          v-for="s in [1, 10, 100, 1000]"
           :key="s"
           :class="['speed-btn', { active: ui.speedMultiplier === s }]"
           @click="ui.setSpeed(s)"
@@ -87,7 +89,9 @@ onUnmounted(() => {
   top: 0.5rem;
   right: 0.5rem;
   display: flex;
-  align-items: center;
+  /* Top-align so the speed row lines up with the "?" button (the top of the
+     stacked ?/i column), not the middle of the column. */
+  align-items: flex-start;
   gap: 0.8rem;
   z-index: 10;
 }
@@ -98,8 +102,12 @@ onUnmounted(() => {
 }
 
 .speed-btn {
-  padding: 0.2rem 0.6rem;
-  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  /* Match the "?" button height (2.2rem). */
+  height: 2.2rem;
+  padding: 0 0.7rem;
+  font-size: 1rem;
   cursor: pointer;
   border: 1px solid var(--color-accent, #5f9948);
   border-radius: 3px;
