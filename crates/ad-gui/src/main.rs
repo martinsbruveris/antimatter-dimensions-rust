@@ -228,13 +228,20 @@ fn format_decimal(val: &Decimal) -> String {
     } else if f < 1e9 {
         format_with_commas(f)
     } else {
-        let exp = f.log10().floor() as i64;
-        let mantissa = f / 10_f64.powi(exp as i32);
+        // Read the mantissa/exponent straight off the Decimal rather than via
+        // `to_f64()`, which returns infinity (losing the value) once the
+        // exponent exceeds f64's ~308 range — past which the old `exp + 1`
+        // saturated to i64::MAX and overflowed. The Decimal is normalized so
+        // the mantissa is in [1, 10).
+        let mut mantissa = val.mantissa();
+        let mut exp = val.exponent();
+        // Round-up case: e.g. 9.999 displays as 10.00, so carry into the
+        // exponent and show 1.00e(exp+1) instead.
         if mantissa >= 9.995 {
-            format!("1.00e{}", exp + 1)
-        } else {
-            format!("{:.2}e{}", mantissa, exp)
+            mantissa = 1.0;
+            exp += 1;
         }
+        format!("{:.2}e{}", mantissa, exp)
     }
 }
 
@@ -273,4 +280,34 @@ pub fn run() {
 
 fn main() {
     run();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_decimal_handles_values_beyond_f64() {
+        // Regression: antimatter past f64::MAX (~1.8e308) made `to_f64()`
+        // return infinity, and the old scientific branch overflowed on
+        // `exp + 1`. Formatting must work from the Decimal's own exponent.
+        assert_eq!(format_decimal(&Decimal::new(1.0, 500)), "1.00e500");
+        assert_eq!(format_decimal(&Decimal::new(1.8, 308)), "1.80e308");
+        // Largest representable exponent should not panic.
+        let _ = format_decimal(&Decimal::new(5.0, i64::MAX - 1));
+    }
+
+    #[test]
+    fn format_decimal_small_and_comma_ranges() {
+        assert_eq!(format_decimal(&Decimal::ZERO), "0");
+        assert_eq!(format_decimal(&Decimal::from_float(12.5)), "12.50");
+        assert_eq!(format_decimal(&Decimal::from_float(12_345.0)), "12,345");
+        assert_eq!(format_decimal(&Decimal::from_float(2.5e9)), "2.50e9");
+    }
+
+    #[test]
+    fn format_decimal_rounds_mantissa_up() {
+        // 9.999e10 should carry into the exponent as 1.00e11.
+        assert_eq!(format_decimal(&Decimal::new(9.999, 10)), "1.00e11");
+    }
 }
