@@ -134,6 +134,25 @@ When adding a new system:
 - Integrate into the tick loop in `tick.rs`
 - Add unit tests alongside the code and integration tests in `tests/`
 
+### Updating Documentation
+
+After completing a significant piece of work (new game system, architectural
+change, new crate, major refactor, or new tooling), update all relevant
+documentation before considering the task done:
+
+- **This file (`AGENTS.md`)** — update repository structure, key source files,
+  crate responsibilities, build commands, or any section affected by the change.
+- **`crates/ad-gui/AGENTS.md`** — if the frontend was modified.
+- **`design-docs/`** — add a new design doc for major architectural decisions;
+  update existing docs if they reference changed behaviour.
+- **Design Documents table** (in this file) — add entries for any new design
+  docs created.
+- **README or inline doc-comments** — if public APIs or usage instructions
+  changed.
+
+This applies to both human and AI contributors. Documentation that drifts from
+the code is worse than no documentation.
+
 ### Referencing the Original Game
 
 The original JS source is at `../antimatter-dimensions/src/core/`. Key directories:
