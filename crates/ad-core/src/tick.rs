@@ -1,5 +1,6 @@
 use break_infinity::Decimal;
 
+use crate::data::constants::BIG_CRUNCH_THRESHOLD;
 use crate::GameState;
 
 #[allow(clippy::needless_range_loop)]
@@ -35,6 +36,13 @@ impl GameState {
         for tier in 1..unlocked {
             self.dimensions[tier - 1].amount += productions[tier];
         }
+
+        // Cap antimatter at the Big Crunch threshold. Pre-Infinity, antimatter
+        // cannot exceed Number.MAX_VALUE; the player must Crunch to progress.
+        // This cap is lifted once breaking Infinity is implemented.
+        if self.antimatter > BIG_CRUNCH_THRESHOLD {
+            self.antimatter = BIG_CRUNCH_THRESHOLD;
+        }
     }
 
     /// Advance the game by `repeats` discrete steps of `dt_ms` each.
@@ -54,5 +62,32 @@ impl GameState {
         for _ in 0..steps {
             self.tick(tick_size_ms);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::GameState;
+
+    #[test]
+    fn tick_caps_antimatter_at_big_crunch_threshold() {
+        let cap = BIG_CRUNCH_THRESHOLD;
+        let mut game = GameState::new();
+
+        // Start just below the cap with strong production so a tick would
+        // otherwise push antimatter well past it.
+        game.antimatter = cap * Decimal::from_float(0.9);
+        game.dimensions[0].amount = Decimal::new(1.0, 400);
+
+        game.tick(1000.0);
+
+        assert!(
+            game.antimatter <= cap,
+            "antimatter {:?} exceeded the cap {:?}",
+            game.antimatter,
+            cap
+        );
+        assert_eq!(game.antimatter, cap);
     }
 }

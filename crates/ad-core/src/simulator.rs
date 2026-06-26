@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use break_infinity::Decimal;
 
-use crate::data::constants::big_crunch_threshold;
+use crate::data::constants::BIG_CRUNCH_THRESHOLD;
 use crate::observed::ObservedState;
 use crate::state::GameState;
 use crate::strategy::{
@@ -18,7 +18,7 @@ use crate::strategy::{
 #[derive(Debug, Clone, Default)]
 pub struct StopCondition {
     /// Stop when antimatter reaches this value.
-    /// Defaults to `big_crunch_threshold()` if `None`.
+    /// Defaults to `BIG_CRUNCH_THRESHOLD` if `None`.
     pub score: Option<Decimal>,
     /// Stop after this many ticks.
     pub max_ticks: Option<u64>,
@@ -182,7 +182,7 @@ pub fn simulate(config: &SimulationConfig) -> SimulationResult {
     let mut cursor = PlanCursor::new();
     let mut trace = StateTrace::new(config.snapshot_count);
 
-    let score_threshold = config.stop.score.unwrap_or_else(big_crunch_threshold);
+    let score_threshold = config.stop.score.unwrap_or(BIG_CRUNCH_THRESHOLD);
 
     let wall_start = Instant::now();
 

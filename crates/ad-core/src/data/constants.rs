@@ -68,12 +68,7 @@ pub const TICKSPEED_MULTIPLIER_MIN: f64 = 0.01;
 
 /// The Big Crunch threshold: antimatter >= this triggers
 /// the first Infinity. Equal to JS Number.MAX_VALUE
-/// (1.7976931348623157e308).
-pub fn big_crunch_threshold() -> Decimal {
-    Decimal::new(1.7976931348623157, 308)
-}
-
-/// Helper to create a Decimal from a constant f64.
-pub fn decimal(value: f64) -> Decimal {
-    Decimal::from_float(value)
-}
+/// (1.7976931348623157e308). The mantissa is already
+/// normalized (in [1, 10)), so `new_unchecked` is sound here.
+pub const BIG_CRUNCH_THRESHOLD: Decimal =
+    Decimal::new_unchecked(1.7976931348623157, 308);

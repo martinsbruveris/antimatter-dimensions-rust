@@ -1,6 +1,8 @@
 use std::sync::Mutex;
 
-use ad_core::data::constants::{BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER};
+use ad_core::data::constants::{
+    BIG_CRUNCH_THRESHOLD, BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER,
+};
 use ad_core::{Decimal, GameState};
 use serde::Serialize;
 use tauri::State;
@@ -109,15 +111,16 @@ fn build_game_view(game: &GameState) -> GameView {
     let (req_tier, req_amount) = game.dim_boost_requirement();
     let tickspeed_cost = &game.tickspeed.cost;
 
-    // Progress towards Infinity: log10(AM) / log10(f64::MAX),
-    // clamped to [0, 1] (matches the JS pLog10-based progress bar).
-    let log10_max = f64::MAX.log10();
+    // Progress towards Infinity: log10(AM) / log10(BIG_CRUNCH_THRESHOLD),
+    // clamped to [0, 1]. Keyed off the Big Crunch threshold (where antimatter
+    // is capped) so progress hits 100% exactly at the cap.
+    let log10_threshold = BIG_CRUNCH_THRESHOLD.log10();
     let am_plog10 = if game.antimatter > Decimal::ONE {
         game.antimatter.log10()
     } else {
         0.0
     };
-    let infinity_progress = (am_plog10 / log10_max).clamp(0.0, 1.0);
+    let infinity_progress = (am_plog10 / log10_threshold).clamp(0.0, 1.0);
 
     GameView {
         antimatter: format_decimal(&game.antimatter),
@@ -162,7 +165,11 @@ fn sacrifice_disabled_condition(game: &GameState) -> String {
 }
 
 #[tauri::command]
-fn tick_and_get_state(dt_ms: f64, repeats: u32, state: State<'_, Mutex<GameState>>) -> GameView {
+fn tick_and_get_state(
+    dt_ms: f64,
+    repeats: u32,
+    state: State<'_, Mutex<GameState>>,
+) -> GameView {
     let mut game = state.lock().unwrap();
     game.ticks(dt_ms, repeats);
     build_game_view(&game)

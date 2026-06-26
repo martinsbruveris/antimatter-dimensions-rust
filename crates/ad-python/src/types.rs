@@ -48,7 +48,7 @@ impl PyDecimal {
     }
 
     pub fn from_big_crunch_threshold() -> Self {
-        let d = ad_core::data::constants::big_crunch_threshold();
+        let d = ad_core::data::constants::BIG_CRUNCH_THRESHOLD;
         Self::from_decimal(&d)
     }
 }

@@ -416,6 +416,17 @@ impl Decimal {
         Decimal { m, e }.normalize()
     }
 
+    /// Creates a `Decimal` from a mantissa and exponent **without normalizing**.
+    ///
+    /// This is `const`, so it can initialize `const`/`static` items (which
+    /// `new` cannot, as normalization is not const-evaluable). The caller must
+    /// pass an already-normalized mantissa — i.e. in `[1, 10)`, `(-10, -1]`, or
+    /// `0` — otherwise arithmetic on the result is undefined. For runtime
+    /// values, prefer `new`, which normalizes.
+    pub const fn new_unchecked(m: f64, e: i64) -> Decimal {
+        Decimal { m, e }
+    }
+
     /// Creates a new instance of Decimal from an f64 value.
     pub fn from_float(value: f64) -> Decimal {
         Decimal::new(value, 0)
