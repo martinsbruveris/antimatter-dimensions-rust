@@ -96,6 +96,12 @@ frontend/
   Place them as siblings of the trigger element inside a `position: relative`
   wrapper and toggle visibility on `:hover`. See `DimensionRow.vue` for an
   example.
+- **External links.** A plain `<a target="_blank">` does not reliably open in
+  the system browser inside the Tauri webview. Open external URLs via the
+  opener plugin instead: `openUrl(url)` from `@tauri-apps/plugin-opener`
+  (registered in `main.rs` as `tauri_plugin_opener::init()`, permission
+  `opener:default` in `capabilities/default.json`). Fall back to `window.open`
+  for plain-browser dev mode. See `InfoButtons.vue` for an example.
 
 ## Known follow-ups
 

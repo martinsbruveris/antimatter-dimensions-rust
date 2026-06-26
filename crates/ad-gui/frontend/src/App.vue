@@ -5,6 +5,7 @@ import { useGameStore } from "./stores/game";
 import { useUiStore } from "./stores/ui";
 import Sidebar from "./components/Sidebar.vue";
 import GameHeader from "./components/GameHeader.vue";
+import InfoButtons from "./components/InfoButtons.vue";
 
 const game = useGameStore();
 const ui = useUiStore();
@@ -38,15 +39,20 @@ onUnmounted(() => {
 <template>
   <Sidebar />
   <div class="game-container">
-    <div class="speed-controls">
-      <button
-        v-for="s in [1, 10, 60]"
-        :key="s"
-        :class="['speed-btn', { active: ui.speedMultiplier === s }]"
-        @click="ui.setSpeed(s)"
-      >
-        {{ s }}x
-      </button>
+    <div class="top-right-controls">
+      <div class="speed-controls">
+        <button
+          v-for="s in [1, 10, 60]"
+          :key="s"
+          :class="['speed-btn', { active: ui.speedMultiplier === s }]"
+          @click="ui.setSpeed(s)"
+        >
+          {{ s }}x
+        </button>
+      </div>
+      <!-- Help (?) and info (i) buttons, matching the JS version's
+           top-right placement. -->
+      <InfoButtons />
     </div>
     <div class="tab-container">
       <GameHeader />
@@ -69,13 +75,19 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.speed-controls {
+.top-right-controls {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
   display: flex;
-  gap: 0.3rem;
+  align-items: center;
+  gap: 0.8rem;
   z-index: 10;
+}
+
+.speed-controls {
+  display: flex;
+  gap: 0.3rem;
 }
 
 .speed-btn {

@@ -23,7 +23,8 @@ const perUpgrade = computed(() =>
       antimatter.</span>
     <div>
       You are getting {{ s.antimatter_per_sec }} antimatter per second.
-      <br>
+    </div>
+    <div>
       ADs produce ×{{ perUpgrade }} faster per Tickspeed upgrade
       <br>
       Total Tickspeed: {{ s.tickspeed_effect }} / sec
