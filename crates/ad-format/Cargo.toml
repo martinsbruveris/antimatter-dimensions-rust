@@ -1,0 +1,8 @@
+[package]
+name = "ad-format"
+version = "0.1.0"
+edition = "2021"
+description = "Number formatting (notations) for Antimatter Dimensions — pure, presentation-only."
+
+[dependencies]
+break_infinity = { path = "../break_infinity" }

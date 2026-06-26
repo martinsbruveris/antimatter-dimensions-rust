@@ -22,6 +22,7 @@ antimatter-dimensions-rust/
 ├── crates/
 │   ├── break_infinity/     # Vendored big-number library (Decimal type)
 │   ├── ad-core/            # Game simulation engine + static config
+│   ├── ad-format/          # Number formatting (notations): format(value, &FormatOptions)
 │   ├── ad-fidelity/        # Rust-vs-JS fidelity test harness
 │   ├── ad-python/          # PyO3 bindings (antimatter_dimensions._native)
 │   └── ad-gui/             # Tauri + Vue 3 frontend (playable; see its AGENTS.md)
@@ -33,6 +34,7 @@ antimatter-dimensions-rust/
 |-------|------|---------|
 | `break_infinity` | lib | Decimal type: `mantissa × 10^exponent` arithmetic for numbers up to ~1e9e15 |
 | `ad-core` | lib | Game simulation engine. Pure logic, no IO. Contains a `data` module for static config. |
+| `ad-format` | lib | Pure, presentation-only number formatting: `format(&Decimal, &FormatOptions) -> String` + notation strategies. Never reads `GameState`. See `design-docs/2026-06-25-number-formatting.md`. |
 | `ad-fidelity` | lib/bin | Scenario-based harness comparing Rust engine outputs against the JS game. |
 | `ad-python` | lib (cdylib) | PyO3 bindings exposing the engine to Python (`antimatter_dimensions._native`). |
 | `ad-gui` | bin | **Playable frontend.** Tauri backend + Vue 3/Vite/Pinia. Rust-authoritative; see `crates/ad-gui/AGENTS.md`. |
@@ -166,6 +168,24 @@ The original JS source is at `../antimatter-dimensions/src/core/`. Key directori
 - `src/game.js` — Main game loop + prestige formulas
 
 When porting a system, aim for **behavioral fidelity** (same gameplay results) rather than structural fidelity (same code organization).
+
+**UI fidelity:** The UI should match the original game **exactly** — same layout,
+sizing, colors, fonts, and styling. The frontend vendors the original game's
+stylesheets verbatim (see `crates/ad-gui/frontend/public/stylesheets/`), so for
+any UI implementation, consult the original game code to see how those stylesheets
+are applied: which classes a component uses, the exact CSS values (widths,
+font-sizes, spacing), and which CSS variables (e.g. `--color-accent`,
+`--color-good`) it references. The original Vue components live in
+`../antimatter-dimensions/src/components/`. Prefer reusing the vendored classes
+and variables over inventing new styles, and copy concrete values from the
+original rather than guessing.
+
+**Number formatting / notations:** `src/core/format.js` holds only the thin wrappers
+(`format`, `formatInt`, `formatX`, …). The actual notation strategies (Scientific,
+Engineering, Standard, Letters, …) live in the external `@antimatter-dimensions/notations`
+package, not in `src/core/`. Its source is the bundled dist (no `.ts` sources shipped):
+`../antimatter-dimensions/node_modules/@antimatter-dimensions/notations/dist/ad-notations.esm.js`
+(run `npm install` in `../antimatter-dimensions` if `node_modules` is absent).
 
 ## Design Documents
 

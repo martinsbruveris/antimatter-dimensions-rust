@@ -2,6 +2,7 @@
 members = [
     "crates/break_infinity",
     "crates/ad-core",
+    "crates/ad-format",
     "crates/ad-gui",
     "crates/ad-fidelity",
     "crates/ad-python",
