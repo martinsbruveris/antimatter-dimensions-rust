@@ -1,9 +1,13 @@
 <script setup>
-import { ref } from "vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
+import { useUiStore } from "../stores/ui";
 import Modal from "./Modal.vue";
 import CreditsDisplay from "./CreditsDisplay.vue";
+
+// Modal open/close state lives in the ui store so the keyboard shortcuts
+// (e.g. H for "How to play") drive the same popups as these buttons.
+const ui = useUiStore();
 
 // Open a URL in the system default browser. Uses the Tauri opener plugin
 // when running in the app; falls back to window.open in a plain browser
@@ -46,15 +50,12 @@ const links = [
   },
 ];
 
-// Which popup, if any, is open. null = none.
-const openModal = ref(null);
-
 function show(name) {
-  openModal.value = name;
+  ui.showModal(name);
 }
 
 function close() {
-  openModal.value = null;
+  ui.closeModal();
 }
 </script>
 
@@ -77,7 +78,7 @@ function close() {
   </div>
 
   <Modal
-    v-if="openModal === 'help'"
+    v-if="ui.openModal === 'help'"
     title="How to play"
     @close="close"
   >
@@ -100,7 +101,7 @@ function close() {
   </Modal>
 
   <Modal
-    v-if="openModal === 'info'"
+    v-if="ui.openModal === 'info'"
     title="About the game"
     @close="close"
   >
@@ -155,7 +156,7 @@ function close() {
   </Modal>
 
   <Modal
-    v-if="openModal === 'credits'"
+    v-if="ui.openModal === 'credits'"
     title="Antimatter Dimensions"
     title-class="c-game-header__antimatter"
     @close="close"

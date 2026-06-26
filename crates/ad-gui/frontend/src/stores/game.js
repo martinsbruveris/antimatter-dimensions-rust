@@ -16,10 +16,19 @@ export const useGameStore = defineStore("game", {
     toggleBuyMode() {
       this.buyUntil10 = !this.buyUntil10;
     },
-    // "Until 10" fills the current group (capped by affordability);
-    // "Buy 1" buys a single dimension.
+    // "Until 10" fills the current group (capped by affordability).
+    buyDimMany(tier) {
+      return invoke("buy_until_10", { tier });
+    },
+    // Buys a single dimension.
+    buyDimSingle(tier) {
+      return invoke("buy_dimension", { tier });
+    },
+    // Click handler: follows the buy-mode toggle. Keyboard shortcuts call
+    // buyDimMany / buyDimSingle directly (1-8 vs Shift+1-8), independent of
+    // the toggle, matching the original.
     buyDim(tier) {
-      return invoke(this.buyUntil10 ? "buy_until_10" : "buy_dimension", { tier });
+      return this.buyUntil10 ? this.buyDimMany(tier) : this.buyDimSingle(tier);
     },
     buyTickspeed() {
       return invoke("buy_tickspeed");
