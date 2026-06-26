@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 import Modal from "./Modal.vue";
+import CreditsDisplay from "./CreditsDisplay.vue";
 
 // Open a URL in the system default browser. Uses the Tauri opener plugin
 // when running in the app; falls back to window.open in a plain browser
@@ -133,7 +134,33 @@ function close() {
           class="c-tooltip-arrow c-tooltip-arrow--dark c-tooltip--top info-tooltip"
         />
       </span>
+      <!-- Credits opens a modal rather than an external link, matching the
+           original's InformationModalButton with show-modal="credits". -->
+      <span class="info-link-wrapper">
+        <a
+          class="info-link"
+          href="#"
+          @click.prevent="show('credits')"
+        >
+          <i class="fas fa-users" />
+        </a>
+        <span
+          class="c-tooltip-content c-tooltip-content--dark c-tooltip--top info-tooltip"
+        >Credits</span>
+        <span
+          class="c-tooltip-arrow c-tooltip-arrow--dark c-tooltip--top info-tooltip"
+        />
+      </span>
     </div>
+  </Modal>
+
+  <Modal
+    v-if="openModal === 'credits'"
+    title="Antimatter Dimensions"
+    title-class="c-game-header__antimatter"
+    @close="close"
+  >
+    <CreditsDisplay />
   </Modal>
 </template>
 

@@ -1,6 +1,9 @@
 <script setup>
 defineProps({
   title: { type: String, default: "" },
+  // Extra class(es) for the title (e.g. `c-game-header__antimatter` to make
+  // the credits title red, matching the original).
+  titleClass: { type: String, default: "" },
 });
 
 const emit = defineEmits(["close"]);
@@ -14,16 +17,19 @@ const emit = defineEmits(["close"]);
     @click.self="emit('close')"
   >
     <div class="l-modal">
-      <div class="c-modal c-modal--short c-modal-text">
+      <div class="c-modal c-modal-text">
         <div
           class="c-modal__close-btn"
           @click="emit('close')"
         >
           <i class="fas fa-times" />
         </div>
+        <!-- Title sits in a non-scrolling header so it stays pinned (sticky)
+             while the body below scrolls, matching the original. -->
         <div
           v-if="title"
           class="c-modal__title"
+          :class="titleClass"
         >
           {{ title }}
         </div>
@@ -60,7 +66,8 @@ const emit = defineEmits(["close"]);
 }
 
 /* Title spans the full width, stays centred, and is larger than the
-   body text, matching the original. */
+   body text, matching the original. Colour comes from the base modal
+   (white) or from `titleClass` (e.g. red `c-game-header__antimatter`). */
 .c-modal-text .c-modal__title {
   display: block;
   width: 100%;
@@ -86,8 +93,12 @@ const emit = defineEmits(["close"]);
   background: var(--color-good, #1bbb36);
 }
 
+/* The body scrolls (long content like credits) while the title above stays
+   pinned. Short modals never reach the max-height, so no scrollbar shows. */
 .l-modal-text__content {
   margin-top: 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
   line-height: 1.6;
 }
 
