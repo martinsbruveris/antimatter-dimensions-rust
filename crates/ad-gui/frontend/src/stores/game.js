@@ -51,5 +51,10 @@ export const useGameStore = defineStore("game", {
     maxAll() {
       return invoke("max_all");
     },
+    // First Big Crunch (Infinity): resets all pre-Infinity progress in the
+    // engine. Available once `snapshot.can_big_crunch` is true.
+    bigCrunch() {
+      return invoke("big_crunch");
+    },
   },
 });

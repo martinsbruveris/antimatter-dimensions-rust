@@ -64,6 +64,10 @@ export function handleShortcut(e, game, ui) {
     case "KeyG":
       game.buyGalaxy();
       break;
+    case "KeyC":
+      // Big Crunch; the engine no-ops unless antimatter is at the threshold.
+      game.bigCrunch();
+      break;
     // Arrow keys cycle pages: Up/Down through tabs, Left/Right through the
     // current tab's subtabs. preventDefault stops the page from scrolling.
     case "ArrowUp":

@@ -60,6 +60,9 @@ struct GameView {
     /// Progress towards Infinity in [0, 1] (log-scaled), for the
     /// bottom progress bar.
     infinity_progress: f64,
+    /// Whether antimatter has reached the Big Crunch threshold, so the
+    /// Big Crunch screen should replace the normal game view.
+    can_big_crunch: bool,
 }
 
 fn build_game_view(game: &GameState) -> GameView {
@@ -147,6 +150,7 @@ fn build_game_view(game: &GameState) -> GameView {
         sacrifice_disabled_condition: sacrifice_disabled_condition(game),
         can_buy_tickspeed: game.antimatter >= *tickspeed_cost,
         infinity_progress,
+        can_big_crunch: game.can_big_crunch(),
     }
 }
 
@@ -223,6 +227,12 @@ fn max_all(state: State<'_, Mutex<GameState>>) {
     game.max_all();
 }
 
+#[tauri::command]
+fn big_crunch(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.big_crunch();
+}
+
 /// Format a Decimal for display (matches the original game's
 /// notation).
 fn format_decimal(val: &Decimal) -> String {
@@ -280,6 +290,7 @@ pub fn run() {
             buy_galaxy,
             sacrifice,
             max_all,
+            big_crunch,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

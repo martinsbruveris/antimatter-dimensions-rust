@@ -1,4 +1,5 @@
 pub mod autobuyers;
+pub mod crunch;
 pub mod data;
 pub mod dimensions;
 pub mod galaxy;

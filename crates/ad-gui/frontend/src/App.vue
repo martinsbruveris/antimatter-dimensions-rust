@@ -8,6 +8,7 @@ import Sidebar from "./components/Sidebar.vue";
 import GameHeader from "./components/GameHeader.vue";
 import InfoButtons from "./components/InfoButtons.vue";
 import HotkeysModal from "./components/HotkeysModal.vue";
+import BigCrunchScreen from "./components/BigCrunchScreen.vue";
 
 const game = useGameStore();
 const ui = useUiStore();
@@ -58,7 +59,14 @@ onUnmounted(() => {
            top-right placement. -->
       <InfoButtons />
     </div>
-    <div class="tab-container">
+    <!-- Once antimatter reaches the Big Crunch threshold the whole game view
+         is replaced by the Big Crunch screen, matching ModernUi.vue's
+         `tab-container` being hidden while the crunch button shows. -->
+    <BigCrunchScreen v-if="game.snapshot && game.snapshot.can_big_crunch" />
+    <div
+      v-else
+      class="tab-container"
+    >
       <GameHeader />
       <!-- Matches ModernUi.vue: an (empty pre-infinity) information-header
            whose green border-bottom is the separator under the header. -->
