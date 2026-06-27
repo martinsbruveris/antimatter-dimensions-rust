@@ -37,13 +37,18 @@ frontend/
     app-shell.css           # minimal layout shell ONLY (ours, not vendored)
     config/tabs.js          # tab/subtab structure -> page components
     stores/game.js          # Pinia: Rust snapshot + action dispatchers
-    stores/ui.js            # Pinia: navigation (current tab/subtab)
-    data/achievements.js    # TEMP frontend data (moves into ad-core later)
-    util/                   # small helpers (dimensionText, responsive)
+    stores/ui.js            # Pinia: navigation + open modal + dev speed
+    data/                   # TEMP frontend data (moves into ad-core later):
+                            #   achievements.js, credits.js,
+                            #   shortcuts.js (Hotkey List content)
+    util/                   # small helpers: dimensionText, responsive,
+                            #   shortcuts.js (keyboard handler)
     components/
-      Sidebar.vue, SidebarCurrency.vue, GameHeader.vue
+      Sidebar.vue, SidebarCurrency.vue, GameHeader.vue, InfoButtons.vue
       DimensionRow.vue, TickspeedRow.vue, DimBoostRow.vue, GalaxyRow.vue,
       ProgressBar.vue        # shared building-block components
+      Modal.vue, HotkeysModal.vue, CreditsDisplay.vue   # popups
+      BigCrunchScreen.vue    # replaces the game view at the Big Crunch cap
       tabs/                  # one component per page (subtab):
         AntimatterDimensionsTab.vue, NormalAchievementsTab.vue
 ```
@@ -55,12 +60,17 @@ frontend/
   Other commands (`buy_dimension`, `sacrifice`, …) mutate state. Number
   formatting is currently done here (`format_decimal`) — see the formatting doc.
 - **Game loop**: `App.vue` runs a `requestAnimationFrame` loop calling
-  `game.tick(dt * speedMultiplier)`; the `game` store stores the latest
-  snapshot. The speed multiplier (1x/10x/60x) is a dev-only UI feature in
-  the `ui` store — it is not part of the game engine.
+  `game.tick(dt, repeats)`; the `game` store stores the latest snapshot.
+  `repeats` is the dev speed multiplier (1x/10x/100x/1000x, in the `ui`
+  store): the engine runs N discrete ticks of the real frame `dt` **inside
+  Rust** (`GameState::ticks`) — one IPC call and one snapshot per frame,
+  rather than a single `dt × N` step. This preserves per-tick precision
+  (e.g. autobuyers) and avoids per-tick IPC. The multiplier is dev-only, not
+  part of the engine.
 - **Stores**: `game` mirrors the Rust snapshot + dispatches actions; `ui` holds
-  navigation state and dev controls (speed multiplier). Components read
-  snapshot fields and call store actions — they never compute game logic.
+  navigation state, the open-modal id, and dev controls (speed multiplier).
+  Components read snapshot fields and call store actions — they never compute
+  game logic.
 
 ## Multi-page navigation
 
@@ -74,6 +84,36 @@ frontend/
 
 **To add a page:** create `components/tabs/XTab.vue`, then point a subtab's
 `component:` at it in `config/tabs.js`. Nothing else to wire.
+
+## Keyboard shortcuts & popups
+
+- `util/shortcuts.js` (`handleShortcut`, wired to `App.vue`'s `window` keydown)
+  maps keys to game/ui actions, mirroring the original `core/hotkeys.js` for the
+  implemented mechanics: `1`-`8` buy-until-10 / `Shift`+`1`-`8` buy-1, `T` /
+  `Shift`+`T` tickspeed, `S`/`D`/`G` sacrifice/boost/galaxy, `C` Big Crunch, `M`
+  max-all, arrows move tab (Up/Down) / subtab (Left/Right), `H` how-to-play, `?`
+  Hotkey List. Letters/digits are matched via `e.code` (robust to Shift), `?` by
+  character; Ctrl/Cmd/Alt combos and typing in inputs are ignored.
+- Popups are centralised in `stores/ui.js` `openModal`
+  (`help`/`info`/`credits`/`hotkeys`, `null` = none) with `showModal` /
+  `closeModal` / `toggleModal`. `InfoButtons.vue`'s on-screen buttons and the
+  `?`/`H` keys drive the same state, so only one modal is open at a time.
+  `Modal.vue` is the shared wrapper (overlay, close button, pinned title; the
+  `fitContent` prop sizes it to content, e.g. the Hotkey List's two columns).
+  The Hotkey List rows come from `data/shortcuts.js` (the original's
+  default-visible bindings).
+
+## Big Crunch
+
+- When antimatter reaches `BIG_CRUNCH_THRESHOLD` (capped there in the engine),
+  the snapshot's `can_big_crunch` is true and `App.vue` replaces the whole
+  `tab-container` with `BigCrunchScreen.vue` — the "world has collapsed" message
+  plus the vendored `.btn-big-crunch` button (mirrors ModernUi's `tab-container`
+  being hidden while the crunch button shows).
+- The button and the `C` key both call `game.bigCrunch()` → the `big_crunch`
+  command → `GameState::big_crunch`, which resets all pre-Infinity progress. The
+  next snapshot clears `can_big_crunch`, so the normal view returns. Infinity
+  Points are **not** awarded yet (planned next).
 
 ## Conventions
 
@@ -111,3 +151,6 @@ frontend/
   real tiles come once `ad-core` owns achievements.
 - Responsive dimension rows use the "narrow" stacked layout unconditionally
   below 1573px (matches the original at the default window size).
+- Big Crunch resets all pre-Infinity progress but awards no Infinity Points
+  yet, and shows the first-crunch (non-"small") screen unconditionally; IP and
+  the post-`break` header button come next.

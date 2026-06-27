@@ -8,7 +8,7 @@ The project exists to:
 1. Learn idiomatic Rust (not a line-by-line JS translation)
 2. Build a fast simulation engine for numerical experiments
 3. Provide Python bindings (PyO3) for data analysis
-4. Create a playable egui frontend
+4. Create a playable frontend (Tauri + Vue 3; see `crates/ad-gui`)
 
 The original JS source code is available at `../antimatter-dimensions` and `../antimatter-dimensions-endgame` for reference.
 
@@ -47,6 +47,7 @@ antimatter-dimensions-rust/
 - `src/tickspeed.rs` — Tickspeed upgrades and effects
 - `src/galaxy.rs` — Antimatter galaxy purchases
 - `src/sacrifice.rs` — Dimension sacrifice
+- `src/crunch.rs` — First Big Crunch (Infinity): `can_big_crunch` + `big_crunch` reset
 - `src/autobuyers.rs` — Automation system
 - `src/data/` — Static game configuration (constants, costs, dimension configs)
 
@@ -121,6 +122,9 @@ The `Decimal` type represents numbers as `mantissa × 10^exponent`:
 - Implements `Add`, `Sub`, `Mul`, `Div`, `Neg`, `PartialOrd`, `Ord`, `Display`, `FromStr`
 - Key constants: `Decimal::ZERO`, `Decimal::ONE`
 - Construction: `Decimal::from_float(f64)`, `Decimal::new(mantissa, exponent)`
+  (normalizing). `Decimal::new_unchecked(mantissa, exponent)` is a `const fn`
+  for already-normalized values, so it can initialize `const`/`static` items
+  (e.g. `BIG_CRUNCH_THRESHOLD`); `new` cannot, as normalization isn't const.
 
 ### Adding Game Systems
 
