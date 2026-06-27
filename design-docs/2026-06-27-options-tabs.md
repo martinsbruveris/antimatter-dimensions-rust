@@ -403,15 +403,23 @@ Status: ☐ not started · ◐ in progress · ☑ done. "Milestone" = needed for
 first-Big-Crunch milestone; "Later" = post-Infinity or depends on an unported
 system.
 
+> **Storage decision (made 2026-06-27):** options live in `ad-core`
+> (`GameState.options`, the `Options` struct), **not** a frontend store — so a
+> save from a fresh game is valid and options round-trip unchanged through
+> load → run → save. This supersedes the frontend-store recommendation in §3.1.
+> The snapshot carries `GameView.options`; the frontend writes via commands
+> (`set_hotkeys`, `set_update_rate`). Classic UI is dropped; themes/notations
+> will be a reduced set.
+
 ### Infrastructure
-- ☐ `stores/options.js` Pinia store mirroring `player.options` (localStorage) — Milestone
+- ☑ `ad-core` `Options` struct in `GameState` (serializable, crunch-preserved) — Milestone
 - ☐ `config/options.js` static metadata (notations, themes, confirmation/info rows + gating) — Milestone
-- ☐ Reusable widgets: OptionsButton, PrimaryToggleButton, OptionsSlider, ExpandingControlBox — Milestone
+- ◐ Reusable widgets: PrimaryToggleButton ☑, OptionsSlider ☑; OptionsButton / ExpandingControlBox pending — Milestone
 - ☐ Options modal wrapper (`c-modal-options*` chrome) + `ui.openModal` ids — Milestone
-- ☐ Wire `visual` / `gameplay` subtabs in `config/tabs.js` — Milestone
+- ☑ Wire `visual` / `gameplay` subtabs in `config/tabs.js` — Milestone
 
 ### Visual tab
-- ☐ V2 Update rate slider (rAF accumulator honours updateRate) — Milestone
+- ☑ V2 Update rate slider (rAF loop honours updateRate) — Milestone
 - ☐ V4 Theme dropdown (Normal-only first; body-class swap) — Milestone
 - ☐ V5 Notation dropdown (limited list; → ad-format) — Milestone
 - ☐ V6 Exponent Notation modal (comma/notation sliders, comma ≤ notation) — Milestone
@@ -425,7 +433,7 @@ system.
 - ✗ V1 UI Modern/Classic toggle — **not porting** (Modern-only); document deviation
 
 ### Gameplay tab
-- ☐ G2 Hotkeys enable/disable (gates `util/shortcuts.js`) — Milestone
+- ☑ G2 Hotkeys enable/disable (gates `util/shortcuts.js`) — Milestone
 - ☐ G1 Confirmation Options modal (4 pre-Infinity types; pairs w/ confirm dialogs) — Milestone
 - ☐ G3 Switch-tabs-on-events toggle — Milestone (optional / low value)
 - ☐ G4 Offline progress toggle — Later (no offline sim)

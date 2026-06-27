@@ -17,12 +17,22 @@ const ui = useUiStore();
 let raf = null;
 let last = performance.now();
 
+// Default cadence until the first snapshot arrives (original `updateRate: 33`).
+const DEFAULT_UPDATE_RATE = 33;
+
 function loop() {
   const now = performance.now();
-  // The speed multiplier runs the engine as N discrete ticks of the real
-  // frame dt (looped in Rust), not a single dt * N step.
-  game.tick(now - last, ui.speedMultiplier);
-  last = now;
+  // Mirror the original game loop, which runs every `updateRate` ms rather
+  // than every animation frame: only tick once that much wall-clock time has
+  // elapsed, then process the whole elapsed interval. A larger update rate
+  // therefore means coarser, less frequent updates.
+  const updateRate = game.snapshot?.options?.update_rate ?? DEFAULT_UPDATE_RATE;
+  if (now - last >= updateRate) {
+    // The speed multiplier runs the engine as N discrete ticks of the real
+    // elapsed dt (looped in Rust), not a single dt * N step.
+    game.tick(now - last, ui.speedMultiplier);
+    last = now;
+  }
   raf = requestAnimationFrame(loop);
 }
 

@@ -117,6 +117,38 @@ frontend/
   the `A` hotkey), `set_all_autobuyers_active` (the "Enable/Disable all"
   button). Store actions mirror these in `stores/game.js`.
 
+## Options tabs
+
+- **Storage is engine-owned.** Player options live in `ad-core`'s `Options`
+  struct (`GameState.options`), not in a frontend store — so a save written
+  from a fresh game is valid and options round-trip unchanged through
+  load → run → save. They are preserved across a Big Crunch. The snapshot
+  exposes them as `GameView.options`; the frontend reads that and writes via
+  dedicated commands (it never mutates options locally).
+- **Scope so far.** Only two options are implemented, each placed in its
+  original grid position with the rest of the grid as invisible placeholders
+  (`l-options-grid__button--hidden`): **Visual → Update rate** (slider) and
+  **Gameplay → Hotkeys** (enable/disable toggle). The Classic-UI toggle is
+  intentionally dropped (Modern UI only); themes and notations will be a
+  reduced set. Full plan + per-option checklist:
+  `design-docs/2026-06-27-options-tabs.md`.
+- **Commands:** `set_hotkeys(enabled)`, `set_update_rate(rate)` (engine clamps
+  to the 33–200 ms slider range). Mirrored by `stores/game.js`
+  `setHotkeys` / `setUpdateRate`.
+- **Update rate** drives the game loop: `App.vue`'s rAF loop only ticks once
+  `update_rate` ms of wall-clock time have elapsed, then processes the whole
+  interval — matching the original's `interval(gameLoop, updateRate)` (larger
+  = coarser, less frequent updates) rather than ticking every frame.
+- **Hotkeys toggle** gates `util/shortcuts.js`: gameplay keys (digits, T, A, M,
+  S, D, G, C) are skipped when disabled, while modal keys (`?`, `H`, `Esc`) and
+  arrow navigation stay active — mirroring the original's `bindHotkey`
+  (gated by `player.options.hotkeys`) vs `bind` (always active) split.
+- **Reusable widgets** (`components/options/`): `PrimaryToggleButton.vue`
+  (labelled on/off button) and `OptionsSlider.vue` — a minimal, visually
+  faithful single-handle slider using the vendored `ad-slider-component.css`
+  (newly added to `public/stylesheets/` + `index.html`), not the original's
+  heavy `vue-slider-component` port.
+
 ## Keyboard shortcuts & popups
 
 - `util/shortcuts.js` (`handleShortcut`, wired to `App.vue`'s `window` keydown)

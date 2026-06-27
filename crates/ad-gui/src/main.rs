@@ -110,6 +110,15 @@ struct GameView {
     infinity_unlocked: bool,
     /// Autobuyer tab state (unlock progress, per-autobuyer status).
     autobuyers: AutobuyersView,
+    /// Player options (UI/UX preferences), surfaced for the options tabs.
+    options: OptionsView,
+}
+
+/// Serializable view of the player options the frontend reads/writes.
+#[derive(Serialize)]
+struct OptionsView {
+    hotkeys: bool,
+    update_rate: u32,
 }
 
 /// Build the serializable view for one autobuyer.
@@ -256,6 +265,10 @@ fn build_game_view(game: &GameState) -> GameView {
         can_big_crunch: game.can_big_crunch(),
         infinity_unlocked: game.infinity_unlocked,
         autobuyers: build_autobuyers_view(game),
+        options: OptionsView {
+            hotkeys: game.options.hotkeys,
+            update_rate: game.options.update_rate,
+        },
     }
 }
 
@@ -380,6 +393,18 @@ fn set_all_autobuyers_active(active: bool, state: State<'_, Mutex<GameState>>) {
     game.set_all_autobuyers_active(active);
 }
 
+#[tauri::command]
+fn set_hotkeys(enabled: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.hotkeys = enabled;
+}
+
+#[tauri::command]
+fn set_update_rate(rate: u32, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_update_rate(rate);
+}
+
 /// Format a Decimal for display (matches the original game's
 /// notation).
 fn format_decimal(val: &Decimal) -> String {
@@ -445,6 +470,8 @@ pub fn run() {
             toggle_tickspeed_autobuyer,
             toggle_autobuyers,
             set_all_autobuyers_active,
+            set_hotkeys,
+            set_update_rate,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

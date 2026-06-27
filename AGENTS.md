@@ -42,6 +42,8 @@ antimatter-dimensions-rust/
 ### Key Source Files (ad-core)
 
 - `src/state.rs` — `GameState` struct (all mutable game state)
+- `src/action.rs` — `Action` IR + `GameState::apply_action`: the single mutation
+  seam every action producer (GUI, autobuyers, simulation) routes through
 - `src/tick.rs` — Main game loop (`tick()` and `simulate()`)
 - `src/dimensions.rs` — Dimension purchasing, production, multipliers
 - `src/tickspeed.rs` — Tickspeed upgrades and effects
@@ -49,6 +51,8 @@ antimatter-dimensions-rust/
 - `src/sacrifice.rs` — Dimension sacrifice
 - `src/crunch.rs` — First Big Crunch (Infinity): `can_big_crunch` + `big_crunch` reset
 - `src/autobuyers.rs` — Automation system
+- `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
+  `player.options`), held in `GameState`, preserved across a Big Crunch
 - `src/data/` — Static game configuration (constants, costs, dimension configs)
 
 ## Architecture Principles

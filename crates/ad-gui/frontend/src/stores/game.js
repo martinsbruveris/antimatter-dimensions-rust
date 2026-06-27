@@ -83,5 +83,15 @@ export const useGameStore = defineStore("game", {
     setAllAutobuyersActive(active) {
       return invoke("set_all_autobuyers_active", { active });
     },
+    // --- Options ---
+    // Enable/disable keyboard shortcuts (original `player.options.hotkeys`).
+    setHotkeys(enabled) {
+      return invoke("set_hotkeys", { enabled });
+    },
+    // Game-loop cadence in ms (original `player.options.updateRate`); the
+    // engine clamps to the 33–200 slider range.
+    setUpdateRate(rate) {
+      return invoke("set_update_rate", { rate });
+    },
   },
 });

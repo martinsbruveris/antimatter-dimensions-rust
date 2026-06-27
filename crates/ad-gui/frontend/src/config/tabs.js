@@ -1,6 +1,8 @@
 import AntimatterDimensionsTab from "../components/tabs/AntimatterDimensionsTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
+import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
+import OptionsGameplayTab from "../components/tabs/OptionsGameplayTab.vue";
 
 // Single source of truth for the tab/subtab structure: display name,
 // sidebar symbol, and the page component each subtab renders. `component:
@@ -46,8 +48,8 @@ export const TABS = [
     name: "Options",
     subtabs: [
       { key: "saving", name: "Saving", symbol: "<i class='fas fa-save'></i>", component: null },
-      { key: "visual", name: "Visual", symbol: "<i class='fas fa-palette'></i>", component: null },
-      { key: "gameplay", name: "Gameplay", symbol: "<i class='fas fa-wrench'></i>", component: null },
+      { key: "visual", name: "Visual", symbol: "<i class='fas fa-palette'></i>", component: OptionsVisualTab },
+      { key: "gameplay", name: "Gameplay", symbol: "<i class='fas fa-wrench'></i>", component: OptionsGameplayTab },
     ],
   },
 ];

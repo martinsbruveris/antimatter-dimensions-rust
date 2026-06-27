@@ -84,6 +84,20 @@ mod tests {
     }
 
     #[test]
+    fn options_persist_through_crunch() {
+        let mut game = GameState::new();
+        game.options.hotkeys = false;
+        game.options.set_update_rate(120);
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+
+        assert!(game.big_crunch());
+
+        // Options are UI prefs, not pre-Infinity progress: unchanged by a crunch.
+        assert!(!game.options.hotkeys);
+        assert_eq!(game.options.update_rate, 120);
+    }
+
+    #[test]
     fn infinity_unlocked_starts_false_and_persists_after_crunch() {
         let mut game = GameState::new();
         assert!(!game.infinity_unlocked);

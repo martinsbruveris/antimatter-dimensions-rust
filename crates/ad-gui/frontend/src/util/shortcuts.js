@@ -35,6 +35,37 @@ export function handleShortcut(e, game, ui) {
     return;
   }
 
+  // Arrow keys cycle pages: Up/Down through tabs, Left/Right through the
+  // current tab's subtabs. Like the original these are bound with `bind` (not
+  // `bindHotkey`), so they stay active even when hotkeys are disabled.
+  switch (e.code) {
+    case "ArrowUp":
+      ui.moveTab(-1);
+      e.preventDefault();
+      return;
+    case "ArrowDown":
+      ui.moveTab(1);
+      e.preventDefault();
+      return;
+    case "ArrowLeft":
+      ui.moveSubtab(-1);
+      e.preventDefault();
+      return;
+    case "ArrowRight":
+      ui.moveSubtab(1);
+      e.preventDefault();
+      return;
+    default:
+      break;
+  }
+
+  // Everything below relates to game functionality and obeys the "Hotkeys"
+  // option, mirroring the original's `bindHotkey` (gated by
+  // `player.options.hotkeys`) versus `bind` (always active) split.
+  if (game.snapshot && game.snapshot.options && !game.snapshot.options.hotkeys) {
+    return;
+  }
+
   // Buy dimensions. Tiers are 0-indexed, so digit N -> tier N-1.
   const dim = e.code.match(DIM_KEY);
   if (dim) {
@@ -78,24 +109,6 @@ export function handleShortcut(e, game, ui) {
     case "KeyC":
       // Big Crunch; the engine no-ops unless antimatter is at the threshold.
       game.bigCrunch();
-      break;
-    // Arrow keys cycle pages: Up/Down through tabs, Left/Right through the
-    // current tab's subtabs. preventDefault stops the page from scrolling.
-    case "ArrowUp":
-      ui.moveTab(-1);
-      e.preventDefault();
-      break;
-    case "ArrowDown":
-      ui.moveTab(1);
-      e.preventDefault();
-      break;
-    case "ArrowLeft":
-      ui.moveSubtab(-1);
-      e.preventDefault();
-      break;
-    case "ArrowRight":
-      ui.moveSubtab(1);
-      e.preventDefault();
       break;
     default:
       break;

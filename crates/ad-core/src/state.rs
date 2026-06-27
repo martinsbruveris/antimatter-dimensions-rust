@@ -4,6 +4,7 @@ use crate::autobuyers::AutobuyerState;
 use crate::data::constants::{
     INITIAL_ANTIMATTER, TICKSPEED_BASE_COST, TICKSPEED_COST_MULTIPLIER,
 };
+use crate::options::Options;
 
 /// A single antimatter dimension tier.
 #[derive(Debug, Clone)]
@@ -88,6 +89,10 @@ pub struct GameState {
     pub infinity_unlocked: bool,
     /// Autobuyer state for dimensions and tickspeed.
     pub autobuyers: AutobuyerState,
+    /// Player options (UI/UX preferences). Not pre-Infinity progress, so they
+    /// are **not** reset by a Big Crunch; they persist for the whole save.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub options: Options,
 }
 
 impl GameState {
@@ -104,6 +109,7 @@ impl GameState {
             sacrificed: Decimal::ZERO,
             infinity_unlocked: false,
             autobuyers: AutobuyerState::new(),
+            options: Options::new(),
         }
     }
 
