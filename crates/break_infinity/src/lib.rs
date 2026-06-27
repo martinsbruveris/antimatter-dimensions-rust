@@ -561,7 +561,7 @@ impl Decimal {
 
     /// Helper function to handle all non-finite cases.
     #[inline(always)]
-    fn to_str_non_finite(&self) -> Option<String> {
+    fn to_str_non_finite(self) -> Option<String> {
         if f64::is_nan(self.m) {
             Some(String::from("NaN"))
         } else if self.e >= EXP_INF_THRESHOLD {
@@ -596,7 +596,7 @@ impl Decimal {
         let rounded = (self.m * 10.0_f64.powi(len as i32 - num_digits as i32)).round()
             * 10.0_f64.powi(num_digits as i32 - len as i32);
 
-        let mantissa = to_str_fixed(rounded, 0_u32.max(len - num_digits));
+        let mantissa = to_str_fixed(rounded, len - num_digits);
         let sign = if self.e >= 0 { "+" } else { "" };
         format!("{}e{}{}", mantissa, sign, self.e)
     }
