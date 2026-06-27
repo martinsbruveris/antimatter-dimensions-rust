@@ -9,6 +9,7 @@ import GameHeader from "./components/GameHeader.vue";
 import InfoButtons from "./components/InfoButtons.vue";
 import HotkeysModal from "./components/HotkeysModal.vue";
 import BigCrunchScreen from "./components/BigCrunchScreen.vue";
+import NotificationContainer from "./components/NotificationContainer.vue";
 
 const game = useGameStore();
 const ui = useUiStore();
@@ -89,6 +90,9 @@ onUnmounted(() => {
     v-if="ui.openModal === 'hotkeys'"
     @close="ui.closeModal()"
   />
+
+  <!-- Transient top-right toast popups (e.g. autobuyer pause/resume). -->
+  <NotificationContainer />
 </template>
 
 <style scoped>

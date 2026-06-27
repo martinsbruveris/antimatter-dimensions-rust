@@ -55,7 +55,13 @@ export function handleShortcut(e, game, ui) {
     case "KeyA":
       // Toggle (pause/resume) all autobuyers — only once the Automation tab is
       // unlocked, matching the original's `Tab.automation.isUnlocked` guard.
-      if (game.snapshot?.autobuyers?.tab_unlocked) game.toggleAutobuyers();
+      // The original also shows a blue "info" toast; the toggle just flips the
+      // global flag, so the new state is the inverse of the current snapshot.
+      if (game.snapshot?.autobuyers?.tab_unlocked) {
+        const resumed = !game.snapshot.autobuyers.enabled;
+        game.toggleAutobuyers();
+        ui.notify(`Autobuyers ${resumed ? "resumed" : "paused"}`);
+      }
       break;
     case "KeyM":
       game.maxAll();

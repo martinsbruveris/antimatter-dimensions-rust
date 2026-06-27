@@ -205,6 +205,7 @@ Located in `design-docs/`:
 | `2026-06-24-ui-framework-analysis.md` | Comparison of GUI framework options for the playable frontend |
 | `2026-06-25-frontend-architecture.md` | `ad-gui` design: Tauri + Vue 3/Vite/Pinia, vendored CSS, Rust-authoritative snapshot |
 | `2026-06-25-number-formatting.md` | Where number formatting lives (Rust now; PyO3 + WASM later) and why |
+| `2026-06-27-options-tabs.md` | Analysis of the Visual & Gameplay options tabs + iterative port plan |
 
 The table lists key documents; see the `design-docs/` folder for the full,
 date-prefixed set. Read these before making architectural decisions. The

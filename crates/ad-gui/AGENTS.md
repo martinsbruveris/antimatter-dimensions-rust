@@ -134,6 +134,15 @@ frontend/
   `fitContent` prop sizes it to content, e.g. the Hotkey List's two columns).
   The Hotkey List rows come from `data/shortcuts.js` (the original's
   default-visible bindings).
+- **Toast notifications.** Transient top-right popups (the original's
+  `GameUI.notify.*` / `core/notify.js`). `stores/ui.js` holds a `notifications`
+  list and a `notify(text, type, duration)` action that drives the
+  enter/leave animation flags and auto-removal (default 2s; click dismisses
+  early); `NotificationContainer.vue` (mounted in `App.vue`) renders them with
+  the vendored `o-notification` / `a-notification` CSS. `type` selects the
+  colour (`info` = blue). The autobuyer toggle (`A`) fires an info toast
+  ("Autobuyers resumed/paused"), matching the original — note the on-screen
+  Pause/Resume button does **not** toast, only the hotkey does.
 
 ## Big Crunch
 

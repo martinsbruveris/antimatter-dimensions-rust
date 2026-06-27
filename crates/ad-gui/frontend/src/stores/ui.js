@@ -16,6 +16,12 @@ export const useUiStore = defineStore("ui", {
     openModal: null,
     // Dev-only: multiplier applied to wall-clock dt before ticking.
     speedMultiplier: 1,
+    // Transient toast notifications shown top-right (the blue "info" popups the
+    // original triggers e.g. when toggling autobuyers via the keyboard). Each:
+    // { id, text, typeClass, entering, leaving }. Mirrors core/notify.js.
+    notifications: [],
+    // Monotonic id source for notifications.
+    nextNotificationId: 0,
   }),
   getters: {
     // Tabs currently visible, honouring each tab's optional unlock condition
@@ -77,6 +83,37 @@ export const useUiStore = defineStore("ui", {
     },
     setSpeed(multiplier) {
       this.speedMultiplier = multiplier;
+    },
+    // Show a transient toast, mirroring core/notify.js: it slides in (enter
+    // animation), stays for `duration` ms, then slides out (leave animation)
+    // and is removed. `type` selects the colour (o-notification--<type>);
+    // "info" is the blue popup. Clicking it dismisses early.
+    notify(text, type = "info", duration = 2000) {
+      const id = this.nextNotificationId++;
+      this.notifications.push({
+        id,
+        text,
+        typeClass: `o-notification--${type}`,
+        entering: true,
+        leaving: false,
+      });
+      // Drop the enter class once the slide-in finishes (matches notify.js).
+      setTimeout(() => {
+        const n = this.notifications.find((x) => x.id === id);
+        if (n) n.entering = false;
+      }, 500);
+      setTimeout(() => this.dismissNotification(id), duration);
+    },
+    // Begin the leave animation for a notification, then remove it once the
+    // 0.25s slide-out has elapsed. Idempotent (a second call is a no-op).
+    dismissNotification(id) {
+      const n = this.notifications.find((x) => x.id === id);
+      if (!n || n.leaving) return;
+      n.entering = false;
+      n.leaving = true;
+      setTimeout(() => {
+        this.notifications = this.notifications.filter((x) => x.id !== id);
+      }, 500);
     },
   },
 });

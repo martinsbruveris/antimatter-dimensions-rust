@@ -50,11 +50,4 @@ export const TABS = [
       { key: "gameplay", name: "Gameplay", symbol: "<i class='fas fa-wrench'></i>", component: null },
     ],
   },
-  {
-    key: "shop",
-    name: "Shop",
-    subtabs: [
-      { key: "shop", name: "Shop", symbol: "$", component: null },
-    ],
-  },
 ];
