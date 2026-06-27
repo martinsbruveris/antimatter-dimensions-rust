@@ -9,5 +9,6 @@ name = "_native"
 
 [dependencies]
 ad-core = { path = "../ad-core" }
+ad-sim = { path = "../ad-sim" }
 break_infinity = { path = "../break_infinity" }
 pyo3 = { version = "0.25", features = ["extension-module"] }

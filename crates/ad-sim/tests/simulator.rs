@@ -1,11 +1,9 @@
-use ad_core::simulator::{
-    simulate, SimulationConfig, StateTrace, StopCondition, StopReason,
-};
-use ad_core::strategy::{
-    BuyPriority, DimensionOrder, PrestigeMode, PurchaseConfig, SacrificeConfig,
+use ad_core::GameState;
+use ad_sim::{
+    simulate, BuyPriority, DimensionOrder, PrestigeMode, PurchaseConfig,
+    SacrificeConfig, SimulationConfig, StateTrace, StopCondition, StopReason,
     StrategyConfig,
 };
-use ad_core::GameState;
 use break_infinity::Decimal;
 
 // ============================================================

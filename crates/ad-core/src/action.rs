@@ -148,7 +148,7 @@ mod tests {
 
         assert!(out.applied);
         assert!(out.count > 1);
-        assert_eq!(game.dimensions[0].bought as u64, out.count);
+        assert_eq!(game.dimensions[0].bought, out.count);
     }
 
     #[test]

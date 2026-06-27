@@ -21,7 +21,8 @@ antimatter-dimensions-rust/
 ├── python/                 # Python source for the PyO3 bindings
 ├── crates/
 │   ├── break_infinity/     # Vendored big-number library (Decimal type)
-│   ├── ad-core/            # Game simulation engine + static config
+│   ├── ad-core/            # Game engine (rules) + static config
+│   ├── ad-sim/             # Simulation driver: Controller + run_simulation (depends on ad-core)
 │   ├── ad-format/          # Number formatting (notations): format(value, &FormatOptions)
 │   ├── ad-fidelity/        # Rust-vs-JS fidelity test harness
 │   ├── ad-python/          # PyO3 bindings (antimatter_dimensions._native)
@@ -33,7 +34,8 @@ antimatter-dimensions-rust/
 | Crate | Type | Purpose |
 |-------|------|---------|
 | `break_infinity` | lib | Decimal type: `mantissa × 10^exponent` arithmetic for numbers up to ~1e9e15 |
-| `ad-core` | lib | Game simulation engine. Pure logic, no IO. Contains a `data` module for static config. |
+| `ad-core` | lib | Game engine (the rules). Pure logic, no IO. Owns `GameState`, the `Action` IR + `apply_action` seam, and the `data` module for static config. Never depends on `ad-sim`. |
+| `ad-sim` | lib | Simulation driver (decides *what a player does*). One-way dependency on `ad-core`; mutates the game only by emitting `Action`s. Hosts the `Controller` trait, `StrategyController`, and `run_simulation`/`simulate`. See `design-docs/2026-06-27-simulation-architecture.md`. |
 | `ad-format` | lib | Pure, presentation-only number formatting: `format(&Decimal, &FormatOptions) -> String` + notation strategies. Never reads `GameState`. See `design-docs/2026-06-25-number-formatting.md`. |
 | `ad-fidelity` | lib/bin | Scenario-based harness comparing Rust engine outputs against the JS game. |
 | `ad-python` | lib (cdylib) | PyO3 bindings exposing the engine to Python (`antimatter_dimensions._native`). |
@@ -53,7 +55,18 @@ antimatter-dimensions-rust/
 - `src/autobuyers.rs` — Automation system
 - `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
   `player.options`), held in `GameState`, preserved across a Big Crunch
+- `src/observed.rs` — `ObservedState`: read-only snapshot of `GameState` plus
+  computed fields (costs, affordability, `next_sacrifice_boost`). The decision
+  input for `ad-sim` controllers and the trace/GUI view.
 - `src/data/` — Static game configuration (constants, costs, dimension configs)
+
+### Key Source Files (ad-sim)
+
+- `src/controller.rs` — `Controller` trait (`on_start` + per-tick `act`) and
+  `StrategyController` (fixed-strategy player; emits `Action`s only)
+- `src/simulator.rs` — `run_simulation` driver loop, `simulate` wrapper, and the
+  `StateTrace`/`StopCondition`/`StopReason`/`Simulation{Config,Result}` types
+- `src/strategy.rs` — `StrategyConfig` and its enums (sacrifice/purchase/prestige)
 
 ## Architecture Principles
 
@@ -72,6 +85,7 @@ cargo build                    # Build all crates
 cargo test                     # Run all tests
 cargo test -p break_infinity   # Test only the number library
 cargo test -p ad-core          # Test only the game engine
+cargo test -p ad-sim           # Test only the simulation driver
 cargo clippy                   # Lint
 cargo fmt                      # Format
 ```

@@ -1,12 +1,10 @@
 use pyo3::prelude::*;
 
 use ad_core::observed::{ObservedDimensionTier, ObservedState, ObservedTickspeedState};
-use ad_core::simulator::{
-    SimulationConfig, SimulationResult, StopCondition, StopReason,
-};
-use ad_core::strategy::{
+use ad_sim::{
     BuyPriority, DimensionOrder, PrestigeMode, PrestigeStep, PurchaseConfig,
-    SacrificeConfig, StrategyConfig,
+    SacrificeConfig, SimulationConfig, SimulationResult, StopCondition, StopReason,
+    StrategyConfig,
 };
 use break_infinity::Decimal;
 
@@ -509,7 +507,7 @@ pub struct PySnapshot {
 }
 
 impl PySnapshot {
-    pub fn from_core(snap: ad_core::simulator::Snapshot) -> Self {
+    pub fn from_core(snap: ad_sim::Snapshot) -> Self {
         Self {
             tick: snap.tick,
             time_ms: snap.time_ms,

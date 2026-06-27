@@ -468,10 +468,10 @@ Status legend: ✅ done · ▶ next · ☐ pending.
 
 1. ✅ **Introduce `Action` + `GameState::apply_action` in `ad-core`.** Adds the
    audited seam. No behaviour change. (See §10.1 for what shipped.)
-2. ▶ **Create `ad-sim`; define `Controller` + `run_simulation`.** Move
+2. ✅ **Create `ad-sim`; define `Controller` + `run_simulation`.** Move
    `strategy.rs`/`simulator.rs` over as `StrategyController`. Update `ad-python`
-   imports. Now separation is compiler-enforced.
-3. ☐ **Add the `RuleEngineController` (rules + plans) and the phase schedule.** The
+   imports. Now separation is compiler-enforced. (See §10.2 for what shipped.)
+3. ▶ **Add the `RuleEngineController` (rules + plans) and the phase schedule.** The
    `HumanController` is then just a rule set with throttle intervals. Enables the
    first true end-to-end "manual until autobuyers, then engine-driven" run through
    Big Crunch.
@@ -507,28 +507,58 @@ Status legend: ✅ done · ▶ next · ☐ pending.
   compiles; `cargo clippy -p ad-core` clean. `apply_action` has no callers yet — the
   wiring happens in Milestone 1.
 
-**Resume at Milestone 1 (phase 2).** Agreed decisions for that step:
+### 10.2 Milestone 1 (phase 2) — done (as of 2026-06-28)
 
-- **Fully replace** `ad_core::simulator` with `ad-sim` — no compatibility shim in
-  `ad-core`. `ad-python` is the only consumer and is updated in the same change.
-- Move `strategy.rs` + `simulator.rs` (and their tests, incl. any in
-  `ad-core/tests/`) into a new `crates/ad-sim`; drop the corresponding re-exports
-  from `ad-core/src/lib.rs`; repoint `ad-python` from `ad_core::{simulator,strategy}`
-  to `ad_sim::*` (Python API surface unchanged).
-- Define `trait Controller { fn on_start(&mut self, &mut GameState) {} fn act(&mut
-  self, &ObservedState, game_time_ms: f64) -> Vec<Action>; }`. `run_simulation`
-  drives `on_start` → per tick `act` → `apply_action` each → `game.tick(dt)` →
-  reuse existing `StateTrace`/`StopCondition`/`StopReason`. Re-express today's logic
-  as `StrategyController`; keep `simulate(config)` as a thin wrapper for API parity.
-- `on_start` resolves the autobuyer-coexistence divergence: `StrategyController`
-  disables in-game autobuyers (as today); the future `RuleEngineController` leaves
-  them on so human + unlocked autobuyers coexist.
+The simulation driver now lives in a separate crate; the game/simulation
+separation is compiler-enforced (`ad-sim → ad-core`, one-way).
 
-**Working-tree note (2026-06-27):** an unrelated in-progress change (a new
-`ad-core` `Options` module: `options.rs`, `state.rs`, and several `ad-gui` files)
-was already uncommitted when Milestone 0 was written and is independent of this
-work. It leaves `state.rs` with `cargo fmt` drift to be cleaned up as part of *that*
-change, not the simulation work.
+- New `crates/ad-sim` (depends on `ad-core` + `break_infinity` only):
+  - `controller.rs`:
+    - `trait Controller { fn on_start(&mut self, &mut GameState) {} fn act(&mut
+      self, &ObservedState, game_time_ms: f64) -> Vec<Action>; }` — the abstraction
+      for "who produces actions".
+    - `StrategyController` — the re-expression of the old `execute_strategy` loop.
+      It carries the `PlanCursor` plus an `in_buy_step` flag; `act` returns the
+      single next primitive action, and the driver re-observes between calls. The
+      flag reproduces the original control flow (prestige/sacrifice re-checked only
+      at buy-loop boundaries, never between individual buy-max ops). `on_start`
+      disables in-game autobuyers via `Action::SetAutobuyers(false)` — routing even
+      that toggle through the action seam. The future `RuleEngineController` will
+      instead leave autobuyers on so human + unlocked autobuyers coexist.
+  - `simulator.rs`: moved `StateTrace`/`Snapshot`/`StopCondition`/`StopReason`/
+    `SimulationConfig`/`SimulationResult` over unchanged. New generic
+    `run_simulation<C: Controller>(controller, tick_ms, snapshot_count, &stop)`
+    drives `on_start` → (per tick: `act` → `apply_action` each, repeated until
+    quiescent) → stop checks → `StateTrace::maybe_record` → `game.tick(dt)`.
+    `simulate(&SimulationConfig)` is a thin wrapper that builds a
+    `StrategyController` — kept for API parity and the Python entry point.
+  - `strategy.rs`: moved verbatim from `ad-core`.
+  - `tests/simulator.rs`: moved from `ad-core/tests/`, imports repointed to
+    `ad_sim::*` (12 tests, all green).
+- `ad-core`: `simulator.rs`/`strategy.rs` deleted; the `simulator`/`strategy`
+  re-exports dropped from `lib.rs`. `ObservedState` gained the computed decision
+  fields a controller needs to choose among legal actions from a read-only
+  snapshot: per-tier `cost` + `unlocked`, and top-level `unlocked_dimensions`,
+  `can_buy_galaxy`, `can_dim_boost`, `can_sacrifice`, `next_sacrifice_boost`. (These
+  are internal to the Rust snapshot; the Python `GameState` surface is unchanged.)
+- `ad-python`: repointed from `ad_core::{simulator,strategy}` to `ad_sim::*`; Python
+  API surface unchanged.
+- **Fidelity:** the baseline auto strategy still reaches Big Crunch with identical
+  galaxies (2) and dim boosts (16) and the same final antimatter; game time is
+  8064.9s vs the previously recorded 8098s (~0.4% faster, because prestige/sacrifice
+  are now re-checked right at each buy-loop boundary rather than at the next outer
+  iteration — a benign micro-ordering effect, not a behaviour change).
+- Verified: `cargo test -p ad-core -p ad-sim` green (28 + 12); `cargo clippy
+  -p ad-core -p ad-sim --all-targets` clean; `cargo fmt --check` clean; the Python
+  extension builds via maturin and `_native.simulate` returns the same result.
+
+**Resume at Milestone 2 (phase 3): `RuleEngineController` + phase schedule.** Add the
+reactive rule engine (Option C) in `ad-sim` — closed-enum `Trigger`/`ActionSpec`,
+`Plan<T>` cursors, and a phase schedule — so the `HumanController` becomes a rule set
+with throttle intervals (using the `game_time_ms` argument `StrategyController`
+currently ignores). This enables the first true end-to-end "manual until autobuyers
+unlock, then engine-driven" run through Big Crunch. Keep `Trigger`/`ActionSpec`
+closed enums — no expressions or variables (§6½, §9).
 
 ## 11. Direct Answers to the Original Questions
 

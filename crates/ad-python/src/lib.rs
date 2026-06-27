@@ -16,7 +16,7 @@ use types::{PySimulationConfig, PySimulationResult};
 #[pyfunction]
 fn simulate(config: PySimulationConfig) -> PySimulationResult {
     let core_config = config.to_core();
-    let result = ad_core::simulator::simulate(&core_config);
+    let result = ad_sim::simulate(&core_config);
     PySimulationResult::from_core(result)
 }
 

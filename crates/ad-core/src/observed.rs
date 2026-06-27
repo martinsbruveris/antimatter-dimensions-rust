@@ -15,6 +15,10 @@ pub struct ObservedDimensionTier {
     pub multiplier: Decimal,
     /// Production rate per second for this tier.
     pub production_per_second: Decimal,
+    /// Cost of the next single-unit purchase of this tier.
+    pub cost: Decimal,
+    /// Whether this tier is currently unlocked (purchasable).
+    pub unlocked: bool,
 }
 
 impl ObservedDimensionTier {
@@ -24,6 +28,8 @@ impl ObservedDimensionTier {
             bought: game.dimensions[tier].bought,
             multiplier: game.dimension_multiplier(tier),
             production_per_second: game.dimension_production_per_second(tier),
+            cost: game.dimension_cost(tier),
+            unlocked: game.is_dimension_unlocked(tier),
         }
     }
 }
@@ -81,11 +87,28 @@ pub struct ObservedState {
     pub sacrifice_boost: Decimal,
     /// Whether sacrifice is unlocked.
     pub sacrifice_unlocked: bool,
+    /// Number of dimension tiers currently unlocked.
+    pub unlocked_dimensions: usize,
+    /// Whether an antimatter galaxy can be bought right now.
+    pub can_buy_galaxy: bool,
+    /// Whether a dimension boost can be bought right now.
+    pub can_dim_boost: bool,
+    /// Whether a sacrifice can be performed right now.
+    pub can_sacrifice: bool,
+    /// Gain ratio the next sacrifice would yield (the
+    /// `nextBoost` value). 1 when sacrifice is not worthwhile.
+    pub next_sacrifice_boost: Decimal,
 }
 
 impl ObservedState {
     /// Construct an observed state by reading all fields from
     /// the game state and computing derived values.
+    ///
+    /// The computed affordability fields (`can_*`,
+    /// `next_sacrifice_boost`, per-tier `cost`) make this a
+    /// complete decision input for an external controller: a
+    /// driver can choose among legal actions without holding a
+    /// mutable borrow of the engine or re-deriving game rules.
     pub fn from_game_state(game: &GameState) -> Self {
         Self {
             antimatter: game.antimatter,
@@ -98,6 +121,11 @@ impl ObservedState {
             sacrificed: game.sacrificed,
             sacrifice_boost: game.sacrifice_multiplier(),
             sacrifice_unlocked: game.sacrifice_unlocked(),
+            unlocked_dimensions: game.unlocked_dimensions(),
+            can_buy_galaxy: game.can_buy_galaxy(),
+            can_dim_boost: game.can_dim_boost(),
+            can_sacrifice: game.can_sacrifice(),
+            next_sacrifice_boost: game.next_sacrifice_boost(),
         }
     }
 }

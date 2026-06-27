@@ -44,8 +44,17 @@ name = "ad-python"
 version = "0.1.0"
 dependencies = [
  "ad-core",
+ "ad-sim",
  "break_infinity",
  "pyo3",
+]
+
+[[package]]
+name = "ad-sim"
+version = "0.1.0"
+dependencies = [
+ "ad-core",
+ "break_infinity",
 ]
 
 [[package]]

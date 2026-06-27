@@ -3,6 +3,9 @@
 .venv/
 *.pyc
 
+# Compiled PyO3 extension — regenerable via `uv run maturin develop`
+*.so
+
 # JS dependencies — regenerable via `npm install` from package-lock.json
 node_modules/
 
