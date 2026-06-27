@@ -71,4 +71,4 @@ pub const TICKSPEED_MULTIPLIER_MIN: f64 = 0.01;
 /// (1.7976931348623157e308). The mantissa is already
 /// normalized (in [1, 10)), so `new_unchecked` is sound here.
 pub const BIG_CRUNCH_THRESHOLD: Decimal =
-    Decimal::new_unchecked(1.7976931348623157, 100);  // 308
+    Decimal::new_unchecked(1.7976931348623157, 308);
