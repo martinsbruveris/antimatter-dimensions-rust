@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 
 import { TABS } from "../config/tabs";
+import { useGameStore } from "./game";
 
 // UI-only navigation state (which tab/subtab is open). Kept separate from
 // the `game` store, which mirrors the Rust snapshot.
@@ -17,8 +18,17 @@ export const useUiStore = defineStore("ui", {
     speedMultiplier: 1,
   }),
   getters: {
+    // Tabs currently visible, honouring each tab's optional unlock condition
+    // (evaluated against the latest game snapshot). Hidden tabs are skipped
+    // by the sidebar and by arrow-key navigation.
+    visibleTabs() {
+      const game = useGameStore();
+      return TABS.filter((t) => !t.condition || t.condition(game.snapshot));
+    },
     currentTab(state) {
-      return TABS.find((t) => t.key === state.currentTabKey) ?? TABS[0];
+      return (
+        this.visibleTabs.find((t) => t.key === state.currentTabKey) ?? TABS[0]
+      );
     },
     currentSubtab(state) {
       const tab = this.currentTab;
@@ -40,9 +50,10 @@ export const useUiStore = defineStore("ui", {
     // Cycle through tabs (delta -1/+1) with wraparound, mirroring the
     // original's Up/Down arrow tab movement.
     moveTab(delta) {
-      const idx = TABS.findIndex((t) => t.key === this.currentTabKey);
-      const next = (idx + delta + TABS.length) % TABS.length;
-      this.setTab(TABS[next].key);
+      const tabs = this.visibleTabs;
+      const idx = tabs.findIndex((t) => t.key === this.currentTabKey);
+      const next = (idx + delta + tabs.length) % tabs.length;
+      this.setTab(tabs[next].key);
     },
     // Cycle through the current tab's subtabs (delta -1/+1) with wraparound,
     // mirroring the original's Left/Right arrow subtab movement.

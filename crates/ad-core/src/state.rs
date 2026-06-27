@@ -65,6 +65,10 @@ impl TickspeedState {
 pub struct GameState {
     /// Current antimatter amount.
     pub antimatter: Decimal,
+    /// All-time total antimatter ever produced. Mirrors JS
+    /// `player.records.totalAntimatter`: monotonic and **not** reset by
+    /// a Big Crunch. Gates the Automation tab and autobuyer unlocks.
+    pub total_antimatter: Decimal,
     /// All 8 antimatter dimension tiers.
     pub dimensions: [DimensionTier; 8],
     /// Tickspeed upgrade state.
@@ -76,6 +80,12 @@ pub struct GameState {
     /// Total antimatter sacrificed (cumulative across all
     /// sacrifices).
     pub sacrificed: Decimal,
+    /// Whether the player has performed at least one Big Crunch. Mirrors JS
+    /// `PlayerProgress.infinityUnlocked()`: set on the first crunch and
+    /// **not** reset by subsequent crunches. Gates Infinity-related UI (e.g.
+    /// the "Infinity" How To Play entry).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub infinity_unlocked: bool,
     /// Autobuyer state for dimensions and tickspeed.
     pub autobuyers: AutobuyerState,
 }
@@ -86,11 +96,13 @@ impl GameState {
 
         Self {
             antimatter: Decimal::from_float(INITIAL_ANTIMATTER),
+            total_antimatter: Decimal::from_float(INITIAL_ANTIMATTER),
             dimensions,
             tickspeed: TickspeedState::new(),
             dim_boosts: 0,
             galaxies: 0,
             sacrificed: Decimal::ZERO,
+            infinity_unlocked: false,
             autobuyers: AutobuyerState::new(),
         }
     }
@@ -115,6 +127,13 @@ impl GameState {
     /// one extra boost).
     pub fn sacrifice_unlocked(&self) -> bool {
         self.dim_boosts >= 5
+    }
+
+    /// Returns whether Tickspeed is unlocked. In JS
+    /// `Tickspeed.isUnlocked` requires `AntimatterDimension(2).bought > 0`
+    /// (the later Eternity/Reality unlock conditions don't exist yet).
+    pub fn tickspeed_unlocked(&self) -> bool {
+        self.dimensions[1].bought > 0
     }
 }
 

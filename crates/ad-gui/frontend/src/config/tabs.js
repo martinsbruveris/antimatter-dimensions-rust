@@ -1,9 +1,11 @@
 import AntimatterDimensionsTab from "../components/tabs/AntimatterDimensionsTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
+import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 
 // Single source of truth for the tab/subtab structure: display name,
 // sidebar symbol, and the page component each subtab renders. `component:
-// null` means "not implemented yet" (renders a placeholder). Only the
+// null` means "not implemented yet" (renders a placeholder). An optional
+// `condition(snapshot)` hides a tab until the game unlocks it. Only the
 // early-game tabs are listed for now; more get added as systems land.
 export const TABS = [
   {
@@ -11,6 +13,17 @@ export const TABS = [
     name: "Dimensions",
     subtabs: [
       { key: "antimatter", name: "Antimatter Dimensions", symbol: "Ω", component: AntimatterDimensionsTab },
+    ],
+  },
+  {
+    key: "automation",
+    name: "Automation",
+    // JS: tab unlocks at total antimatter >= 1e40 (around buying the 7th
+    // Antimatter Dimension). The Automator subtab is post-Reality, so it is
+    // omitted here.
+    condition: (s) => Boolean(s?.autobuyers?.tab_unlocked),
+    subtabs: [
+      { key: "autobuyers", name: "Autobuyers", symbol: "<i class='fas fa-cog'></i>", component: AutobuyersTab },
     ],
   },
   {

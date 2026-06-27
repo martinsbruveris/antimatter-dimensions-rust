@@ -1,6 +1,5 @@
 <script setup>
 import { useUiStore } from "../stores/ui";
-import { TABS } from "../config/tabs";
 import SidebarCurrency from "./SidebarCurrency.vue";
 
 const ui = useUiStore();
@@ -10,7 +9,7 @@ const ui = useUiStore();
   <div class="c-modern-sidebar">
     <SidebarCurrency />
     <div
-      v-for="tab in TABS"
+      v-for="tab in ui.visibleTabs"
       :key="tab.key"
       class="o-tab-btn o-tab-btn--modern-tabs o-tab-btn--subtabs"
       :class="{ 'o-tab-btn--active': ui.currentTabKey === tab.key }"

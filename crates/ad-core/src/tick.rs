@@ -32,6 +32,10 @@ impl GameState {
         // Tier 0 (AD1) produces antimatter
         self.antimatter += productions[0];
 
+        // Track all-time antimatter produced (monotonic, survives crunches).
+        // Counted before the Big Crunch cap so it reflects true production.
+        self.total_antimatter += productions[0];
+
         // Tiers 1-7 produce into the tier below
         for tier in 1..unlocked {
             self.dimensions[tier - 1].amount += productions[tier];

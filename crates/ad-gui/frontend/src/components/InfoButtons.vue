@@ -3,6 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { useUiStore } from "../stores/ui";
 import Modal from "./Modal.vue";
+import H2PModal from "./H2PModal.vue";
 import CreditsDisplay from "./CreditsDisplay.vue";
 
 // Modal open/close state lives in the ui store so the keyboard shortcuts
@@ -77,28 +78,7 @@ function close() {
     </div>
   </div>
 
-  <Modal
-    v-if="ui.openModal === 'help'"
-    title="How to play"
-    @close="close"
-  >
-    <p>
-      Welcome to Antimatter Dimensions! You generate antimatter, which is used
-      to buy Dimensions. Each Dimension produces the Dimension below it, and the
-      1st Dimension produces antimatter.
-    </p>
-    <h3>Getting started</h3>
-    <ul>
-      <li>Buy <b>Antimatter Dimensions</b> to increase your antimatter income.</li>
-      <li>Buy <b>Tickspeed</b> upgrades to make all Dimensions produce faster.</li>
-      <li>Use <b>Dimension Boosts</b> and <b>Antimatter Galaxies</b> to reset
-        for stronger production multipliers.</li>
-    </ul>
-    <h3>Shortcuts</h3>
-    <ul>
-      <li><b>M</b> — Max all (buy max tickspeed and all Dimensions).</li>
-    </ul>
-  </Modal>
+  <H2PModal v-if="ui.openModal === 'help'" />
 
   <Modal
     v-if="ui.openModal === 'info'"

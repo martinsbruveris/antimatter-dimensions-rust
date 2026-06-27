@@ -3,9 +3,14 @@ use std::sync::Mutex;
 use ad_core::data::constants::{
     BIG_CRUNCH_THRESHOLD, BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER,
 };
-use ad_core::{Decimal, GameState};
+use ad_core::{AutobuyerMode, Decimal, GameState};
 use serde::Serialize;
 use tauri::State;
+
+/// Ordinal names for the eight antimatter dimensions, used to label the
+/// per-dimension autobuyers (mirrors `AntimatterDimension(tier).shortDisplayName`).
+const DIMENSION_ORDINALS: [&str; 8] =
+    ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 
 /// Serializable view of a single dimension tier for the frontend.
 #[derive(Serialize)]
@@ -27,6 +32,41 @@ struct DimensionView {
     rate_percent: f64,
 }
 
+/// Serializable view of a single autobuyer (AD tier or tickspeed).
+#[derive(Serialize)]
+struct AutobuyerView {
+    /// Display name, e.g. "1st Dimension Autobuyer" / "Tickspeed Autobuyer".
+    name: String,
+    /// Whether the slow version is unlocked (full row vs. purchase box).
+    is_bought: bool,
+    /// Whether the antimatter requirement is met (purchase box enabled).
+    can_unlock: bool,
+    /// Formatted requirement amount shown on the purchase box.
+    requirement: String,
+    /// Interval between purchases, formatted in seconds (e.g. "0.50").
+    interval_seconds: String,
+    /// Whether the autobuyer is toggled on.
+    is_active: bool,
+    /// Current purchase mode: "single" or "max".
+    mode: String,
+    /// Whether the mode can be changed. Pre-Infinity the tickspeed autobuyer is
+    /// locked to single (the toggle needs a completed challenge).
+    can_change_mode: bool,
+}
+
+/// Serializable view of the whole autobuyers tab.
+#[derive(Serialize)]
+struct AutobuyersView {
+    /// Whether the Automation tab (Autobuyers subtab) is unlocked.
+    tab_unlocked: bool,
+    /// Global on/off switch (JS `autobuyersOn`).
+    enabled: bool,
+    /// The eight antimatter dimension autobuyers (index 0 = 1st Dimension).
+    dimensions: Vec<AutobuyerView>,
+    /// The tickspeed autobuyer.
+    tickspeed: AutobuyerView,
+}
+
 /// Serializable game view sent to the frontend each frame.
 #[derive(Serialize)]
 struct GameView {
@@ -36,6 +76,8 @@ struct GameView {
     tickspeed_bought: u64,
     tickspeed_effect: String,
     tickspeed_purchase_multiplier: f64,
+    /// Whether Tickspeed is unlocked (JS `Tickspeed.isUnlocked`).
+    tickspeed_unlocked: bool,
     dimensions: Vec<DimensionView>,
     unlocked_dimensions: usize,
     buy_ten_multiplier: String,
@@ -63,6 +105,66 @@ struct GameView {
     /// Whether antimatter has reached the Big Crunch threshold, so the
     /// Big Crunch screen should replace the normal game view.
     can_big_crunch: bool,
+    /// Whether the player has performed at least one Big Crunch (JS
+    /// `PlayerProgress.infinityUnlocked()`). Persists across crunches.
+    infinity_unlocked: bool,
+    /// Autobuyer tab state (unlock progress, per-autobuyer status).
+    autobuyers: AutobuyersView,
+}
+
+/// Build the serializable view for one autobuyer.
+fn build_autobuyer_view(
+    autobuyer: &ad_core::Autobuyer,
+    name: String,
+    requirement: Decimal,
+    can_unlock: bool,
+    can_change_mode: bool,
+) -> AutobuyerView {
+    AutobuyerView {
+        name,
+        is_bought: autobuyer.is_bought,
+        can_unlock,
+        requirement: format_decimal(&requirement),
+        interval_seconds: format!("{:.2}", autobuyer.interval_ms / 1000.0),
+        is_active: autobuyer.is_active,
+        mode: match autobuyer.mode {
+            AutobuyerMode::BuySingle => "single".to_string(),
+            AutobuyerMode::BuyMax => "max".to_string(),
+        },
+        can_change_mode,
+    }
+}
+
+fn build_autobuyers_view(game: &GameState) -> AutobuyersView {
+    let dimensions = (0..8)
+        .map(|tier| {
+            build_autobuyer_view(
+                &game.autobuyers.dimensions[tier],
+                format!("{} Dimension Autobuyer", DIMENSION_ORDINALS[tier]),
+                GameState::ad_autobuyer_requirement(tier),
+                game.can_unlock_ad_autobuyer(tier),
+                // AD autobuyer mode ("Buys singles"/"Buys max") is always
+                // changeable, even pre-Infinity.
+                true,
+            )
+        })
+        .collect();
+
+    let tickspeed = build_autobuyer_view(
+        &game.autobuyers.tickspeed,
+        "Tickspeed Autobuyer".to_string(),
+        GameState::tickspeed_autobuyer_requirement(),
+        game.can_unlock_tickspeed_autobuyer(),
+        // Pre-Infinity the tickspeed autobuyer is locked to single.
+        false,
+    );
+
+    AutobuyersView {
+        tab_unlocked: game.autobuyer_tab_unlocked(),
+        enabled: game.autobuyers.enabled,
+        dimensions,
+        tickspeed,
+    }
 }
 
 fn build_game_view(game: &GameState) -> GameView {
@@ -132,6 +234,7 @@ fn build_game_view(game: &GameState) -> GameView {
         tickspeed_bought: game.tickspeed.bought,
         tickspeed_effect: format_decimal(&game.tickspeed_effect()),
         tickspeed_purchase_multiplier: game.tickspeed_purchase_multiplier(),
+        tickspeed_unlocked: game.tickspeed_unlocked(),
         dimensions,
         unlocked_dimensions: unlocked,
         buy_ten_multiplier: format_decimal(&Decimal::from_float(BUY_TEN_MULTIPLIER)),
@@ -151,6 +254,8 @@ fn build_game_view(game: &GameState) -> GameView {
         can_buy_tickspeed: game.antimatter >= *tickspeed_cost,
         infinity_progress,
         can_big_crunch: game.can_big_crunch(),
+        infinity_unlocked: game.infinity_unlocked,
+        autobuyers: build_autobuyers_view(game),
     }
 }
 
@@ -233,6 +338,48 @@ fn big_crunch(state: State<'_, Mutex<GameState>>) {
     game.big_crunch();
 }
 
+#[tauri::command]
+fn unlock_ad_autobuyer(tier: usize, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.unlock_ad_autobuyer(tier);
+}
+
+#[tauri::command]
+fn toggle_ad_autobuyer(tier: usize, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.toggle_ad_autobuyer(tier);
+}
+
+#[tauri::command]
+fn toggle_ad_autobuyer_mode(tier: usize, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.toggle_ad_autobuyer_mode(tier);
+}
+
+#[tauri::command]
+fn unlock_tickspeed_autobuyer(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.unlock_tickspeed_autobuyer();
+}
+
+#[tauri::command]
+fn toggle_tickspeed_autobuyer(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.toggle_tickspeed_autobuyer();
+}
+
+#[tauri::command]
+fn toggle_autobuyers(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.toggle_autobuyers();
+}
+
+#[tauri::command]
+fn set_all_autobuyers_active(active: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.set_all_autobuyers_active(active);
+}
+
 /// Format a Decimal for display (matches the original game's
 /// notation).
 fn format_decimal(val: &Decimal) -> String {
@@ -291,6 +438,13 @@ pub fn run() {
             sacrifice,
             max_all,
             big_crunch,
+            unlock_ad_autobuyer,
+            toggle_ad_autobuyer,
+            toggle_ad_autobuyer_mode,
+            unlock_tickspeed_autobuyer,
+            toggle_tickspeed_autobuyer,
+            toggle_autobuyers,
+            set_all_autobuyers_active,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");
@@ -327,5 +481,37 @@ mod tests {
     fn format_decimal_rounds_mantissa_up() {
         // 9.999e10 should carry into the exponent as 1.00e11.
         assert_eq!(format_decimal(&Decimal::new(9.999, 10)), "1.00e11");
+    }
+
+    #[test]
+    fn autobuyers_view_reflects_unlock_state() {
+        let mut game = GameState::new();
+
+        // Fresh game: tab locked, nothing unlockable yet.
+        let view = build_autobuyers_view(&game);
+        assert!(!view.tab_unlocked);
+        assert!(view.enabled);
+        assert_eq!(view.dimensions.len(), 8);
+        assert_eq!(view.dimensions[0].name, "1st Dimension Autobuyer");
+        assert_eq!(view.dimensions[0].requirement, "1.00e40");
+        assert_eq!(view.dimensions[0].interval_seconds, "0.50");
+        assert_eq!(view.dimensions[0].mode, "max");
+        assert!(!view.dimensions[0].can_unlock);
+        assert!(!view.dimensions[0].is_bought);
+        // Tickspeed mode is locked pre-Infinity.
+        assert!(!view.tickspeed.can_change_mode);
+        assert_eq!(view.tickspeed.requirement, "1.00e140");
+
+        // Past 1e40: tab unlocks and the 1st AD autobuyer becomes unlockable.
+        game.total_antimatter = Decimal::new(1.0, 40);
+        let view = build_autobuyers_view(&game);
+        assert!(view.tab_unlocked);
+        assert!(view.dimensions[0].can_unlock);
+        assert!(!view.dimensions[1].can_unlock);
+
+        // After unlocking, the entry reports as bought.
+        game.unlock_ad_autobuyer(0);
+        let view = build_autobuyers_view(&game);
+        assert!(view.dimensions[0].is_bought);
     }
 }

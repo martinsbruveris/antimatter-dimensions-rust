@@ -72,3 +72,37 @@ pub const TICKSPEED_MULTIPLIER_MIN: f64 = 0.01;
 /// normalized (in [1, 10)), so `new_unchecked` is sound here.
 pub const BIG_CRUNCH_THRESHOLD: Decimal =
     Decimal::new_unchecked(1.7976931348623157, 308);
+
+// --- Autobuyers (pre-Infinity) ---
+
+/// Total antimatter required to unlock the Automation tab (which
+/// contains the Autobuyers subtab). JS: `tabs.js` automation
+/// `condition: () => player.records.totalAntimatter.gte(1e40)`.
+pub const AUTOMATION_TAB_REQUIREMENT: Decimal = Decimal::new_unchecked(1.0, 40);
+
+/// Base interval (ms) for each antimatter dimension autobuyer tier
+/// (0-indexed). Fixed pre-Infinity; interval upgrades cost Infinity
+/// Points. JS: `player.defaultStart.auto.antimatterDims.all[tier].interval`.
+pub const AD_AUTOBUYER_INTERVALS_MS: [f64; 8] =
+    [500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1100.0, 1200.0];
+
+/// Antimatter required to unlock each AD autobuyer's "slow version"
+/// (0-indexed). JS: `antimatterCost = DC.E10.pow(tier).times(DC.E40)`,
+/// i.e. 1e40, 1e50, ..., 1e110.
+pub const AD_AUTOBUYER_REQUIREMENTS: [Decimal; 8] = [
+    Decimal::new_unchecked(1.0, 40),
+    Decimal::new_unchecked(1.0, 50),
+    Decimal::new_unchecked(1.0, 60),
+    Decimal::new_unchecked(1.0, 70),
+    Decimal::new_unchecked(1.0, 80),
+    Decimal::new_unchecked(1.0, 90),
+    Decimal::new_unchecked(1.0, 100),
+    Decimal::new_unchecked(1.0, 110),
+];
+
+/// Base interval (ms) for the tickspeed autobuyer. Fixed pre-Infinity.
+pub const TICKSPEED_AUTOBUYER_INTERVAL_MS: f64 = 500.0;
+
+/// Antimatter required to unlock the tickspeed autobuyer's "slow
+/// version". JS: `antimatterCost = DC.E140`.
+pub const TICKSPEED_AUTOBUYER_REQUIREMENT: Decimal = Decimal::new_unchecked(1.0, 140);

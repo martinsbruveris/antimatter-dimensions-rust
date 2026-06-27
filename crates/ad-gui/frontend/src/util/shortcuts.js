@@ -52,6 +52,11 @@ export function handleShortcut(e, game, ui) {
   }
 
   switch (e.code) {
+    case "KeyA":
+      // Toggle (pause/resume) all autobuyers — only once the Automation tab is
+      // unlocked, matching the original's `Tab.automation.isUnlocked` guard.
+      if (game.snapshot?.autobuyers?.tab_unlocked) game.toggleAutobuyers();
+      break;
     case "KeyM":
       game.maxAll();
       break;

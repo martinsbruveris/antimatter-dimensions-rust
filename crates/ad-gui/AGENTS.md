@@ -50,7 +50,11 @@ frontend/
       Modal.vue, HotkeysModal.vue, CreditsDisplay.vue   # popups
       BigCrunchScreen.vue    # replaces the game view at the Big Crunch cap
       tabs/                  # one component per page (subtab):
-        AntimatterDimensionsTab.vue, NormalAchievementsTab.vue
+        AntimatterDimensionsTab.vue, NormalAchievementsTab.vue,
+        AutobuyersTab.vue
+        autobuyers/          # AutobuyerBox (shared row/purchase box),
+                             #   DimensionAutobuyerBox, TickspeedAutobuyerBox,
+                             #   AutobuyerToggles
 ```
 
 ## How it works
@@ -84,6 +88,34 @@ frontend/
 
 **To add a page:** create `components/tabs/XTab.vue`, then point a subtab's
 `component:` at it in `config/tabs.js`. Nothing else to wire.
+
+**Conditional tabs.** A tab may carry an optional `condition(snapshot)` in
+`config/tabs.js` that hides it until the game unlocks it. The `ui` store's
+`visibleTabs` getter filters `TABS` through these conditions against the live
+`game.snapshot`; `Sidebar.vue` and arrow-key `moveTab` both iterate
+`visibleTabs`. The Automation tab uses this (`autobuyers.tab_unlocked`).
+
+## Autobuyers tab
+
+- Pre-Infinity only: the antimatter-dimension (8 tiers) and tickspeed
+  autobuyers. The dimboost/galaxy/sacrifice/crunch autobuyers and interval
+  upgrades are post-Infinity and not built yet.
+- **Unlock model** (engine-owned, see `ad-core`): the Automation tab unlocks at
+  all-time `total_antimatter >= 1e40`; each autobuyer's "slow version" is
+  unlocked by clicking its purchase box once its antimatter requirement is met
+  (AD tiers 1e40…1e110, tickspeed 1e140). Unlocking costs no antimatter. Both
+  the tab and unlocked autobuyers persist through a Big Crunch.
+- Intervals are fixed (the interval/mode-upgrade buttons show the disabled
+  "Complete the challenge to …" state); AD autobuyers can toggle "Buys
+  singles"/"Buys max", tickspeed is locked to single.
+- **Snapshot:** `GameView.autobuyers` (`build_autobuyers_view`) carries
+  `tab_unlocked`, `enabled`, and per-entry `{ name, is_bought, can_unlock,
+  requirement, interval_seconds, is_active, mode, can_change_mode }`.
+- **Commands:** `unlock_ad_autobuyer`, `toggle_ad_autobuyer`,
+  `toggle_ad_autobuyer_mode`, `unlock_tickspeed_autobuyer`,
+  `toggle_tickspeed_autobuyer`, `toggle_autobuyers` (global pause/resume, also
+  the `A` hotkey), `set_all_autobuyers_active` (the "Enable/Disable all"
+  button). Store actions mirror these in `stores/game.js`.
 
 ## Keyboard shortcuts & popups
 

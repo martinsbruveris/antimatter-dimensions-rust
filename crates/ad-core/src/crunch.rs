@@ -12,8 +12,12 @@ impl GameState {
 
     /// Perform the first Big Crunch (Infinity): reset all pre-Infinity progress
     /// — antimatter, dimensions, tickspeed, dimension boosts, galaxies, and
-    /// sacrifices — back to the start. Autobuyer configuration is preserved
-    /// (it is not pre-Infinity progress). Returns true if the crunch happened.
+    /// sacrifices — back to the start. Autobuyer configuration (unlocks, modes,
+    /// toggles) and the all-time `total_antimatter` record are preserved — they
+    /// are not pre-Infinity progress, matching the original where the Automation
+    /// tab and unlocked autobuyers persist through Infinity. Returns true if the
+    /// crunch happened. The `infinity_unlocked` flag and the all-time
+    /// `total_antimatter` record are preserved (not pre-Infinity progress).
     ///
     /// Infinity Points are not awarded yet; that comes in a later step.
     pub fn big_crunch(&mut self) -> bool {
@@ -27,6 +31,7 @@ impl GameState {
         self.dim_boosts = 0;
         self.galaxies = 0;
         self.sacrificed = Decimal::ZERO;
+        self.infinity_unlocked = true;
 
         true
     }
@@ -73,5 +78,32 @@ mod tests {
 
         // No longer able to crunch after resetting.
         assert!(!game.can_big_crunch());
+
+        // Infinity stays unlocked after the crunch (persists across resets).
+        assert!(game.infinity_unlocked);
+    }
+
+    #[test]
+    fn infinity_unlocked_starts_false_and_persists_after_crunch() {
+        let mut game = GameState::new();
+        assert!(!game.infinity_unlocked);
+
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+        assert!(game.infinity_unlocked);
+
+        // A second crunch does not clear it.
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+        assert!(game.infinity_unlocked);
+    }
+
+    #[test]
+    fn tickspeed_unlocks_with_second_dimension_purchase() {
+        let mut game = GameState::new();
+        assert!(!game.tickspeed_unlocked());
+
+        game.dimensions[1].bought = 1;
+        assert!(game.tickspeed_unlocked());
     }
 }

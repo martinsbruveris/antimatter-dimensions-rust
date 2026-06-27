@@ -56,5 +56,32 @@ export const useGameStore = defineStore("game", {
     bigCrunch() {
       return invoke("big_crunch");
     },
+    // --- Autobuyers ---
+    // Unlock an AD autobuyer's slow version (no antimatter cost; only succeeds
+    // once the requirement is met).
+    unlockAdAutobuyer(tier) {
+      return invoke("unlock_ad_autobuyer", { tier });
+    },
+    toggleAdAutobuyer(tier) {
+      return invoke("toggle_ad_autobuyer", { tier });
+    },
+    toggleAdAutobuyerMode(tier) {
+      return invoke("toggle_ad_autobuyer_mode", { tier });
+    },
+    unlockTickspeedAutobuyer() {
+      return invoke("unlock_tickspeed_autobuyer");
+    },
+    toggleTickspeedAutobuyer() {
+      return invoke("toggle_tickspeed_autobuyer");
+    },
+    // Global pause/resume (the `a` hotkey and the toggles bar).
+    toggleAutobuyers() {
+      return invoke("toggle_autobuyers");
+    },
+    // "Enable/Disable all autobuyers": sets the active flag on every unlocked
+    // autobuyer.
+    setAllAutobuyersActive(active) {
+      return invoke("set_all_autobuyers_active", { active });
+    },
   },
 });
