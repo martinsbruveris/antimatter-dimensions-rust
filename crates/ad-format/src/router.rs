@@ -33,7 +33,8 @@ pub fn format(value: &Decimal, opts: &FormatOptions) -> String {
         };
     }
 
-    // Under 1000: plain fixed-point on the f64 value.
+    // Under 1000: plain fixed-point on the f64 value. Unlike the Decimal branches
+    // below, this path negates the f64 directly since it already materialized it.
     if exponent < 3 {
         let number = value.to_f64();
         return if number < 0.0 {

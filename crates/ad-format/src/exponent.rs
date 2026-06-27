@@ -26,7 +26,7 @@ pub(crate) fn is_exponent_fully_shown(exponent: f64, commas: &ExponentCommas) ->
 /// Render an integer-valued exponent as a base-10 string (port of the default
 /// `specialFormat = n => n.toString()`).
 pub(crate) fn exponent_to_string(exponent: f64) -> String {
-    format!("{}", exponent as i64)
+    (exponent as i64).to_string()
 }
 
 /// Group the integer part of `value` into comma-separated thousands. Port of

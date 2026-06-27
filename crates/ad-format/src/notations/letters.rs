@@ -49,6 +49,8 @@ fn to_engineering(value: &Decimal) -> (f64, i64) {
 fn transcribe(exponent: i64) -> String {
     let base = LETTERS.len() as i64;
     let mut n = exponent / 3;
+    // Fast path for the common single-letter case (`a`..`z`); the loop below would
+    // produce the same result but allocates a `Vec`.
     if n <= base {
         return (LETTERS[(n - 1) as usize] as char).to_string();
     }

@@ -4,7 +4,9 @@
 use break_infinity::Decimal;
 
 use super::NotationStrategy;
-use crate::mantissa::{format_mantissa_base_ten, format_mantissa_with_exponent};
+use crate::mantissa::{
+    format_mantissa_base_ten, format_mantissa_with_exponent, MantissaSpec,
+};
 use crate::options::FormatOptions;
 
 const STANDARD_ABBREVIATIONS: [&str; 10] =
@@ -33,19 +35,22 @@ impl NotationStrategy for Standard {
         places_exponent: i32,
         opts: &FormatOptions,
     ) -> String {
-        // base 1000, steps 1, separator " ", forced non-negative exponent, and no
-        // alternate mantissa formatting (exponent is never numeric here).
+        // base 1000, steps 1, separator " ", forced non-negative exponent. The
+        // exponent is always an abbreviation (never numeric), so it is never
+        // rendered in notation and `use_log_if_exponent_is_formatted` is moot.
         format_mantissa_with_exponent(
             value,
             places,
             places_exponent,
-            1000.0,
-            1,
+            &MantissaSpec {
+                base: 1000.0,
+                steps: 1,
+                separator: " ",
+                force_positive_exponent: true,
+                use_log_if_exponent_is_formatted: false,
+            },
             format_mantissa_base_ten,
             |exp, _prec| abbreviate_standard(exp),
-            None::<fn(f64, i32) -> String>,
-            " ",
-            true,
             &opts.exponent_commas,
         )
     }

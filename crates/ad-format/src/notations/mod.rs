@@ -16,7 +16,9 @@ use break_infinity::Decimal;
 use crate::exponent::{
     exponent_to_string, format_with_commas, no_special_formatting, show_commas,
 };
-use crate::mantissa::{format_mantissa_base_ten, format_mantissa_with_exponent};
+use crate::mantissa::{
+    format_mantissa_base_ten, format_mantissa_with_exponent, MantissaSpec,
+};
 use crate::options::{FormatOptions, Notation};
 
 pub(crate) use engineering::Engineering;
@@ -89,13 +91,15 @@ pub(crate) trait NotationStrategy: Sync {
             value,
             places,
             places_exponent,
-            10.0,
-            steps,
+            &MantissaSpec {
+                base: 10.0,
+                steps,
+                separator: "e",
+                force_positive_exponent: false,
+                use_log_if_exponent_is_formatted: false,
+            },
             format_mantissa_base_ten,
             |exp, prec| self.format_exponent(exp, prec, opts),
-            Some(|x: f64, _p: i32| format_mantissa_base_ten(x, 0)),
-            "e",
-            false,
             &opts.exponent_commas,
         )
     }

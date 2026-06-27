@@ -117,6 +117,47 @@ fn letters_places_0() {
 }
 
 #[test]
+fn comma_grouped_exponents() {
+    // `min` (1e5) <= exponent < `max` (1e9): the exponent itself is rendered in
+    // full with thousands separators rather than recursively in notation.
+    assert_eq!(sci(Decimal::new(1.0, 100_000), 2), "1.00e100,000");
+    assert_eq!(sci(Decimal::new(1.5, 100_000), 2), "1.50e100,000");
+    assert_eq!(sci(Decimal::new(1.0, 1_234_567), 2), "1.00e1,234,567");
+    assert_eq!(sci(Decimal::new(1.0, 100_000), 0), "1e100,000");
+    // Engineering rebases to a multiple of 3: 100001 -> 99999 (mantissa 100),
+    // which falls below `min` and so prints plain (no commas).
+    assert_eq!(eng(Decimal::new(1.0, 100_001), 2), "100.00e99999");
+    assert_eq!(eng(Decimal::new(1.0, 100_002), 2), "1.00e100,002");
+    assert_eq!(std_(Decimal::new(1.0, 100_002), 2), "1.00 TTgMI-TTgTc");
+}
+
+#[test]
+fn recursive_notation_exponents() {
+    // exponent >= `max` (1e9): the exponent is itself formatted in this notation
+    // (with `places_exponent` = 3), nested after the mantissa. The mantissa keeps
+    // its `places` (these notations do not drop it when the exponent is formatted).
+    assert_eq!(sci(Decimal::new(1.0, 1_000_000_000), 2), "1.00e1.000e9");
+    assert_eq!(sci(Decimal::new(1.23, 1_000_000_000), 2), "1.23e1.000e9");
+    assert_eq!(
+        sci(Decimal::new(1.0, 1_230_000_000_000_000), 2),
+        "1.00e1.230e15"
+    );
+    assert_eq!(sci(Decimal::new(1.0, 1_000_000_000), 0), "1e1.000e9");
+    // Mantissa roll-over pushes the exponent across the recursion boundary.
+    assert_eq!(sci(Decimal::new(9.999, 999_999_999), 2), "1.00e1.000e9");
+    // Engineering rebases 1e9 down to 999,999,999 (mantissa 10), which is < `max`
+    // and so comma-grouped rather than recursive — a boundary the step-3 split moves.
+    assert_eq!(
+        eng(Decimal::new(1.0, 1_000_000_000), 2),
+        "10.00e999,999,999"
+    );
+    assert_eq!(
+        eng(Decimal::new(1.0, 1_230_000_000_000_000), 2),
+        "1.00e1.230e15"
+    );
+}
+
+#[test]
 fn under_1000_and_sign_unaffected_by_notation() {
     // Both notations fall through to the shared under-1000 / very-small paths.
     for n in [Notation::Scientific, Notation::Engineering] {
