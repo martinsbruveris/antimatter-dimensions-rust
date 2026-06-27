@@ -464,22 +464,71 @@ and deterministic.
 
 ## 10. Suggested Phasing
 
-1. **Introduce `Action` + `GameState::apply_action` in `ad-core`.** Route
-   autobuyers and the current simulator through it. No behaviour change; adds the
-   audited seam. (Small, high-value, do first.)
-2. **Create `ad-sim`; define `Controller` + `run_simulation`.** Move
+Status legend: ✅ done · ▶ next · ☐ pending.
+
+1. ✅ **Introduce `Action` + `GameState::apply_action` in `ad-core`.** Adds the
+   audited seam. No behaviour change. (See §10.1 for what shipped.)
+2. ▶ **Create `ad-sim`; define `Controller` + `run_simulation`.** Move
    `strategy.rs`/`simulator.rs` over as `StrategyController`. Update `ad-python`
    imports. Now separation is compiler-enforced.
-3. **Add the `RuleEngineController` (rules + plans) and the phase schedule.** The
+3. ☐ **Add the `RuleEngineController` (rules + plans) and the phase schedule.** The
    `HumanController` is then just a rule set with throttle intervals. Enables the
    first true end-to-end "manual until autobuyers, then engine-driven" run through
    Big Crunch.
-4. **Grow the rule/plan vocabulary (Option C)** as new mechanics (challenges, infinity
-   upgrades, studies) land — adding `Trigger`/`ActionSpec`/`Plan` variants and
-   expanding `Action` in step. No control-flow syntax; keep the vocabulary closed.
-5. **When Reality lands, implement the Automator in `ad-core`** as the real
+4. ☐ **Grow the rule/plan vocabulary (Option C)** as new mechanics (challenges,
+   infinity upgrades, studies) land — adding `Trigger`/`ActionSpec`/`Plan` variants
+   and expanding `Action` in step. No control-flow syntax; keep the vocabulary
+   closed.
+5. ☐ **When Reality lands, implement the Automator in `ad-core`** as the real
    mechanic and add a thin `ScriptController` wrapper in `ad-sim`. No second
    interpreter is ever written.
+
+### 10.1 Implementation status (as of 2026-06-27)
+
+**Milestone 0 (phase 1) — done.** The `Action` IR seam shipped in `ad-core`:
+
+- New `crates/ad-core/src/action.rs`:
+  - `enum Action` — the closed action vocabulary for current pre-Infinity
+    mechanics: `BuyDimension`/`BuyMaxDimension`/`BuyUntil10Dimension(tier)`,
+    `BuyTickspeed`/`BuyMaxTickspeed`, `Galaxy`, `DimBoost`, `Sacrifice`, `Crunch`,
+    `UnlockAdAutobuyer(tier)`, `UnlockTickspeedAutobuyer`, `SetAutobuyers(bool)`.
+    Derives `serde` behind the existing `serde` feature.
+  - `struct ActionOutcome { applied: bool, count: u64 }` (`count` carries bulk-buy
+    quantity).
+  - `GameState::apply_action(&mut self, Action) -> ActionOutcome` — one exhaustive
+    `match` routing to existing methods (`buy_*`, `buy_galaxy`, `buy_dim_boost`,
+    `sacrifice`, `big_crunch`, `unlock_*`). Illegal actions are no-ops returning
+    `applied == false`; the per-mechanic `can_*` guards already enforce legality.
+  - 6 unit tests (routing, unaffordable no-op, bulk count, crunch, requirement-gated
+    unlock, global toggle).
+- `ad-core/src/lib.rs` exports `Action`, `ActionOutcome`; `AGENTS.md` lists
+  `action.rs` under *Key Source Files (ad-core)*.
+- Verified: `cargo test -p ad-core` green; `cargo build -p ad-core --features serde`
+  compiles; `cargo clippy -p ad-core` clean. `apply_action` has no callers yet — the
+  wiring happens in Milestone 1.
+
+**Resume at Milestone 1 (phase 2).** Agreed decisions for that step:
+
+- **Fully replace** `ad_core::simulator` with `ad-sim` — no compatibility shim in
+  `ad-core`. `ad-python` is the only consumer and is updated in the same change.
+- Move `strategy.rs` + `simulator.rs` (and their tests, incl. any in
+  `ad-core/tests/`) into a new `crates/ad-sim`; drop the corresponding re-exports
+  from `ad-core/src/lib.rs`; repoint `ad-python` from `ad_core::{simulator,strategy}`
+  to `ad_sim::*` (Python API surface unchanged).
+- Define `trait Controller { fn on_start(&mut self, &mut GameState) {} fn act(&mut
+  self, &ObservedState, game_time_ms: f64) -> Vec<Action>; }`. `run_simulation`
+  drives `on_start` → per tick `act` → `apply_action` each → `game.tick(dt)` →
+  reuse existing `StateTrace`/`StopCondition`/`StopReason`. Re-express today's logic
+  as `StrategyController`; keep `simulate(config)` as a thin wrapper for API parity.
+- `on_start` resolves the autobuyer-coexistence divergence: `StrategyController`
+  disables in-game autobuyers (as today); the future `RuleEngineController` leaves
+  them on so human + unlocked autobuyers coexist.
+
+**Working-tree note (2026-06-27):** an unrelated in-progress change (a new
+`ad-core` `Options` module: `options.rs`, `state.rs`, and several `ad-gui` files)
+was already uncommitted when Milestone 0 was written and is independent of this
+work. It leaves `state.rs` with `cargo fmt` drift to be cleaned up as part of *that*
+change, not the simulation work.
 
 ## 11. Direct Answers to the Original Questions
 
