@@ -10,26 +10,26 @@ use break_infinity::Decimal;
 
 /// `FormatOptions` for `notation` with the given mantissa `places` (defaults
 /// otherwise: `places_under_1000 = 0`, `places_exponent = 3`).
-fn opts(notation: Notation, places: i32) -> FormatOptions {
+fn opts(notation: Notation, places: u32) -> FormatOptions {
     FormatOptions {
         places,
         ..FormatOptions::new(notation)
     }
 }
 
-fn sci(value: Decimal, places: i32) -> String {
+fn sci(value: Decimal, places: u32) -> String {
     format(&value, &opts(Notation::Scientific, places))
 }
 
-fn eng(value: Decimal, places: i32) -> String {
+fn eng(value: Decimal, places: u32) -> String {
     format(&value, &opts(Notation::Engineering, places))
 }
 
-fn std_(value: Decimal, places: i32) -> String {
+fn std_(value: Decimal, places: u32) -> String {
     format(&value, &opts(Notation::Standard, places))
 }
 
-fn letters(value: Decimal, places: i32) -> String {
+fn letters(value: Decimal, places: u32) -> String {
     format(&value, &opts(Notation::Letters, places))
 }
 

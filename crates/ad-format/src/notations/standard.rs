@@ -28,30 +28,18 @@ impl NotationStrategy for Standard {
         "Standard"
     }
 
-    fn format_decimal(
-        &self,
-        value: &Decimal,
-        places: i32,
-        places_exponent: i32,
-        opts: &FormatOptions,
-    ) -> String {
-        // base 1000, steps 1, separator " ", forced non-negative exponent. The
-        // exponent is always an abbreviation (never numeric), so it is never
-        // rendered in notation and `use_log_if_exponent_is_formatted` is moot.
+    fn format_decimal(&self, value: &Decimal, opts: &FormatOptions) -> String {
+        // base 1000, steps 1, separator " ", forced non-negative exponent.
         format_mantissa_with_exponent(
             value,
-            places,
-            places_exponent,
             &MantissaSpec {
                 base: 1000.0,
                 steps: 1,
                 separator: " ",
                 force_positive_exponent: true,
-                use_log_if_exponent_is_formatted: false,
             },
-            format_mantissa_base_ten,
-            |exp, _prec| abbreviate_standard(exp),
-            &opts.exponent_commas,
+            |m| format_mantissa_base_ten(m, opts.places),
+            abbreviate_standard,
         )
     }
 }

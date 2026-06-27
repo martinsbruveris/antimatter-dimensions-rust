@@ -16,21 +16,15 @@ impl NotationStrategy for Letters {
         "Letters"
     }
 
-    fn format_decimal(
-        &self,
-        value: &Decimal,
-        places: i32,
-        _places_exponent: i32,
-        _opts: &FormatOptions,
-    ) -> String {
+    fn format_decimal(&self, value: &Decimal, opts: &FormatOptions) -> String {
         // `CustomNotation.formatDecimal`: an engineering split (3-digit mantissa),
-        // then the exponent transcribed into base-26 letters. `places_exponent` is
-        // ignored, as are the exponent commas. The Letters separators are empty, so
-        // mantissa and letters are simply concatenated.
+        // then the exponent transcribed into base-26 letters. Only `opts.places`
+        // is used (`places_exponent` and the exponent commas are ignored). The
+        // Letters separators are empty, so mantissa and letters are concatenated.
         let (mantissa, exponent) = to_engineering(value);
         format!(
             "{}{}",
-            format_mantissa_base_ten(mantissa, places),
+            format_mantissa_base_ten(mantissa, opts.places),
             transcribe(exponent)
         )
     }

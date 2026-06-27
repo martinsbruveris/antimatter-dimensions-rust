@@ -16,5 +16,5 @@ mod notations;
 mod options;
 mod router;
 
-pub use options::{ExponentCommas, FormatOptions, Notation};
+pub use options::{ExponentDisplay, FormatOptions, Notation};
 pub use router::format;

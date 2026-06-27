@@ -3,18 +3,16 @@
 
 use break_infinity::Decimal;
 
-use crate::exponent::is_exponent_fully_shown;
-use crate::options::ExponentCommas;
-
-/// Port of `formatMantissaBaseTen`: `n.toFixed(max(0, precision))`.
+/// Port of `formatMantissaBaseTen`: `n.toFixed(precision)`.
 ///
-/// `precision` is clamped to 0 because the JS uses `-1` as a sentinel and guards
-/// with `Math.max(0, precision)`.
+/// The JS clamps with `Math.max(0, precision)` to absorb its `-1` "unspecified"
+/// sentinel; our `precision` is `u32`, so non-negativity is guaranteed by the type
+/// and no clamp is needed.
 ///
 // TODO(fidelity): JS `toFixed` rounds half-away-from-zero; Rust's `{:.*}` formatter
 // rounds half-to-even. Reconcile when the `ad-fidelity` `format()` harness lands.
-pub(crate) fn format_mantissa_base_ten(n: f64, precision: i32) -> String {
-    format!("{:.*}", precision.max(0) as usize, n)
+pub(crate) fn format_mantissa_base_ten(n: f64, precision: u32) -> String {
+    format!("{:.*}", precision as usize, n)
 }
 
 /// `base ** exponent` as a `Decimal`. Specialised to `pow10` for base 10 (the only
@@ -42,10 +40,6 @@ pub(crate) struct MantissaSpec<'a> {
     pub separator: &'a str,
     /// Clamp the exponent to be non-negative (Standard never shows `K^-1`).
     pub force_positive_exponent: bool,
-    /// Port of JS `useLogIfExponentIsFormatted`: when the exponent is itself
-    /// rendered in notation (not plain/comma), drop the mantissa entirely so the
-    /// output is just the formatted exponent. `false` for all four M1 notations.
-    pub use_log_if_exponent_is_formatted: bool,
 }
 
 /// Port of `formatMantissaWithExponent` — the shared mantissa/exponent engine
@@ -57,20 +51,22 @@ pub(crate) struct MantissaSpec<'a> {
 /// joins them with `spec.separator`. Handles mantissa roll-over (`9.999e3 -> 1e4`)
 /// and the `exponent == 0` short-circuit exactly as the JS does.
 ///
-/// - `mantissa_fmt(mantissa, precision)` — renders the mantissa.
-/// - `exponent_fmt(exponent, precision_exponent)` — renders the exponent.
+/// The closures are value-formatters. The JS threads `precision` /
+/// `precisionExponent` through here too, but for us those are always
+/// `opts.places` / `opts.places_exponent`, so the call sites capture them instead
+/// (which also keeps this engine independent of `FormatOptions`).
+///
+/// - `mantissa_fmt(mantissa)` — renders the mantissa.
+/// - `exponent_fmt(exponent)` — renders the exponent.
 pub(crate) fn format_mantissa_with_exponent<FM, FE>(
     n: &Decimal,
-    precision: i32,
-    precision_exponent: i32,
     spec: &MantissaSpec,
     mantissa_fmt: FM,
     exponent_fmt: FE,
-    exponent_commas: &ExponentCommas,
 ) -> String
 where
-    FM: Fn(f64, i32) -> String,
-    FE: Fn(f64, i32) -> String,
+    FM: Fn(f64) -> String,
+    FE: Fn(f64) -> String,
 {
     let steps_f = spec.steps as f64;
     let real_base = spec.base.powi(spec.steps);
@@ -88,10 +84,10 @@ where
         exponent += steps_f * adjust;
     }
 
-    let mut m = mantissa_fmt(mantissa, precision);
+    let mut m = mantissa_fmt(mantissa);
     // Mantissa rounded up to the base (e.g. "10.00") — roll into the exponent.
-    if m == mantissa_fmt(real_base, precision) {
-        m = mantissa_fmt(1.0, precision);
+    if m == mantissa_fmt(real_base) {
+        m = mantissa_fmt(1.0);
         exponent += steps_f;
     }
 
@@ -100,13 +96,6 @@ where
         return m;
     }
 
-    let e = exponent_fmt(exponent, precision_exponent);
-    // When the exponent is itself in notation, some notations show only the
-    // exponent (e.g. Logarithm). None of the M1 four opt in, so `m` is kept.
-    if spec.use_log_if_exponent_is_formatted
-        && !is_exponent_fully_shown(exponent, exponent_commas)
-    {
-        m = String::new();
-    }
+    let e = exponent_fmt(exponent);
     format!("{m}{}{e}", spec.separator)
 }

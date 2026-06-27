@@ -133,9 +133,10 @@ So the three digit parameters map to three different magnitude regimes.
 ### Per-call parameters (vary by call site, not stored on the notation)
 
 - **`places`** — mantissa decimal places for numbers ≥ 1000. Default `0`; call sites
-  commonly pass `0`, `2`, `3`. May be negative in JS (used as a `-1` sentinel
-  elsewhere and clamped via `Math.max(0, …)` in `formatMantissaBaseTen`) → use a
-  signed type and clamp.
+  commonly pass `0`, `2`, `3`. JS types this as a signed `number` with `-1` as an
+  "unspecified" sentinel, clamped via `Math.max(0, …)` in `formatMantissaBaseTen`.
+  We don't need the sentinel (callers always supply a value), so we model it as
+  `u32` — non-negativity becomes a type invariant and the clamp disappears.
 - **`placesUnder1000`** — decimal places for numbers < 1000 (and very-small).
   Default `0`.
 - **`placesExponent`** — digits for the exponent *when the exponent is itself large
@@ -319,7 +320,8 @@ Implementation notes for whoever resumes:
 - Regenerate JS reference strings by requiring `@antimatter-dimensions/notations` in
   `../antimatter-dimensions` (run `npm install` there first if `node_modules` is
   absent); mirror the game call `notation.format(value, places, placesUnder1000, 3)`.
-- `places` may be negative (JS `-1` sentinel); keep clamping with `.max(0)` at the
-  `toFixed` boundary.
+- The place counts (`places`, `places_under_1000`, `places_exponent`) are `u32`. JS
+  uses a signed `-1` "unspecified" sentinel clamped via `Math.max(0, …)`; we don't
+  need it, so non-negativity is enforced by the type rather than a runtime clamp.
 - `Notation::name()` carries `#[allow(dead_code)]` until the fidelity harness consumes
   it for JS lookup.

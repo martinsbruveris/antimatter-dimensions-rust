@@ -22,24 +22,25 @@ pub enum Notation {
     Letters,
 }
 
-/// Controls how a *large exponent* is itself rendered (port of
-/// `ADNotations.Settings.exponentCommas`).
+/// Controls how a *large exponent* is itself rendered. Corresponds to the JS
+/// `ADNotations.Settings.exponentCommas` setting (renamed here since it governs
+/// more than commas).
 ///
 /// An exponent below `min` is printed plain; below `max` (when `show`) it is
 /// comma-grouped; at or above `max` it is recursively formatted in notation. In the
 /// game `min`/`max` come from the player's `notationDigits` option
 /// (`min = 10**comma`, `max = 10**notation`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ExponentCommas {
+pub struct ExponentDisplay {
     pub show: bool,
     pub min: i64,
     pub max: i64,
 }
 
-impl Default for ExponentCommas {
+impl Default for ExponentDisplay {
     fn default() -> Self {
         // Library defaults: show, min 1e5, max 1e9.
-        ExponentCommas {
+        ExponentDisplay {
             show: true,
             min: 100_000,
             max: 1_000_000_000,
@@ -51,22 +52,23 @@ impl Default for ExponentCommas {
 ///
 /// This is **caller / UI state**, never part of `GameState`. `places`,
 /// `places_under_1000` and `places_exponent` are per-call digit counts;
-/// `exponent_commas` and `inf_threshold` are per-frame settings the caller derives
+/// `exponent_display` and `inf_threshold` are per-frame settings the caller derives
 /// from user options / game state.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FormatOptions {
-    /// Notation strategy.
+    /// Notation strategy (scientific, engineering, etc.).
     pub notation: Notation,
-    /// Mantissa decimal places for numbers with |exponent| >= 3. May be negative
-    /// (the JS uses `-1` as a sentinel elsewhere); clamped to 0 when applied.
-    pub places: i32,
+    /// Mantissa decimal places for numbers with |exponent| >= 3. The JS passes a
+    /// signed `number` (with `-1` as an "unspecified" sentinel, guarded by
+    /// `Math.max(0, …)`); we make non-negativity a type invariant instead.
+    pub places: u32,
     /// Decimal places for numbers with |exponent| < 3 (and very-small values).
-    pub places_under_1000: i32,
+    pub places_under_1000: u32,
     /// Decimal places for the exponent once it is itself large enough to be in
-    /// notation (e.g. `1e1.23e15`). The game hardcodes this to 3.
-    pub places_exponent: i32,
+    /// notation (e.g. `1e1.234e15`). The game hardcodes this to 3.
+    pub places_exponent: u32,
     /// How a large exponent is rendered (plain / commas / recursive notation).
-    pub exponent_commas: ExponentCommas,
+    pub exponent_display: ExponentDisplay,
     /// If `Some(t)`, any value with `|value| >= t` renders as `"Infinite"`. `None`
     /// (the default) never shows "Infinite". The caller derives this from game state
     /// (`Some(NUMBER_MAX_VALUE)` pre-break, `None` post-break); `format` only
@@ -83,7 +85,7 @@ impl Default for FormatOptions {
             places: 2,
             places_under_1000: 0,
             places_exponent: 3,
-            exponent_commas: ExponentCommas::default(),
+            exponent_display: ExponentDisplay::default(),
             inf_threshold: None,
         }
     }
