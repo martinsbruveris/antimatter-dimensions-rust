@@ -225,6 +225,7 @@ Located in `design-docs/`:
 | `2026-06-25-number-formatting.md` | Where number formatting lives (Rust now; PyO3 + WASM later) and why |
 | `2026-06-27-options-tabs.md` | Analysis of the Visual & Gameplay options tabs + iterative port plan |
 | `2026-06-27-simulation-architecture.md` | Options for a full end-to-end simulation driver (Action IR + Controller trait) kept cleanly separate from game logic |
+| `2026-06-28-js-frontend-rust-wasm-engine.md` | Feasibility analysis of keeping the original JS/Vue app and swapping its engine for Rust/WASM (rejected; recommends a WASM target for `ad-core` instead) |
 
 The table lists key documents; see the `design-docs/` folder for the full,
 date-prefixed set. Read these before making architectural decisions. The

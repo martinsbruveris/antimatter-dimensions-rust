@@ -1,5 +1,4 @@
-//! The exponent-based routing that drives every notation — a port of the base
-//! `Notation.format` method.
+//! The exponent-based routing that drives every notation.
 //!
 //! `format` dispatches on the value's base-10 exponent into the very-small,
 //! under-1000, infinite, and big-number cases, handling sign uniformly so each

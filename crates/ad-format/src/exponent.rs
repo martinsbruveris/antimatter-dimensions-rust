@@ -1,10 +1,10 @@
-//! Exponent string-rendering helpers (ports from the notations library's
-//! `utils.ts`). The `exponentCommas` threshold logic and recursive `formatExponent`
-//! live on [`NotationStrategy::format_exponent`](crate::notations::NotationStrategy),
-//! since the recursive case dispatches back into a notation's `format_decimal`.
+//! Exponent string-rendering helpers. The exponent-display threshold logic and the
+//! recursive case live on
+//! [`NotationStrategy::format_exponent`](crate::notations::NotationStrategy), since
+//! the recursion dispatches back into a notation's `format_decimal`.
 
-/// Group the integer part of `value` into comma-separated thousands. Port of
-/// `formatWithCommas` for the (decimal-point-free) exponent case.
+/// Group the integer part of `value` into comma-separated thousands (the
+/// decimal-point-free exponent case).
 pub(crate) fn format_with_commas(value: &str) -> String {
     let (sign, digits) = match value.strip_prefix('-') {
         Some(rest) => ("-", rest),

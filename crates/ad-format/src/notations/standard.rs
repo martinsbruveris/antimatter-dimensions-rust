@@ -1,12 +1,10 @@
 //! Standard notation (K/M/B/T/Qa… abbreviations; `places` applies to the mantissa
-//! only). Port step 6, mirroring `abbreviateStandard` in the notations library.
+//! only).
 
 use break_infinity::Decimal;
 
 use super::NotationStrategy;
-use crate::mantissa::{
-    format_mantissa_base_ten, format_mantissa_with_exponent, MantissaSpec,
-};
+use crate::mantissa::{format_mantissa, format_mantissa_with_exponent, MantissaSpec};
 use crate::options::FormatOptions;
 
 const STANDARD_ABBREVIATIONS: [&str; 10] =
@@ -29,25 +27,27 @@ impl NotationStrategy for Standard {
     }
 
     fn format_decimal(&self, value: &Decimal, opts: &FormatOptions) -> String {
-        // base 1000, steps 1, separator " ", forced non-negative exponent.
+        // steps 3 (mantissa in [1, 1000)), separator " ", forced non-negative
+        // exponent; `abbreviate_standard` rescales the power-of-ten exponent into
+        // thousands.
         format_mantissa_with_exponent(
             value,
             &MantissaSpec {
-                base: 1000.0,
-                steps: 1,
+                steps: 3,
                 separator: " ",
                 force_positive_exponent: true,
             },
-            |m| format_mantissa_base_ten(m, opts.places),
+            |m| format_mantissa(m, opts.places),
             abbreviate_standard,
         )
     }
 }
 
-/// Port of `abbreviateStandard`: turns a thousands-exponent into its letter
-/// abbreviation (`K`, `M`, …, `UDc`, …, `MI`).
+/// Turns an exponent into its letter abbreviation (`K`, `M`, …, `UDc`, …, `MI`).
+/// The engine hands us a power-of-ten exponent (a multiple of 3); dividing by 3
+/// recovers the thousands index the abbreviation is keyed by.
 fn abbreviate_standard(raw_exp: f64) -> String {
-    let exp = raw_exp as i64 - 1;
+    let exp = raw_exp as i64 / 3 - 1;
     if exp == -1 {
         return String::new();
     }
@@ -75,8 +75,8 @@ fn abbreviate_standard(raw_exp: f64) -> String {
     strip_trailing_dash(&strip_leading_u(&collapse_inner_dashes(&abbreviation)))
 }
 
-/// Port of `.replace(/-[A-Z]{2}-/g, "-")`: collapse `-XX-` (two uppercase letters)
-/// down to a single `-`. Non-overlapping, left to right, matching JS `/g`.
+/// Collapse `-XX-` (a dash, two uppercase letters, a dash) down to a single `-`,
+/// scanning non-overlapping and left to right (equivalent to `/-[A-Z]{2}-/g`).
 fn collapse_inner_dashes(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = String::with_capacity(s.len());
@@ -98,7 +98,7 @@ fn collapse_inner_dashes(s: &str) -> String {
     out
 }
 
-/// Port of `.replace(/U([A-Z]{2}-)/g, "$1")`: drop a `U` directly before `XX-`.
+/// Drop a `U` directly before `XX-` (equivalent to `/U([A-Z]{2}-)/g`).
 fn strip_leading_u(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = String::with_capacity(s.len());
@@ -122,7 +122,7 @@ fn strip_leading_u(s: &str) -> String {
     out
 }
 
-/// Port of `.replace(/-$/, "")`.
+/// Drop a single trailing `-`.
 fn strip_trailing_dash(s: &str) -> String {
     s.strip_suffix('-').unwrap_or(s).to_string()
 }

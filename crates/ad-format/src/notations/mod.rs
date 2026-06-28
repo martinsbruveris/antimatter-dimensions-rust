@@ -1,7 +1,7 @@
 //! Notation strategies and the per-notation dispatch.
 //!
-//! Each notation implements [`NotationStrategy`]. The base `Notation.format`
-//! routing (very-small / under-1000 / negative / infinite) lives in
+//! Each notation implements [`NotationStrategy`]. The shared routing
+//! (very-small / under-1000 / negative / infinite) lives in
 //! [`crate::router`]; a strategy only supplies `format_decimal` for the big-number
 //! case, and may override the under-1000 / very-small fallbacks if it formats small
 //! numbers specially (none of the M1 four do).
@@ -14,7 +14,7 @@ mod standard;
 use break_infinity::Decimal;
 
 use crate::exponent::format_with_commas;
-use crate::mantissa::format_mantissa_base_ten;
+use crate::mantissa::format_mantissa;
 use crate::options::{FormatOptions, Notation};
 
 pub(crate) use engineering::Engineering;
@@ -22,10 +22,9 @@ pub(crate) use letters::Letters;
 pub(crate) use scientific::Scientific;
 pub(crate) use standard::Standard;
 
-/// A single notation strategy (port of the notations library's `Notation`
-/// subclasses). Implementors are zero-sized and shared as `&'static`.
+/// A single notation strategy. Implementors are zero-sized and shared as `&'static`.
 pub(crate) trait NotationStrategy: Sync {
-    /// Display name, matching the JS notation `name` (used for fidelity lookup).
+    /// Display name of the notation (used for fidelity lookup).
     // Wired up by the `ad-fidelity` `format()` harness in a later step.
     #[allow(dead_code)]
     fn name(&self) -> &'static str;
@@ -40,33 +39,32 @@ pub(crate) trait NotationStrategy: Sync {
     /// Numbers with |exponent| < 3. We provide a default implementation, but
     /// specific strategies might overwrite it.
     fn format_under_1000(&self, value: &Decimal, opts: &FormatOptions) -> String {
-        format_mantissa_base_ten(value.to_f64(), opts.places_under_1000)
+        format_mantissa(value.to_f64(), opts.places_under_1000)
     }
 
     /// Format the big-number case: `value` is positive (the router has already
     /// taken `abs` and will re-apply the sign), with base-10 exponent >= 3 and
-    /// below any infinite threshold. Port of the abstract `formatDecimal`.
+    /// below any infinite threshold.
     fn format_decimal(&self, value: &Decimal, opts: &FormatOptions) -> String;
 
-    /// Recursive exponent formatting (port of base `formatExponent`, with the
-    /// default `specialFormat = n => n.toString()`): plain below `min`,
-    /// comma-grouped below `max`, otherwise formatted in this notation.
+    /// Recursive exponent formatting: plain below `min`, comma-grouped below `max`,
+    /// otherwise formatted in this notation.
     fn format_exponent(&self, exponent: f64, opts: &FormatOptions) -> String {
         let display = &opts.exponent_display;
         let exponent_str = (exponent as i64).to_string();
 
-        // Below `min`: render the exponent plain (JS `noSpecialFormatting`).
+        // Below `min`: render the exponent plain.
         if exponent < display.min as f64 {
             return exponent_str;
         }
 
-        // Below `max` (when enabled): comma-group the exponent (JS `showCommas`).
+        // Below `max` (when enabled): comma-group the exponent.
         if display.show && exponent < display.max as f64 {
             return format_with_commas(&exponent_str);
         }
 
         // The nested value reuses the surrounding options but with both place
-        // counts bumped to `places_exponent.max(2)` (the JS `formatExponent`).
+        // counts bumped to `places_exponent.max(2)`.
         let large = opts.places_exponent.max(2);
         let exp_opts = FormatOptions {
             places: large,

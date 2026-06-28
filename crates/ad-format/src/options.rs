@@ -1,8 +1,7 @@
 //! [`FormatOptions`] and the notation selector.
 //!
-//! These mirror the per-frame inputs the original game threads into
-//! `Notations.current.format(value, places, placesUnder1000, placesExponent)` plus
-//! the global `ADNotations.Settings` (exponent commas, the "Infinite" cutoff).
+//! These are the per-frame inputs that drive a single `format` call: the per-call
+//! digit counts plus the exponent-display and "Infinite"-cutoff settings.
 //!
 //! See `design-docs/2026-06-25-number-formatting.md` ("What `FormatOptions` must
 //! carry") for the full rationale.
@@ -11,8 +10,7 @@ use break_infinity::Decimal;
 
 /// Which notation strategy to render with.
 ///
-/// Milestone 1 ships the four notations the design doc calls out; the remaining
-/// ~20 (Mixed, Logarithm, Roman, …) are added incrementally.
+/// There are more formats we could be adding if we want...
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Notation {
     #[default]
@@ -22,13 +20,12 @@ pub enum Notation {
     Letters,
 }
 
-/// Controls how a *large exponent* is itself rendered. Corresponds to the JS
-/// `ADNotations.Settings.exponentCommas` setting (renamed here since it governs
-/// more than commas).
+/// Controls how a *large exponent* is itself rendered (plain, comma-grouped, or
+/// recursively in-notation — it governs more than just commas).
 ///
 /// An exponent below `min` is printed plain; below `max` (when `show`) it is
 /// comma-grouped; at or above `max` it is recursively formatted in notation. In the
-/// game `min`/`max` come from the player's `notationDigits` option
+/// game `min`/`max` come from the player's notation-digits option
 /// (`min = 10**comma`, `max = 10**notation`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExponentDisplay {
@@ -58,9 +55,8 @@ impl Default for ExponentDisplay {
 pub struct FormatOptions {
     /// Notation strategy (scientific, engineering, etc.).
     pub notation: Notation,
-    /// Mantissa decimal places for numbers with |exponent| >= 3. The JS passes a
-    /// signed `number` (with `-1` as an "unspecified" sentinel, guarded by
-    /// `Math.max(0, …)`); we make non-negativity a type invariant instead.
+    /// Mantissa decimal places for numbers with |exponent| >= 3. Non-negativity is a
+    /// type invariant (`u32`), so there is no "unspecified" sentinel to guard against.
     pub places: u32,
     /// Decimal places for numbers with |exponent| < 3 (and very-small values).
     pub places_under_1000: u32,

@@ -1,10 +1,9 @@
-//! Letters notation (base-26 a…z exponent transcription). Port step 7, mirroring
-//! the notations library's `CustomNotation` instantiated with the alphabet.
+//! Letters notation (base-26 a…z exponent transcription).
 
 use break_infinity::Decimal;
 
 use super::NotationStrategy;
-use crate::mantissa::format_mantissa_base_ten;
+use crate::mantissa::format_mantissa;
 use crate::options::FormatOptions;
 
 const LETTERS: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
@@ -17,29 +16,29 @@ impl NotationStrategy for Letters {
     }
 
     fn format_decimal(&self, value: &Decimal, opts: &FormatOptions) -> String {
-        // `CustomNotation.formatDecimal`: an engineering split (3-digit mantissa),
-        // then the exponent transcribed into base-26 letters. Only `opts.places`
-        // is used (`places_exponent` and the exponent commas are ignored). The
-        // Letters separators are empty, so mantissa and letters are concatenated.
+        // An engineering split (3-digit mantissa), then the exponent transcribed
+        // into base-26 letters. Only `opts.places` is used (`places_exponent` and
+        // the exponent commas are ignored), and the mantissa and letters are
+        // concatenated with no separator.
         let (mantissa, exponent) = to_engineering(value);
         format!(
             "{}{}",
-            format_mantissa_base_ten(mantissa, opts.places),
+            format_mantissa(mantissa, opts.places),
             transcribe(exponent)
         )
     }
 }
 
-/// Port of `toEngineering`: rebase the value to a mantissa in `[1, 1000)` with an
-/// exponent that is a multiple of 3. Returns `(mantissa, exponent)`.
+/// Rebase the value to a mantissa in `[1, 1000)` with an exponent that is a multiple
+/// of 3. Returns `(mantissa, exponent)`.
 fn to_engineering(value: &Decimal) -> (f64, i64) {
     let offset = value.exponent().rem_euclid(3);
     let mantissa = value.mantissa() * 10f64.powi(offset as i32);
     (mantissa, value.exponent() - offset)
 }
 
-/// Port of `CustomNotation.transcribe`: bijective base-26 encoding of
-/// `exponent / 3` into letters (`a`, `b`, …, `z`, `aa`, `ab`, …).
+/// Bijective base-26 encoding of `exponent / 3` into letters
+/// (`a`, `b`, …, `z`, `aa`, `ab`, …).
 fn transcribe(exponent: i64) -> String {
     let base = LETTERS.len() as i64;
     let mut n = exponent / 3;

@@ -35,7 +35,7 @@ fn boundary_999_is_under_1000() {
 
 #[test]
 fn very_small_collapses_to_zero() {
-    // Below 1e-300 the f64 value underflows to 0, matching the JS fallback.
+    // Below 1e-300 the f64 value underflows to 0.
     let v = Decimal::new(1.0, -310);
     assert_eq!(format(&v, &under_1000_opts(0)), "0");
 }
