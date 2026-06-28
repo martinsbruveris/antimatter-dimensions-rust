@@ -15,15 +15,32 @@ function currentNotation() {
   return useGameStore().snapshot?.options?.notation ?? "Standard";
 }
 
+// The player's Exponent Notation thresholds (comma / in-notation digit counts).
+function exponentDigits() {
+  const o = useGameStore().snapshot?.options;
+  return [o?.notation_digits_comma ?? 5, o?.notation_digits_notation ?? 9];
+}
+
 // Format a raw snapshot number ({ m, e }). `places` = mantissa digits for
 // numbers ≥ 1000; `placesUnder1000` = digits for smaller numbers. Defaults
 // mirror the original game's common `format(value, 2)` call.
 export function formatDecimal(num, places = 2, placesUnder1000 = 0) {
   if (!num) return "0";
-  return wasmFormat(num.m, num.e, currentNotation(), places, placesUnder1000);
+  const [comma, notation] = exponentDigits();
+  return wasmFormat(num.m, num.e, currentNotation(), places, placesUnder1000, comma, notation);
 }
 
 // A multiplier (`×N`); keeps one decimal under 1000 like the original `formatX`.
 export function formatMultiplier(num) {
   return formatDecimal(num, 2, 1);
+}
+
+// Format a sample number for the Exponent Notation modal's live preview, using
+// the slider's in-flight `commaDigits`/`notationDigits` (not the stored ones, so
+// dragging updates immediately) with the current notation. Mirrors the
+// original's `formatPostBreak(num)` — no mantissa places, so a pure power of ten
+// reads as e.g. "1e1234".
+export function formatExponentSample(num, commaDigits, notationDigits) {
+  if (!num) return "0";
+  return wasmFormat(num.m, num.e, currentNotation(), 0, 0, commaDigits, notationDigits);
 }

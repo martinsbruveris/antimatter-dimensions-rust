@@ -141,6 +141,10 @@ struct OptionsView {
     update_rate: u32,
     /// Active notation name; the frontend passes it to the WASM formatter.
     notation: String,
+    /// Exponent-notation digit thresholds (comma / in-notation), passed to the
+    /// WASM formatter and shown on the Exponent Notation modal's sliders.
+    notation_digits_comma: u32,
+    notation_digits_notation: u32,
 }
 
 /// Build the serializable view for one autobuyer.
@@ -291,6 +295,8 @@ fn build_game_view(game: &GameState) -> GameView {
             hotkeys: game.options.hotkeys,
             update_rate: game.options.update_rate,
             notation: game.options.notation.clone(),
+            notation_digits_comma: game.options.notation_digits_comma,
+            notation_digits_notation: game.options.notation_digits_notation,
         },
     }
 }
@@ -434,6 +440,12 @@ fn set_notation(notation: String, state: State<'_, Mutex<GameState>>) {
     game.options.set_notation(&notation);
 }
 
+#[tauri::command]
+fn set_notation_digits(comma: u32, notation: u32, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_notation_digits(comma, notation);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -460,6 +472,7 @@ pub fn run() {
             set_hotkeys,
             set_update_rate,
             set_notation,
+            set_notation_digits,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

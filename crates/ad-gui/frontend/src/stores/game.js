@@ -98,5 +98,11 @@ export const useGameStore = defineStore("game", {
     setNotation(notation) {
       return invoke("set_notation", { notation });
     },
+    // Exponent Notation digit thresholds (original
+    // `player.options.notationDigits`); the engine clamps to [3, 15] and keeps
+    // the notation threshold >= the comma threshold.
+    setNotationDigits(comma, notation) {
+      return invoke("set_notation_digits", { comma, notation });
+    },
   },
 });

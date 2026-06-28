@@ -8,6 +8,7 @@ import Sidebar from "./components/Sidebar.vue";
 import GameHeader from "./components/GameHeader.vue";
 import InfoButtons from "./components/InfoButtons.vue";
 import HotkeysModal from "./components/HotkeysModal.vue";
+import NotationModal from "./components/NotationModal.vue";
 import BigCrunchScreen from "./components/BigCrunchScreen.vue";
 import NotificationContainer from "./components/NotificationContainer.vue";
 
@@ -98,6 +99,11 @@ onUnmounted(() => {
 
   <HotkeysModal
     v-if="ui.openModal === 'hotkeys'"
+    @close="ui.closeModal()"
+  />
+
+  <NotationModal
+    v-if="ui.openModal === 'notation'"
     @close="ui.closeModal()"
   />
 

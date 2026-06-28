@@ -1,19 +1,22 @@
 <script setup>
 // Visual options subtab. The grid layout mirrors the original
 // `OptionsVisualTab.vue` (rows of three controls). Implemented so far: the
-// Update Rate slider (row 1) and the Notation picker (row 2, middle — its
-// original position); every other slot is an invisible placeholder so the
-// implemented controls keep their original positions. The Classic-UI toggle is
+// Update Rate slider (row 1), and on row 2 the Notation picker (middle) and the
+// Open Exponent Notation Options button (right) — each in its original
+// position; every other slot is an invisible placeholder so the implemented
+// controls keep their original positions. The Classic-UI toggle is
 // intentionally dropped (Modern UI only). Other controls land iteratively
 // (see design-docs/2026-06-27-options-tabs.md).
 import { ref } from "vue";
 
 import { useGameStore } from "../../stores/game";
+import { useUiStore } from "../../stores/ui";
 import OptionsSlider from "../options/OptionsSlider.vue";
 import OpenHotkeysButton from "../options/OpenHotkeysButton.vue";
 import SelectNotationDropdown from "../options/SelectNotationDropdown.vue";
 
 const game = useGameStore();
+const ui = useUiStore();
 
 // Local copy for a responsive slider: the snapshot only refreshes each tick,
 // so driving the dot straight off it would stutter while dragging. We own the
@@ -49,7 +52,12 @@ function setUpdateRate(value) {
       <div class="l-options-grid__row">
         <div class="l-options-grid__button l-options-grid__button--hidden" />
         <SelectNotationDropdown />
-        <div class="l-options-grid__button l-options-grid__button--hidden" />
+        <button
+          class="o-primary-btn o-primary-btn--option l-options-grid__button"
+          @click="ui.showModal('notation')"
+        >
+          Open Exponent Notation Options
+        </button>
       </div>
       <div class="l-options-grid__row">
         <div class="l-options-grid__button l-options-grid__button--hidden" />

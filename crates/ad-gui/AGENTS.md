@@ -138,12 +138,13 @@ frontend/
   load → run → save. They are preserved across a Big Crunch. The snapshot
   exposes them as `GameView.options`; the frontend reads that and writes via
   dedicated commands (it never mutates options locally).
-- **Scope so far.** Three options are implemented, each placed in its
-  original grid position with the rest of the grid as invisible placeholders
+- **Scope so far.** The implemented options each sit in their original grid
+  position with the rest of the grid as invisible placeholders
   (`l-options-grid__button--hidden`): **Visual → Update rate** (slider),
-  **Visual → Notation** (dropdown) and **Gameplay → Hotkeys** (enable/disable
-  toggle). The Classic-UI toggle is intentionally dropped (Modern UI only);
-  themes will be a reduced set. Full plan + per-option checklist:
+  **Visual → Notation** (dropdown), **Visual → Exponent Notation Options**
+  (button → modal) and **Gameplay → Hotkeys** (enable/disable toggle). The
+  Classic-UI toggle is intentionally dropped (Modern UI only); themes will be a
+  reduced set. Full plan + per-option checklist:
   `design-docs/2026-06-27-options-tabs.md`.
 - **Notation** (`SelectNotationDropdown.vue`, Visual row 2 middle): a simplified
   port of the original's ExpandingControlBox — a header button expanding an
@@ -151,10 +152,20 @@ frontend/
   Standard, Letters; default **Standard**). Selecting one calls `set_notation`;
   the next snapshot's `options.notation` re-renders every number via the WASM
   formatter. Only implemented notations are listed (no dead entries).
+- **Exponent Notation Options** (`NotationModal.vue`, opened from the Visual-tab
+  button via `ui.openModal === 'notation'`): two 3–15 sliders for the
+  `notationDigits` comma / in-notation thresholds, with the original's verbatim
+  text and a live sample preview. The thresholds set `ExponentDisplay { min:
+  10^comma, max: 10^notation }` in the WASM formatter (`util/format.js` threads
+  them through every `formatDecimal` call); the preview (`formatExponentSample`)
+  uses the in-flight slider values so it updates while dragging. The engine keeps
+  the notation threshold `>= comma` (original NotationModal invariant), mirrored
+  locally in the modal.
 - **Commands:** `set_hotkeys(enabled)`, `set_update_rate(rate)` (engine clamps
   to the 33–200 ms slider range), `set_notation(name)` (ignores names outside
-  the known set). Mirrored by `stores/game.js`
-  `setHotkeys` / `setUpdateRate` / `setNotation`.
+  the known set), `set_notation_digits(comma, notation)` (clamps to 3–15, keeps
+  notation `>=` comma). Mirrored by `stores/game.js` `setHotkeys` /
+  `setUpdateRate` / `setNotation` / `setNotationDigits`.
 - **Update rate** drives the game loop: `App.vue`'s rAF loop only ticks once
   `update_rate` ms of wall-clock time have elapsed, then processes the whole
   interval — matching the original's `interval(gameLoop, updateRate)` (larger
@@ -242,9 +253,10 @@ frontend/
   `ad-format`); **PyO3** exposure of `format` is the remaining part of Option C
   (see `design-docs/2026-06-25-number-formatting.md`).
 - Notation options: only the four implemented notations are listed; the
-  `notationDigits` (comma/notation thresholds) modal and the remaining ~18
-  notations are not ported yet. `inf_threshold` is left at its default (never
-  "Infinite") — fine pre-Infinity since antimatter caps before `NUMBER_MAX_VALUE`.
+  remaining ~18 notations are not ported yet (the `notationDigits` thresholds
+  modal is done — see Options tabs above). `inf_threshold` is left at its default
+  (never "Infinite") — fine pre-Infinity since antimatter caps before
+  `NUMBER_MAX_VALUE`.
 - Achievements live in `data/achievements.js` for display only; unlock state and
   real tiles come once `ad-core` owns achievements.
 - Responsive dimension rows use the "narrow" stacked layout unconditionally

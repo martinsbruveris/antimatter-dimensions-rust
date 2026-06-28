@@ -8,6 +8,11 @@ defineProps({
   // modal width. Used by the Hotkey List modal, which is only as wide as
   // its two columns (matching the original).
   fitContent: { type: Boolean, default: false },
+  // Use the original game's base modal text sizing (1.4rem body / 1.6rem
+  // title) instead of our larger Information-modal default (2rem / 2.6rem).
+  // Matches modals that vendor `.c-modal`'s default size, e.g. the Exponent
+  // Notation modal.
+  compact: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["close"]);
@@ -23,7 +28,7 @@ const emit = defineEmits(["close"]);
     <div class="l-modal">
       <div
         class="c-modal c-modal-text"
-        :class="{ 'c-modal-text--fit': fitContent }"
+        :class="{ 'c-modal-text--fit': fitContent, 'c-modal-text--compact': compact }"
       >
         <div
           class="c-modal__close-btn"
@@ -86,6 +91,16 @@ const emit = defineEmits(["close"]);
   width: 100%;
   font-size: 2.6rem;
   text-align: center;
+}
+
+/* Original base modal sizing (vendored `.c-modal` is 1.4rem, `.c-modal__title`
+   1.6rem). Defined after the rules above so it wins on equal specificity. */
+.c-modal-text--compact {
+  font-size: 1.4rem;
+}
+
+.c-modal-text--compact .c-modal__title {
+  font-size: 1.6rem;
 }
 
 /* Slightly larger close button with a green border, matching the original. */

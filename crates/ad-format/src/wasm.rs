@@ -8,7 +8,7 @@
 use break_infinity::Decimal;
 use wasm_bindgen::prelude::*;
 
-use crate::options::{FormatOptions, Notation};
+use crate::options::{ExponentDisplay, FormatOptions, Notation};
 use crate::router;
 
 /// Map a notation name (case-insensitive, as stored in player options) to its
@@ -23,12 +23,20 @@ fn notation_from_str(name: &str) -> Notation {
     }
 }
 
+/// 10^`digits`, the threshold an exponent must reach for the next display tier.
+/// `digits` is a slider value in [3, 15], so the result never overflows `i64`.
+fn threshold(digits: u32) -> i64 {
+    10i64.saturating_pow(digits)
+}
+
 /// Format a number given as `mantissa × 10^exponent`.
 ///
 /// `mantissa`/`exponent` come straight off a `Decimal` in the snapshot (the
 /// exponent is an `i64` widened to `f64`, exact for every in-game magnitude).
 /// `notation` is the player's notation name; `places`/`places_under_1000` are the
-/// per-call-site digit counts (see [`FormatOptions`]).
+/// per-call-site digit counts. `comma_digits`/`notation_digits` are the player's
+/// Exponent Notation thresholds: the exponent gets commas at 10^`comma_digits`
+/// and switches to in-notation at 10^`notation_digits` (see [`FormatOptions`]).
 #[wasm_bindgen]
 pub fn format(
     mantissa: f64,
@@ -36,12 +44,19 @@ pub fn format(
     notation: &str,
     places: u32,
     places_under_1000: u32,
+    comma_digits: u32,
+    notation_digits: u32,
 ) -> String {
     let value = Decimal::new(mantissa, exponent as i64);
     let opts = FormatOptions {
         notation: notation_from_str(notation),
         places,
         places_under_1000,
+        exponent_display: ExponentDisplay {
+            show: true,
+            min: threshold(comma_digits),
+            max: threshold(notation_digits),
+        },
         ..FormatOptions::default()
     };
     router::format(&value, &opts)
