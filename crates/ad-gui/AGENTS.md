@@ -12,10 +12,15 @@ egui frontend and a vanilla-JS Tauri frontend — have been removed.)
 
 ```bash
 npm --prefix frontend install     # once
-npm --prefix frontend run build   # build Vue app -> frontend/dist
+npm --prefix frontend run build   # build wasm + Vue app -> frontend/dist
 cargo run -p ad-gui               # Tauri serves frontend/dist (dev)
 cargo tauri build                 # release build (.app/.dmg with icon)
 ```
+
+`npm run build` first runs `build:wasm` (`wasm-pack build ../../ad-format
+--target web ... --features wasm`, output to `frontend/src/wasm/`), then the
+Vite build. **`wasm-pack` must be installed** (`cargo install wasm-pack`); the
+generated `src/wasm/` is regenerable and git-ignored like `dist/`.
 
 `cargo run` is dev mode and serves `frontend/dist` from disk, so after a
 frontend change just re-run `npm run build` (no Rust rebuild needed). There is
@@ -61,8 +66,16 @@ frontend/
 
 - **Backend** (`src/main.rs`): owns `Mutex<GameState>`. `tick_and_get_state`
   ticks the engine and returns a serialized `GameView` snapshot each frame.
-  Other commands (`buy_dimension`, `sacrifice`, …) mutate state. Number
-  formatting is currently done here (`format_decimal`) — see the formatting doc.
+  Other commands (`buy_dimension`, `sacrifice`, …) mutate state. Numbers ship
+  **raw** in the snapshot as `Num { m, e }` (mantissa × 10^exponent); the
+  webview formats them via the `ad-format` WASM module (Option C in the
+  formatting doc), so no formatting crosses IPC.
+- **Number formatting** (`frontend/src/util/format.js`): `formatDecimal(num,
+  places, placesUnder1000)` calls the WASM `format` synchronously in-process,
+  reading the active notation from `snapshot.options.notation`. The WASM module
+  (`frontend/src/wasm/`, built by `npm run build:wasm`) is initialised once in
+  `main.js` before the app mounts. `formatMultiplier` is the `×N` variant
+  (1 decimal under 1000).
 - **Game loop**: `App.vue` runs a `requestAnimationFrame` loop calling
   `game.tick(dt, repeats)`; the `game` store stores the latest snapshot.
   `repeats` is the dev speed multiplier (1x/10x/100x/1000x, in the `ui`
@@ -125,16 +138,23 @@ frontend/
   load → run → save. They are preserved across a Big Crunch. The snapshot
   exposes them as `GameView.options`; the frontend reads that and writes via
   dedicated commands (it never mutates options locally).
-- **Scope so far.** Only two options are implemented, each placed in its
+- **Scope so far.** Three options are implemented, each placed in its
   original grid position with the rest of the grid as invisible placeholders
-  (`l-options-grid__button--hidden`): **Visual → Update rate** (slider) and
-  **Gameplay → Hotkeys** (enable/disable toggle). The Classic-UI toggle is
-  intentionally dropped (Modern UI only); themes and notations will be a
-  reduced set. Full plan + per-option checklist:
+  (`l-options-grid__button--hidden`): **Visual → Update rate** (slider),
+  **Visual → Notation** (dropdown) and **Gameplay → Hotkeys** (enable/disable
+  toggle). The Classic-UI toggle is intentionally dropped (Modern UI only);
+  themes will be a reduced set. Full plan + per-option checklist:
   `design-docs/2026-06-27-options-tabs.md`.
+- **Notation** (`SelectNotationDropdown.vue`, Visual row 2 middle): a simplified
+  port of the original's ExpandingControlBox — a header button expanding an
+  inline list of the four `ad-format` notations (Scientific, Engineering,
+  Standard, Letters; default **Standard**). Selecting one calls `set_notation`;
+  the next snapshot's `options.notation` re-renders every number via the WASM
+  formatter. Only implemented notations are listed (no dead entries).
 - **Commands:** `set_hotkeys(enabled)`, `set_update_rate(rate)` (engine clamps
-  to the 33–200 ms slider range). Mirrored by `stores/game.js`
-  `setHotkeys` / `setUpdateRate`.
+  to the 33–200 ms slider range), `set_notation(name)` (ignores names outside
+  the known set). Mirrored by `stores/game.js`
+  `setHotkeys` / `setUpdateRate` / `setNotation`.
 - **Update rate** drives the game loop: `App.vue`'s rAF loop only ticks once
   `update_rate` ms of wall-clock time have elapsed, then processes the whole
   interval — matching the original's `interval(gameLoop, updateRate)` (larger
@@ -218,8 +238,13 @@ frontend/
 
 ## Known follow-ups
 
-- Formatting → a shared `ad-format` crate (PyO3 + WASM); snapshot then sends raw
-  numbers (see `design-docs/2026-06-25-number-formatting.md`).
+- Formatting WASM done (snapshot sends raw `Num { m, e }`, webview formats via
+  `ad-format`); **PyO3** exposure of `format` is the remaining part of Option C
+  (see `design-docs/2026-06-25-number-formatting.md`).
+- Notation options: only the four implemented notations are listed; the
+  `notationDigits` (comma/notation thresholds) modal and the remaining ~18
+  notations are not ported yet. `inf_threshold` is left at its default (never
+  "Infinite") — fine pre-Infinity since antimatter caps before `NUMBER_MAX_VALUE`.
 - Achievements live in `data/achievements.js` for display only; unlock state and
   real tiles come once `ad-core` owns achievements.
 - Responsive dimension rows use the "narrow" stacked layout unconditionally

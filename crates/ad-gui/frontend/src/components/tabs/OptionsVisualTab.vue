@@ -1,15 +1,17 @@
 <script setup>
 // Visual options subtab. The grid layout mirrors the original
-// `OptionsVisualTab.vue` (rows of three controls), but only the Update Rate
-// slider is implemented for now; every other slot is an invisible placeholder
-// so the implemented control keeps its original position. The Classic-UI
-// toggle is intentionally dropped (Modern UI only). Other controls land
-// iteratively (see design-docs/2026-06-27-options-tabs.md).
+// `OptionsVisualTab.vue` (rows of three controls). Implemented so far: the
+// Update Rate slider (row 1) and the Notation picker (row 2, middle — its
+// original position); every other slot is an invisible placeholder so the
+// implemented controls keep their original positions. The Classic-UI toggle is
+// intentionally dropped (Modern UI only). Other controls land iteratively
+// (see design-docs/2026-06-27-options-tabs.md).
 import { ref } from "vue";
 
 import { useGameStore } from "../../stores/game";
 import OptionsSlider from "../options/OptionsSlider.vue";
 import OpenHotkeysButton from "../options/OpenHotkeysButton.vue";
+import SelectNotationDropdown from "../options/SelectNotationDropdown.vue";
 
 const game = useGameStore();
 
@@ -46,7 +48,7 @@ function setUpdateRate(value) {
       </div>
       <div class="l-options-grid__row">
         <div class="l-options-grid__button l-options-grid__button--hidden" />
-        <div class="l-options-grid__button l-options-grid__button--hidden" />
+        <SelectNotationDropdown />
         <div class="l-options-grid__button l-options-grid__button--hidden" />
       </div>
       <div class="l-options-grid__row">

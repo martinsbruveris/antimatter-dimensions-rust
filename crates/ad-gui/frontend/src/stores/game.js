@@ -93,5 +93,10 @@ export const useGameStore = defineStore("game", {
     setUpdateRate(rate) {
       return invoke("set_update_rate", { rate });
     },
+    // Number-formatting notation (original `player.options.notation`); the
+    // engine ignores names outside its known set.
+    setNotation(notation) {
+      return invoke("set_notation", { notation });
+    },
   },
 });

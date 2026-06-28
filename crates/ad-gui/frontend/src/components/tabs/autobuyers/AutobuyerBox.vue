@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
+import { formatDecimal } from "../../../util/format";
 
 // Shared autobuyer entry: a full row once unlocked, or a purchase box before
 // then. Mirrors the original AutobuyerBox.vue. The interval-upgrade and mode
@@ -91,6 +92,6 @@ const stateClass = computed(() => {
   >
     {{ entry.name }}
     <br>
-    Requirement: {{ entry.requirement }} Total Antimatter
+    Requirement: {{ formatDecimal(entry.requirement) }} Total Antimatter
   </div>
 </template>

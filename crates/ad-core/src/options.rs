@@ -16,6 +16,13 @@ pub const DEFAULT_UPDATE_RATE_MS: u32 = 33;
 pub const MIN_UPDATE_RATE_MS: u32 = 33;
 pub const MAX_UPDATE_RATE_MS: u32 = 200;
 
+/// The notation names the frontend can render (subset of the original's ~22).
+/// These are the display names; the `ad-format` WASM matches them case-insensitively.
+pub const NOTATIONS: [&str; 4] = ["Scientific", "Engineering", "Standard", "Letters"];
+/// Default notation. The original defaults to "Mixed scientific" (not yet ported);
+/// until then we default to "Standard".
+pub const DEFAULT_NOTATION: &str = "Standard";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Options {
@@ -25,6 +32,9 @@ pub struct Options {
     /// only ticks the engine once this much wall-clock time has elapsed, so a
     /// larger value means coarser, less frequent updates.
     pub update_rate: u32,
+    /// Active number-formatting notation (original `notation`). Display name from
+    /// [`NOTATIONS`]; the frontend hands it to the `ad-format` WASM formatter.
+    pub notation: String,
 }
 
 impl Options {
@@ -32,12 +42,20 @@ impl Options {
         Self {
             hotkeys: true,
             update_rate: DEFAULT_UPDATE_RATE_MS,
+            notation: DEFAULT_NOTATION.to_string(),
         }
     }
 
     /// Set the update rate, clamped to the original game's slider range.
     pub fn set_update_rate(&mut self, rate: u32) {
         self.update_rate = rate.clamp(MIN_UPDATE_RATE_MS, MAX_UPDATE_RATE_MS);
+    }
+
+    /// Set the notation, ignoring any name not in [`NOTATIONS`].
+    pub fn set_notation(&mut self, notation: &str) {
+        if NOTATIONS.contains(&notation) {
+            self.notation = notation.to_string();
+        }
     }
 }
 

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
+import { formatDecimal, formatMultiplier } from "../../util/format";
 import TickspeedRow from "../TickspeedRow.vue";
 import DimensionRow from "../DimensionRow.vue";
 import DimBoostRow from "../DimBoostRow.vue";
@@ -12,16 +13,16 @@ const game = useGameStore();
 const s = computed(() => game.snapshot);
 
 const multiplierText = computed(() => {
-  let t = `Buy 10 Dimension purchase multiplier: ×${s.value.buy_ten_multiplier}`;
+  let t = `Buy 10 Dimension purchase multiplier: ×${formatMultiplier(s.value.buy_ten_multiplier)}`;
   if (s.value.sacrifice_unlocked) {
-    t += ` | Dimensional Sacrifice multiplier: ×${s.value.sacrifice_multiplier}`;
+    t += ` | Dimensional Sacrifice multiplier: ×${formatDecimal(s.value.sacrifice_multiplier)}`;
   }
   return t;
 });
 
 const sacrificeTooltip = computed(() =>
   s.value.can_sacrifice
-    ? `Boosts 8th Antimatter Dimension by ×${s.value.next_sacrifice_boost}`
+    ? `Boosts 8th Antimatter Dimension by ×${formatDecimal(s.value.next_sacrifice_boost)}`
     : ""
 );
 </script>
@@ -43,7 +44,7 @@ const sacrificeTooltip = computed(() =>
         @click="game.sacrifice()"
       >
         <span v-if="s.can_sacrifice">
-          Dimensional Sacrifice (×{{ s.next_sacrifice_boost }})
+          Dimensional Sacrifice (×{{ formatDecimal(s.next_sacrifice_boost) }})
         </span>
         <span v-else>
           Dimensional Sacrifice Disabled ({{ s.sacrifice_disabled_condition }})

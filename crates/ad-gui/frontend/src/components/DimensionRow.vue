@@ -3,6 +3,7 @@ import { computed } from "vue";
 
 import { useGameStore } from "../stores/game";
 import { DIM_NAMES } from "../util/dimensionText";
+import { formatDecimal, formatMultiplier } from "../util/format";
 import { isSmall } from "../util/responsive";
 
 const props = defineProps({ tier: { type: Number, required: true } });
@@ -24,7 +25,7 @@ const howMany = computed(() =>
 );
 const costText = computed(() => {
   const cost = game.buyUntil10 ? dim.value.until_10_cost : dim.value.single_cost;
-  return `Cost: ${cost} AM`;
+  return `Cost: ${formatDecimal(cost)} AM`;
 });
 const hasLongText = computed(() => costText.value.length > 20);
 const showRate = computed(() => props.tier < 7 && dim.value.rate_percent > 0.01);
@@ -45,13 +46,13 @@ function buy() {
         <span
           v-if="unlocked"
           class="c-dim-row__small"
-        >×{{ dim.multiplier }}</span>
+        >×{{ formatMultiplier(dim.multiplier) }}</span>
       </div>
       <div :class="boxClass">
         <span
           v-if="unlocked"
           class="c-dim-row__large"
-        >{{ dim.amount }}</span>
+        >{{ formatDecimal(dim.amount) }}</span>
         <span
           v-if="unlocked && showRate"
           class="c-dim-row__small"

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../stores/game";
+import { formatDecimal } from "../util/format";
 
 const game = useGameStore();
 const s = computed(() => game.snapshot);
@@ -19,15 +20,15 @@ const perUpgrade = computed(() =>
     class="c-prestige-button-container"
   >
     <span>You have
-      <span class="c-game-header__antimatter">{{ s.antimatter }}</span>
+      <span class="c-game-header__antimatter">{{ formatDecimal(s.antimatter) }}</span>
       antimatter.</span>
     <div>
-      You are getting {{ s.antimatter_per_sec }} antimatter per second.
+      You are getting {{ formatDecimal(s.antimatter_per_sec) }} antimatter per second.
     </div>
     <div>
       ADs produce ×{{ perUpgrade }} faster per Tickspeed upgrade
       <br>
-      Total Tickspeed: {{ s.tickspeed_effect }} / sec
+      Total Tickspeed: {{ formatDecimal(s.tickspeed_effect) }} / sec
     </div>
   </div>
 </template>

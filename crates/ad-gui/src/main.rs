@@ -12,19 +12,39 @@ use tauri::State;
 const DIMENSION_ORDINALS: [&str; 8] =
     ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 
+/// A raw number for the frontend to format: `mantissa × 10^exponent`.
+///
+/// Formatting moved to the webview (the `ad-format` WASM module), so the snapshot
+/// ships raw numbers instead of pre-baked strings — see
+/// `design-docs/2026-06-25-number-formatting.md` (Option C). The exponent is the
+/// `Decimal`'s `i64` widened to `f64`, which is exact for every in-game magnitude.
+#[derive(Serialize)]
+struct Num {
+    m: f64,
+    e: f64,
+}
+
+/// Build a [`Num`] from a `Decimal` for the snapshot.
+fn num(value: &Decimal) -> Num {
+    Num {
+        m: value.mantissa(),
+        e: value.exponent() as f64,
+    }
+}
+
 /// Serializable view of a single dimension tier for the frontend.
 #[derive(Serialize)]
 struct DimensionView {
-    amount: String,
+    amount: Num,
     bought: u64,
     bought_mod_10: u64,
-    multiplier: String,
-    production_per_sec: String,
+    multiplier: Num,
+    production_per_sec: Num,
     /// Cost of a single purchase.
-    single_cost: String,
+    single_cost: Num,
     /// Cost of buying `max(how_many_can_buy, 1)` (mirrors the JS
     /// `until10Cost`, which is the cost of the actual bulk purchase).
-    until_10_cost: String,
+    until_10_cost: Num,
     /// How many can be bought right now without exceeding the
     /// current group of 10 (matches JS `dimension.howManyCanBuy`).
     how_many_can_buy: u64,
@@ -41,8 +61,8 @@ struct AutobuyerView {
     is_bought: bool,
     /// Whether the antimatter requirement is met (purchase box enabled).
     can_unlock: bool,
-    /// Formatted requirement amount shown on the purchase box.
-    requirement: String,
+    /// Requirement amount shown on the purchase box.
+    requirement: Num,
     /// Interval between purchases, formatted in seconds (e.g. "0.50").
     interval_seconds: String,
     /// Whether the autobuyer is toggled on.
@@ -70,17 +90,17 @@ struct AutobuyersView {
 /// Serializable game view sent to the frontend each frame.
 #[derive(Serialize)]
 struct GameView {
-    antimatter: String,
-    antimatter_per_sec: String,
-    tickspeed_cost: String,
+    antimatter: Num,
+    antimatter_per_sec: Num,
+    tickspeed_cost: Num,
     tickspeed_bought: u64,
-    tickspeed_effect: String,
+    tickspeed_effect: Num,
     tickspeed_purchase_multiplier: f64,
     /// Whether Tickspeed is unlocked (JS `Tickspeed.isUnlocked`).
     tickspeed_unlocked: bool,
     dimensions: Vec<DimensionView>,
     unlocked_dimensions: usize,
-    buy_ten_multiplier: String,
+    buy_ten_multiplier: Num,
     dim_boosts: u32,
     dim_boost_power: f64,
     dim_boost_req_tier: usize,
@@ -91,10 +111,10 @@ struct GameView {
     can_buy_galaxy: bool,
     sacrifice_unlocked: bool,
     can_sacrifice: bool,
-    sacrifice_multiplier: String,
+    sacrifice_multiplier: Num,
     /// Boost multiplier the next sacrifice would grant (JS
     /// `Sacrifice.nextBoost`); shown on the sacrifice button.
-    next_sacrifice_boost: String,
+    next_sacrifice_boost: Num,
     /// Why sacrifice is disabled, when it is unlocked but not
     /// currently performable (JS `Sacrifice.disabledCondition`).
     sacrifice_disabled_condition: String,
@@ -119,6 +139,8 @@ struct GameView {
 struct OptionsView {
     hotkeys: bool,
     update_rate: u32,
+    /// Active notation name; the frontend passes it to the WASM formatter.
+    notation: String,
 }
 
 /// Build the serializable view for one autobuyer.
@@ -133,7 +155,7 @@ fn build_autobuyer_view(
         name,
         is_bought: autobuyer.is_bought,
         can_unlock,
-        requirement: format_decimal(&requirement),
+        requirement: num(&requirement),
         interval_seconds: format!("{:.2}", autobuyer.interval_ms / 1000.0),
         is_active: autobuyer.is_active,
         mode: match autobuyer.mode {
@@ -209,13 +231,13 @@ fn build_game_view(game: &GameState) -> GameView {
         };
 
         dimensions.push(DimensionView {
-            amount: format_decimal(amount),
+            amount: num(amount),
             bought,
             bought_mod_10: bought % 10,
-            multiplier: format_decimal(&mult),
-            production_per_sec: format_decimal(&production),
-            single_cost: format_decimal(&cost),
-            until_10_cost: format_decimal(&until_10_cost),
+            multiplier: num(&mult),
+            production_per_sec: num(&production),
+            single_cost: num(&cost),
+            until_10_cost: num(&until_10_cost),
             how_many_can_buy,
             can_buy: game.antimatter >= cost,
             rate_percent,
@@ -237,16 +259,16 @@ fn build_game_view(game: &GameState) -> GameView {
     let infinity_progress = (am_plog10 / log10_threshold).clamp(0.0, 1.0);
 
     GameView {
-        antimatter: format_decimal(&game.antimatter),
-        antimatter_per_sec: format_decimal(&game.antimatter_per_second()),
-        tickspeed_cost: format_decimal(tickspeed_cost),
+        antimatter: num(&game.antimatter),
+        antimatter_per_sec: num(&game.antimatter_per_second()),
+        tickspeed_cost: num(tickspeed_cost),
         tickspeed_bought: game.tickspeed.bought,
-        tickspeed_effect: format_decimal(&game.tickspeed_effect()),
+        tickspeed_effect: num(&game.tickspeed_effect()),
         tickspeed_purchase_multiplier: game.tickspeed_purchase_multiplier(),
         tickspeed_unlocked: game.tickspeed_unlocked(),
         dimensions,
         unlocked_dimensions: unlocked,
-        buy_ten_multiplier: format_decimal(&Decimal::from_float(BUY_TEN_MULTIPLIER)),
+        buy_ten_multiplier: num(&Decimal::from_float(BUY_TEN_MULTIPLIER)),
         dim_boosts: game.dim_boosts,
         dim_boost_power: DIM_BOOST_MULTIPLIER,
         dim_boost_req_tier: req_tier,
@@ -257,8 +279,8 @@ fn build_game_view(game: &GameState) -> GameView {
         can_buy_galaxy: game.can_buy_galaxy(),
         sacrifice_unlocked: game.sacrifice_unlocked(),
         can_sacrifice: game.can_sacrifice(),
-        sacrifice_multiplier: format_decimal(&game.sacrifice_multiplier()),
-        next_sacrifice_boost: format_decimal(&game.next_sacrifice_boost()),
+        sacrifice_multiplier: num(&game.sacrifice_multiplier()),
+        next_sacrifice_boost: num(&game.next_sacrifice_boost()),
         sacrifice_disabled_condition: sacrifice_disabled_condition(game),
         can_buy_tickspeed: game.antimatter >= *tickspeed_cost,
         infinity_progress,
@@ -268,6 +290,7 @@ fn build_game_view(game: &GameState) -> GameView {
         options: OptionsView {
             hotkeys: game.options.hotkeys,
             update_rate: game.options.update_rate,
+            notation: game.options.notation.clone(),
         },
     }
 }
@@ -405,46 +428,10 @@ fn set_update_rate(rate: u32, state: State<'_, Mutex<GameState>>) {
     game.options.set_update_rate(rate);
 }
 
-/// Format a Decimal for display (matches the original game's
-/// notation).
-fn format_decimal(val: &Decimal) -> String {
-    let f = val.to_f64();
-    if f == 0.0 {
-        return "0".to_string();
-    }
-    if f < 1000.0 {
-        format!("{:.2}", f)
-    } else if f < 1e9 {
-        format_with_commas(f)
-    } else {
-        // Read the mantissa/exponent straight off the Decimal rather than via
-        // `to_f64()`, which returns infinity (losing the value) once the
-        // exponent exceeds f64's ~308 range — past which the old `exp + 1`
-        // saturated to i64::MAX and overflowed. The Decimal is normalized so
-        // the mantissa is in [1, 10).
-        let mut mantissa = val.mantissa();
-        let mut exp = val.exponent();
-        // Round-up case: e.g. 9.999 displays as 10.00, so carry into the
-        // exponent and show 1.00e(exp+1) instead.
-        if mantissa >= 9.995 {
-            mantissa = 1.0;
-            exp += 1;
-        }
-        format!("{:.2}e{}", mantissa, exp)
-    }
-}
-
-fn format_with_commas(f: f64) -> String {
-    let int_part = f.floor() as u64;
-    let s = int_part.to_string();
-    let mut result = String::new();
-    for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            result.push(',');
-        }
-        result.push(c);
-    }
-    result.chars().rev().collect()
+#[tauri::command]
+fn set_notation(notation: String, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_notation(&notation);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -472,6 +459,7 @@ pub fn run() {
             set_all_autobuyers_active,
             set_hotkeys,
             set_update_rate,
+            set_notation,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");
@@ -486,28 +474,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn format_decimal_handles_values_beyond_f64() {
-        // Regression: antimatter past f64::MAX (~1.8e308) made `to_f64()`
-        // return infinity, and the old scientific branch overflowed on
-        // `exp + 1`. Formatting must work from the Decimal's own exponent.
-        assert_eq!(format_decimal(&Decimal::new(1.0, 500)), "1.00e500");
-        assert_eq!(format_decimal(&Decimal::new(1.8, 308)), "1.80e308");
-        // Largest representable exponent should not panic.
-        let _ = format_decimal(&Decimal::new(5.0, i64::MAX - 1));
-    }
+    fn num_carries_raw_mantissa_and_exponent() {
+        // The snapshot ships raw numbers; the webview's WASM formatter renders
+        // them. `num` must read mantissa/exponent straight off the Decimal,
+        // which stays exact past f64's range (~1.8e308).
+        let n = num(&Decimal::new(1.0, 500));
+        assert_eq!(n.m, 1.0);
+        assert_eq!(n.e, 500.0);
 
-    #[test]
-    fn format_decimal_small_and_comma_ranges() {
-        assert_eq!(format_decimal(&Decimal::ZERO), "0");
-        assert_eq!(format_decimal(&Decimal::from_float(12.5)), "12.50");
-        assert_eq!(format_decimal(&Decimal::from_float(12_345.0)), "12,345");
-        assert_eq!(format_decimal(&Decimal::from_float(2.5e9)), "2.50e9");
-    }
-
-    #[test]
-    fn format_decimal_rounds_mantissa_up() {
-        // 9.999e10 should carry into the exponent as 1.00e11.
-        assert_eq!(format_decimal(&Decimal::new(9.999, 10)), "1.00e11");
+        let z = num(&Decimal::ZERO);
+        assert_eq!(z.m, 0.0);
+        assert_eq!(z.e, 0.0);
     }
 
     #[test]
@@ -520,14 +497,16 @@ mod tests {
         assert!(view.enabled);
         assert_eq!(view.dimensions.len(), 8);
         assert_eq!(view.dimensions[0].name, "1st Dimension Autobuyer");
-        assert_eq!(view.dimensions[0].requirement, "1.00e40");
+        assert_eq!(view.dimensions[0].requirement.m, 1.0);
+        assert_eq!(view.dimensions[0].requirement.e, 40.0);
         assert_eq!(view.dimensions[0].interval_seconds, "0.50");
         assert_eq!(view.dimensions[0].mode, "max");
         assert!(!view.dimensions[0].can_unlock);
         assert!(!view.dimensions[0].is_bought);
         // Tickspeed mode is locked pre-Infinity.
         assert!(!view.tickspeed.can_change_mode);
-        assert_eq!(view.tickspeed.requirement, "1.00e140");
+        assert_eq!(view.tickspeed.requirement.m, 1.0);
+        assert_eq!(view.tickspeed.requirement.e, 140.0);
 
         // Past 1e40: tab unlocks and the 1st AD autobuyer becomes unlockable.
         game.total_antimatter = Decimal::new(1.0, 40);

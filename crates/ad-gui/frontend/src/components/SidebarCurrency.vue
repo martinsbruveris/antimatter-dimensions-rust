@@ -2,10 +2,13 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../stores/game";
+import { formatDecimal } from "../util/format";
 
 const game = useGameStore();
 
-const displayValue = computed(() => (game.snapshot ? game.snapshot.antimatter : "0"));
+const displayValue = computed(() =>
+  game.snapshot ? formatDecimal(game.snapshot.antimatter) : "0"
+);
 
 // Shrink long values to fit, mirroring ModernSidebarCurrency.styleObject.
 const scaleStyle = computed(() => {

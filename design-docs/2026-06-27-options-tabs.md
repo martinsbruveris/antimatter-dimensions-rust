@@ -421,7 +421,7 @@ system.
 ### Visual tab
 - ☑ V2 Update rate slider (rAF loop honours updateRate) — Milestone
 - ☐ V4 Theme dropdown (Normal-only first; body-class swap) — Milestone
-- ☐ V5 Notation dropdown (limited list; → ad-format) — Milestone
+- ☑ V5 Notation dropdown (limited list; → ad-format WASM) — Milestone
 - ☐ V6 Exponent Notation modal (comma/notation sliders, comma ≤ notation) — Milestone
 - ☐ V11 Relative prestige gain text coloring toggle — Milestone
 - ☑ V13 Hotkey List button (already implemented)

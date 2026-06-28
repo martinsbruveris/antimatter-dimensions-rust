@@ -302,15 +302,19 @@ roughly in priority order:
    Pick a rounding helper that matches JS and replace the `format!` call (see the
    `// TODO(fidelity)` in `mantissa.rs`). Best done alongside step 1 so the harness
    proves it.
-3. **Wire `ad-format` into `ad-gui` (migration A → C).** Replace
-   `ad-gui::format_decimal` with `ad_format::format`; thread a `FormatOptions` from
-   GUI state (notation picker, digit options, and the `inf_threshold` derived from
-   game state). Per the design above this can stay Rust-side first (pre-baked
-   snapshot) before taking on the WASM build step.
-4. **PyO3 + WASM exposure (rest of step C).** Expose `format` + `FormatOptions` from
-   `ad-python`; compile `ad-format` with `wasm-bindgen` and switch the snapshot to raw
-   `{mantissa, exponent}`. Add the `serde` / `wasm` / `pyo3` integration behind crate
-   features (M1 deliberately has none).
+3. ✅ **Wire `ad-format` into `ad-gui` (migration A → C).** Done via the WASM
+   path directly (skipping the interim Rust-side pre-bake). `ad-gui::format_decimal`
+   is gone; the snapshot ships raw `Num { m, e }` and the webview formats with
+   `ad_format::format` through the WASM module, reading the notation from
+   `GameState.options.notation` (default Standard). `inf_threshold` is left at its
+   default (never "Infinite") — fine pre-Infinity since antimatter caps before
+   `NUMBER_MAX_VALUE`; thread it from game state when post-break formatting lands.
+4. ◐ **PyO3 + WASM exposure (rest of step C).** ✅ WASM: `ad-format` builds with
+   `wasm-bindgen` behind the `wasm` feature (`wasm-pack build --target web`),
+   exposing `format(mantissa, exponent, notation, places, places_under_1000)`;
+   the snapshot now sends raw `{m, e}`. ☐ PyO3: still expose `format` +
+   `FormatOptions` from `ad-python` (add a `pyo3` feature). `serde` is not needed —
+   `Num` lives in `ad-gui`, not `ad-format`.
 5. **More notations.** Add the remaining strategies incrementally (Mixed first, since
    it reuses Scientific/Engineering + Standard); each is a new `NotationStrategy` impl
    plus a `Notation` enum variant and reference tests.

@@ -4,5 +4,16 @@ version = "0.1.0"
 edition = "2021"
 description = "Number formatting (notations) for Antimatter Dimensions — pure, presentation-only."
 
+[lib]
+# `cdylib` for the wasm-bindgen build; `rlib` so the crate stays usable as a
+# normal Rust dependency (PyO3 bindings, native tests).
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# WASM bindings for the web frontend (built via `wasm-pack`); off by default so
+# native builds (`cargo build`/`cargo test`) don't pull in wasm-bindgen.
+wasm = ["dep:wasm-bindgen"]
+
 [dependencies]
 break_infinity = { path = "../break_infinity" }
+wasm-bindgen = { version = "0.2", optional = true }

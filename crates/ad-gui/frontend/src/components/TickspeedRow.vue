@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../stores/game";
+import { formatDecimal } from "../util/format";
 
 const game = useGameStore();
 const s = computed(() => game.snapshot);
@@ -15,7 +16,7 @@ const s = computed(() => game.snapshot);
         :class="{ 'o-primary-btn--disabled': !s.can_buy_tickspeed }"
         @click="game.buyTickspeed()"
       >
-        Tickspeed Cost: {{ s.tickspeed_cost }}
+        Tickspeed Cost: {{ formatDecimal(s.tickspeed_cost) }}
       </button>
       <button
         class="o-primary-btn tickspeed-max-btn"

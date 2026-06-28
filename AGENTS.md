@@ -36,7 +36,7 @@ antimatter-dimensions-rust/
 | `break_infinity` | lib | Decimal type: `mantissa × 10^exponent` arithmetic for numbers up to ~1e9e15 |
 | `ad-core` | lib | Game engine (the rules). Pure logic, no IO. Owns `GameState`, the `Action` IR + `apply_action` seam, and the `data` module for static config. Never depends on `ad-sim`. |
 | `ad-sim` | lib | Simulation driver (decides *what a player does*). One-way dependency on `ad-core`; mutates the game only by emitting `Action`s. Hosts the `Controller` trait, `StrategyController`, and `run_simulation`/`simulate`. See `design-docs/2026-06-27-simulation-architecture.md`. |
-| `ad-format` | lib | Pure, presentation-only number formatting: `format(&Decimal, &FormatOptions) -> String` + notation strategies. Never reads `GameState`. See `design-docs/2026-06-25-number-formatting.md`. |
+| `ad-format` | lib (+cdylib) | Pure, presentation-only number formatting: `format(&Decimal, &FormatOptions) -> String` + notation strategies. Never reads `GameState`. Ships WASM bindings (`wasm` feature, built via `wasm-pack`) used by `ad-gui`'s webview. See `design-docs/2026-06-25-number-formatting.md`. |
 | `ad-fidelity` | lib/bin | Scenario-based harness comparing Rust engine outputs against the JS game. |
 | `ad-python` | lib (cdylib) | PyO3 bindings exposing the engine to Python (`antimatter_dimensions._native`). |
 | `ad-gui` | bin | **Playable frontend.** Tauri backend + Vue 3/Vite/Pinia. Rust-authoritative; see `crates/ad-gui/AGENTS.md`. |
@@ -93,11 +93,16 @@ cargo fmt                      # Format
 #### Frontend (ad-gui)
 
 ```bash
-npm --prefix crates/ad-gui/frontend install   # once
-npm --prefix crates/ad-gui/frontend run build # build the Vue app to dist/
-cargo run -p ad-gui                           # run the Tauri app (serves dist/)
-cd crates/ad-gui && cargo tauri build         # release build (.app/.dmg)
+cargo install wasm-pack                        # once (frontend build needs it)
+npm --prefix crates/ad-gui/frontend install    # once
+npm --prefix crates/ad-gui/frontend run build  # build wasm + Vue app to dist/
+cargo run -p ad-gui                            # run the Tauri app (serves dist/)
+cd crates/ad-gui && cargo tauri build          # release build (.app/.dmg)
 ```
+
+The frontend `build` step first compiles `ad-format` to WASM (`wasm-pack`,
+`wasm` feature) into `frontend/src/wasm/`, then runs Vite; the webview formats
+numbers in-process via that module.
 
 `cargo run` serves the pre-built `dist/` (rebuild the frontend after JS/Vue
 changes — no Rust rebuild needed). `cargo tauri build` produces a bundled

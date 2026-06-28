@@ -25,6 +25,7 @@ name = "ad-format"
 version = "0.1.0"
 dependencies = [
  "break_infinity",
+ "wasm-bindgen",
 ]
 
 [[package]]

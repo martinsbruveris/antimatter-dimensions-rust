@@ -14,6 +14,8 @@ mod mantissa;
 mod notations;
 mod options;
 mod router;
+#[cfg(feature = "wasm")]
+mod wasm;
 
 pub use options::{ExponentDisplay, FormatOptions, Notation};
 pub use router::format;
