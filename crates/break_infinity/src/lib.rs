@@ -9,6 +9,9 @@ use std::str::FromStr;
 #[macro_use]
 mod macros;
 
+#[cfg(feature = "serde")]
+pub mod serde_string;
+
 #[cfg(test)]
 mod tests;
 
