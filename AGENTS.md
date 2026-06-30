@@ -56,9 +56,15 @@ antimatter-dimensions-rust/
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
   action methods; see `design-docs/2026-06-30-achievements.md`.
+- `src/tutorial.rs` — Tutorial-highlight state machine (`tutorial_state` /
+  `tutorial_active`): the gold glow + `!` that points a new player at the next
+  action. Advances passively in `tick()` and on the boost/galaxy/tickspeed
+  actions; the frontend renders the highlight. See
+  `design-docs/2026-06-30-ui-reveal-and-tutorial.md`.
 - `src/autobuyers.rs` — Automation system
 - `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
-  `player.options`), held in `GameState`, preserved across a Big Crunch
+  `player.options`), held in `GameState`, preserved across a Big Crunch.
+  Includes the per-action `Confirmations` toggles (boost/galaxy/sacrifice/crunch)
 - `src/observed.rs` — `ObservedState`: read-only snapshot of `GameState` plus
   computed fields (costs, affordability, `next_sacrifice_boost`). The decision
   input for `ad-sim` controllers and the trace/GUI view.

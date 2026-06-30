@@ -7,7 +7,22 @@ questions: tutorial advance stays tick-driven; the snapshot exposes raw
 `tutorial_state` / `tutorial_active`; `dim_available_for_purchase` was fixed
 (can no longer buy a dimension before owning the one below it); sacrifice
 visibility now reads `achievement_unlocked(18)` (no `bought_8th_dimension`
-field); and `emphasizeH2P` (the pulsing How-To-Play link) is included.
+field — the persistence table below is superseded on that row); and
+`emphasizeH2P` (the pulsing How-To-Play link) is included.
+
+Two post-doc implementation notes:
+
+- **`emphasizeH2P` is currently suppressed.** It overlays the always-visible dev
+  speed/offline/pause controls, so the frontend gates it behind a UI flag
+  (`ui.h2pEmphasisShown`, pre-set so a new game never shows it). When those dev
+  controls become a toggleable option, drive the flag from their visibility so
+  the emphasis returns only when they are hidden.
+- **New save fields are required, not defaulted.** Saves are short-lived during
+  active development, so the read path (`save/dto.rs`) treats `tutorialState`,
+  `tutorialActive`, and `options.confirmations` (and its four flags) as required
+  — a missing one fails the load (surfacing a format change) rather than
+  silently defaulting. Tutorial Feature 1 still adds no persisted state of its
+  own (sacrifice visibility rides on the existing `achievementBits`).
 
 ## Goal
 

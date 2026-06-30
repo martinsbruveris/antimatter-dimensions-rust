@@ -42,14 +42,16 @@ frontend/
     app-shell.css           # minimal layout shell ONLY (ours, not vendored)
     config/tabs.js          # tab/subtab structure -> page components
     stores/game.js          # Pinia: Rust snapshot + action dispatchers
-    stores/ui.js            # Pinia: navigation + open modal + dev speed
+    stores/ui.js            # Pinia: navigation + open modal + dev speed +
+                            #   h2pEmphasisShown (suppresses the How-To-Play glow)
     data/                   # frontend display data:
                             #   achievements.js (id/name/description/reward —
                             #     strings live frontend-side by design; the
                             #     engine owns only unlock state + effects),
                             #   credits.js, shortcuts.js (Hotkey List content)
     util/                   # small helpers: dimensionText, responsive,
-                            #   shortcuts.js (keyboard handler)
+                            #   shortcuts.js (keyboard handler),
+                            #   tutorial.js (step ids + hasTutorial/emphasizeH2P)
     components/
       Sidebar.vue, SidebarCurrency.vue, GameHeader.vue, InfoButtons.vue
       DimensionRow.vue, TickspeedRow.vue, DimBoostRow.vue, GalaxyRow.vue,
@@ -57,6 +59,9 @@ frontend/
       Modal.vue, HotkeysModal.vue, CreditsDisplay.vue   # popups
       ImportSaveModal.vue, HardResetModal.vue            # save/load modals
       LoadGameModal.vue, BackupWindowModal.vue            #   (wired to engine)
+      ConfirmModal.vue, ModalConfirmationCheck.vue       # prestige-confirm shell
+      DimensionBoostConfirmModal.vue, AntimatterGalaxyConfirmModal.vue,
+      SacrificeConfirmModal.vue, BigCrunchConfirmModal.vue  #   confirm bodies
       BigCrunchScreen.vue    # replaces the game view at the Big Crunch cap
       tabs/                  # one component per page (subtab):
         AntimatterDimensionsTab.vue, NormalAchievementsTab.vue,
@@ -237,14 +242,22 @@ frontend/
   implemented mechanics: `1`-`8` buy-until-10 / `Shift`+`1`-`8` buy-1, `T` /
   `Shift`+`T` tickspeed, `S`/`D`/`G` sacrifice/boost/galaxy, `C` Big Crunch, `M`
   max-all, arrows move tab (Up/Down) / subtab (Left/Right), `H` how-to-play, `?`
-  Hotkey List. Letters/digits are matched via `e.code` (robust to Shift), `?` by
-  character; Ctrl/Cmd/Alt combos and typing in inputs are ignored.
+  Hotkey List. `S`/`D`/`G`/`C` route through the confirmation gate (the
+  `request*` store actions), so they pop the explanatory modal just like the
+  on-screen buttons. Letters/digits are matched via `e.code` (robust to Shift),
+  `?` by character; Ctrl/Cmd/Alt combos and typing in inputs are ignored.
 - Popups are centralised in `stores/ui.js` `openModal`
-  (`help`/`info`/`credits`/`hotkeys`, `null` = none) with `showModal` /
+  (`help`/`info`/`credits`/`hotkeys`, the prestige-confirm ids
+  `dimboostConfirm`/`galaxyConfirm`/`sacrificeConfirm`/`bigCrunchConfirm`,
+  `null` = none) with `showModal` /
   `closeModal` / `toggleModal`. `InfoButtons.vue`'s on-screen buttons and the
   `?`/`H` keys drive the same state, so only one modal is open at a time.
   `Modal.vue` is the shared wrapper (overlay, close button, pinned title; the
-  `fitContent` prop sizes it to content, e.g. the Hotkey List's two columns).
+  `fitContent` prop sizes it to content, e.g. the Hotkey List's two columns; the
+  `centered` prop gives confirmation/choice modals a stable-width (`min-width:
+  50rem`) centred column matching the original's `ModalWrapperChoice`, so
+  width-capped content stays centred and they need no per-modal `text-align`
+  rules — see *Confirmation modals* below).
   The Hotkey List rows come from `data/shortcuts.js` (the original's
   default-visible bindings).
 - **Toast notifications.** Transient top-right popups (the original's
@@ -264,10 +277,47 @@ frontend/
   `tab-container` with `BigCrunchScreen.vue` — the "world has collapsed" message
   plus the vendored `.btn-big-crunch` button (mirrors ModernUi's `tab-container`
   being hidden while the crunch button shows).
-- The button and the `C` key both call `game.bigCrunch()` → the `big_crunch`
-  command → `GameState::big_crunch`, which resets all pre-Infinity progress. The
-  next snapshot clears `can_big_crunch`, so the normal view returns. Infinity
-  Points are **not** awarded yet (planned next).
+- The button and the `C` key both call `game.requestBigCrunch()`, which (with
+  the `bigCrunch` confirmation on) opens `BigCrunchConfirmModal.vue` — the
+  first-infinity explanation, no disable checkbox; its Confirm invokes the
+  `big_crunch` command → `GameState::big_crunch`, which resets all pre-Infinity
+  progress. The next snapshot clears `can_big_crunch`, so the normal view
+  returns. Infinity Points are **not** awarded yet (planned next).
+
+## Progressive reveal, tutorial highlights & confirmations
+
+Three early-game presentation features, all engine-driven; the frontend only
+renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md`.
+
+- **Progressive reveal.** The engine derives per-dimension `available_for_purchase`
+  (band + "own the tier below") and `shown` (reveal/lookahead) flags, shipped in
+  each `GameView.dimensions[]` entry. `DimensionRow.vue` uses `v-show="dim.shown"`
+  and dims not-yet-purchasable rows via `c-dim-row--not-reached`;
+  `TickspeedRow.vue` hides itself with `visibility:hidden` (reserving space)
+  until `tickspeed_unlocked`; the sacrifice button's visibility follows
+  `sacrifice_unlocked` (= achievement 18, *not* the boost count, which gates only
+  `can_sacrifice`).
+- **Tutorial highlights.** The snapshot carries raw `tutorial_state` /
+  `tutorial_active`; `util/tutorial.js` exposes the step ids and
+  `hasTutorial(snapshot, step)` / `emphasizeH2P(snapshot)`. The DIM1/DIM2/
+  TICKSPEED/DIMBOOST/GALAXY targets add the vendored `tutorial--glow` (when the
+  action is affordable) and a `fa-circle-exclamation l-notification-icon` `!`.
+  `emphasizeH2P` (the pulsing How-To-Play `?`) is currently suppressed by the
+  `ui.h2pEmphasisShown` flag (always true for now) because it would overlay the
+  dev speed controls; when those become a toggleable option, drive the flag from
+  their visibility.
+- **Confirmation modals.** `ConfirmModal.vue` is the shared shell (built on
+  `Modal.vue` with the `centered` variant) + `ModalConfirmationCheck.vue` (the
+  "Don't show this message again" checkbox, which flips the engine flag via
+  `set_confirmation`). The four bodies map to `ui.openModal` ids
+  `dimboostConfirm` / `galaxyConfirm` / `sacrificeConfirm` / `bigCrunchConfirm`.
+  Click handlers and the `S`/`D`/`G`/`C` hotkeys route through the store's
+  `requestDimBoost` / `requestGalaxy` / `requestSacrifice` / `requestBigCrunch`,
+  which no-op when the action isn't possible and otherwise either open the modal
+  (when the matching `confirmations.*` flag is on) or perform the action
+  directly — mirroring the original's `manualRequest*` / `sacrificeBtnClick`.
+  The toggles live in the engine's `Options.confirmations`, surfaced as
+  `GameView.options.confirmations` and round-tripped through the save.
 
 ## Conventions
 
