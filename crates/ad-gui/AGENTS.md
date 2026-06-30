@@ -87,9 +87,17 @@ frontend/
   (e.g. autobuyers) and avoids per-tick IPC. The multiplier is dev-only, not
   part of the engine.
 - **Stores**: `game` mirrors the Rust snapshot + dispatches actions; `ui` holds
-  navigation state, the open-modal id, and dev controls (speed multiplier).
-  Components read snapshot fields and call store actions — they never compute
-  game logic.
+  navigation state, the open-modal id, and dev controls (speed multiplier,
+  offline mode, absolute pause). Components read snapshot fields and call store
+  actions — they never compute game logic.
+- **Offline mode + absolute pause** (dev controls under the speed row, in `ui`):
+  while *offline mode* is on the loop stops ticking the engine and instead
+  accumulates speed-scaled game-time (`accumulatedGameMs`, shown as a live
+  readout); switching it off replays that interval via the `simulate_offline`
+  command at the player's `offline_ticks` resolution and, above 10 s, opens the
+  `OfflineSummaryModal` catch-up (before→after, original `AwayProgressModal`
+  formatting). *Absolute pause* freezes both live ticks and offline accumulation.
+  See `design-docs/2026-06-30-offline-progress.md`.
 
 ## Multi-page navigation
 
@@ -144,10 +152,10 @@ frontend/
   position with the rest of the grid as invisible placeholders
   (`l-options-grid__button--hidden`): **Visual → Update rate** (slider),
   **Visual → Notation** (dropdown), **Visual → Exponent Notation Options**
-  (button → modal) and **Gameplay → Hotkeys** (enable/disable toggle). The
-  Classic-UI toggle is intentionally dropped (Modern UI only); themes will be a
-  reduced set. Full plan + per-option checklist:
-  `design-docs/2026-06-27-options-tabs.md`.
+  (button → modal), **Gameplay → Hotkeys** (enable/disable toggle) and
+  **Gameplay → Offline ticks** (slider). The Classic-UI toggle is intentionally
+  dropped (Modern UI only); themes will be a reduced set. Full plan + per-option
+  checklist: `design-docs/2026-06-27-options-tabs.md`.
 - **Notation** (`SelectNotationDropdown.vue`, Visual row 2 middle): a simplified
   port of the original's ExpandingControlBox — a header button expanding an
   inline list of the four `ad-format` notations (Scientific, Engineering,
@@ -163,11 +171,18 @@ frontend/
   uses the in-flight slider values so it updates while dragging. The engine keeps
   the notation threshold `>= comma` (original NotationModal invariant), mirrored
   locally in the modal.
+- **Offline ticks** (`OptionsGameplayTab.vue`, Gameplay row 2 middle): the offline
+  replay-resolution slider. Values follow the original's per-decade spacing
+  `(1 + v%9) × 10^floor(v/9)` over slider indices 36..=63 → 10K…10M (default
+  100K), a deliberately wider range than the original's 500…1M (the faster engine
+  affords it). Calls `set_offline_ticks`; consumed by the Offline-mode replay.
 - **Commands:** `set_hotkeys(enabled)`, `set_update_rate(rate)` (engine clamps
   to the 33–200 ms slider range), `set_notation(name)` (ignores names outside
   the known set), `set_notation_digits(comma, notation)` (clamps to 3–15, keeps
-  notation `>=` comma). Mirrored by `stores/game.js` `setHotkeys` /
-  `setUpdateRate` / `setNotation` / `setNotationDigits`.
+  notation `>=` comma), `set_offline_ticks(ticks)` (accepts any positive value —
+  the slider range diverges from the original, so imported saves are not clamped).
+  Mirrored by `stores/game.js` `setHotkeys` / `setUpdateRate` / `setNotation` /
+  `setNotationDigits` / `setOfflineTicks`.
 - **Update rate** drives the game loop: `App.vue`'s rAF loop only ticks once
   `update_rate` ms of wall-clock time have elapsed, then processes the whole
   interval — matching the original's `interval(gameLoop, updateRate)` (larger

@@ -2,6 +2,14 @@
 
 Date: 2026-06-30
 
+**Status: implemented** (all four phases). Engine: `GameState::simulate_offline`
+(`ad-core/src/tick.rs`) + the `offline_ticks` option (`ad-core/src/options.rs`,
+read/written via `save/dto.rs` & `save/encode.rs`). GUI: `simulate_offline` /
+`set_offline_ticks` commands (`ad-gui/src/main.rs`), offline-mode + absolute-pause
+controls and the live readout (`App.vue`, `stores/ui.js`), the `OfflineSummaryModal`
+catch-up, and the Gameplay-tab offline-ticks slider. The benchmark for the 10M
+ceiling (open question below) is the one deferred item.
+
 ## Goal
 
 Two related things:
@@ -46,7 +54,7 @@ The mechanism, stripped of black-hole / celestial concerns we don't model:
 
 - Base resolution is a **50 ms tick** → `ticks = floor(seconds * 20)`.
 - Tick count is capped by `maxOfflineTicks`:
-  `min(player.options.offlineTicks /*default 1000*/, floor(simulatedMs / 33), 1e6)`.
+  `min(player.options.offlineTicks /*default 1e5*/, floor(simulatedMs / 33), 1e6)`.
   Two invariants: a tick is never shorter than 33 ms (so you can't exploit tick
   microstructure), and there are at most 1e6 ticks.
 - The total *game* time to simulate is `getGameSpeedupFactor() * seconds` (game
@@ -232,12 +240,16 @@ There is **one** offline mechanism, with a single player-facing knob —
 buys is simply a **wider slider range**, not a different code path:
 
 - **Default 100,000** reproduces the original's behaviour and numbers.
-- The slider's **maximum is extended well beyond the original's 1e6** (target
-  ~10M–100M, precise bounds TBC) because our engine processes that many ticks in
-  a fraction of the ~10 s the JS game needs. A player who cranks it up gets finer
-  offline resolution — closer to "as if I'd been online" — without the wait. A
-  player who leaves it at 100,000 gets exactly the original behaviour, just
+- The slider runs **10K → 10M**, in the original's per-decade steps (10K, 20K,
+  …, 100K, 200K, …, 1M, 2M, …, 10M), because our engine processes that many ticks
+  in a fraction of the ~10 s the JS game needs. A player who cranks it up gets
+  finer offline resolution — closer to "as if I'd been online" — without the wait.
+  A player who leaves it at 100,000 gets exactly the original behaviour, just
   computed instantly.
+- This range **deliberately differs from the original's** (which is 500 → 1M):
+  we raise both ends. Consequently, when importing an original-game save we
+  **accept any positive `offlineTicks`** rather than clamping to our range — it's
+  just a resolution dial and we are knowingly diverging here.
 
 So `offline_ticks` is the sole control over **how accumulated offline time is
 translated into game progress**. The tick budget is `min(game_ms / 50 ms,
@@ -362,8 +374,9 @@ impl GameState {
     /// not one big step, so per-tick effects (autobuyers) behave.
     ///
     /// `offline_ticks` is the player setting (default 100_000, reproducing the
-    /// original; the slider's extended max trades the engine's speed for finer
-    /// resolution). At speed 1× this matches the original's load-time offline.
+    /// original; the slider spans 10K..=10M, trading the engine's speed for
+    /// finer resolution). At speed 1× this matches the original's load-time
+    /// offline.
     pub fn simulate_offline(&mut self, game_ms: f64, offline_ticks: u32) {
         if game_ms <= 0.0 {
             return;
@@ -432,10 +445,11 @@ budget rather than a single step.
   accumulation.
 - **Tick budget:** a single knob, the `offline_ticks` player slider. Budget =
   `min(game_ms / 50 ms, offline_ticks)`. Default 100,000 reproduces the original;
-  the slider's max is extended (~10M–100M, TBC) so players can spend the faster
-  engine on finer resolution. No separate modes — matching the original is the
-  low end of the same slider. `offline_ticks` is the sole control over how
-  accumulated offline time translates into progress.
+  the slider spans **10K → 10M** (original per-decade steps) so players can spend
+  the faster engine on finer resolution. No separate modes — `offline_ticks` is
+  the sole control over how accumulated offline time translates into progress.
+- **Slider range diverges from the original** (500 → 1M); we accept any positive
+  `offlineTicks` from imported saves rather than clamping.
 
 ## Sequencing note
 
@@ -454,17 +468,75 @@ The full feature has a natural ordering:
 Splitting it this way keeps the first PR small and avoids touching the save
 format until the mechanic itself is proven.
 
+## Resolved (catch-up UX)
+
+- **10 s threshold:** kept. If the accumulated offline game-time is below 10 s,
+  apply it silently (no summary modal) — matching the original, which only shows
+  the away modal above its 10 s diff. Above 10 s, show the summary.
+- **Summary modal:** reproduce the original's away-progress modal in the same
+  formatting. Header `While you were away for {TimeSpan}:` (via the same
+  `TimeSpan.fromSeconds(...).toString()` style), then one line per resource —
+  pre-Infinity that is Antimatter — as `<b>Antimatter</b> {before} to {after}`,
+  numbers via the standard `format(n, 2, 2)`. Reuse the vendored
+  `c-modal-away-progress*` classes. Capture a before-snapshot prior to the
+  replay so before/after can be shown.
+- **No MAX_OFFLINE_TICKS warning:** it is a pure dev/customization dial. Offline
+  time is offline; whatever resolution the player picked is what they get.
+  `offline_ticks` is a UI-customizable value (the slider).
+
 ## Open questions
 
-1. Precise extended slider bounds and step spacing (target max ~10M–100M). Needs
-   a quick benchmark of how long the engine takes to run, say, 100M ticks so the
-   max stays interactive.
-2. When the original stores `offlineTicks` beyond our extended range (or vice
-   versa) on import, do we clamp or accept? (Lean: accept any positive value;
-   it's just a resolution dial.)
-3. Should offline mode have a minimum threshold (the original ignores < 10 s of
-   load-time offline)? For a manual button, probably not — apply whatever
-   accumulated.
-4. Do we want a visible "X time away → Y gained" summary like the original's
-   offline modal, or just silently apply and update the snapshot? (Recommend
-   silent for v1; add a toast later.)
+None blocking. Bounds are fixed at **10K → 10M** (original per-decade steps) and
+imported saves accept any positive `offlineTicks`. A one-off sanity benchmark of
+a 10M-tick replay is worth running during Phase 4, but 10M is conservative enough
+that it is not expected to gate anything.
+
+## Implementation plan
+
+Four phases, smallest-first, mirroring the sequencing note (save format untouched
+until the mechanic is proven).
+
+### Phase 1 — Engine (`ad-core`)
+
+- Add `GameState::simulate_offline(&mut self, game_ms: f64, offline_ticks: u32)`
+  (in `tick.rs`, beside `ticks`/`simulate`). Budget
+  `min(floor(game_ms / 50), offline_ticks).max(1)`, `tick_size = game_ms / ticks`,
+  `self.ticks(tick_size, ticks)`.
+- Tests: budget clamps to `offline_ticks`; `tick_size >= 50 ms`; the speed-1×
+  equivalence to the original's load-time budget; a long away-time at default
+  `offline_ticks` fires autobuyers fewer times than the same time at a high
+  `offline_ticks` (the behaviour-knob property).
+
+### Phase 2 — Buttons + live offline mode (`ad-gui`, no save changes)
+
+- `main.rs`: `simulate_offline` command taking `game_ms` and `offline_ticks`
+  (hardcode `100_000` for now), returning the fresh `GameView`.
+- `stores/ui.js`: `offlineMode` / `absolutePause` booleans, `accumulatedGameMs`,
+  `toggleOfflineMode()` / `toggleAbsolutePause()`.
+- `App.vue` `loop()`: priority `absolutePause` > `offlineMode` > live tick (per
+  the matrix above); always advance `last`. On offline-mode **off**, if
+  `accumulatedGameMs >= 10_000` capture the before-snapshot and open the summary
+  modal after replaying; else replay silently. Reset the accumulator.
+- UI: Offline-mode and Absolute-pause buttons + the live game-time readout under
+  `.speed-controls`, styled from the vendored `.speed-btn` rules; format the
+  readout as a `TimeSpan`.
+
+### Phase 3 — Catch-up summary modal (`ad-gui`)
+
+- A modal mirroring `AwayProgressModal.vue`: header
+  `While you were away for {TimeSpan}:`, one `Antimatter {before} to {after}`
+  line via `format(n, 2, 2)`, reusing the `c-modal-away-progress*` classes. Wire
+  it into the existing `ui.openModal` system; pass before/after + seconds.
+
+### Phase 4 — `offline_ticks` as a player option (`ad-core` + `ad-gui`)
+
+- `options.rs`: add `offline_ticks` (default 100_000) + a setter.
+- `save/dto.rs` + `save/encode.rs`: read/write `player.options.offlineTicks`.
+  **Accept any positive value on read** (do not clamp to the slider range) — our
+  range diverges from the original's.
+- Snapshot `OptionsView` + `game.js` store + a `set_offline_ticks` command.
+- Gameplay options tab: the slider, reusing the original's spacing
+  `(1 + v%9) × 10^floor(v/9)` over **slider values 36..=63** → 10K, 20K, …, 100K,
+  200K, …, 1M, 2M, …, 10M (default 100K at value 45). Replace the hardcoded
+  `100_000` in the Phase 2 command with the option value.
+- Run a quick 10M-tick replay benchmark as a sanity check on responsiveness.

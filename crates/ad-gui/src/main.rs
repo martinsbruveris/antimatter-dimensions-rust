@@ -148,6 +148,9 @@ struct OptionsView {
     /// WASM formatter and shown on the Exponent Notation modal's sliders.
     notation_digits_comma: u32,
     notation_digits_notation: u32,
+    /// Offline replay resolution (original `offlineTicks`); drives the Gameplay
+    /// tab slider and the Offline-mode replay budget.
+    offline_ticks: u32,
 }
 
 /// Build the serializable view for one autobuyer.
@@ -300,6 +303,7 @@ fn build_game_view(game: &GameState) -> GameView {
             notation: game.options.notation.clone(),
             notation_digits_comma: game.options.notation_digits_comma,
             notation_digits_notation: game.options.notation_digits_notation,
+            offline_ticks: game.options.offline_ticks,
         },
     }
 }
@@ -326,6 +330,21 @@ fn tick_and_get_state(
 ) -> GameView {
     let mut game = state.lock().unwrap();
     game.ticks(dt_ms, repeats);
+    build_game_view(&game)
+}
+
+/// Replays `game_ms` of accumulated offline game-time (already speed-scaled by
+/// the caller) at the resolution set by `offline_ticks`, returning the new view.
+/// Used by the Offline-mode button when it is switched off. See
+/// `design-docs/2026-06-30-offline-progress.md`.
+#[tauri::command]
+fn simulate_offline(
+    game_ms: f64,
+    offline_ticks: u32,
+    state: State<'_, Mutex<GameState>>,
+) -> GameView {
+    let mut game = state.lock().unwrap();
+    game.simulate_offline(game_ms, offline_ticks);
     build_game_view(&game)
 }
 
@@ -452,6 +471,12 @@ fn set_notation(notation: String, state: State<'_, Mutex<GameState>>) {
 }
 
 #[tauri::command]
+fn set_offline_ticks(ticks: u32, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_offline_ticks(ticks);
+}
+
+#[tauri::command]
 fn set_notation_digits(comma: u32, notation: u32, state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.options.set_notation_digits(comma, notation);
@@ -553,6 +578,7 @@ pub fn run() {
         .manage(Mutex::new(GameState::new()))
         .invoke_handler(tauri::generate_handler![
             tick_and_get_state,
+            simulate_offline,
             buy_dimension,
             buy_until_10,
             buy_tickspeed,
@@ -574,6 +600,7 @@ pub fn run() {
             set_update_rate,
             set_notation,
             set_notation_digits,
+            set_offline_ticks,
             export_save,
             import_save,
             export_save_to_file,

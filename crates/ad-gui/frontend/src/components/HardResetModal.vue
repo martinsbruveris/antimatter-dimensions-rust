@@ -77,4 +77,10 @@ async function doReset() {
 .c-hard-reset-text {
   text-align: center;
 }
+
+/* The original centres the whole modal body via ModalWrapperChoice; our Modal
+   defaults to left-aligned, so centre the confirm/prompt line explicitly too. */
+.c-modal-hard-reset-info {
+  text-align: center;
+}
 </style>

@@ -16,6 +16,12 @@ export const useGameStore = defineStore("game", {
     async tick(dtMs, repeats = 1) {
       this.snapshot = await invoke("tick_and_get_state", { dtMs, repeats });
     },
+    // Replay `gameMs` of accumulated offline game-time (already speed-scaled) at
+    // the resolution set by `offlineTicks`. Called when Offline mode is switched
+    // off; returns nothing but updates the snapshot.
+    async simulateOffline(gameMs, offlineTicks) {
+      this.snapshot = await invoke("simulate_offline", { gameMs, offlineTicks });
+    },
     toggleBuyMode() {
       this.buyUntil10 = !this.buyUntil10;
     },
@@ -101,6 +107,11 @@ export const useGameStore = defineStore("game", {
     // engine ignores names outside its known set.
     setNotation(notation) {
       return invoke("set_notation", { notation });
+    },
+    // Offline replay resolution (original `player.options.offlineTicks`); the
+    // engine accepts any positive value (we diverge from the original's range).
+    setOfflineTicks(ticks) {
+      return invoke("set_offline_ticks", { ticks });
     },
     // Exponent Notation digit thresholds (original
     // `player.options.notationDigits`); the engine clamps to [3, 15] and keeps

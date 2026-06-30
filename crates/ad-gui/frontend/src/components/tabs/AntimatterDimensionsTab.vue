@@ -2,7 +2,8 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
-import { formatDecimal, formatMultiplier } from "../../util/format";
+import { formatMultiplier } from "../../util/format";
+import GeneralTooltip from "../GeneralTooltip.vue";
 import TickspeedRow from "../TickspeedRow.vue";
 import DimensionRow from "../DimensionRow.vue";
 import DimBoostRow from "../DimBoostRow.vue";
@@ -15,15 +16,16 @@ const s = computed(() => game.snapshot);
 const multiplierText = computed(() => {
   let t = `Buy 10 Dimension purchase multiplier: ×${formatMultiplier(s.value.buy_ten_multiplier)}`;
   if (s.value.sacrifice_unlocked) {
-    t += ` | Dimensional Sacrifice multiplier: ×${formatDecimal(s.value.sacrifice_multiplier)}`;
+    t += ` | Dimensional Sacrifice multiplier: ×${formatMultiplier(s.value.sacrifice_multiplier)}`;
   }
   return t;
 });
 
-const sacrificeTooltip = computed(() =>
-  s.value.can_sacrifice
-    ? `Boosts 8th Antimatter Dimension by ×${formatDecimal(s.value.next_sacrifice_boost)}`
-    : ""
+// Mirrors the original `sacrificeTooltip`: always shows the boost the next
+// sacrifice grants (not gated on affordability).
+const sacrificeTooltip = computed(
+  () =>
+    `Boosts 8th Antimatter Dimension by ×${formatMultiplier(s.value.next_sacrifice_boost)}`
 );
 </script>
 
@@ -36,20 +38,23 @@ const sacrificeTooltip = computed(() =>
       >
         {{ game.buyUntil10 ? "Until 10" : "Buy 1" }}
       </button>
-      <button
+      <GeneralTooltip
         v-show="s.sacrifice_unlocked"
-        class="o-primary-btn o-primary-btn--sacrifice"
-        :class="{ 'o-primary-btn--disabled': !s.can_sacrifice }"
-        :title="sacrificeTooltip"
-        @click="game.sacrifice()"
+        :text="sacrificeTooltip"
       >
-        <span v-if="s.can_sacrifice">
-          Dimensional Sacrifice (×{{ formatDecimal(s.next_sacrifice_boost) }})
-        </span>
-        <span v-else>
-          Dimensional Sacrifice Disabled ({{ s.sacrifice_disabled_condition }})
-        </span>
-      </button>
+        <button
+          class="o-primary-btn o-primary-btn--sacrifice"
+          :class="{ 'o-primary-btn--disabled': !s.can_sacrifice }"
+          @click="game.sacrifice()"
+        >
+          <span v-if="s.can_sacrifice">
+            Dimensional Sacrifice (×{{ formatMultiplier(s.next_sacrifice_boost) }})
+          </span>
+          <span v-else>
+            Dimensional Sacrifice Disabled ({{ s.sacrifice_disabled_condition }})
+          </span>
+        </button>
+      </GeneralTooltip>
       <button
         class="o-primary-btn l-button-container"
         @click="game.maxAll()"

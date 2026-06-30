@@ -25,7 +25,9 @@ const howMany = computed(() =>
 );
 const costText = computed(() => {
   const cost = game.buyUntil10 ? dim.value.until_10_cost : dim.value.single_cost;
-  return `Cost: ${formatDecimal(cost)} AM`;
+  // The original formats dimension cost with `format(cost)` — no mantissa
+  // places (ModernAntimatterDimensionRow.vue), e.g. "100 QT", not "100.00 QT".
+  return `Cost: ${formatDecimal(cost, 0)} AM`;
 });
 const hasLongText = computed(() => costText.value.length > 20);
 const showRate = computed(() => props.tier < 7 && dim.value.rate_percent > 0.01);
@@ -160,7 +162,11 @@ function buy() {
   transform: translateY(-50%);
   white-space: nowrap;
   width: auto;
-  font-size: 1.1rem;
+  /* Match the original purchase-count tooltip
+     (.c-modern-dim-purchase-count-tooltip in new-ui-styles.css): 1.3rem /
+     1.6rem, not the smaller size we had. */
+  font-size: 1.3rem;
+  line-height: 1.6rem;
 }
 
 .dim-buy-wrapper .c-tooltip-arrow.dim-tooltip {

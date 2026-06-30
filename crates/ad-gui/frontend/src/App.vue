@@ -4,6 +4,7 @@ import { onMounted, onUnmounted } from "vue";
 import { useGameStore } from "./stores/game";
 import { useUiStore } from "./stores/ui";
 import { handleShortcut } from "./util/shortcuts";
+import { formatTime } from "./util/format";
 import Sidebar from "./components/Sidebar.vue";
 import GameHeader from "./components/GameHeader.vue";
 import InfoButtons from "./components/InfoButtons.vue";
@@ -14,6 +15,7 @@ import HardResetModal from "./components/HardResetModal.vue";
 import LoadGameModal from "./components/LoadGameModal.vue";
 import BackupWindowModal from "./components/BackupWindowModal.vue";
 import BigCrunchScreen from "./components/BigCrunchScreen.vue";
+import OfflineSummaryModal from "./components/OfflineSummaryModal.vue";
 import NotificationContainer from "./components/NotificationContainer.vue";
 
 const game = useGameStore();
@@ -27,6 +29,24 @@ const DEFAULT_UPDATE_RATE = 33;
 
 function loop() {
   const now = performance.now();
+
+  // Absolute pause (dev) freezes everything: no live ticks and no offline
+  // accumulation. Consume the elapsed wall time so unpausing doesn't jump.
+  if (ui.absolutePause) {
+    last = now;
+    raf = requestAnimationFrame(loop);
+    return;
+  }
+
+  // Offline mode: don't tick the engine. Accumulate speed-scaled game-time each
+  // frame (the integration), to be replayed as one batch when switched off.
+  if (ui.offlineMode) {
+    ui.accumulateOffline((now - last) * ui.speedMultiplier);
+    last = now;
+    raf = requestAnimationFrame(loop);
+    return;
+  }
+
   // Mirror the original game loop, which runs every `updateRate` ms rather
   // than every animation frame: only tick once that much wall-clock time has
   // elapsed, then process the whole elapsed interval. A larger update rate
@@ -61,15 +81,40 @@ onUnmounted(() => {
   <Sidebar />
   <div class="game-container">
     <div class="top-right-controls">
-      <div class="speed-controls">
-        <button
-          v-for="s in [1, 10, 100, 1000]"
-          :key="s"
-          :class="['speed-btn', { active: ui.speedMultiplier === s }]"
-          @click="ui.setSpeed(s)"
-        >
-          {{ s }}x
-        </button>
+      <div class="control-stack">
+        <div class="speed-controls">
+          <button
+            v-for="s in [1, 10, 100, 1000]"
+            :key="s"
+            :class="['speed-btn', { active: ui.speedMultiplier === s }]"
+            @click="ui.setSpeed(s)"
+          >
+            {{ s }}x
+          </button>
+        </div>
+        <!-- Offline mode + absolute pause (dev). Sit under the speed row,
+             right-aligned with it; the live readout (left of the buttons) shows
+             accumulated offline game-time. -->
+        <div class="offline-controls">
+          <span
+            v-if="ui.offlineMode"
+            class="offline-readout"
+          >
+            {{ formatTime(ui.accumulatedGameMs) }}
+          </span>
+          <button
+            :class="['speed-btn', { active: ui.offlineMode }]"
+            @click="ui.toggleOfflineMode()"
+          >
+            Offline
+          </button>
+          <button
+            :class="['speed-btn', { active: ui.absolutePause }]"
+            @click="ui.toggleAbsolutePause()"
+          >
+            Pause
+          </button>
+        </div>
       </div>
       <!-- Help (?) and info (i) buttons, matching the JS version's
            top-right placement. -->
@@ -132,6 +177,12 @@ onUnmounted(() => {
     @close="ui.closeModal()"
   />
 
+  <!-- Catch-up summary after an Offline-mode replay of >= 10 s. -->
+  <OfflineSummaryModal
+    v-if="ui.openModal === 'offlineSummary'"
+    @close="ui.closeModal()"
+  />
+
   <!-- Transient top-right toast popups (e.g. autobuyer pause/resume). -->
   <NotificationContainer />
 </template>
@@ -149,9 +200,31 @@ onUnmounted(() => {
   z-index: 10;
 }
 
+.control-stack {
+  display: flex;
+  flex-direction: column;
+  /* Right-align both rows so the offline row's right edge (the Pause button)
+     lines up with the speed row's right edge (the 1000x button). The readout
+     grows leftward without shifting the buttons. */
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+
 .speed-controls {
   display: flex;
   gap: 0.3rem;
+}
+
+.offline-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.offline-readout {
+  font-size: 0.9rem;
+  color: var(--color-text, #cccccc);
+  white-space: nowrap;
 }
 
 .speed-btn {

@@ -3,6 +3,15 @@ import { defineStore } from "pinia";
 import { TABS } from "../config/tabs";
 import { useGameStore } from "./game";
 
+// Fallback offline replay resolution, used only before the first snapshot
+// arrives. Normally we read the player's `offline_ticks` option from the
+// snapshot (set via the Gameplay tab slider).
+const DEFAULT_OFFLINE_TICKS = 100000;
+
+// Below this much accumulated offline game-time we apply it silently, with no
+// catch-up summary (mirrors the original's 10 s away-modal threshold).
+const OFFLINE_SUMMARY_THRESHOLD_MS = 10000;
+
 // UI-only navigation state (which tab/subtab is open). Kept separate from
 // the `game` store, which mirrors the Rust snapshot.
 export const useUiStore = defineStore("ui", {
@@ -17,6 +26,18 @@ export const useUiStore = defineStore("ui", {
     openModal: null,
     // Dev-only: multiplier applied to wall-clock dt before ticking.
     speedMultiplier: 1,
+    // Offline mode: while on, the live loop stops ticking the engine and instead
+    // accumulates speed-scaled game-time (`accumulatedGameMs`), replayed as one
+    // offline batch when switched off. See
+    // design-docs/2026-06-30-offline-progress.md.
+    offlineMode: false,
+    accumulatedGameMs: 0,
+    // Absolute pause (dev): freezes everything — live ticks AND offline
+    // accumulation. Takes priority over offline mode.
+    absolutePause: false,
+    // Catch-up summary shown after an offline replay of >= 10 s:
+    // { seconds, before, after } snapshots. Drives the offlineSummary modal.
+    offlineSummary: null,
     // Transient toast notifications shown top-right (the blue "info" popups the
     // original triggers e.g. when toggling autobuyers via the keyboard). Each:
     // { id, text, typeClass, entering, leaving }. Mirrors core/notify.js.
@@ -84,6 +105,46 @@ export const useUiStore = defineStore("ui", {
     },
     setSpeed(multiplier) {
       this.speedMultiplier = multiplier;
+    },
+    // Toggle the absolute (dev) pause. Freezes the live loop and offline
+    // accumulation alike; the App.vue loop checks this first.
+    toggleAbsolutePause() {
+      this.absolutePause = !this.absolutePause;
+    },
+    // Accumulate speed-scaled game-time while offline mode is engaged. Called
+    // each frame by the App.vue loop.
+    accumulateOffline(gameMs) {
+      this.accumulatedGameMs += gameMs;
+    },
+    // Toggle Offline mode. Turning it on resets the accumulator and freezes the
+    // live loop (handled in App.vue). Turning it off replays the accumulated
+    // game-time as one offline batch and, above the threshold, opens the
+    // catch-up summary with before/after snapshots.
+    async toggleOfflineMode() {
+      if (!this.offlineMode) {
+        this.accumulatedGameMs = 0;
+        this.offlineMode = true;
+        return;
+      }
+
+      const game = useGameStore();
+      const gameMs = this.accumulatedGameMs;
+      const before = game.snapshot;
+      const offlineTicks =
+        game.snapshot?.options?.offline_ticks ?? DEFAULT_OFFLINE_TICKS;
+      this.offlineMode = false;
+      this.accumulatedGameMs = 0;
+
+      await game.simulateOffline(gameMs, offlineTicks);
+
+      if (gameMs >= OFFLINE_SUMMARY_THRESHOLD_MS) {
+        this.offlineSummary = {
+          seconds: gameMs / 1000,
+          before,
+          after: game.snapshot,
+        };
+        this.openModal = "offlineSummary";
+      }
     },
     // Show a transient toast, mirroring core/notify.js: it slides in (enter
     // animation), stays for `duration` ms, then slides out (leave animation)

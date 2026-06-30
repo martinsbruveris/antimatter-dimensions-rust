@@ -92,6 +92,6 @@ const stateClass = computed(() => {
   >
     {{ entry.name }}
     <br>
-    Requirement: {{ formatDecimal(entry.requirement) }} Total Antimatter
+    Requirement: {{ formatDecimal(entry.requirement, 0) }} Total Antimatter
   </div>
 </template>

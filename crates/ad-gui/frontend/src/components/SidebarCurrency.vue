@@ -6,8 +6,10 @@ import { formatDecimal } from "../util/format";
 
 const game = useGameStore();
 
+// Sidebar antimatter uses `format(x, 2, 1)` in the original
+// (secret-formula/sidebar-resources.js).
 const displayValue = computed(() =>
-  game.snapshot ? formatDecimal(game.snapshot.antimatter) : "0"
+  game.snapshot ? formatDecimal(game.snapshot.antimatter, 2, 1) : "0"
 );
 
 // Shrink long values to fit, mirroring ModernSidebarCurrency.styleObject.

@@ -129,6 +129,7 @@ pub struct OptionsDTO {
     pub update_rate: u32,
     pub notation: String,
     pub notation_digits: NotationDigitsDTO,
+    pub offline_ticks: u32,
 }
 
 /// `player.options.notationDigits`.
@@ -231,6 +232,10 @@ impl GameState {
             MAX_NOTATION_DIGITS,
         )?;
         options.set_notation_digits(comma, notation);
+        // Offline ticks are intentionally *not* range-checked: our slider range
+        // diverges from the original's, so we accept any positive value from the
+        // save as-is (§ offline-progress design).
+        options.set_offline_ticks(dto.options.offline_ticks);
 
         Ok(GameState {
             antimatter: dto.antimatter,
@@ -462,6 +467,8 @@ mod tests {
         player["options"]["updateRate"] = json!(100);
         player["options"]["notation"] = json!("Engineering");
         player["options"]["notationDigits"] = json!({ "comma": 4, "notation": 12 });
+        // A value inside our extended slider range.
+        player["options"]["offlineTicks"] = json!(5_000_000);
 
         let state = load(player).unwrap();
         assert!(!state.options.hotkeys);
@@ -469,6 +476,18 @@ mod tests {
         assert_eq!(state.options.notation, "Engineering");
         assert_eq!(state.options.notation_digits_comma, 4);
         assert_eq!(state.options.notation_digits_notation, 12);
+        assert_eq!(state.options.offline_ticks, 5_000_000);
+    }
+
+    #[test]
+    fn offline_ticks_outside_slider_range_is_accepted() {
+        // Unlike the other numeric options, offlineTicks is not range-checked:
+        // our slider range diverges from the original's, so an imported value
+        // (here the original's 1e6 max, below our 10M but a fine example) is
+        // taken as-is rather than rejected.
+        let mut player = base_player();
+        player["options"]["offlineTicks"] = json!(500);
+        assert_eq!(load(player).unwrap().options.offline_ticks, 500);
     }
 
     #[test]

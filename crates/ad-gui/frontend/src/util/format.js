@@ -30,9 +30,42 @@ export function formatDecimal(num, places = 2, placesUnder1000 = 0) {
   return wasmFormat(num.m, num.e, currentNotation(), places, placesUnder1000, comma, notation);
 }
 
-// A multiplier (`×N`); keeps one decimal under 1000 like the original `formatX`.
+// A multiplier (`×N`). Two decimal places below 1000, matching the original's
+// `formatX(value, 2, 2)` — the form used for the per-dimension multiplier
+// (ModernAntimatterDimensionRow.vue) and the Buy-10 / sacrifice multipliers
+// (ModernAntimatterDimensionsTab.vue). The caller supplies the leading `×`.
 export function formatMultiplier(num) {
-  return formatDecimal(num, 2, 1);
+  return formatDecimal(num, 2, 2);
+}
+
+// Format a duration in milliseconds, mirroring the original `TimeSpan.toString()`:
+// at or above 10 s it lists non-zero year/day/hour/minute/second components joined
+// by commas and "and" (the original's `toStringNoDecimals`); below that it shows a
+// short seconds/ms form. Used by the offline-mode readout and catch-up summary.
+export function formatTime(ms) {
+  const totalSeconds = ms / 1000;
+  if (totalSeconds < 1) return `${Math.round(ms)} ms`;
+  if (totalSeconds < 10) return `${totalSeconds.toFixed(3)} seconds`;
+
+  const years = Math.floor(ms / 31536e6);
+  const days = Math.floor((ms / 864e5) % 365);
+  const hours = Math.floor((ms / 36e5) % 24);
+  const minutes = Math.floor((ms / 6e4) % 60);
+  const seconds = Math.floor((ms / 1e3) % 60);
+
+  const parts = [];
+  const add = (value, name) => {
+    if (value !== 0) parts.push(`${value} ${name}${value === 1 ? "" : "s"}`);
+  };
+  add(years, "year");
+  add(days, "day");
+  add(hours, "hour");
+  add(minutes, "minute");
+  add(seconds, "second");
+
+  if (parts.length === 0) return "0 seconds";
+  if (parts.length < 2) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} and ${parts.slice(-1)[0]}`;
 }
 
 // Format a sample number for the Exponent Notation modal's live preview, using

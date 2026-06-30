@@ -86,6 +86,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     options["notationDigits"]["comma"] = json!(state.options.notation_digits_comma);
     options["notationDigits"]["notation"] =
         json!(state.options.notation_digits_notation);
+    options["offlineTicks"] = json!(state.options.offline_ticks);
 
     // Autobuyers. Intervals/timers are the original's derived state — we leave the
     // template's values and only write the flags/modes we model (§4.4).

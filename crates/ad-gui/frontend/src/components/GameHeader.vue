@@ -20,7 +20,7 @@ const perUpgrade = computed(() =>
     class="c-prestige-button-container"
   >
     <span>You have
-      <span class="c-game-header__antimatter">{{ formatDecimal(s.antimatter) }}</span>
+      <span class="c-game-header__antimatter">{{ formatDecimal(s.antimatter, 2, 1) }}</span>
       antimatter.</span>
     <div>
       You are getting {{ formatDecimal(s.antimatter_per_sec) }} antimatter per second.
@@ -28,7 +28,7 @@ const perUpgrade = computed(() =>
     <div>
       ADs produce ×{{ perUpgrade }} faster per Tickspeed upgrade
       <br>
-      Total Tickspeed: {{ formatDecimal(s.tickspeed_effect) }} / sec
+      Total Tickspeed: {{ formatDecimal(s.tickspeed_effect, 2, 3) }} / sec
     </div>
   </div>
 </template>

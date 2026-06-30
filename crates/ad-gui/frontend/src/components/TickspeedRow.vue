@@ -3,21 +3,31 @@ import { computed } from "vue";
 
 import { useGameStore } from "../stores/game";
 import { formatDecimal } from "../util/format";
+import GeneralTooltip from "./GeneralTooltip.vue";
 
 const game = useGameStore();
 const s = computed(() => game.snapshot);
+
+// Mirrors the original `upgradeCount` (pre-Infinity, no free upgrades):
+// `quantifyInt("Purchased Upgrade", totalTickBought)`.
+const tickspeedTooltip = computed(() => {
+  const n = s.value.tickspeed_bought;
+  return `${n.toLocaleString("en-US")} Purchased Upgrade${n === 1 ? "" : "s"}`;
+});
 </script>
 
 <template>
   <div class="l-tickspeed-container">
     <div class="tickspeed-buttons">
-      <button
-        class="o-primary-btn tickspeed-btn"
-        :class="{ 'o-primary-btn--disabled': !s.can_buy_tickspeed }"
-        @click="game.buyTickspeed()"
-      >
-        Tickspeed Cost: {{ formatDecimal(s.tickspeed_cost) }}
-      </button>
+      <GeneralTooltip :text="tickspeedTooltip">
+        <button
+          class="o-primary-btn tickspeed-btn"
+          :class="{ 'o-primary-btn--disabled': !s.can_buy_tickspeed }"
+          @click="game.buyTickspeed()"
+        >
+          Tickspeed Cost: {{ formatDecimal(s.tickspeed_cost, 0) }}
+        </button>
+      </GeneralTooltip>
       <button
         class="o-primary-btn tickspeed-max-btn"
         :class="{ 'o-primary-btn--disabled': !s.can_buy_tickspeed }"
