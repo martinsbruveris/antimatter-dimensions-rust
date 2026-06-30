@@ -2,18 +2,16 @@
 // Saving options subtab. The grid layout mirrors the original
 // `OptionsSavingTab.vue` (../antimatter-dimensions/src/components/tabs/
 // options-saving), reproducing the top half only — everything related to Cloud
-// saves (and the post-Reality Speedrun row) is omitted. Nothing is wired up yet:
-// the buttons are visual only, except the ones that open a modal (Import save,
-// RESET THE GAME, Choose save, backup menu), which drive `ui.openModal` so the
-// modals can be seen. The autosave-interval slider and save-file-name input keep
-// local-only state. Real save/load actions land later.
+// saves (and the post-Reality Speedrun row) is omitted.
 import { ref } from "vue";
 
+import { useGameStore } from "../../stores/game";
 import { useUiStore } from "../../stores/ui";
 import OptionsSlider from "../options/OptionsSlider.vue";
 import PrimaryToggleButton from "../options/PrimaryToggleButton.vue";
 import OpenHotkeysButton from "../options/OpenHotkeysButton.vue";
 
+const game = useGameStore();
 const ui = useUiStore();
 
 // Local-only placeholders until saving options are engine-owned.
@@ -28,13 +26,44 @@ function handleNameChange(event) {
   saveFileName.value = newName;
   event.target.value = newName;
 }
+
+async function exportToClipboard() {
+  const saveStr = await game.exportSave();
+  await navigator.clipboard.writeText(saveStr);
+  ui.notify("Save exported to clipboard");
+}
+
+async function exportToFile() {
+  try {
+    await game.exportSaveToFile(saveFileName.value);
+    ui.notify("Save exported to file");
+  } catch (e) {
+    if (e !== "Cancelled") {
+      ui.notify(`Export failed: ${e}`, "error");
+    }
+  }
+}
+
+async function importFromFile() {
+  try {
+    await game.importSaveFromFile();
+    ui.notify("Save loaded from file");
+  } catch (e) {
+    if (e !== "Cancelled") {
+      ui.notify(`Import failed: ${e}`, "error");
+    }
+  }
+}
 </script>
 
 <template>
   <div class="l-options-tab">
     <div class="l-options-grid">
       <div class="l-options-grid__row">
-        <button class="o-primary-btn o-primary-btn--option o-primary-btn--option_font-x-large l-options-grid__button">
+        <button
+          class="o-primary-btn o-primary-btn--option o-primary-btn--option_font-x-large l-options-grid__button"
+          @click="exportToClipboard"
+        >
           Export save
         </button>
         <button
@@ -73,16 +102,17 @@ function handleNameChange(event) {
         </div>
       </div>
       <div class="l-options-grid__row">
-        <button class="o-primary-btn o-primary-btn--option l-options-grid__button">
+        <button
+          class="o-primary-btn o-primary-btn--option l-options-grid__button"
+          @click="exportToFile"
+        >
           Export save as file
         </button>
-        <button class="o-primary-btn o-primary-btn--option l-options-grid__button c-file-import-button">
-          <input
-            class="c-file-import"
-            type="file"
-            accept=".txt"
-          >
-          <label for="file">Import save from file</label>
+        <button
+          class="o-primary-btn o-primary-btn--option l-options-grid__button"
+          @click="importFromFile"
+        >
+          Import save from file
         </button>
         <PrimaryToggleButton
           class="o-primary-btn--option l-options-grid__button"
@@ -119,16 +149,6 @@ function handleNameChange(event) {
 </template>
 
 <style scoped>
-/* The vendored `.c-file-import` hack balloons an invisible `::before`
-   (font-size: 100rem; padding: 10rem 20rem) so the whole button opens the file
-   dialog. WebKit (the Tauri macOS webview) paints that overflow outside the
-   button — covering the "Choose save" button in the row above and stealing its
-   clicks — whereas Chrome clips it. Clip it to the button: the file input still
-   fills its own button (width: 100%; height: 5.5rem), so import stays clickable. */
-.c-file-import-button {
-  overflow: hidden;
-}
-
 /* Replicated from the original SaveFileName.vue's <style scoped> block (this
    class is not part of the vendored global CSS). */
 .c-custom-save-name__input {

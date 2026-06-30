@@ -1,9 +1,10 @@
 # Save / Load: Analysis
 
-Status: in progress (§9 phases 1–4 done; phase 5 UI shell built but **not wired**
-to the codec). Scope: design how `ad-gui` persists a game and, crucially, how it
-interoperates with **external Antimatter Dimensions saves** — both directions —
-while only a slice of the game is implemented.
+Status: in progress (§9 phases 1–4 done; phase 5 core save/load buttons
+**wired** to the codec — export/import clipboard + file + hard reset; save
+slots, autosave, persistence remain). Scope: design how `ad-gui` persists a
+game and, crucially, how it interoperates with **external Antimatter Dimensions
+saves** — both directions — while only a slice of the game is implemented.
 
 See §9 for the phase checklist and §10 for the now-resolved open decisions.
 
@@ -487,32 +488,47 @@ before any UI work.
     `crates/ad-core/src/save/encode.rs` (new), `crates/ad-core/src/save/mod.rs`
     (`pub use encode::encode_save`).
 
-- **Phase 5 — UI shell built (visual only, NOT wired).** The **Saving** options
-  subtab and its modals now exist in `ad-gui` as faithful, vendored-CSS replicas
-  of the original — but nothing is connected to the codec yet. Built (top half
-  only; all Cloud-save UI deliberately omitted, as is the post-Reality Speedrun
-  row): `components/tabs/OptionsSavingTab.vue` (the button grid: Export/Import
-  save, RESET THE GAME, Save game, Choose save, autosave-interval slider,
-  Export/Import save as file, "Display time since save" toggle, Open Backup Menu,
-  Save file name input) plus four modals — `ImportSaveModal.vue`,
-  `HardResetModal.vue`, `LoadGameModal.vue`, `BackupWindowModal.vue` — opened via
-  `ui.openModal` ids `importSave`/`hardReset`/`loadGame`/`backup`. The tab is
-  wired into `config/tabs.js`; modals render from `App.vue`. **All buttons are
-  inert except the ones that open a modal**; the slider, file inputs, name input
-  and toggles hold local-only state. The save-slot/backup-slot contents are
-  static placeholders (empty/new-save state). Modal widths use `Modal.vue`'s
-  `fit-content` to match the originals.
-  - **Still to wire (next time):** the Tauri commands (`export_save`/`import_save`,
-    `save_to_disk`/`load_from_disk`) backed by the ready engine codec
-    (`decode_save`/`encode_save`), swapping the `Mutex<GameState>` and returning a
-    fresh `GameView` on import; real save slots / backup slots; autosave; "time
-    since last save"; the keyboard shortcuts. `ad-gui` already enables `ad-core`'s
-    `serde` feature.
-  - **WebKit gotcha hit while building this** — the vendored `.c-file-import` hack
-    (its giant invisible `::before`) overflows in the Tauri webview and both stole
-    clicks from a neighbouring button and inflated a modal's scroll height; fixed
-    by clipping each file-import button with `overflow: hidden`. See the ad-gui
-    `AGENTS.md` "Conventions" note.
+- **Phase 5 — UI shell built; core save/load buttons wired.** The **Saving**
+  options subtab and its modals exist in `ad-gui` as faithful, vendored-CSS
+  replicas of the original (top half only; all Cloud-save UI deliberately
+  omitted, as is the post-Reality Speedrun row):
+  `components/tabs/OptionsSavingTab.vue` (the button grid: Export/Import save,
+  RESET THE GAME, Save game, Choose save, autosave-interval slider,
+  Export/Import save as file, "Display time since save" toggle, Open Backup
+  Menu, Save file name input) plus four modals — `ImportSaveModal.vue`,
+  `HardResetModal.vue`, `LoadGameModal.vue`, `BackupWindowModal.vue` — opened
+  via `ui.openModal` ids `importSave`/`hardReset`/`loadGame`/`backup`. The tab
+  is wired into `config/tabs.js`; modals render from `App.vue`. Modal widths
+  use `Modal.vue`'s `fit-content` to match the originals.
+  - **Wired (2026-06-30):** five Tauri commands backed by the engine codec:
+    - `export_save` — encodes the `Mutex<GameState>` via `encode_save`, returns
+      the AD save string. The frontend copies it to the clipboard via
+      `navigator.clipboard.writeText()` and shows a toast.
+    - `import_save(text)` — `decode_save` on the input, swaps the
+      `Mutex<GameState>`, returns a fresh `GameView`. The `ImportSaveModal`
+      sends the pasted text, shows errors inline, closes + toasts on success.
+    - `export_save_to_file(save_file_name)` — encodes, then shows a native
+      "Save As" dialog via `tauri-plugin-dialog` (`blocking_save_file`), writes
+      the `.txt`. The "Save file name" input on the tab feeds the default
+      filename.
+    - `import_save_from_file` — shows a native "Open" dialog
+      (`blocking_pick_file`), reads the file, decodes, swaps state. Replaces
+      the old `<input type="file">` + `.c-file-import` CSS hack, eliminating
+      the WebKit overflow issue entirely.
+    - `hard_reset` — replaces the `Mutex<GameState>` with `GameState::new()`,
+      returns a fresh `GameView`. The `HardResetModal` calls it on confirmation
+      (the "Shrek is love, Shrek is life" phrase gate is unchanged).
+    - Added `tauri-plugin-dialog` dependency (Cargo.toml, registered in
+      Builder, `dialog:default` permission in `capabilities/default.json`).
+    - Store actions: `exportSave`, `importSave`, `exportSaveToFile`,
+      `importSaveFromFile`, `hardReset` in `stores/game.js`.
+  - **Still to wire:** Save game button, Choose save / save slots, backup
+    slots, autosave, on-disk persistence, "time since last save", the `S`
+    keyboard shortcut (save).
+  - **WebKit note (now partially resolved):** the `.c-file-import` overflow
+    hack is no longer used for the main "Import save from file" button (replaced
+    by the native dialog), but `BackupWindowModal.vue` still uses the
+    `<input type="file">` + `overflow: hidden` pattern for its per-slot import.
 
 - **Deferred — backup-bundle file support (§2.4).** The Backup menu's
   "Export/Import as File" uses the same `AAB` codec but bundles multiple `player`

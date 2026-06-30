@@ -53,6 +53,8 @@ frontend/
       DimensionRow.vue, TickspeedRow.vue, DimBoostRow.vue, GalaxyRow.vue,
       ProgressBar.vue        # shared building-block components
       Modal.vue, HotkeysModal.vue, CreditsDisplay.vue   # popups
+      ImportSaveModal.vue, HardResetModal.vue            # save/load modals
+      LoadGameModal.vue, BackupWindowModal.vue            #   (wired to engine)
       BigCrunchScreen.vue    # replaces the game view at the Big Crunch cap
       tabs/                  # one component per page (subtab):
         AntimatterDimensionsTab.vue, NormalAchievementsTab.vue,
@@ -180,6 +182,37 @@ frontend/
   (newly added to `public/stylesheets/` + `index.html`), not the original's
   heavy `vue-slider-component` port.
 
+## Save / Load
+
+- **Engine codec** (`ad-core::save`): `encode_save(&GameState, now_ms) ->
+  String` and `decode_save(&str) -> Result<GameState, SaveError>`. Pure,
+  deterministic, no IO. The codec implements the original's `AAB` format
+  (zlib + base64 + character-safe cleanup + magic markers). Saves are
+  wire-compatible with the real game. See
+  `design-docs/2026-06-28-save-load-analysis.md`.
+- **Commands:** `export_save` (returns the save string for clipboard copy),
+  `import_save(text)` (decodes + swaps `Mutex<GameState>` + returns
+  `GameView`), `export_save_to_file(save_file_name)` (native Save As dialog
+  via `tauri-plugin-dialog`, writes `.txt`), `import_save_from_file` (native
+  Open dialog, reads + decodes + swaps state), `hard_reset` (replaces state
+  with `GameState::new()`). Mirrored by `stores/game.js` `exportSave` /
+  `importSave` / `exportSaveToFile` / `importSaveFromFile` / `hardReset`.
+- **File dialogs** use `tauri-plugin-dialog` (`blocking_save_file` /
+  `blocking_pick_file`), registered in `main.rs` and permitted via
+  `dialog:default` in `capabilities/default.json`. This replaced the original's
+  `<input type="file">` / `.c-file-import` CSS hack for the main save tab,
+  avoiding the WebKit overflow issue.
+- **ImportSaveModal** (opened by the "Import save" button): text input +
+  Import/Cancel buttons. On Import, calls `importSave`, shows errors inline
+  (red text), closes + toasts on success. Enter key submits.
+- **HardResetModal** (opened by "RESET THE GAME"): the original's
+  confirmation-phrase gate ("Shrek is love, Shrek is life") controls whether
+  the HARD RESET button appears; clicking it calls `hardReset`, toasts, and
+  closes the modal.
+- **Not yet wired:** Save game button, Choose save / save slots, backup slots,
+  autosave, on-disk persistence, "time since last save" display, the `S`
+  keyboard shortcut (save).
+
 ## Keyboard shortcuts & popups
 
 - `util/shortcuts.js` (`handleShortcut`, wired to `App.vue`'s `window` keydown)
@@ -247,18 +280,18 @@ frontend/
   `opener:default` in `capabilities/default.json`). Fall back to `window.open`
   for plain-browser dev mode. See `InfoButtons.vue` for an example.
 - **File-import buttons need `overflow: hidden`.** The vendored `.c-file-import`
-  hack (the "Import save from file" / Backup "Import from file" buttons) balloons
-  an invisible `::before` (`font-size: 100rem; padding: 10rem 20rem`) so the whole
-  button opens the file dialog. The **Tauri webview is WebKit**, which paints that
-  overflow *outside* the button instead of clipping it (Chrome clips). Left
-  unclipped it silently covers and steals clicks from nearby controls, and inside
-  a scrollable modal it inflates the scroll height to far past the content. Always
-  clip the file-import button's container with `overflow: hidden` in the
-  component's `<style scoped>` — the input still fills its own button, so the
-  dialog still opens. See `OptionsSavingTab.vue` and `BackupWindowModal.vue`.
-  General rule: prefer testing webview-bound UI against **WebKit** (Playwright's
-  `webkit`), not just Chrome — they differ on form-control rendering and flexbox
-  `min-width: auto` overflow.
+  hack (the Backup "Import from file" buttons) balloons an invisible `::before`
+  (`font-size: 100rem; padding: 10rem 20rem`) so the whole button opens the file
+  dialog. The **Tauri webview is WebKit**, which paints that overflow *outside*
+  the button instead of clipping it (Chrome clips). Left unclipped it silently
+  covers and steals clicks from nearby controls, and inside a scrollable modal it
+  inflates the scroll height to far past the content. Always clip the file-import
+  button's container with `overflow: hidden` in the component's `<style scoped>`.
+  See `BackupWindowModal.vue`. The main "Import save from file" button on the
+  Saving tab no longer uses this hack — it uses a native dialog via
+  `tauri-plugin-dialog` instead. General rule: prefer testing webview-bound UI
+  against **WebKit** (Playwright's `webkit`), not just Chrome — they differ on
+  form-control rendering and flexbox `min-width: auto` overflow.
 
 ## Known follow-ups
 
@@ -277,3 +310,7 @@ frontend/
 - Big Crunch resets all pre-Infinity progress but awards no Infinity Points
   yet, and shows the first-crunch (non-"small") screen unconditionally; IP and
   the post-`break` header button come next.
+- Save/load: export/import (clipboard + file) and hard reset are wired; save
+  slots, autosave, on-disk persistence, "time since last save", and the `S`
+  keyboard shortcut remain. See `design-docs/2026-06-28-save-load-analysis.md`
+  §9.

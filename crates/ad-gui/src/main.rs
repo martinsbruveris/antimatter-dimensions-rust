@@ -1,11 +1,14 @@
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use ad_core::data::constants::{
     BIG_CRUNCH_THRESHOLD, BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER,
 };
+use ad_core::save::{decode_save, encode_save};
 use ad_core::{AutobuyerMode, Decimal, GameState};
 use serde::Serialize;
 use tauri::State;
+use tauri_plugin_dialog::DialogExt;
 
 /// Ordinal names for the eight antimatter dimensions, used to label the
 /// per-dimension autobuyers (mirrors `AntimatterDimension(tier).shortDisplayName`).
@@ -380,6 +383,14 @@ fn big_crunch(state: State<'_, Mutex<GameState>>) {
     game.big_crunch();
 }
 
+/// Resets the game to a fresh state (the "HARD RESET" option).
+#[tauri::command]
+fn hard_reset(state: State<'_, Mutex<GameState>>) -> GameView {
+    let mut game = state.lock().unwrap();
+    *game = GameState::new();
+    build_game_view(&game)
+}
+
 #[tauri::command]
 fn unlock_ad_autobuyer(tier: usize, state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
@@ -446,10 +457,99 @@ fn set_notation_digits(comma: u32, notation: u32, state: State<'_, Mutex<GameSta
     game.options.set_notation_digits(comma, notation);
 }
 
+/// Returns the current epoch-millisecond timestamp for save encoding.
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
+}
+
+/// Exports the current game state as an AD-compatible save string (for
+/// clipboard copy). The frontend shows a toast on success.
+#[tauri::command]
+fn export_save(state: State<'_, Mutex<GameState>>) -> String {
+    let game = state.lock().unwrap();
+    encode_save(&game, now_ms())
+}
+
+/// Imports a save from a text string (pasted by the user). Decodes and
+/// validates, then swaps the engine state. Returns the new `GameView` on
+/// success or an error message on failure.
+#[tauri::command]
+fn import_save(
+    text: String,
+    state: State<'_, Mutex<GameState>>,
+) -> Result<GameView, String> {
+    let new_state = decode_save(text.trim()).map_err(|e| e.to_string())?;
+    let mut game = state.lock().unwrap();
+    *game = new_state;
+    Ok(build_game_view(&game))
+}
+
+/// Exports the current save to a file chosen via a native "Save As" dialog.
+/// The `save_file_name` is used as the default filename suggestion.
+#[tauri::command]
+async fn export_save_to_file(
+    app: tauri::AppHandle,
+    save_file_name: String,
+    state: State<'_, Mutex<GameState>>,
+) -> Result<(), String> {
+    let save_str = {
+        let game = state.lock().unwrap();
+        encode_save(&game, now_ms())
+    };
+
+    let default_name = if save_file_name.is_empty() {
+        "Antimatter Dimensions Save".to_string()
+    } else {
+        save_file_name
+    };
+
+    let path = app
+        .dialog()
+        .file()
+        .set_file_name(format!("{default_name}.txt"))
+        .add_filter("Text files", &["txt"])
+        .blocking_save_file();
+
+    match path {
+        Some(file_path) => std::fs::write(file_path.as_path().unwrap(), save_str)
+            .map_err(|e| format!("Failed to write file: {e}")),
+        None => Err("Cancelled".to_string()),
+    }
+}
+
+/// Imports a save from a file chosen via a native "Open" dialog.
+#[tauri::command]
+async fn import_save_from_file(
+    app: tauri::AppHandle,
+    state: State<'_, Mutex<GameState>>,
+) -> Result<GameView, String> {
+    let path = app
+        .dialog()
+        .file()
+        .add_filter("Text files", &["txt"])
+        .blocking_pick_file();
+
+    match path {
+        Some(file_path) => {
+            let contents = std::fs::read_to_string(file_path.as_path().unwrap())
+                .map_err(|e| format!("Failed to read file: {e}"))?;
+            let new_state = decode_save(contents.trim()).map_err(|e| e.to_string())?;
+            let mut game = state.lock().unwrap();
+            *game = new_state;
+            Ok(build_game_view(&game))
+        }
+        None => Err("Cancelled".to_string()),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(GameState::new()))
         .invoke_handler(tauri::generate_handler![
             tick_and_get_state,
@@ -462,6 +562,7 @@ pub fn run() {
             sacrifice,
             max_all,
             big_crunch,
+            hard_reset,
             unlock_ad_autobuyer,
             toggle_ad_autobuyer,
             toggle_ad_autobuyer_mode,
@@ -473,6 +574,10 @@ pub fn run() {
             set_update_rate,
             set_notation,
             set_notation_digits,
+            export_save,
+            import_save,
+            export_save_to_file,
+            import_save_from_file,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

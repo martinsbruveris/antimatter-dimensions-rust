@@ -43,7 +43,8 @@ production_per_second(tier) = amount * multiplier * tickspeed_effect
 **Buy-10 multiplier:** Every 10 purchases of a dimension grants a `2x` multiplier
 (stacking multiplicatively). The buy-10 multiplier is `2^floor(bought/10)`.
 
-**Status:** ✅ Partially implemented (basic production + purchasing)
+**Status:** ✅ Implemented (8 tiers, production chain, costs, single/bulk buy,
+buy-10 multiplier)
 
 ---
 
@@ -68,7 +69,8 @@ current_tickspeed_ms = 1000 * multiplier^bought
 
 The effective `multiplier` decreases with galaxies (see Feature 1.5).
 
-**Status:** ✅ Partially implemented
+**Status:** ✅ Implemented (purchases, cost formula, galaxy-based scaling,
+effect on production)
 
 ---
 
@@ -87,6 +89,9 @@ geometric series cost summation.
   using `floor(log(budget * (r-1) / cost + 1) / log(r))`
 
 **Note:** The buy-10 multiplier in the original game is 2x by default, upgradeable later.
+
+**Status:** ✅ Implemented (buy-10, buy-max via repeated single buys; no
+closed-form bulk purchase optimization)
 
 ---
 
@@ -114,7 +119,8 @@ boost_mult(tier) = 2^max(0, dim_boosts + 1 - tier)
 ```
 (Tier is 1-indexed; boost only helps tiers ≤ dim_boosts)
 
-**Status:** ✅ Partially implemented
+**Status:** ✅ Implemented (requirements, soft reset, tier unlocking,
+multiplier formula)
 
 ---
 
@@ -157,7 +163,8 @@ requirement += (galaxies - distantStart)^2 + (galaxies - distantStart)
 requirement *= 1.002^(galaxies - 799)
 ```
 
-**Status:** ✅ Partially implemented (basic formula, no distant/remote scaling)
+**Status:** ✅ Implemented (requirements, reset, tickspeed improvement; no
+distant/remote galaxy scaling yet)
 
 ---
 
@@ -179,7 +186,8 @@ formula). The exponent is modified by achievements.
 **Reset:** All dimension amounts (1-7) are set to 0. Bought counts and costs are
 preserved. 8th dimension amount is preserved.
 
-**Status:** ✅ Partially implemented (simplified formula)
+**Status:** ✅ Implemented (sacrifice mechanic, multiplier formula, reset
+behaviour)
 
 ---
 
@@ -197,6 +205,8 @@ buy10_mult(tier) = buy10_base ^ floor(bought[tier] / 10)
 
 Where `buy10_base` is 2.0 by default (increased by Infinity Upgrade to a value based on
 the number of galaxies + dim boosts).
+
+**Status:** ✅ Implemented (integrated into dimension multiplier calculation)
 
 ---
 
@@ -227,6 +237,10 @@ purchased), achievements.
 - Best IP/min for this eternity
 - Total infinities performed
 - Total antimatter produced (all-time)
+
+**Status:** ⚠️ Partially implemented (Big Crunch trigger + reset works;
+IP formula not yet implemented, no records tracking beyond
+total_antimatter)
 
 ---
 

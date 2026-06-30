@@ -2,18 +2,25 @@
 // "RESET THE GAME" confirmation popup, opened from the Saving options tab.
 // Mirrors the original game's HardResetModal.vue
 // (../antimatter-dimensions/src/components/modals/prestige) — same title, danger
-// text, confirmation-phrase input and the phrase-gated HARD RESET button. The
-// reveal of the confirm button when the phrase matches is pure presentation; no
-// reset is actually wired up (the button just closes the modal). Renders inside
-// our shared Modal.vue wrapper.
+// text, confirmation-phrase input and the phrase-gated HARD RESET button.
 import { computed, ref } from "vue";
 
+import { useGameStore } from "../stores/game";
+import { useUiStore } from "../stores/ui";
 import Modal from "./Modal.vue";
 
 defineEmits(["close"]);
 
+const game = useGameStore();
+const ui = useUiStore();
 const input = ref("");
 const willHardReset = computed(() => input.value === "Shrek is love, Shrek is life");
+
+async function doReset() {
+  await game.hardReset();
+  ui.notify("Game has been reset");
+  ui.closeModal();
+}
 </script>
 
 <template>
@@ -23,7 +30,7 @@ const willHardReset = computed(() => input.value === "Shrek is love, Shrek is li
     fit-content
     @close="$emit('close')"
   >
-    <div class="c-modal-message__text">
+    <div class="c-modal-message__text c-hard-reset-text">
       Please confirm your desire to hard reset this save slot.
       <span class="c-modal-hard-reset-danger">Deleting your save will not unlock anything secret.</span>
       Type in "Shrek is love, Shrek is life" to confirm.
@@ -58,10 +65,16 @@ const willHardReset = computed(() => input.value === "Shrek is love, Shrek is li
       <button
         v-else
         class="o-primary-btn o-primary-btn--width-medium c-modal__confirm-btn c-modal-hard-reset-btn"
-        @click="$emit('close')"
+        @click="doReset"
       >
         HARD RESET
       </button>
     </div>
   </Modal>
 </template>
+
+<style scoped>
+.c-hard-reset-text {
+  text-align: center;
+}
+</style>

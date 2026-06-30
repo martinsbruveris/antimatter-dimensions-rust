@@ -56,6 +56,10 @@ export const useGameStore = defineStore("game", {
     bigCrunch() {
       return invoke("big_crunch");
     },
+    // Hard reset: wipes the game back to a completely fresh state.
+    async hardReset() {
+      this.snapshot = await invoke("hard_reset");
+    },
     // --- Autobuyers ---
     // Unlock an AD autobuyer's slow version (no antimatter cost; only succeeds
     // once the requirement is met).
@@ -103,6 +107,23 @@ export const useGameStore = defineStore("game", {
     // the notation threshold >= the comma threshold.
     setNotationDigits(comma, notation) {
       return invoke("set_notation_digits", { comma, notation });
+    },
+    // --- Save / Load ---
+    // Returns the current game state as an AD-compatible save string.
+    exportSave() {
+      return invoke("export_save");
+    },
+    // Imports a save from a text string. Replaces the running game state.
+    async importSave(text) {
+      this.snapshot = await invoke("import_save", { text });
+    },
+    // Exports the save to a user-chosen file via native Save As dialog.
+    exportSaveToFile(saveFileName = "") {
+      return invoke("export_save_to_file", { saveFileName });
+    },
+    // Imports a save from a user-chosen file via native Open dialog.
+    async importSaveFromFile() {
+      this.snapshot = await invoke("import_save_from_file");
     },
   },
 });
