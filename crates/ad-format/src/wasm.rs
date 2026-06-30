@@ -19,6 +19,10 @@ fn notation_from_str(name: &str) -> Notation {
         "engineering" => Notation::Engineering,
         "standard" => Notation::Standard,
         "letters" => Notation::Letters,
+        "mixed scientific" => Notation::MixedScientific,
+        "mixed engineering" => Notation::MixedEngineering,
+        "logarithm" => Notation::Logarithm,
+        "infinity" => Notation::Infinity,
         _ => Notation::default(),
     }
 }

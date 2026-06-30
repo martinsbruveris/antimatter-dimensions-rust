@@ -381,12 +381,16 @@ roughly in priority order:
    the snapshot now sends raw `{m, e}`. ☐ PyO3: still expose `format` +
    `FormatOptions` from `ad-python` (add a `pyo3` feature). `serde` is not needed —
    `Num` lives in `ad-gui`, not `ad-format`.
-5. **More notations.** Add the remaining strategies incrementally (Mixed first, since
-   it reuses Scientific/Engineering + Standard); each is a new `NotationStrategy` impl
-   plus a `Notation` enum variant and reference tests. See **The full notation catalogue
-   (and port priority)** above for the recommended scope: finish the Tier 2 set (Mixed
-   scientific — the game default! — Mixed engineering, Logarithm, Infinity) and treat the
-   ~14 painful glyph/joke notations as optional cosmetic parity.
+5. ✅ **More notations (Tier 2).** Mixed scientific, Mixed engineering, Logarithm, and
+   Infinity are implemented (`notations/{mixed_scientific,mixed_engineering,logarithm,
+   infinity}.rs`), fidelity-tested against the JS package (`tests/notations.rs`), wired
+   into the WASM name map and the GUI notation dropdown. The Mixed pair delegates to
+   Standard below 1e33 and to Scientific/Engineering above (routing the big-number case
+   through their own `format_exponent` so the recursive-exponent case stays Mixed, as the
+   game does). `format_with_commas` now also groups the integer part of a value with a
+   fractional component (needed by Infinity). Remaining: the ~14 painful glyph/joke
+   notations (Emoji, Brackets, Roman, …) — optional cosmetic parity only; see **The full
+   notation catalogue (and port priority)** above.
 
 Implementation notes for whoever resumes:
 

@@ -3,12 +3,17 @@
 //! [`NotationStrategy::format_exponent`](crate::notations::NotationStrategy), since
 //! the recursion dispatches back into a notation's `format_decimal`.
 
-/// Group the integer part of `value` into comma-separated thousands (the
-/// decimal-point-free exponent case).
+/// Group the integer part of `value` into comma-separated thousands. Any fractional
+/// part (e.g. the `∞`-count in Infinity notation) is left untouched, matching the
+/// game's `formatWithCommas` which only groups the digits before the decimal point.
 pub(crate) fn format_with_commas(value: &str) -> String {
-    let (sign, digits) = match value.strip_prefix('-') {
+    let (int_part, frac) = match value.split_once('.') {
+        Some((int_part, frac)) => (int_part, Some(frac)),
+        None => (value, None),
+    };
+    let (sign, digits) = match int_part.strip_prefix('-') {
         Some(rest) => ("-", rest),
-        None => ("", value),
+        None => ("", int_part),
     };
     let mut out = String::with_capacity(digits.len() + digits.len() / 3);
     let first = digits.len() % 3;
@@ -18,7 +23,10 @@ pub(crate) fn format_with_commas(value: &str) -> String {
         }
         out.push(ch);
     }
-    format!("{sign}{out}")
+    match frac {
+        Some(frac) => format!("{sign}{out}.{frac}"),
+        None => format!("{sign}{out}"),
+    }
 }
 
 #[cfg(test)]

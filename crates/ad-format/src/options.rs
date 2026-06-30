@@ -18,6 +18,14 @@ pub enum Notation {
     Engineering,
     Standard,
     Letters,
+    /// Standard below 1e33, Scientific above. The game's default notation.
+    MixedScientific,
+    /// Standard below 1e33, Engineering above.
+    MixedEngineering,
+    /// `e` followed by the base-10 logarithm of the value.
+    Logarithm,
+    /// The value counted in multiples of the float `MAX_VALUE` (`∞`-suffixed).
+    Infinity,
 }
 
 /// Controls how a *large exponent* is itself rendered (plain, comma-grouped, or

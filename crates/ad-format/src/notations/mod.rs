@@ -7,7 +7,11 @@
 //! numbers specially (none of the M1 four do).
 
 mod engineering;
+mod infinity;
 mod letters;
+mod logarithm;
+mod mixed_engineering;
+mod mixed_scientific;
 mod scientific;
 mod standard;
 
@@ -18,7 +22,11 @@ use crate::mantissa::format_mantissa;
 use crate::options::{FormatOptions, Notation};
 
 pub(crate) use engineering::Engineering;
+pub(crate) use infinity::Infinity;
 pub(crate) use letters::Letters;
+pub(crate) use logarithm::Logarithm;
+pub(crate) use mixed_engineering::MixedEngineering;
+pub(crate) use mixed_scientific::MixedScientific;
 pub(crate) use scientific::Scientific;
 pub(crate) use standard::Standard;
 
@@ -82,5 +90,9 @@ pub(crate) fn strategy(notation: Notation) -> &'static dyn NotationStrategy {
         Notation::Engineering => &Engineering,
         Notation::Standard => &Standard,
         Notation::Letters => &Letters,
+        Notation::MixedScientific => &MixedScientific,
+        Notation::MixedEngineering => &MixedEngineering,
+        Notation::Logarithm => &Logarithm,
+        Notation::Infinity => &Infinity,
     }
 }

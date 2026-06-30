@@ -5,9 +5,10 @@
 //! travel in [`FormatOptions`]. Nothing here reads `GameState` — see
 //! `design-docs/2026-06-25-number-formatting.md`.
 //!
-//! The original game supports ~20 notations; we implement a subset (Scientific,
-//! Engineering, Standard, Letters). The routing is general, so additional notations
-//! can be added in future.
+//! The original game supports ~22 notations; we implement the practical subset
+//! (Scientific, Engineering, Standard, Letters, Mixed scientific, Mixed engineering,
+//! Logarithm, Infinity). The routing is general, so additional notations can be added
+//! in future.
 
 mod exponent;
 mod mantissa;

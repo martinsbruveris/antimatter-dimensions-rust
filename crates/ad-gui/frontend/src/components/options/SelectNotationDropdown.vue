@@ -11,7 +11,16 @@ import { ref } from "vue";
 
 import { useGameStore } from "../../stores/game";
 
-const NOTATIONS = ["Scientific", "Engineering", "Standard", "Letters"];
+const NOTATIONS = [
+  "Scientific",
+  "Engineering",
+  "Standard",
+  "Letters",
+  "Mixed scientific",
+  "Mixed engineering",
+  "Logarithm",
+  "Infinity",
+];
 
 const game = useGameStore();
 const open = ref(false);

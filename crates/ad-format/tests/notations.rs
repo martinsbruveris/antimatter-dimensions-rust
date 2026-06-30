@@ -33,6 +33,22 @@ fn letters(value: Decimal, places: u32) -> String {
     format(&value, &opts(Notation::Letters, places))
 }
 
+fn mixed_sci(value: Decimal, places: u32) -> String {
+    format(&value, &opts(Notation::MixedScientific, places))
+}
+
+fn mixed_eng(value: Decimal, places: u32) -> String {
+    format(&value, &opts(Notation::MixedEngineering, places))
+}
+
+fn logarithm(value: Decimal, places: u32) -> String {
+    format(&value, &opts(Notation::Logarithm, places))
+}
+
+fn infinity(value: Decimal, places: u32) -> String {
+    format(&value, &opts(Notation::Infinity, places))
+}
+
 #[test]
 fn scientific_places_2() {
     assert_eq!(sci(Decimal::new(1.5, 10), 2), "1.50e10");
@@ -155,6 +171,119 @@ fn recursive_notation_exponents() {
         eng(Decimal::new(1.0, 1_230_000_000_000_000), 2),
         "1.00e1.230e15"
     );
+}
+
+#[test]
+fn mixed_scientific_places_2() {
+    // Below 1e33: Standard letter abbreviations.
+    assert_eq!(mixed_sci(Decimal::new(1.0, 3), 2), "1.00 K");
+    assert_eq!(mixed_sci(Decimal::new(1.234, 3), 2), "1.23 K");
+    assert_eq!(mixed_sci(Decimal::new(1.5, 6), 2), "1.50 M");
+    assert_eq!(mixed_sci(Decimal::new(1.5, 10), 2), "15.00 B");
+    assert_eq!(mixed_sci(Decimal::new(6.7, 21), 2), "6.70 Sx");
+    assert_eq!(mixed_sci(Decimal::new(1.0, 30), 2), "1.00 No");
+    assert_eq!(mixed_sci(Decimal::new(1.0, 32), 2), "100.00 No");
+    assert_eq!(mixed_sci(Decimal::new(9.999, 8), 2), "999.90 M");
+    // At/above 1e33: scientific.
+    assert_eq!(mixed_sci(Decimal::new(1.0, 33), 2), "1.00e33");
+    assert_eq!(mixed_sci(Decimal::new(1.0, 36), 2), "1.00e36");
+    assert_eq!(mixed_sci(Decimal::new(1.0, 100), 2), "1.00e100");
+    assert_eq!(mixed_sci(Decimal::new(1.0, 100_000), 2), "1.00e100,000");
+    // Recursive exponent renders Standard-style (Mixed recurses into itself).
+    assert_eq!(mixed_sci(Decimal::new(1.0, 1_000_000_000), 2), "1.00e1.000 B");
+    assert_eq!(mixed_sci(Decimal::new(1.23, 1_000_000_000), 2), "1.23e1.000 B");
+    assert_eq!(
+        mixed_sci(Decimal::new(1.0, 1_230_000_000_000_000), 2),
+        "1.00e1.230 Qa"
+    );
+}
+
+#[test]
+fn mixed_scientific_places_0() {
+    assert_eq!(mixed_sci(Decimal::new(1.5, 6), 0), "2 M");
+    assert_eq!(mixed_sci(Decimal::new(6.7, 21), 0), "7 Sx");
+    assert_eq!(mixed_sci(Decimal::new(1.0, 33), 0), "1e33");
+    assert_eq!(mixed_sci(Decimal::new(1.0, 1_000_000_000), 0), "1e1.000 B");
+}
+
+#[test]
+fn mixed_engineering_places_2() {
+    // Below 1e33: identical to Mixed scientific (Standard).
+    assert_eq!(mixed_eng(Decimal::new(1.5, 6), 2), "1.50 M");
+    assert_eq!(mixed_eng(Decimal::new(1.0, 32), 2), "100.00 No");
+    assert_eq!(mixed_eng(Decimal::new(9.999, 8), 2), "999.90 M");
+    // At/above 1e33: engineering (exponent forced to multiples of 3).
+    assert_eq!(mixed_eng(Decimal::new(1.0, 33), 2), "1.00e33");
+    assert_eq!(mixed_eng(Decimal::new(1.0, 100), 2), "10.00e99");
+    assert_eq!(mixed_eng(Decimal::new(1.0, 100_000), 2), "10.00e99999");
+    assert_eq!(
+        mixed_eng(Decimal::new(1.0, 1_000_000_000), 2),
+        "10.00e999,999,999"
+    );
+    assert_eq!(
+        mixed_eng(Decimal::new(1.0, 1_230_000_000_000_000), 2),
+        "1.00e1.230 Qa"
+    );
+}
+
+#[test]
+fn mixed_engineering_places_0() {
+    assert_eq!(mixed_eng(Decimal::new(1.0, 100), 0), "10e99");
+    assert_eq!(mixed_eng(Decimal::new(1.23, 1_000_000_000), 0), "12e999,999,999");
+}
+
+#[test]
+fn logarithm_places_2() {
+    assert_eq!(logarithm(Decimal::new(1.0, 3), 2), "e3.00");
+    assert_eq!(logarithm(Decimal::new(1.234, 3), 2), "e3.09");
+    assert_eq!(logarithm(Decimal::new(1.5, 6), 2), "e6.18");
+    assert_eq!(logarithm(Decimal::new(6.7, 21), 2), "e21.83");
+    assert_eq!(logarithm(Decimal::new(1.0, 100), 2), "e100.00");
+    // Comma-grouped once log10 reaches `min` (1e5).
+    assert_eq!(logarithm(Decimal::new(1.0, 100_000), 2), "e100,000");
+    assert_eq!(logarithm(Decimal::new(1.0, 1_234_567), 2), "e1,234,567");
+    // Recursive once log10 reaches `max` (1e9): the log is itself logarithm-formatted.
+    assert_eq!(logarithm(Decimal::new(1.0, 1_000_000_000), 2), "ee9.000");
+    assert_eq!(
+        logarithm(Decimal::new(1.0, 1_230_000_000_000_000), 2),
+        "ee15.090"
+    );
+}
+
+#[test]
+fn logarithm_places_0() {
+    // Below `min` always keeps at least one decimal (`max(places, 1)`).
+    assert_eq!(logarithm(Decimal::new(1.0, 3), 0), "e3.0");
+    assert_eq!(logarithm(Decimal::new(1.234, 3), 0), "e3.1");
+    assert_eq!(logarithm(Decimal::new(1.5, 6), 0), "e6.2");
+    assert_eq!(logarithm(Decimal::new(1.0, 100_000), 0), "e100,000");
+    assert_eq!(logarithm(Decimal::new(1.0, 1_000_000_000), 0), "ee9.000");
+}
+
+#[test]
+fn infinity_notation_places_2() {
+    assert_eq!(infinity(Decimal::new(1.0, 3), 2), "0.0097\u{221e}");
+    assert_eq!(infinity(Decimal::new(1.234, 3), 2), "0.0100\u{221e}");
+    assert_eq!(infinity(Decimal::new(1.0, 9), 2), "0.0292\u{221e}");
+    assert_eq!(infinity(Decimal::new(1.0, 100), 2), "0.3244\u{221e}");
+    // Three decimals (and commas) once the count passes 1000.
+    assert_eq!(infinity(Decimal::new(1.0, 100_000), 2), "324.4070\u{221e}");
+    assert_eq!(infinity(Decimal::new(1.0, 1_234_567), 2), "4,005.022\u{221e}");
+    assert_eq!(
+        infinity(Decimal::new(1.0, 1_000_000_000), 2),
+        "3,244,070.405\u{221e}"
+    );
+    assert_eq!(
+        infinity(Decimal::new(1.0, 1_230_000_000_000_000), 2),
+        "3,990,206,598,351.031\u{221e}"
+    );
+}
+
+#[test]
+fn infinity_notation_places_0() {
+    // `places` only matters once it exceeds the built-in `infPlaces` (4 or 3).
+    assert_eq!(infinity(Decimal::new(1.0, 3), 0), "0.0097\u{221e}");
+    assert_eq!(infinity(Decimal::new(1.0, 1_234_567), 0), "4,005.022\u{221e}");
 }
 
 #[test]
