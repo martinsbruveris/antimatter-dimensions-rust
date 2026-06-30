@@ -5,12 +5,15 @@
 //
 // The original builds each `info` string with formatting helpers
 // (formatInt, formatX, formatPercents, …) that resolve at runtime against
-// the player's notation/settings. Here the bodies are static HTML, so those
+// the player's notation/settings. Most bodies here are static HTML, so those
 // helpers are resolved to the values the original renders with default
 // settings (e.g. formatInt(10) -> "10", formatX(2) -> "×2",
-// formatPercents(1) -> "100%"). The base-price/cost-multiplier lists use
-// this reimplementation's constants (ad-core AD_BASE_COSTS /
-// AD_COST_MULTIPLIERS).
+// formatPercents(1) -> "100%"); these are all small numbers that read the
+// same under every notation. The exceptions are the large numbers whose
+// rendering *does* vary with notation — the Antimatter Dimensions base-price /
+// cost-multiplier lists (from ad-core AD_BASE_COSTS / AD_COST_MULTIPLIERS) and
+// the Infinity antimatter cap — which are formatted live via formatDecimal so
+// they follow the player's chosen notation.
 //
 // Each entry has:
 //   name  Display name, shown in the tab list and as the body title.
@@ -30,6 +33,27 @@
 // Sacrifice.isVisible, PlayerProgress.infinityUnlocked()). Only the gates
 // for currently-implemented mechanics are wired; every other entry is
 // always unlocked.
+import { formatDecimal } from "../util/format.js";
+
+// Raw { mantissa, exponent } pairs (value = m × 10^e), mirroring ad-core's
+// AD_BASE_COSTS / AD_COST_MULTIPLIERS (crates/ad-core/src/data/constants.rs).
+// Kept as literals because those Rust constants aren't exposed to JS;
+// formatDecimal renders them under the player's current notation rather than
+// hardcoding a single notation's text.
+const AD_BASE_COSTS = [
+  { m: 1, e: 1 }, { m: 1, e: 2 }, { m: 1, e: 4 }, { m: 1, e: 6 },
+  { m: 1, e: 9 }, { m: 1, e: 13 }, { m: 1, e: 18 }, { m: 1, e: 24 },
+];
+const AD_COST_MULTIPLIERS = [
+  { m: 1, e: 3 }, { m: 1, e: 4 }, { m: 1, e: 5 }, { m: 1, e: 6 },
+  { m: 1, e: 8 }, { m: 1, e: 10 }, { m: 1, e: 12 }, { m: 1, e: 15 },
+];
+
+// Number.MAX_VALUE (2^1024 − 2^971 ≈ 1.797693e308), the largest finite f64 and
+// the antimatter cap that forces the first Big Crunch. formatDecimal(_, 6)
+// renders the 6-place mantissa the original shows.
+const INFINITY_THRESHOLD = { m: 1.7976931348623157, e: 308 };
+
 export const h2pTabs = [
   {
     name: "This Modal",
@@ -68,7 +92,7 @@ ${f.infinityUnlocked ? "- <b>IP</b>: Infinity Point<br>" : ""}
   },
   {
     name: "Antimatter Dimensions",
-    info: `
+    info: () => `
 Antimatter is a resource that is used throughout the entire game for purchasing various things as you progress. You
 start with 10 antimatter when you first open the game, and you can
 spend it to buy the 1st Antimatter Dimension to start the game.
@@ -111,9 +135,9 @@ you can buy whatever quantity gets you to that Dimension's next Dimension multip
 then second, and so on until the 8th Antimatter Dimension, and then buy max Tickspeed Upgrades.
 <br>
 <br>
-<b>Dimension base prices:</b> 10, 100, 1.00e4, 1.00e6, 1.00e9, 1.00e13, 1.00e18, 1.00e24
+<b>Dimension base prices:</b> ${AD_BASE_COSTS.map((n) => formatDecimal(n)).join(", ")}
 <br>
-<b>Base per 10 bought dimension price increases:</b> 1.00e3, 1.00e4, 1.00e5, 1.00e6, 1.00e8, 1.00e10, 1.00e12, 1.00e15
+<b>Base per 10 bought dimension price increases:</b> ${AD_COST_MULTIPLIERS.map((n) => formatDecimal(n)).join(", ")}
 <br>
 <br>
 <b>Hotkeys: 1, 2, 3, 4, 5, 6, 7, 8</b> for buy until 10 Xth Dimension
@@ -247,15 +271,15 @@ Achievement will give a hint on how to attain them.
   },
   {
     name: "Infinity",
-    info: `
+    info: () => `
 Once you have too much antimatter for the world to handle (2<sup>1024</sup>
-or about 1.797693e308,
+or about ${formatDecimal(INFINITY_THRESHOLD, 6)},
 sometimes called "Infinity"), you will be forced to do a "Big Crunch". This will reset your antimatter, Antimatter
 Dimensions, Dimension Boosts, and your Antimatter Galaxies. Doing a Big Crunch is also sometimes referred to as
 "Infinitying".
 <br>
 <br>
-You will eventually be able to pass 1.797693e308, but until then any larger numbers will
+You will eventually be able to pass ${formatDecimal(INFINITY_THRESHOLD, 6)}, but until then any larger numbers will
 display as Infinity.
 <br>
 <br>
