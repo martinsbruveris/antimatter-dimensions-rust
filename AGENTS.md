@@ -231,6 +231,7 @@ Located in `design-docs/`:
 | `2026-06-27-options-tabs.md` | Analysis of the Visual & Gameplay options tabs + iterative port plan |
 | `2026-06-27-simulation-architecture.md` | Options for a full end-to-end simulation driver (Action IR + Controller trait) kept cleanly separate from game logic |
 | `2026-06-28-js-frontend-rust-wasm-engine.md` | Feasibility analysis of keeping the original JS/Vue app and swapping its engine for Rust/WASM (rejected; recommends a WASM target for `ad-core` instead) |
+| `2026-06-30-offline-progress.md` | How the original simulates offline progress, how it maps onto our `simulate`/`ticks` primitives, the game-speed/timestamp implications, and a design for a manual Offline-mode button |
 
 The table lists key documents; see the `design-docs/` folder for the full,
 date-prefixed set. Read these before making architectural decisions. The
