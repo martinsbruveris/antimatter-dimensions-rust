@@ -246,6 +246,19 @@ frontend/
   (registered in `main.rs` as `tauri_plugin_opener::init()`, permission
   `opener:default` in `capabilities/default.json`). Fall back to `window.open`
   for plain-browser dev mode. See `InfoButtons.vue` for an example.
+- **File-import buttons need `overflow: hidden`.** The vendored `.c-file-import`
+  hack (the "Import save from file" / Backup "Import from file" buttons) balloons
+  an invisible `::before` (`font-size: 100rem; padding: 10rem 20rem`) so the whole
+  button opens the file dialog. The **Tauri webview is WebKit**, which paints that
+  overflow *outside* the button instead of clipping it (Chrome clips). Left
+  unclipped it silently covers and steals clicks from nearby controls, and inside
+  a scrollable modal it inflates the scroll height to far past the content. Always
+  clip the file-import button's container with `overflow: hidden` in the
+  component's `<style scoped>` — the input still fills its own button, so the
+  dialog still opens. See `OptionsSavingTab.vue` and `BackupWindowModal.vue`.
+  General rule: prefer testing webview-bound UI against **WebKit** (Playwright's
+  `webkit`), not just Chrome — they differ on form-control rendering and flexbox
+  `min-width: auto` overflow.
 
 ## Known follow-ups
 

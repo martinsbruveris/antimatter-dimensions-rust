@@ -9,6 +9,10 @@ import GameHeader from "./components/GameHeader.vue";
 import InfoButtons from "./components/InfoButtons.vue";
 import HotkeysModal from "./components/HotkeysModal.vue";
 import NotationModal from "./components/NotationModal.vue";
+import ImportSaveModal from "./components/ImportSaveModal.vue";
+import HardResetModal from "./components/HardResetModal.vue";
+import LoadGameModal from "./components/LoadGameModal.vue";
+import BackupWindowModal from "./components/BackupWindowModal.vue";
 import BigCrunchScreen from "./components/BigCrunchScreen.vue";
 import NotificationContainer from "./components/NotificationContainer.vue";
 
@@ -104,6 +108,27 @@ onUnmounted(() => {
 
   <NotationModal
     v-if="ui.openModal === 'notation'"
+    @close="ui.closeModal()"
+  />
+
+  <!-- Saving-tab popups (visual only; save/load not wired up yet). -->
+  <ImportSaveModal
+    v-if="ui.openModal === 'importSave'"
+    @close="ui.closeModal()"
+  />
+
+  <HardResetModal
+    v-if="ui.openModal === 'hardReset'"
+    @close="ui.closeModal()"
+  />
+
+  <LoadGameModal
+    v-if="ui.openModal === 'loadGame'"
+    @close="ui.closeModal()"
+  />
+
+  <BackupWindowModal
+    v-if="ui.openModal === 'backup'"
     @close="ui.closeModal()"
   />
 

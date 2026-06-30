@@ -1,8 +1,9 @@
 # Save / Load: Analysis
 
-Status: in progress (phase 1 of §9 done). Scope: design how `ad-gui` persists a
-game and, crucially, how it interoperates with **external Antimatter Dimensions
-saves** — both directions — while only a slice of the game is implemented.
+Status: in progress (§9 phases 1–4 done; phase 5 UI shell built but **not wired**
+to the codec). Scope: design how `ad-gui` persists a game and, crucially, how it
+interoperates with **external Antimatter Dimensions saves** — both directions —
+while only a slice of the game is implemented.
 
 See §9 for the phase checklist and §10 for the now-resolved open decisions.
 
@@ -121,6 +122,60 @@ Notes on the trickier mappings:
 - **AD `bought` semantics match.** Our `bought` is the raw single-purchase count
   and our cost uses `bought / 10`; the original uses
   `floor(bought/10) + costBumps`. Identical with `costBumps = 0`. Direct map.
+
+### 2.4 Other payloads sharing the same codec
+
+`GameSaveSerializer` (the §2.1 `AAB` pipeline) is a *universal* string codec —
+the same encode/decode is reused for several different JSON payloads. Everything
+we read so far is a single `player` object, but the game stores and exports a few
+other shapes through the identical codec. Source:
+`../antimatter-dimensions/src/core/storage/storage.js`.
+
+| Producer | Decoded JSON shape | Notes |
+|----------|--------------------|-------|
+| Options → "Export as File" (`exportAsFile`) / clipboard `export` / cloud / a single backup *slot* (`saveToBackup`) | a single `player` | What `decode_save`/`encode_save` handle today; our fixtures are these. |
+| **Backup → "Export as File" (`exportBackupsAsFile`) / "Import from File" (`importBackupsFromFile`)** | **a *bundle* of players** | See below. **Not** a single player — needs a dispatch layer. |
+| Browser `localStorage` root (`GameStorage.load`/`save`) | `{ saves: { 0,1,2 }, current }` wrapper (or, legacy, a bare `player`) | Only relevant if we ever ingest a *live* localStorage dump; out of scope for file/clipboard import. |
+
+**The backup-bundle file** (`exportBackupsAsFile`, storage.js:373) is the same
+`AntimatterDimensionsSavefileFormatAAB…EndOfSavefile` string, but the payload is
+a map of populated backup slots to full `player` objects, plus a reserved `time`
+key of timing metadata:
+
+```json
+{
+  "1": { …full player… },        // keyed by AutoBackupSlots id (1–8):
+  "2": { …full player… },        //   online 1/2/3/4, offline 5/6/7, reserve 8
+  "5": { …full player… },        // only populated slots are present
+  "8": { …full player… },
+  "time": { "1": { "backupTimer": …, "date": … }, … }
+}
+```
+
+`importBackupsFromFile` (storage.js:387) reverses it: skip `"time"`, treat every
+other key as a slot id whose value is a full `player`.
+
+**Implication (deferred — documented 2026-06-30, not yet implemented).** To
+support the Backup menu's *Export/Import as File*, the byte codec is unchanged,
+but we need a **dispatch layer above `decode_save`** that, after the pipeline,
+inspects the top-level JSON: a single player (`version`/`antimatter` at top) maps
+via `from_save_dto` as today; a bundle (numeric slot keys + `time`) yields the
+contained players (each is a full `player` → `from_save_dto`), carrying slot id +
+backup time. Proposed shape:
+
+```rust
+pub enum ImportedSave {
+    Single(GameState),
+    Backups(Vec<BackupSlotSave>), // { id, backup_timer, state }
+}
+pub fn decode_save_file(text: &str) -> Result<ImportedSave, SaveError>;
+```
+
+Writing a bundle (export) additionally needs a multi-slot/backup concept of our
+own to bundle, so it is tied to how `ad-gui` manages saves. **Open (deferred to
+the implementation phase):** scope (import-only vs symmetric) and how a bundle's
+multiple saves are surfaced on import (return all for the caller to choose vs
+auto-pick the newest by `backupTimer`).
 
 ## 3. The version / migration question
 
@@ -432,11 +487,39 @@ before any UI work.
     `crates/ad-core/src/save/encode.rs` (new), `crates/ad-core/src/save/mod.rs`
     (`pub use encode::encode_save`).
 
-- **Next up — phase 5:** Tauri commands (`export_save`/`import_save`,
-  `save_to_disk`/`load_from_disk`) + webview import/export modals in `ad-gui`,
-  swapping the `Mutex<GameState>` and returning a fresh `GameView` on import. The
-  engine codec (`decode_save`/`encode_save`) is ready to plug in; `ad-gui` already
-  enables `ad-core`'s `serde` feature.
+- **Phase 5 — UI shell built (visual only, NOT wired).** The **Saving** options
+  subtab and its modals now exist in `ad-gui` as faithful, vendored-CSS replicas
+  of the original — but nothing is connected to the codec yet. Built (top half
+  only; all Cloud-save UI deliberately omitted, as is the post-Reality Speedrun
+  row): `components/tabs/OptionsSavingTab.vue` (the button grid: Export/Import
+  save, RESET THE GAME, Save game, Choose save, autosave-interval slider,
+  Export/Import save as file, "Display time since save" toggle, Open Backup Menu,
+  Save file name input) plus four modals — `ImportSaveModal.vue`,
+  `HardResetModal.vue`, `LoadGameModal.vue`, `BackupWindowModal.vue` — opened via
+  `ui.openModal` ids `importSave`/`hardReset`/`loadGame`/`backup`. The tab is
+  wired into `config/tabs.js`; modals render from `App.vue`. **All buttons are
+  inert except the ones that open a modal**; the slider, file inputs, name input
+  and toggles hold local-only state. The save-slot/backup-slot contents are
+  static placeholders (empty/new-save state). Modal widths use `Modal.vue`'s
+  `fit-content` to match the originals.
+  - **Still to wire (next time):** the Tauri commands (`export_save`/`import_save`,
+    `save_to_disk`/`load_from_disk`) backed by the ready engine codec
+    (`decode_save`/`encode_save`), swapping the `Mutex<GameState>` and returning a
+    fresh `GameView` on import; real save slots / backup slots; autosave; "time
+    since last save"; the keyboard shortcuts. `ad-gui` already enables `ad-core`'s
+    `serde` feature.
+  - **WebKit gotcha hit while building this** — the vendored `.c-file-import` hack
+    (its giant invisible `::before`) overflows in the Tauri webview and both stole
+    clicks from a neighbouring button and inflated a modal's scroll height; fixed
+    by clipping each file-import button with `overflow: hidden`. See the ad-gui
+    `AGENTS.md` "Conventions" note.
+
+- **Deferred — backup-bundle file support (§2.4).** The Backup menu's
+  "Export/Import as File" uses the same `AAB` codec but bundles multiple `player`
+  objects in one file (`{ "<slotId>": player, …, "time": {…} }`). Documented in
+  §2.4; implementation (a `decode_save_file` dispatch layer over `decode_save`,
+  and whether we also *write* bundles) is left for the implementation/UI phase,
+  along with the import-pick decision.
 
 ## 10. Open decisions (RESOLVED)
 

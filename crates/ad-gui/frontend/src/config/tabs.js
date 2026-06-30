@@ -1,6 +1,7 @@
 import AntimatterDimensionsTab from "../components/tabs/AntimatterDimensionsTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
+import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
 import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
 import OptionsGameplayTab from "../components/tabs/OptionsGameplayTab.vue";
 
@@ -47,7 +48,7 @@ export const TABS = [
     key: "options",
     name: "Options",
     subtabs: [
-      { key: "saving", name: "Saving", symbol: "<i class='fas fa-save'></i>", component: null },
+      { key: "saving", name: "Saving", symbol: "<i class='fas fa-save'></i>", component: OptionsSavingTab },
       { key: "visual", name: "Visual", symbol: "<i class='fas fa-palette'></i>", component: OptionsVisualTab },
       { key: "gameplay", name: "Gameplay", symbol: "<i class='fas fa-wrench'></i>", component: OptionsGameplayTab },
     ],

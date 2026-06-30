@@ -10,7 +10,8 @@ export const useUiStore = defineStore("ui", {
     currentTabKey: "dimensions",
     // Remembers the last-open subtab per tab: { [tabKey]: subtabKey }.
     currentSubtabKey: {},
-    // Which popup is open, if any: "help" | "info" | "credits" | "hotkeys"
+    // Which popup is open, if any: "help" | "info" | "credits" | "hotkeys" |
+    // "notation" | "importSave" | "hardReset" | "loadGame" | "backup"
     // (null = none). Centralised here so both InfoButtons and the keyboard
     // shortcuts (?, H) drive the same state; only one modal is open at once.
     openModal: null,
