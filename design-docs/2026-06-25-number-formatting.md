@@ -198,6 +198,72 @@ holds: the **caller** computes the threshold and bakes it in; `ad-format` only c
 is the right default for Python/notebook use. The router checks it in the big-number
 branch, mirroring where JS calls `Settings.isInfinite`.
 
+## The full notation catalogue (and port priority)
+
+> Source: `src/core/notations.js` (the registry) and the `@antimatter-dimensions/notations`
+> package (`dist/ad-notations.esm.js`). The default notation is **Mixed scientific**
+> (`Notations.find` falls back to it).
+
+The original game ships **22** notations. The registry wraps some of them in a
+`painful()` helper (`notations.js:13`) which sets `isPainful = true`; the options UI
+shows a "this notation is impractical" confirmation before switching to one. **That flag
+is the game's own novelty-vs-practical signal**, and it lines up almost exactly with what
+is worth porting.
+
+### All 22 notations
+
+| # | Name | Painful? | What it does | Example (≈1.0e9) |
+|---|---|:---:|---|---|
+| 1 | **Scientific** | no | mantissa × 10ᵉ, exponent step 1 | `1.00e9` |
+| 2 | **Engineering** | no | scientific, exponent forced to multiples of 3 | `1.00e9` |
+| 3 | **Letters** | no | engineering mantissa + exponent/3 transcribed to a base-26 `a…z` suffix | `1.00 B`-ish |
+| 4 | **Standard** | yes | SI-style `K/M/B/T/Qa…` prefix names keyed off the exponent | `1.00 B` |
+| 5 | **Emoji** | yes | digits replaced by AD's antimatter-themed emoji | 🌌-glyphs |
+| 6 | **Mixed scientific** *(default)* | no | Standard below 1e33, Scientific above | `1.00 B` → `1.00e33` |
+| 7 | **Mixed engineering** | no | Standard below 1e33, Engineering above | `1.00 B` → `1.00e33` |
+| 8 | **Logarithm** | no | plain log₁₀ of the value | `e9.0000` |
+| 9 | **Brackets** | yes | base-8 encoded with `()[]{}<>` glyphs | `[({` … |
+| 10 | **Infinity** | no | counts the value in "∞" units (log relative to MAX_VALUE) | `1.00∞` |
+| 11 | **Roman** | yes | Roman numerals (overflows to repeated bars/`Infinitus`) | `M̄…` |
+| 12 | **Dots** | yes | base-254 packed into braille dot glyphs | `⠝⡙` … |
+| 13 | **Zalgo** | yes | corrupted/glitch combining-character text | `Z̸a̵l̶` … |
+| 14 | **Hex** | yes | the raw value encoded as a base-16 colored grid | `0xA…` |
+| 15 | **Imperial** | yes | value expressed as a volume in imperial units (minims→gallons→…) | `3 gallons…` |
+| 16 | **Clock** | yes | value rendered as time using 🕛 clock-face emoji + calendar | 🕒🕘 … |
+| 17 | **Prime** | yes | prime factorisation with superscript exponents | `2⁹·3²…` |
+| 18 | **Bar** | yes | base-8 packed into Unicode bar-fill glyphs | `▁▅▇` … |
+| 19 | **Shi** | yes | base-26 transcribed into Chinese characters (`世使侍…`) | `世使` … |
+| 20 | **Blind** | yes | renders nothing (all whitespace) — a joke | (blank) |
+| 21 | **Blobs** | yes | base-N packed into Discord "blob" emoji | blob-glyphs |
+| 22 | **ALL** | yes | cycles/mixes every other notation at random — a joke | (varies) |
+
+### Port-priority recommendation
+
+The split is clean: the **7 non-painful notations are the practical ones**; the 15
+painful ones are novelty/cosmetic. Recommended tiers:
+
+- **Tier 1 — done (M1).** Scientific, Engineering, Standard, Letters. (Standard is flagged
+  painful only because the prefix names get unwieldy at the top end, but it is a normal,
+  readable numeric notation and a building block for the Mixed pair — porting it first was
+  correct.)
+- **Tier 2 — worth porting; finish the "practical" set.** **Mixed scientific** (the game
+  **default** — and currently `ad-gui` defaults to Standard, so this is the highest-value
+  gap), **Mixed engineering**, **Logarithm**, and **Infinity**. Mixed scientific/engineering
+  are almost free once Standard + Scientific/Engineering exist (they just switch strategy at
+  an exponent threshold). Logarithm and Infinity are small, self-contained, and genuinely
+  useful for very large numbers.
+- **Tier 3 — novelty; skip unless we want bit-for-bit parity.** The 11 remaining painful
+  glyph/joke notations (Emoji, Brackets, Roman, Dots, Zalgo, Hex, Imperial, Clock, Prime,
+  Bar, Shi, Blind, Blobs, ALL). None carry numeric information a player would actually read
+  by; several are deliberate jokes (Blind renders blank, ALL is random). They each pull in
+  large glyph tables and bespoke encodings for zero practical benefit. Port them only if/when
+  we want a 100%-faithful options screen, and only after everything else is done. **Hex** is
+  the one borderline case (it is a faithful, if unreadable, base-16 view) but it is still
+  painful and low-value.
+
+Net: a **Tier 1 + Tier 2 = 8 notations** covers every notation a player would realistically
+use, including the default. Treat the other 14 as optional cosmetic parity, not roadmap.
+
 ## Implementation plan — `ad-format` M1
 
 Scope: a standalone, pure crate implementing the routing pipeline above plus the four
@@ -317,7 +383,10 @@ roughly in priority order:
    `Num` lives in `ad-gui`, not `ad-format`.
 5. **More notations.** Add the remaining strategies incrementally (Mixed first, since
    it reuses Scientific/Engineering + Standard); each is a new `NotationStrategy` impl
-   plus a `Notation` enum variant and reference tests.
+   plus a `Notation` enum variant and reference tests. See **The full notation catalogue
+   (and port priority)** above for the recommended scope: finish the Tier 2 set (Mixed
+   scientific — the game default! — Mixed engineering, Logarithm, Infinity) and treat the
+   ~14 painful glyph/joke notations as optional cosmetic parity.
 
 Implementation notes for whoever resumes:
 
