@@ -7,6 +7,8 @@ pub mod galaxy;
 pub mod observed;
 pub mod options;
 pub mod sacrifice;
+#[cfg(feature = "serde")]
+pub mod save;
 pub mod state;
 pub mod tick;
 pub mod tickspeed;

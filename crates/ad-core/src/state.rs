@@ -58,6 +58,20 @@ impl TickspeedState {
             cost_multiplier: Decimal::from_float(TICKSPEED_COST_MULTIPLIER),
         }
     }
+
+    /// Rebuilds tickspeed state for a given purchased count, recomputing the
+    /// next-purchase cost from our cost formula. The original save stores only
+    /// the purchase count (`player.totalTickBought`), never the cost — it is
+    /// derived — so on load we recompute it here rather than trusting a saved
+    /// value. Matches the geometric accumulation in [`GameState::buy_tickspeed`]
+    /// (`cost = base * multiplier^bought`).
+    pub fn with_bought(bought: u64) -> Self {
+        let mut state = Self::new();
+        state.bought = bought;
+        state.cost = Decimal::from_float(TICKSPEED_BASE_COST)
+            * state.cost_multiplier.pow(&Decimal::from(bought));
+        state
+    }
 }
 
 /// Full game state for pre-infinity gameplay.

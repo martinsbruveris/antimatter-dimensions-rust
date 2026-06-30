@@ -6,8 +6,11 @@ version = 4
 name = "ad-core"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "break_infinity",
+ "flate2",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

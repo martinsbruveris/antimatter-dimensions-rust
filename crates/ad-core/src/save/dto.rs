@@ -1,0 +1,544 @@
+//! Serde DTOs mirroring the original `player` save schema, for the **read path**.
+//!
+//! These structs deliberately match the *save's* JSON layout (nested,
+//! camelCased) rather than our internal [`GameState`]. We only declare the
+//! fields we actually model; serde ignores every other key in the save, which is
+//! exactly the "ignore unimplemented mechanics" behaviour we want — a late-game
+//! save deserializes fine and we read just the early-game slice we understand.
+//!
+//! The fields we *do* model are **required**: there are no serde defaults, so a
+//! missing one fails deserialization rather than being silently replaced. We
+//! would rather be alerted that the external format changed than quietly diverge.
+//! (Ignoring *unknown* keys is a separate behaviour that still applies — that's
+//! how we drop mechanics we don't model.) Every `Decimal` is a JSON string, read
+//! through [`break_infinity::serde_string`].
+//!
+//! [`PlayerDTO`] is the untrusted external shape; [`GameState::from_save_dto`]
+//! is where we map it in, rebuild derived state (tickspeed cost, autobuyer
+//! intervals/timers) from our own constructors, and validate the modelled
+//! values — erroring on anything out of range or the wrong shape — so a
+//! malformed save is rejected rather than silently coerced. The one intentional
+//! leniency is an unmodelled notation name (we implement only a subset of the
+//! game's notations), which is ignored, keeping our default.
+
+use break_infinity::Decimal;
+use serde::Deserialize;
+
+use crate::autobuyers::{AutobuyerMode, AutobuyerState};
+use crate::options::{
+    Options, MAX_NOTATION_DIGITS, MAX_UPDATE_RATE_MS, MIN_NOTATION_DIGITS,
+    MIN_UPDATE_RATE_MS,
+};
+use crate::state::{DimensionTier, GameState, TickspeedState};
+
+use super::SaveError;
+
+/// The original `AUTOBUYER_MODE` values we accept; any other value in a save is
+/// rejected as malformed (see [`autobuyer_mode_from_raw`]).
+const AUTOBUYER_MODE_BUY_SINGLE: i64 = 1;
+const AUTOBUYER_MODE_BUY_10: i64 = 10;
+
+/// The fixed number of antimatter dimension tiers (and their autobuyers).
+const DIMENSION_COUNT: usize = 8;
+
+/// Top-level `player` object (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerDTO {
+    #[serde(with = "break_infinity::serde_string")]
+    pub antimatter: Decimal,
+    pub dimensions: DimensionsDTO,
+    #[serde(with = "break_infinity::serde_string")]
+    pub sacrificed: Decimal,
+    pub dimension_boosts: u32,
+    pub galaxies: u32,
+    pub total_tick_bought: u64,
+    /// `player.break` — break-infinity flag. `break` is a Rust keyword, hence the
+    /// rename. Part of the Infinity-unlocked test (§4.3).
+    #[serde(rename = "break")]
+    pub break_unlocked: bool,
+    #[serde(with = "break_infinity::serde_string")]
+    pub infinities: Decimal,
+    #[serde(with = "break_infinity::serde_string")]
+    pub infinity_points: Decimal,
+    pub records: RecordsDTO,
+    pub auto: AutoDTO,
+    pub options: OptionsDTO,
+}
+
+/// `player.dimensions` — only the `antimatter` array is modelled.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DimensionsDTO {
+    pub antimatter: Vec<DimensionDTO>,
+}
+
+/// One entry of `player.dimensions.antimatter[]`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DimensionDTO {
+    #[serde(with = "break_infinity::serde_string")]
+    pub amount: Decimal,
+    pub bought: u64,
+    // `costBumps` exists in the save but is always 0 at our frontier; ignored.
+}
+
+/// `player.records` — only the all-time antimatter total is modelled.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordsDTO {
+    #[serde(with = "break_infinity::serde_string")]
+    pub total_antimatter: Decimal,
+}
+
+/// `player.auto` — autobuyer state (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoDTO {
+    pub autobuyers_on: bool,
+    pub antimatter_dims: AntimatterDimsDTO,
+    pub tickspeed: AutobuyerDTO,
+}
+
+/// `player.auto.antimatterDims` — the `all` array holds the 8 tier autobuyers.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AntimatterDimsDTO {
+    pub all: Vec<AutobuyerDTO>,
+}
+
+/// A single autobuyer entry (`auto.antimatterDims.all[t]` or `auto.tickspeed`).
+///
+/// We read only `isActive`/`isBought`/`mode`. The save's other fields are
+/// intentionally ignored: `interval` and `bulk` are only ever changed by
+/// Infinity-era upgrades we don't model, so we use our fixed constructor
+/// defaults instead of the saved values; `lastTick` is transient timer phase
+/// (an absolute timestamp in the original; an elapsed-time accumulator for us)
+/// which we just reset to 0 on load.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutobuyerDTO {
+    pub is_active: bool,
+    pub is_bought: bool,
+    /// Original `AUTOBUYER_MODE` (`1` = single, `10` = buy-10/max).
+    pub mode: i64,
+}
+
+/// `player.options` — UI/UX preferences (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OptionsDTO {
+    pub hotkeys: bool,
+    pub update_rate: u32,
+    pub notation: String,
+    pub notation_digits: NotationDigitsDTO,
+}
+
+/// `player.options.notationDigits`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NotationDigitsDTO {
+    pub comma: u32,
+    pub notation: u32,
+}
+
+impl GameState {
+    /// Maps a decoded save DTO into a fresh [`GameState`].
+    ///
+    /// The DTO's modelled fields are required, so a missing one has already
+    /// failed deserialization before we get here. This method additionally
+    /// validates the shape/values and returns a [`SaveError`] rather than
+    /// silently guessing when something is off:
+    /// - [`UnexpectedArrayLength`](SaveError::UnexpectedArrayLength) if the
+    ///   dimension or dimension-autobuyer arrays aren't exactly 8 long;
+    /// - [`InvalidAutobuyerMode`](SaveError::InvalidAutobuyerMode) for an
+    ///   unrecognized autobuyer mode;
+    /// - [`OptionOutOfRange`](SaveError::OptionOutOfRange) for a numeric option
+    ///   outside its accepted range.
+    ///
+    /// Everything past our frontier is left at its constructor default (a
+    /// late-game save loads as "fresh early-game run, Infinity unlocked"). The
+    /// derived tickspeed cost is recomputed from our formula and autobuyer
+    /// intervals/timers come from our constructors. The single intentional
+    /// leniency is an unmodelled notation name, which is ignored (we model only
+    /// a subset), keeping our default.
+    pub fn from_save_dto(dto: &PlayerDTO) -> Result<GameState, SaveError> {
+        // The 8 antimatter dimensions are a fixed-length array; a different
+        // length signals an unexpected save format.
+        let dims = &dto.dimensions.antimatter;
+        if dims.len() != DIMENSION_COUNT {
+            return Err(SaveError::UnexpectedArrayLength {
+                field: "dimensions.antimatter",
+                expected: DIMENSION_COUNT,
+                found: dims.len(),
+            });
+        }
+        let dimensions = std::array::from_fn(|tier| DimensionTier {
+            amount: dims[tier].amount,
+            bought: dims[tier].bought,
+        });
+
+        // §4.3: Infinity is unlocked once `break` is set or any infinity / IP has
+        // ever been gained. We reset everything past the frontier, so this only
+        // carries the unlock flag, not late-game progress.
+        let infinity_unlocked = dto.break_unlocked
+            || dto.infinities > Decimal::ZERO
+            || dto.infinity_points > Decimal::ZERO;
+
+        // The per-tier autobuyer array is fixed-length for the same reason.
+        let ad_autobuyers = &dto.auto.antimatter_dims.all;
+        if ad_autobuyers.len() != DIMENSION_COUNT {
+            return Err(SaveError::UnexpectedArrayLength {
+                field: "auto.antimatterDims.all",
+                expected: DIMENSION_COUNT,
+                found: ad_autobuyers.len(),
+            });
+        }
+        // Rebuild autobuyers from defaults (fixed intervals, zeroed timers) and
+        // overlay only the saved active/bought/mode flags (§4.4).
+        let mut autobuyers = AutobuyerState::new();
+        autobuyers.enabled = dto.auto.autobuyers_on;
+        for (tier, ab) in autobuyers.dimensions.iter_mut().enumerate() {
+            let src = &ad_autobuyers[tier];
+            ab.is_active = src.is_active;
+            ab.is_bought = src.is_bought;
+            ab.mode = autobuyer_mode_from_raw(src.mode)?;
+        }
+        // The tickspeed autobuyer's mode is locked to single pre-Infinity for us,
+        // so only its active/bought flags are taken from the save.
+        autobuyers.tickspeed.is_active = dto.auto.tickspeed.is_active;
+        autobuyers.tickspeed.is_bought = dto.auto.tickspeed.is_bought;
+
+        // Options: numeric values must be in range — we reject rather than clamp.
+        // Notation is the one intentional exception: a name we don't model (the
+        // game default "Mixed scientific" included) is ignored, keeping our
+        // default, since we implement only a subset of notations.
+        let mut options = Options::new();
+        options.hotkeys = dto.options.hotkeys;
+        options.set_update_rate(check_range(
+            "options.updateRate",
+            dto.options.update_rate,
+            MIN_UPDATE_RATE_MS,
+            MAX_UPDATE_RATE_MS,
+        )?);
+        options.set_notation(&dto.options.notation);
+        let comma = check_range(
+            "options.notationDigits.comma",
+            dto.options.notation_digits.comma,
+            MIN_NOTATION_DIGITS,
+            MAX_NOTATION_DIGITS,
+        )?;
+        let notation = check_range(
+            "options.notationDigits.notation",
+            dto.options.notation_digits.notation,
+            MIN_NOTATION_DIGITS,
+            MAX_NOTATION_DIGITS,
+        )?;
+        options.set_notation_digits(comma, notation);
+
+        Ok(GameState {
+            antimatter: dto.antimatter,
+            total_antimatter: dto.records.total_antimatter,
+            dimensions,
+            tickspeed: TickspeedState::with_bought(dto.total_tick_bought),
+            dim_boosts: dto.dimension_boosts,
+            galaxies: dto.galaxies,
+            sacrificed: dto.sacrificed,
+            infinity_unlocked,
+            autobuyers,
+            options,
+        })
+    }
+}
+
+/// Maps the original numeric `AUTOBUYER_MODE` to ours: `1` (BUY_SINGLE) →
+/// `BuySingle`, `10` (BUY_10) → `BuyMax`. Any other value indicates a malformed
+/// or unsupported save and is rejected with [`SaveError::InvalidAutobuyerMode`].
+fn autobuyer_mode_from_raw(mode: i64) -> Result<AutobuyerMode, SaveError> {
+    match mode {
+        AUTOBUYER_MODE_BUY_SINGLE => Ok(AutobuyerMode::BuySingle),
+        AUTOBUYER_MODE_BUY_10 => Ok(AutobuyerMode::BuyMax),
+        other => Err(SaveError::InvalidAutobuyerMode(other)),
+    }
+}
+
+/// Validates that a modelled numeric option lies within its accepted range,
+/// returning [`SaveError::OptionOutOfRange`] (rather than clamping) if not.
+fn check_range(
+    field: &'static str,
+    value: u32,
+    min: u32,
+    max: u32,
+) -> Result<u32, SaveError> {
+    if (min..=max).contains(&value) {
+        Ok(value)
+    } else {
+        Err(SaveError::OptionOutOfRange {
+            field,
+            value,
+            min,
+            max,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use serde_json::json;
+
+    use super::*;
+    use crate::options::{
+        DEFAULT_NOTATION, DEFAULT_NOTATION_DIGITS_COMMA,
+        DEFAULT_NOTATION_DIGITS_NOTATION, DEFAULT_UPDATE_RATE_MS,
+    };
+    use crate::save::{decode_pipeline, decode_save};
+
+    const INITIAL_SAVE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/ad_initial_save.txt"
+    ));
+    const SAMPLE_SAVE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/ad_sample_save.txt"
+    ));
+
+    fn dec(s: &str) -> Decimal {
+        Decimal::from_str(s).unwrap()
+    }
+
+    /// A complete, valid `player` JSON value (the fresh-start fixture) that tests
+    /// mutate to exercise individual fields. Starting from a real save keeps the
+    /// now-required fields present.
+    fn base_player() -> serde_json::Value {
+        let json = decode_pipeline(INITIAL_SAVE.trim()).unwrap();
+        serde_json::from_str(&json).unwrap()
+    }
+
+    /// Parses a `player` JSON value through the DTO and maps it to a `GameState`,
+    /// mirroring `decode_save` minus the byte pipeline.
+    fn load(player: serde_json::Value) -> Result<GameState, SaveError> {
+        let dto: PlayerDTO = serde_json::from_value(player)?;
+        GameState::from_save_dto(&dto)
+    }
+
+    #[test]
+    fn decodes_initial_save() {
+        let state = decode_save(INITIAL_SAVE.trim()).unwrap();
+
+        assert_eq!(state.antimatter, dec("10"));
+        assert_eq!(state.total_antimatter, dec("10"));
+        assert_eq!(state.dim_boosts, 0);
+        assert_eq!(state.galaxies, 0);
+        assert_eq!(state.tickspeed.bought, 0);
+        assert_eq!(state.sacrificed, Decimal::ZERO);
+        assert!(!state.infinity_unlocked);
+        assert!(state.dimensions.iter().all(|d| d.bought == 0));
+
+        // Autobuyers: globally on, none unlocked yet, dims default to buy-max.
+        assert!(state.autobuyers.enabled);
+        assert!(!state.autobuyers.dimensions[0].is_bought);
+        assert!(state.autobuyers.dimensions[0].is_active);
+        assert_eq!(state.autobuyers.dimensions[0].mode, AutobuyerMode::BuyMax);
+
+        // Options: defaults, and the save's "Mixed scientific" (which we don't
+        // model) is ignored, leaving our default notation.
+        assert!(state.options.hotkeys);
+        assert_eq!(state.options.update_rate, DEFAULT_UPDATE_RATE_MS);
+        assert_eq!(state.options.notation, DEFAULT_NOTATION);
+        assert_eq!(
+            state.options.notation_digits_comma,
+            DEFAULT_NOTATION_DIGITS_COMMA
+        );
+        assert_eq!(
+            state.options.notation_digits_notation,
+            DEFAULT_NOTATION_DIGITS_NOTATION
+        );
+    }
+
+    #[test]
+    fn decodes_sample_save() {
+        let state = decode_save(SAMPLE_SAVE.trim()).unwrap();
+
+        assert_eq!(state.antimatter, dec("16613773273375400000"));
+        assert_eq!(state.total_antimatter, dec("3.3579029107185e+134"));
+        assert_eq!(state.galaxies, 1);
+        assert_eq!(state.dim_boosts, 0);
+        assert_eq!(state.sacrificed, Decimal::ZERO);
+        assert!(!state.infinity_unlocked);
+
+        // Tickspeed: only the purchased count is stored; cost is recomputed.
+        assert_eq!(state.tickspeed.bought, 12);
+        assert_eq!(state.tickspeed.cost, TickspeedState::with_bought(12).cost);
+
+        // Dimension purchase counts and the first tier's fractional amount.
+        let bought: Vec<u64> = state.dimensions.iter().map(|d| d.bought).collect();
+        assert_eq!(bought, vec![50, 30, 20, 20, 0, 0, 0, 0]);
+        assert_eq!(state.dimensions[0].amount, dec("43777257640570.91"));
+
+        assert_eq!(state.options.notation, DEFAULT_NOTATION);
+        assert_eq!(state.options.update_rate, DEFAULT_UPDATE_RATE_MS);
+    }
+
+    #[test]
+    fn infinity_unlocked_from_break_or_progress() {
+        let mut by_break = base_player();
+        by_break["break"] = json!(true);
+        assert!(load(by_break).unwrap().infinity_unlocked);
+
+        let mut by_infinities = base_player();
+        by_infinities["infinities"] = json!("1");
+        assert!(load(by_infinities).unwrap().infinity_unlocked);
+
+        let mut by_ip = base_player();
+        by_ip["infinityPoints"] = json!("5.5e10");
+        assert!(load(by_ip).unwrap().infinity_unlocked);
+
+        // The fresh-start base has break=false, infinities="0", IP="0".
+        assert!(!load(base_player()).unwrap().infinity_unlocked);
+    }
+
+    #[test]
+    fn unknown_fields_are_ignored() {
+        // Unmodelled mechanics in the save must not prevent a load.
+        let mut player = base_player();
+        player["replicanti"] = json!("1e50");
+        player["celestials"] = json!({ "teresa": { "pouredAmount": 1 } });
+        player["someBrandNewField"] = json!(42);
+
+        let state = load(player).unwrap();
+        assert_eq!(state.antimatter, dec("10"));
+    }
+
+    #[test]
+    fn missing_modelled_field_errors() {
+        // Dropping a field we model must fail the load (surfacing a format change)
+        // rather than silently defaulting.
+        let mut player = base_player();
+        player.as_object_mut().unwrap().remove("antimatter");
+        assert!(matches!(load(player), Err(SaveError::Json(_))));
+
+        let mut player = base_player();
+        player["records"]
+            .as_object_mut()
+            .unwrap()
+            .remove("totalAntimatter");
+        assert!(matches!(load(player), Err(SaveError::Json(_))));
+    }
+
+    #[test]
+    fn wrong_array_length_errors() {
+        // A dimensions array that isn't exactly 8 long is an unexpected shape.
+        let mut player = base_player();
+        player["dimensions"]["antimatter"]
+            .as_array_mut()
+            .unwrap()
+            .truncate(7);
+        assert!(matches!(
+            load(player),
+            Err(SaveError::UnexpectedArrayLength {
+                field: "dimensions.antimatter",
+                expected: 8,
+                found: 7,
+            })
+        ));
+
+        // Likewise for the per-tier autobuyer array.
+        let mut player = base_player();
+        player["auto"]["antimatterDims"]["all"]
+            .as_array_mut()
+            .unwrap()
+            .pop();
+        assert!(matches!(
+            load(player),
+            Err(SaveError::UnexpectedArrayLength {
+                field: "auto.antimatterDims.all",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn valid_in_range_options_are_applied() {
+        let mut player = base_player();
+        player["options"]["hotkeys"] = json!(false);
+        player["options"]["updateRate"] = json!(100);
+        player["options"]["notation"] = json!("Engineering");
+        player["options"]["notationDigits"] = json!({ "comma": 4, "notation": 12 });
+
+        let state = load(player).unwrap();
+        assert!(!state.options.hotkeys);
+        assert_eq!(state.options.update_rate, 100);
+        assert_eq!(state.options.notation, "Engineering");
+        assert_eq!(state.options.notation_digits_comma, 4);
+        assert_eq!(state.options.notation_digits_notation, 12);
+    }
+
+    #[test]
+    fn out_of_range_options_error() {
+        let mut player = base_player();
+        player["options"]["updateRate"] = json!(99999);
+        assert!(matches!(
+            load(player),
+            Err(SaveError::OptionOutOfRange {
+                field: "options.updateRate",
+                ..
+            })
+        ));
+
+        let mut player = base_player();
+        player["options"]["notationDigits"]["notation"] = json!(99);
+        assert!(matches!(
+            load(player),
+            Err(SaveError::OptionOutOfRange { .. })
+        ));
+    }
+
+    #[test]
+    fn unsupported_notation_is_kept_lenient() {
+        // We model only a subset of notations, so an unknown name (here, and the
+        // game default "Mixed scientific") is ignored rather than failing the
+        // load — the one intentional leniency.
+        let mut player = base_player();
+        player["options"]["notation"] = json!("Totally Made Up Notation");
+        assert_eq!(load(player).unwrap().options.notation, DEFAULT_NOTATION);
+    }
+
+    #[test]
+    fn autobuyer_mode_and_flags_mapped() {
+        let mut player = base_player();
+        player["auto"]["autobuyersOn"] = json!(false);
+        let tier0 = &mut player["auto"]["antimatterDims"]["all"][0];
+        tier0["isActive"] = json!(false);
+        tier0["isBought"] = json!(true);
+        tier0["mode"] = json!(1);
+        player["auto"]["tickspeed"]["isBought"] = json!(true);
+        player["auto"]["tickspeed"]["mode"] = json!(10);
+
+        let state = load(player).unwrap();
+
+        assert!(!state.autobuyers.enabled);
+        // Tier 0 overlaid from the save: single-buy, bought, inactive.
+        assert_eq!(
+            state.autobuyers.dimensions[0].mode,
+            AutobuyerMode::BuySingle
+        );
+        assert!(state.autobuyers.dimensions[0].is_bought);
+        assert!(!state.autobuyers.dimensions[0].is_active);
+        // Tier 1 keeps the base save's values (buy-max, not yet unlocked).
+        assert_eq!(state.autobuyers.dimensions[1].mode, AutobuyerMode::BuyMax);
+        assert!(!state.autobuyers.dimensions[1].is_bought);
+        assert!(state.autobuyers.dimensions[1].is_active);
+        // Tickspeed flags taken from save, but mode stays locked to single.
+        assert!(state.autobuyers.tickspeed.is_bought);
+        assert_eq!(state.autobuyers.tickspeed.mode, AutobuyerMode::BuySingle);
+    }
+
+    #[test]
+    fn rejects_invalid_autobuyer_mode() {
+        // A dimension autobuyer `mode` that is neither 1 nor 10 is malformed.
+        let mut player = base_player();
+        player["auto"]["antimatterDims"]["all"][0]["mode"] = json!(7);
+        match load(player) {
+            Err(SaveError::InvalidAutobuyerMode(7)) => {}
+            other => panic!("expected InvalidAutobuyerMode(7), got {other:?}"),
+        }
+    }
+}

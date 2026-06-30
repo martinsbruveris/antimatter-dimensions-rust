@@ -163,22 +163,34 @@ layout deliberately differs from the `player` schema (e.g. flat `dimensions:
 [DimensionTier; 8]` vs nested `dimensions.antimatter[]`, derived tickspeed cost,
 different option field names/casing). Instead add a dedicated **save module**
 (proposed `ad-core::save`) with serde DTO structs that mirror the `player`
-schema for *only the fields we read*, each annotated `#[serde(default)]` so any
-missing or extra field is ignored. `serde` on a struct already ignores unknown
+schema for *only the fields we read*. `serde` on a struct already ignores unknown
 keys by default, which is exactly the "ignore unimplemented mechanics" behavior
-we want for req. (1). A late-game save deserializes fine; we read the handful of
+we want for req. (1): a late-game save deserializes fine; we read the handful of
 fields we understand and drop the rest.
+
+**Strict on what we model (decided 2026-06-30).** The fields we *do* declare are
+**required** — no `#[serde(default)]` — so a missing modelled field fails the
+load (serde "missing field") rather than being silently replaced by a default.
+The goal is to be *alerted* that the external format changed rather than quietly
+diverge. This is orthogonal to ignoring unknown keys (which still happens). The
+same strictness applies in `from_save_dto` validation (below).
 
 The DTO uses a `Decimal`-as-string newtype/helper (a `deserialize_with` that
 calls `Decimal::from_str`) so the string format from §2.2 is honored.
 
-`GameState::from_save_dto(dto) -> GameState`:
+`GameState::from_save_dto(dto) -> Result<GameState, SaveError>`:
 
 - copy mapped scalar/Decimal fields;
 - rebuild derived state (tickspeed cost, autobuyer timers/intervals) from our own
   constructors so it's internally consistent;
-- clamp / validate (e.g. options through the existing `set_*` clamps), so a
-  hostile or out-of-range external value can't put us in an invalid state;
+- **validate strictly, erroring (not clamping/guessing)** on anything off:
+  out-of-range numeric options (`SaveError::OptionOutOfRange`), an unexpected
+  fixed-array length (`UnexpectedArrayLength`), or an unrecognized autobuyer mode
+  (`InvalidAutobuyerMode`);
+- **one intentional leniency:** an unmodelled `options.notation` name (we
+  implement only a subset of the game's notations, and the game default
+  "Mixed scientific" is one we don't model) is ignored, keeping our default —
+  erroring there would reject almost every real save;
 - everything we don't model is simply never read.
 
 ### 4.3 `infinity_unlocked`
@@ -265,7 +277,10 @@ persistence. Proposed additions:
   leave untouched; never emit a literal JS `Infinity` ourselves.
 - Sets serialized as arrays: only via the template's empty `[]`s for now.
 - Template/version drift (§3): pin and document the source game build.
-- Out-of-range or malicious external values: validate/clamp on import.
+- Out-of-range or malicious external values: validated on import and **rejected
+  with an error** (not clamped/guessed), so an unexpected value or format change
+  is surfaced rather than silently absorbed. The lone exception is an unmodelled
+  notation name, which is ignored (see §4.2).
 - Tickspeed cost & autobuyer intervals are derived — recompute on load, don't
   trust saved values.
 
@@ -287,9 +302,9 @@ persistence. Proposed additions:
 ## 9. Suggested phasing
 
 1. **[DONE]** `Decimal` string (de)serialization helpers + tests.
-2. Encode/decode *pipeline* (steps 1–7) with fixture tests, JSON ⇄ string only.
-3. Read path: DTO + `from_save_dto`, decode an external save into `GameState`.
-4. Write path: vendored template + overlay + `encode_save`.
+2. **[DONE]** Encode/decode *pipeline* (steps 1–7) with fixture tests, JSON ⇄ string only.
+3. **[DONE]** Read path: DTO + `from_save_dto`, decode an external save into `GameState`.
+4. **[DONE]** Write path: vendored template + overlay + `encode_save`.
 5. Tauri commands + webview import/export modals.
 6. Autosave, on-disk persistence, "time since last save", keyboard shortcuts.
 
@@ -318,9 +333,110 @@ before any UI work.
     feature-gated, so a plain `cargo test` skips them; the whole-workspace
     command is `cargo test --workspace --all-features`).
 
-- **Next up — phase 2:** the encode/decode pipeline (§2.1 / §4.1), JSON ⇄ save
-  string only, with the real external save in `ad_initial_save.txt` as a decode
-  fixture.
+- **Phase 2 — done.** Added the `ad-core::save` module (gated behind the crate's
+  `serde` feature, per §6), with a `codec` submodule porting
+  `serializer.js`/`GameSaveSerializer` for the `AAB` format:
+  `encode_pipeline(json: &str) -> String` and
+  `decode_pipeline(save: &str) -> Result<String, SaveError>`. Pure/deterministic,
+  no IO, JSON-string ⇄ save-string only. The `Infinity`/`Set`/`Decimal`-string
+  conventions are deliberately left to the DTO layer (phases 3–4). Uses `flate2`
+  (zlib) and `base64` as optional deps pulled in by the `serde` feature.
+  `SaveError` covers `UnrecognizedFormat` (no magic prefix → legacy/garbage,
+  rejected per §10), base64, inflate, and UTF-8 failures.
+  - Two real saves serve as fixtures (decoded & asserted in tests), under
+    `crates/ad-core/tests/fixtures/`: `ad_initial_save.txt` (fresh start) and
+    `ad_sample_save.txt` (mid-game, pre-Big-Crunch).
+  - Tests (6): decode each real fixture and assert mapped fields; JSON round-trip;
+    encoded-string well-formedness (prefix/suffix present, no raw `+`/`/`/`=` in
+    the body); both real fixtures survive decode→re-encode→decode; rejection of
+    non-AD / legacy strings.
+  - Cross-checked the **write** direction out-of-band: the original game's own
+    `pako.inflate` successfully decompresses our `encode_pipeline` output (zlib
+    bytes differ from pako's, but the stream is standard zlib so the real game
+    accepts it). The full §8.3 paste-into-game acceptance waits on phase 4's
+    template-based complete save.
+  - Files: `crates/ad-core/src/save/mod.rs` (module + `SaveError`),
+    `crates/ad-core/src/save/codec.rs` (pipeline + tests),
+    `crates/ad-core/src/lib.rs` (gated `pub mod save`),
+    `crates/ad-core/Cargo.toml` (`flate2`/`base64` optional deps via `serde`
+    feature; `serde_json` dev-dep).
+
+- **Phase 3 — done** (read path; made **strict on load** 2026-06-30, see §4.2):
+  - `save/dto.rs` — `Deserialize`-only serde DTOs mirroring the `player` schema
+    for the modelled subset only (`PlayerDTO` + `DimensionsDTO`/`DimensionDTO`,
+    `RecordsDTO`, `AutoDTO`/`AntimatterDimsDTO`/`AutobuyerDTO`,
+    `OptionsDTO`/`NotationDigitsDTO`), `#[serde(rename_all="camelCase")]`.
+    **No serde defaults:** the fields we model are required, so a missing one is a
+    load error (surfacing a format change) rather than a silent default; unknown
+    keys are still ignored. Every `Decimal` is read as a string via
+    `break_infinity::serde_string`; `break` via `#[serde(rename="break")]`.
+  - `GameState::from_save_dto(&PlayerDTO) -> Result<GameState, SaveError>` —
+    copies the mapped fields; rebuilds derived state from our own constructors
+    rather than trusting the save (`TickspeedState::with_bought(totalTickBought)`
+    recomputes the unsaved tickspeed cost; autobuyer intervals/timers come from
+    `AutobuyerState::new()`, only the `isActive`/`isBought`/`mode` flags overlaid);
+    computes `infinity_unlocked = break || infinities > 0 || infinityPoints > 0`
+    (§4.3); locks the tickspeed autobuyer to single-buy regardless of saved mode
+    (§4.4). **Strict validation, erroring rather than guessing:** autobuyer mode
+    must be `1`→`BuySingle` / `10`→`BuyMax` (else `InvalidAutobuyerMode`); the
+    dimension and dimension-autobuyer arrays must be exactly length 8 (else
+    `UnexpectedArrayLength`); numeric options must be in range (else
+    `OptionOutOfRange`). **Sole leniency:** an unmodelled `options.notation` (incl.
+    the game default "Mixed scientific") is ignored, keeping our default.
+  - `save::decode_save(&str) -> Result<GameState, SaveError>` ties it together
+    (`decode_pipeline` → `serde_json` → `from_save_dto`). `SaveError` gained
+    `Json`, `InvalidAutobuyerMode(i64)`, `OptionOutOfRange { field, value, min,
+    max }`, and `UnexpectedArrayLength { field, expected, found }`.
+  - `TickspeedState::with_bought` added in `state.rs`.
+  - `serde_json` moved from a dev-dependency to an optional dependency pulled in
+    by the `serde` feature (now needed at runtime by `decode_save`).
+  - Tests (11): decode both real fixtures and assert mapped fields; `infinity_unlocked`
+    from each of `break`/`infinities`/`infinityPoints`; unknown-field tolerance;
+    **missing modelled field errors**; **wrong array length errors**; in-range
+    options applied vs **out-of-range options error**; unmodelled notation kept
+    lenient; autobuyer mode/flag mapping and **invalid mode errors**. Targeted
+    tests mutate the real fixture JSON (now that partial objects no longer parse).
+  - Files: `crates/ad-core/src/save/dto.rs` (new),
+    `crates/ad-core/src/save/mod.rs` (`decode_save`, the `SaveError` variants),
+    `crates/ad-core/src/state.rs` (`TickspeedState::with_bought`),
+    `crates/ad-core/Cargo.toml` (`serde_json` optional dep).
+
+- **Phase 4 — done.** Added the write path in `ad-core::save`:
+  - `save/default_player.json` — the vendored `defaultStart` template: a complete,
+    valid fresh-start `player` (67 keys, `version: 25`, all empty `Set`s as `[]`,
+    full `options`/`auto`/`records` trees) decoded from
+    `tests/fixtures/ad_initial_save.txt`. Regenerated manually per §10 (decode a
+    fresh save, overwrite the file).
+  - `save/encode.rs` — `encode_save(&GameState, now_ms: i64) -> String`. Parses a
+    fresh copy of the template into a `serde_json::Value`, overlays only our
+    modelled fields **in place** (never removing keys, so the object stays
+    complete): `antimatter`, `records.totalAntimatter`, `sacrificed`,
+    `dimensionBoosts`, `galaxies`, `totalTickBought`, `break` (the §4.3-inverse of
+    `infinity_unlocked`), each `dimensions.antimatter[t].{amount,bought}`, the
+    `options.*` subtree, and the `auto.*` flags/modes — then runs `encode_pipeline`.
+    Decimals are written as JSON strings (`Decimal::Display`); `AutobuyerMode` maps
+    back to the numeric `AUTOBUYER_MODE` (`BuyMax`→10, `BuySingle`→1); autobuyer
+    intervals/timers are left at the template's derived values (§4.4); `lastUpdate`
+    is stamped with the caller-supplied `now_ms` so import computes ~0 offline
+    progress (engine stays clock-free).
+  - Tests (4): template completeness/validity; produced save decodes back to a
+    complete `player` with our fields + timestamp; full `decode → encode → decode`
+    round-trip reproduces every modelled field for both fixtures; mutated-state
+    changes survive the round-trip (incl. `break` reflecting `infinity_unlocked`).
+  - **Acceptance (§8.3) cross-checked out-of-band:** emitted a real `encode_save`
+    output from Rust and decoded it with the **original game's own** `decodeText` +
+    `JSON.parse` — accepted, `version: 25` (no migrations), all 67 keys present,
+    overlaid fields intact, `lastUpdate` stamped. The write path is wire-compatible
+    with the real game (a manual paste-into-game remains the ultimate confirmation).
+  - Files: `crates/ad-core/src/save/default_player.json` (new template),
+    `crates/ad-core/src/save/encode.rs` (new), `crates/ad-core/src/save/mod.rs`
+    (`pub use encode::encode_save`).
+
+- **Next up — phase 5:** Tauri commands (`export_save`/`import_save`,
+  `save_to_disk`/`load_from_disk`) + webview import/export modals in `ad-gui`,
+  swapping the `Mutex<GameState>` and returning a fresh `GameView` on import. The
+  engine codec (`decode_save`/`encode_save`) is ready to plug in; `ad-gui` already
+  enables `ad-core`'s `serde` feature.
 
 ## 10. Open decisions (RESOLVED)
 
@@ -332,8 +448,8 @@ All three resolved by the user (2026-06-29):
 - **Template source:** AD is not under active development and the save format is
   stable, so regenerating the `defaultStart` template is kept a **manual
   process**. An initial real save captured from the browser game is checked in
-  at `ad_initial_save.txt` (repo root) for use as a decode fixture / template
-  source.
+  at `crates/ad-core/tests/fixtures/ad_initial_save.txt` for use as a decode
+  fixture / template source.
 - **Legacy saves:** **reject** pre-`AAB` (pre-Reality) saves. Only the latest
   format (`AAB`) needs to be supported, in both directions. The `atob`-only
   legacy decode path is out of scope.

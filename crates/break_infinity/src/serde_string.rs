@@ -4,7 +4,7 @@
 //!
 //! This is what Antimatter Dimensions saves use: every `Decimal` is stored as a
 //! plain JSON string (`"1000"`, `"1e+100"`, `"5e-8"`, `"Infinity"`). The save
-//! layer routes its DTO (Data Transfer Object) fields through these helpers; the 
+//! layer routes its DTO (Data Transfer Object) fields through these helpers; the
 //! type's derived serde impls are left untouched for our own internal serialization.
 //!
 //! Usage:
@@ -75,7 +75,10 @@ impl Visitor<'_> for DecimalStrVisitor {
 pub mod option {
     use super::*;
 
-    pub fn serialize<S>(value: &Option<Decimal>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(
+        value: &Option<Decimal>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -153,7 +156,10 @@ mod tests {
             (r#"{"value":"1000"}"#, Decimal::from_float(1000.0)),
             (r#"{"value":"0"}"#, Decimal::ZERO),
             // Scientific branch.
-            (r#"{"value":"1.0000000000000000e+100"}"#, Decimal::new(1.0, 100)),
+            (
+                r#"{"value":"1.0000000000000000e+100"}"#,
+                Decimal::new(1.0, 100),
+            ),
             // Sentinels
             (r#"{"value":"Infinity"}"#, Decimal::MAX_VALUE),
             (r#"{"value":"NaN"}"#, Decimal::NAN),
@@ -212,10 +218,11 @@ mod tests {
         let cases = [
             (r#"{"value":null}"#, OptHolder { value: None }),
             (
-                r#"{"value":"1.0000000000000000e+50"}"#, 
-                OptHolder { value: Some(Decimal::new(1.0, 50))}
+                r#"{"value":"1.0000000000000000e+50"}"#,
+                OptHolder {
+                    value: Some(Decimal::new(1.0, 50)),
+                },
             ),
-
         ];
         for (expected, obj) in cases {
             let json = serde_json::to_string(&obj).unwrap();
@@ -227,8 +234,10 @@ mod tests {
             (r#"{"value":null}"#, OptHolder { value: None }),
             (r#"{}"#, OptHolder { value: None }),
             (
-                r#"{"value":"1e+50"}"#, 
-                OptHolder { value: Some(Decimal::new(1.0, 50)) }
+                r#"{"value":"1e+50"}"#,
+                OptHolder {
+                    value: Some(Decimal::new(1.0, 50)),
+                },
             ),
         ];
         for (json, expected) in cases {
