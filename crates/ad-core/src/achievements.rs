@@ -2,10 +2,17 @@
 //! achievement-power multiplier.
 //!
 //! Unlock state is a bitmask array mirroring the original `player.achievementBits`
-//! (17 rows, one bitmask each). An achievement `id` encodes its grid position as
+//! (18 rows, one bitmask each). An achievement `id` encodes its grid position as
 //! `row = id / 10`, `column = id % 10`, and unlock is bit `column - 1` of
 //! `achievement_bits[row - 1]` — identical to the original's
 //! `achievementBits[row-1] & (1 << (column-1))`.
+//!
+//! Row 18 (ids 181-188) is the Pelle achievements. We model no Pelle mechanic
+//! and never *unlock* those bits ourselves, but the array is sized to hold them
+//! so a save from the original game — including a Doomed one whose
+//! `achievementBits` has grown to length 18 — round-trips losslessly. They count
+//! toward the global power exactly as the original's `Achievements.all` does
+//! (the Doomed multiplier-disable is a separate mechanic we don't model).
 //!
 //! Unlocks are driven inline from the relevant action methods (buying a
 //! dimension, a galaxy, a boost, crunching, and once per tick) rather than via an
@@ -19,15 +26,18 @@ use break_infinity::Decimal;
 use crate::data::constants::INITIAL_ANTIMATTER;
 use crate::state::GameState;
 
-/// Number of achievement rows; mirrors the length of `player.achievementBits`.
-pub const ACHIEVEMENT_ROW_COUNT: usize = 17;
+/// Number of achievement rows; mirrors the full length of
+/// `player.achievementBits` once row 18 (the Pelle achievements) exists. A fresh
+/// or pre-Pelle original save has only 17 rows; the save loader zero-fills the
+/// 18th. See [`crate::save`].
+pub const ACHIEVEMENT_ROW_COUNT: usize = 18;
 
 /// Number of columns (achievements) per row.
 const ACHIEVEMENTS_PER_ROW: u16 = 8;
 
 impl GameState {
     /// `(row_index, column_bitmask)` for an achievement id, where
-    /// `id = row * 10 + column` with `row ∈ 1..=17` and `column ∈ 1..=8`.
+    /// `id = row * 10 + column` with `row ∈ 1..=18` and `column ∈ 1..=8`.
     fn achievement_index(id: u16) -> (usize, u32) {
         let row = (id / 10) as usize;
         let column = id % 10;
@@ -198,6 +208,9 @@ mod tests {
         let mut game = GameState::new();
         game.dim_boosts = 4; // unlock the 8th dimension
         game.antimatter = Decimal::new(1.0, 70);
+        // Buying an 8th dimension requires owning a 7th (the purchasability
+        // chain); seed it directly so we exercise just the achievement unlock.
+        game.dimensions[6].amount = Decimal::ONE;
         assert!(game.buy_dimension(7)); // buy an 8th dimension → achievement 18
         assert!(game.achievement_unlocked(18));
 

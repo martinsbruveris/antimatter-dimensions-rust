@@ -17,6 +17,10 @@ import BackupWindowModal from "./components/BackupWindowModal.vue";
 import BigCrunchScreen from "./components/BigCrunchScreen.vue";
 import OfflineSummaryModal from "./components/OfflineSummaryModal.vue";
 import NotificationContainer from "./components/NotificationContainer.vue";
+import DimensionBoostConfirmModal from "./components/DimensionBoostConfirmModal.vue";
+import AntimatterGalaxyConfirmModal from "./components/AntimatterGalaxyConfirmModal.vue";
+import SacrificeConfirmModal from "./components/SacrificeConfirmModal.vue";
+import BigCrunchConfirmModal from "./components/BigCrunchConfirmModal.vue";
 
 const game = useGameStore();
 const ui = useUiStore();
@@ -182,6 +186,13 @@ onUnmounted(() => {
     v-if="ui.openModal === 'offlineSummary'"
     @close="ui.closeModal()"
   />
+
+  <!-- Prestige confirmation popups (shown when the matching confirmation
+       option is on; each Confirm button performs the engine action). -->
+  <DimensionBoostConfirmModal v-if="ui.openModal === 'dimboostConfirm'" />
+  <AntimatterGalaxyConfirmModal v-if="ui.openModal === 'galaxyConfirm'" />
+  <SacrificeConfirmModal v-if="ui.openModal === 'sacrificeConfirm'" />
+  <BigCrunchConfirmModal v-if="ui.openModal === 'bigCrunchConfirm'" />
 
   <!-- Transient top-right toast popups (e.g. autobuyer pause/resume). -->
   <NotificationContainer />

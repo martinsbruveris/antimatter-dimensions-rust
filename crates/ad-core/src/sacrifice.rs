@@ -4,11 +4,13 @@ use crate::data::constants::SACRIFICE_EXPONENT;
 use crate::state::GameState;
 
 impl GameState {
-    /// Check if the player can sacrifice dimensions.
-    /// Matches JS: requires 5+ dim boosts, AD8 amount > 0,
-    /// and next boost > 1.
+    /// Check if the player can sacrifice dimensions. This is the *enable* gate
+    /// (`Sacrifice.canSacrifice`), distinct from the *visibility* gate
+    /// [`sacrifice_unlocked`](Self::sacrifice_unlocked): the original requires
+    /// `DimBoost.purchasedBoosts > 4` (≥ 5 boosts) regardless of whether the
+    /// button is visible, plus AD8 amount > 0 and next boost > 1.
     pub fn can_sacrifice(&self) -> bool {
-        self.sacrifice_unlocked()
+        self.dim_boosts >= 5
             && self.dimensions[7].amount > Decimal::ZERO
             && self.next_sacrifice_boost() > Decimal::ONE
     }

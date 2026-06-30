@@ -20,7 +20,7 @@ impl GameState {
     /// (0-indexed). Returns true if the purchase was
     /// successful.
     pub fn buy_dimension(&mut self, tier: usize) -> bool {
-        if tier >= 8 || !self.is_dimension_unlocked(tier) {
+        if !self.dim_available_for_purchase(tier) {
             return false;
         }
 
@@ -67,7 +67,7 @@ impl GameState {
     /// Buy dimensions until the next group of 10 is complete.
     /// Returns the number bought.
     pub fn buy_until_10_dimension(&mut self, tier: usize) -> u64 {
-        if tier >= 8 || !self.is_dimension_unlocked(tier) {
+        if !self.dim_available_for_purchase(tier) {
             return 0;
         }
         let remaining = 10 - (self.dimensions[tier].bought % 10);

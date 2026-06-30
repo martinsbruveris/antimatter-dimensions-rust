@@ -30,6 +30,9 @@ impl GameState {
             return false;
         }
 
+        // Clear the GALAXY tutorial highlight on the purchase (the original's
+        // requestGalaxyReset calls turnOffEffect before the reset).
+        self.tutorial_turn_off(crate::tutorial::state::GALAXY);
         // 26: buy an Antimatter Galaxy (fires before the reset, like the
         // original's GALAXY_RESET_BEFORE).
         self.unlock_achievement(26);
@@ -98,6 +101,9 @@ impl GameState {
             return false;
         }
 
+        // Clear the DIMBOOST tutorial highlight on the purchase (the original's
+        // requestDimensionBoost calls turnOffEffect before the reset).
+        self.tutorial_turn_off(crate::tutorial::state::DIMBOOST);
         self.dim_boosts += 1;
         self.dim_boost_reset();
         // 25: buy 10 Dimension Boosts.

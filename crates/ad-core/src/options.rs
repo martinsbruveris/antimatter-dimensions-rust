@@ -41,6 +41,36 @@ pub const DEFAULT_OFFLINE_TICKS: u32 = 100_000;
 pub const MIN_OFFLINE_TICKS: u32 = 10_000;
 pub const MAX_OFFLINE_TICKS: u32 = 10_000_000;
 
+/// Per-action confirmation toggles, mirroring the subset of
+/// `player.options.confirmations` we model. Each is "show the explanatory modal
+/// before performing this action"; all default `true`. The modal's "Don't show
+/// this message again" checkbox flips the corresponding flag off.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Confirmations {
+    pub dimension_boost: bool,
+    pub antimatter_galaxy: bool,
+    pub sacrifice: bool,
+    pub big_crunch: bool,
+}
+
+impl Confirmations {
+    pub fn new() -> Self {
+        Self {
+            dimension_boost: true,
+            antimatter_galaxy: true,
+            sacrifice: true,
+            big_crunch: true,
+        }
+    }
+}
+
+impl Default for Confirmations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Options {
@@ -63,6 +93,8 @@ pub struct Options {
     /// Offline replay resolution (original `offlineTicks`): the maximum number of
     /// discrete ticks an offline interval is spread across. Higher = finer.
     pub offline_ticks: u32,
+    /// Per-action confirmation toggles (original `confirmations`).
+    pub confirmations: Confirmations,
 }
 
 impl Options {
@@ -74,6 +106,20 @@ impl Options {
             notation_digits_comma: DEFAULT_NOTATION_DIGITS_COMMA,
             notation_digits_notation: DEFAULT_NOTATION_DIGITS_NOTATION,
             offline_ticks: DEFAULT_OFFLINE_TICKS,
+            confirmations: Confirmations::new(),
+        }
+    }
+
+    /// Set a single confirmation toggle by its original camelCase name
+    /// (`dimensionBoost`, `antimatterGalaxy`, `sacrifice`, `bigCrunch`). An
+    /// unknown name is ignored.
+    pub fn set_confirmation(&mut self, kind: &str, enabled: bool) {
+        match kind {
+            "dimensionBoost" => self.confirmations.dimension_boost = enabled,
+            "antimatterGalaxy" => self.confirmations.antimatter_galaxy = enabled,
+            "sacrifice" => self.confirmations.sacrifice = enabled,
+            "bigCrunch" => self.confirmations.big_crunch = enabled,
+            _ => {}
         }
     }
 
@@ -133,6 +179,22 @@ mod tests {
         o.set_notation_digits(10, 4);
         assert_eq!(o.notation_digits_comma, 10);
         assert_eq!(o.notation_digits_notation, 10);
+    }
+
+    #[test]
+    fn confirmations_default_on_and_toggle_by_name() {
+        let mut o = Options::new();
+        assert!(o.confirmations.dimension_boost);
+        assert!(o.confirmations.antimatter_galaxy);
+        assert!(o.confirmations.sacrifice);
+        assert!(o.confirmations.big_crunch);
+
+        o.set_confirmation("dimensionBoost", false);
+        assert!(!o.confirmations.dimension_boost);
+        // Other toggles are untouched, and an unknown name is a no-op.
+        assert!(o.confirmations.antimatter_galaxy);
+        o.set_confirmation("nope", false);
+        assert!(o.confirmations.antimatter_galaxy);
     }
 
     #[test]

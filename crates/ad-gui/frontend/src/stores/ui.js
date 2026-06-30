@@ -24,6 +24,13 @@ export const useUiStore = defineStore("ui", {
     // (null = none). Centralised here so both InfoButtons and the keyboard
     // shortcuts (?, H) drive the same state; only one modal is open at once.
     openModal: null,
+    // Whether the How-To-Play tutorial emphasis (emphasizeH2P — the pulsing
+    // gold "?" highlight) has already been shown. Pre-set to true so it does
+    // NOT appear right now: it would overlay the always-visible dev speed/
+    // offline/pause controls in the top-right. Once those controls become a
+    // toggleable option, initialise this from whether they are hidden so the
+    // emphasis returns when they are off.
+    h2pEmphasisShown: true,
     // Dev-only: multiplier applied to wall-clock dt before ticking.
     speedMultiplier: 1,
     // Offline mode: while on, the live loop stops ticking the engine and instead
@@ -44,6 +51,10 @@ export const useUiStore = defineStore("ui", {
     notifications: [],
     // Monotonic id source for notifications.
     nextNotificationId: 0,
+    // Achievements tab: hide rows whose achievements are all unlocked. Lives
+    // here (not in the tab component) so it survives the tab unmounting on
+    // navigation, mirroring the original's persisted player option.
+    hideCompletedAchievementRows: false,
   }),
   getters: {
     // Tabs currently visible, honouring each tab's optional unlock condition

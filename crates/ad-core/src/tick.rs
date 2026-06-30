@@ -57,6 +57,10 @@ impl GameState {
         if self.antimatter.exponent() >= 80 {
             self.unlock_achievement(24);
         }
+
+        // Advance the tutorial highlight if the next step's condition now holds
+        // (mirrors the original's game-loop-driven `tutorialLoop`).
+        self.tutorial_loop();
     }
 
     /// Advance the game by `repeats` discrete steps of `dt_ms` each.

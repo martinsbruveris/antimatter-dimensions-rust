@@ -10,6 +10,9 @@ impl GameState {
     /// Buy one tickspeed upgrade. Returns true if successful.
     pub fn buy_tickspeed(&mut self) -> bool {
         if self.antimatter >= self.tickspeed.cost {
+            // Clear the TICKSPEED tutorial highlight on the purchase, like the
+            // original's buyTickSpeed (no-op once past that step).
+            self.tutorial_turn_off(crate::tutorial::state::TICKSPEED);
             self.antimatter -= self.tickspeed.cost;
             self.tickspeed.bought += 1;
             self.tickspeed.cost *= self.tickspeed.cost_multiplier;

@@ -17,8 +17,14 @@ pub struct ObservedDimensionTier {
     pub production_per_second: Decimal,
     /// Cost of the next single-unit purchase of this tier.
     pub cost: Decimal,
-    /// Whether this tier is currently unlocked (purchasable).
+    /// Whether this tier is currently unlocked (within the dim-boost band).
     pub unlocked: bool,
+    /// Whether this tier can be purchased right now (band **and** the tier
+    /// below it owned). Drives the buy gate and the dimmed `not-reached` style.
+    pub available_for_purchase: bool,
+    /// Whether this tier's row should be shown (progressive reveal): shown by
+    /// the reveal/lookahead rules or because the player already owns some.
+    pub shown: bool,
 }
 
 impl ObservedDimensionTier {
@@ -30,6 +36,9 @@ impl ObservedDimensionTier {
             production_per_second: game.dimension_production_per_second(tier),
             cost: game.dimension_cost(tier),
             unlocked: game.is_dimension_unlocked(tier),
+            available_for_purchase: game.dim_available_for_purchase(tier),
+            shown: game.dim_is_shown(tier)
+                || game.dimensions[tier].amount > Decimal::ZERO,
         }
     }
 }

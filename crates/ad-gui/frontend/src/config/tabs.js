@@ -34,7 +34,6 @@ export const TABS = [
     name: "Achievements",
     subtabs: [
       { key: "normal", name: "Achievements", symbol: "<i class='fas fa-trophy'></i>", component: NormalAchievementsTab },
-      { key: "secret", name: "Secret Achievements", symbol: "<i class='fas fa-question'></i>", component: null },
     ],
   },
   {

@@ -8,7 +8,7 @@ import { useGameStore } from "../stores/game";
 const game = useGameStore();
 
 function crunch() {
-  game.bigCrunch();
+  game.requestBigCrunch();
 }
 </script>
 

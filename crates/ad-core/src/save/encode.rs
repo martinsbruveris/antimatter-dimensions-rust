@@ -69,6 +69,9 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     player["break"] = json!(state.infinity_unlocked);
     // Achievement bitmask, written back verbatim (one int per row).
     player["achievementBits"] = json!(state.achievement_bits);
+    // Tutorial-highlight progress (at the player root, not under options).
+    player["tutorialState"] = json!(state.tutorial_state);
+    player["tutorialActive"] = json!(state.tutorial_active);
     // Stamp the save time so the game computes ~0 offline progress on import.
     player["lastUpdate"] = json!(now_ms);
 
@@ -89,6 +92,13 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     options["notationDigits"]["notation"] =
         json!(state.options.notation_digits_notation);
     options["offlineTicks"] = json!(state.options.offline_ticks);
+    let confirmations = &mut options["confirmations"];
+    confirmations["dimensionBoost"] =
+        json!(state.options.confirmations.dimension_boost);
+    confirmations["antimatterGalaxy"] =
+        json!(state.options.confirmations.antimatter_galaxy);
+    confirmations["sacrifice"] = json!(state.options.confirmations.sacrifice);
+    confirmations["bigCrunch"] = json!(state.options.confirmations.big_crunch);
 
     // Autobuyers. Intervals/timers are the original's derived state — we leave the
     // template's values and only write the flags/modes we model (§4.4).
@@ -216,6 +226,11 @@ mod tests {
         // Unlock a couple of achievements (18 → bits[0] bit 7; 21 → bits[1] bit 0).
         state.unlock_achievement(18);
         state.unlock_achievement(21);
+        // Tutorial progress (player root): advanced to TICKSPEED, glow cleared.
+        state.tutorial_state = 2;
+        state.tutorial_active = false;
+        // Disable one confirmation; the others stay on.
+        state.options.set_confirmation("sacrifice", false);
 
         let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
         assert_eq!(reloaded.galaxies, 7);
@@ -223,6 +238,13 @@ mod tests {
         assert!(reloaded.infinity_unlocked);
         assert_eq!(reloaded.dimensions[2].bought, 42);
         assert_eq!(reloaded.options.notation, "Engineering");
+        // Tutorial fields survive the round-trip.
+        assert_eq!(reloaded.tutorial_state, 2);
+        assert!(!reloaded.tutorial_active);
+        // The disabled confirmation round-trips; the rest remain on.
+        assert!(!reloaded.options.confirmations.sacrifice);
+        assert!(reloaded.options.confirmations.dimension_boost);
+        assert!(reloaded.options.confirmations.big_crunch);
         // Achievement bits survive the round-trip verbatim.
         assert_eq!(reloaded.achievement_bits, state.achievement_bits);
         assert!(reloaded.achievement_unlocked(18));

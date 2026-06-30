@@ -5,13 +5,18 @@ import { useGameStore } from "../stores/game";
 import { DIM_NAMES } from "../util/dimensionText";
 import { formatDecimal, formatMultiplier } from "../util/format";
 import { isSmall } from "../util/responsive";
+import { TUTORIAL_STATE, hasTutorial } from "../util/tutorial";
 
 const props = defineProps({ tier: { type: Number, required: true } });
 
 const game = useGameStore();
 const s = computed(() => game.snapshot);
 const dim = computed(() => s.value.dimensions[props.tier]);
-const unlocked = computed(() => props.tier < s.value.unlocked_dimensions);
+// "Unlocked" here is the original's `isUnlocked = isAvailableForPurchase`:
+// the tier is within the dim-boost band AND the tier below is owned. A row can
+// be shown (progressive reveal) yet not-yet-purchasable, in which case it is
+// dimmed and the buy button reads "Locked".
+const unlocked = computed(() => dim.value.available_for_purchase);
 
 // Stack name/multiplier (and amount/rate) vertically on narrow windows,
 // matching the original GenericDimensionRowText.
@@ -32,6 +37,15 @@ const costText = computed(() => {
 const hasLongText = computed(() => costText.value.length > 20);
 const showRate = computed(() => props.tier < 7 && dim.value.rate_percent > 0.01);
 
+// Tutorial highlight: the 1st and 2nd dimension buy buttons are the DIM1 / DIM2
+// steps. The glow only shows when the buy is affordable; the `!` icon shows
+// whenever this is the current step (matching the original row markup).
+const hasTut = computed(
+  () =>
+    (props.tier === 0 && hasTutorial(s.value, TUTORIAL_STATE.DIM1)) ||
+    (props.tier === 1 && hasTutorial(s.value, TUTORIAL_STATE.DIM2))
+);
+
 function buy() {
   if (unlocked.value) game.buyDim(props.tier);
 }
@@ -39,6 +53,7 @@ function buy() {
 
 <template>
   <div
+    v-show="dim.shown"
     class="c-dimension-row l-dimension-row-antimatter-dim c-antimatter-dim-row l-dimension-single-row"
     :class="{ 'c-dim-row--not-reached': !unlocked }"
   >
@@ -68,7 +83,10 @@ function buy() {
           :class="{ 'o-primary-btn--disabled': !unlocked || !dim.can_buy }"
           @click="buy"
         >
-          <div class="button-content l-modern-buy-ad-text">
+          <div
+            class="button-content l-modern-buy-ad-text"
+            :class="{ 'tutorial--glow': hasTut && dim.can_buy }"
+          >
             <div>{{ unlocked ? `Buy ${howMany}` : "Locked" }}</div>
             <div
               v-if="unlocked"
@@ -76,6 +94,10 @@ function buy() {
             >
               {{ costText }}
             </div>
+            <div
+              v-if="hasTut"
+              class="fas fa-circle-exclamation l-notification-icon"
+            />
           </div>
           <div
             v-if="unlocked"

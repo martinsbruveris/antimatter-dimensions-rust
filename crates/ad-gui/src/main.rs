@@ -53,6 +53,11 @@ struct DimensionView {
     how_many_can_buy: u64,
     can_buy: bool,
     rate_percent: f64,
+    /// Whether this tier can be purchased (band + previous tier owned). Gates
+    /// the buy button and drives the dimmed `c-dim-row--not-reached` style.
+    available_for_purchase: bool,
+    /// Whether the row is shown at all (progressive reveal).
+    shown: bool,
 }
 
 /// Serializable view of a single autobuyer (AD tier or tickspeed).
@@ -140,6 +145,12 @@ struct GameView {
     unlocked_achievements: Vec<u16>,
     /// Global achievement-power multiplier (shown as the tab's boost).
     achievement_power: Num,
+    /// Current tutorial-highlight step (`player.tutorialState`); components
+    /// compare against their own step id to decide whether to glow.
+    tutorial_state: u8,
+    /// Whether the current tutorial step's highlight is active
+    /// (`player.tutorialActive`).
+    tutorial_active: bool,
 }
 
 /// Serializable view of the player options the frontend reads/writes.
@@ -156,6 +167,18 @@ struct OptionsView {
     /// Offline replay resolution (original `offlineTicks`); drives the Gameplay
     /// tab slider and the Offline-mode replay budget.
     offline_ticks: u32,
+    /// Per-action confirmation toggles; the action handlers branch on these to
+    /// decide whether to show the explanatory modal.
+    confirmations: ConfirmationsView,
+}
+
+/// Serializable view of the per-action confirmation toggles.
+#[derive(Serialize)]
+struct ConfirmationsView {
+    dimension_boost: bool,
+    antimatter_galaxy: bool,
+    sacrifice: bool,
+    big_crunch: bool,
 }
 
 /// Build the serializable view for one autobuyer.
@@ -267,6 +290,8 @@ fn build_game_view(game: &GameState) -> GameView {
             how_many_can_buy,
             can_buy: game.antimatter >= cost,
             rate_percent,
+            available_for_purchase: game.dim_available_for_purchase(tier),
+            shown: game.dim_is_shown(tier) || *amount > Decimal::ZERO,
         });
     }
 
@@ -315,6 +340,8 @@ fn build_game_view(game: &GameState) -> GameView {
         autobuyers: build_autobuyers_view(game),
         unlocked_achievements: game.unlocked_achievement_ids(),
         achievement_power: num(&game.achievement_power()),
+        tutorial_state: game.tutorial_state,
+        tutorial_active: game.tutorial_active,
         options: OptionsView {
             hotkeys: game.options.hotkeys,
             update_rate: game.options.update_rate,
@@ -322,6 +349,12 @@ fn build_game_view(game: &GameState) -> GameView {
             notation_digits_comma: game.options.notation_digits_comma,
             notation_digits_notation: game.options.notation_digits_notation,
             offline_ticks: game.options.offline_ticks,
+            confirmations: ConfirmationsView {
+                dimension_boost: game.options.confirmations.dimension_boost,
+                antimatter_galaxy: game.options.confirmations.antimatter_galaxy,
+                sacrifice: game.options.confirmations.sacrifice,
+                big_crunch: game.options.confirmations.big_crunch,
+            },
         },
     }
 }
@@ -500,6 +533,16 @@ fn set_notation_digits(comma: u32, notation: u32, state: State<'_, Mutex<GameSta
     game.options.set_notation_digits(comma, notation);
 }
 
+/// Flip a single per-action confirmation toggle (original
+/// `player.options.confirmations.*`). `kind` is the camelCase action name
+/// (`dimensionBoost`, `antimatterGalaxy`, `sacrifice`, `bigCrunch`); an unknown
+/// name is ignored by the engine.
+#[tauri::command]
+fn set_confirmation(kind: String, enabled: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_confirmation(&kind, enabled);
+}
+
 /// Returns the current epoch-millisecond timestamp for save encoding.
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -619,6 +662,7 @@ pub fn run() {
             set_notation,
             set_notation_digits,
             set_offline_ticks,
+            set_confirmation,
             export_save,
             import_save,
             export_save_to_file,

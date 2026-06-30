@@ -13,6 +13,7 @@ pub mod save;
 pub mod state;
 pub mod tick;
 pub mod tickspeed;
+pub mod tutorial;
 
 pub use action::{Action, ActionOutcome};
 pub use autobuyers::{Autobuyer, AutobuyerMode, AutobuyerState};

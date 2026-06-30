@@ -52,6 +52,10 @@ antimatter-dimensions-rust/
 - `src/galaxy.rs` — Antimatter galaxy purchases
 - `src/sacrifice.rs` — Dimension sacrifice
 - `src/crunch.rs` — First Big Crunch (Infinity): `can_big_crunch` + `big_crunch` reset
+- `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
+  (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
+  multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
+  action methods; see `design-docs/2026-06-30-achievements.md`.
 - `src/autobuyers.rs` — Automation system
 - `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
   `player.options`), held in `GameState`, preserved across a Big Crunch
@@ -233,7 +237,7 @@ Located in `design-docs/`:
 | `2026-06-28-js-frontend-rust-wasm-engine.md` | Feasibility analysis of keeping the original JS/Vue app and swapping its engine for Rust/WASM (rejected; recommends a WASM target for `ad-core` instead) |
 | `2026-06-30-offline-progress.md` | How the original simulates offline progress, how it maps onto our `simulate`/`ticks` primitives, the game-speed/timestamp implications, and a design for a manual Offline-mode button |
 | `2026-06-30-ui-reveal-and-tutorial.md` | Progressive UI reveal (hiding/showing AD rows, tickspeed, sacrifice), first-time/disable-able confirmation modals (boost/galaxy/sacrifice/crunch), and the tutorial glow + exclamation highlight; how the original implements each and a phased plan |
-| `2026-06-30-achievements.md` | Normal achievements: bitmask state on `GameState`, inline unlock hooks at the `apply_action` seam (rows 1–2 minus News), per-achievement effects + the global achievement-power multiplier, `achievementBits` save round-trip, and the sprite-driven tab; phased plan |
+| `2026-06-30-achievements.md` | Normal achievements: bitmask state on `GameState`, unlock hooks inline in the buy/galaxy/boost/crunch/tick methods (rows 1–2 minus News), per-achievement effects + the global achievement-power multiplier, `achievementBits` save round-trip, the sprite-driven tab, and the unlock toast; phased plan |
 
 The table lists key documents; see the `design-docs/` folder for the full,
 date-prefixed set. Read these before making architectural decisions. The

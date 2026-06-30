@@ -2,7 +2,12 @@
 
 Date: 2026-06-30
 
-**Status: proposed.**
+**Status: implemented (2026-06-30).** All three features landed. Resolved open
+questions: tutorial advance stays tick-driven; the snapshot exposes raw
+`tutorial_state` / `tutorial_active`; `dim_available_for_purchase` was fixed
+(can no longer buy a dimension before owning the one below it); sacrifice
+visibility now reads `achievement_unlocked(18)` (no `bought_8th_dimension`
+field); and `emphasizeH2P` (the pulsing How-To-Play link) is included.
 
 ## Goal
 

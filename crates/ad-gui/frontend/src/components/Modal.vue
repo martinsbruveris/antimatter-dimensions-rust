@@ -13,6 +13,13 @@ defineProps({
   // Matches modals that vendor `.c-modal`'s default size, e.g. the Exponent
   // Notation modal.
   compact: { type: Boolean, default: false },
+  // Confirmation / choice modal layout: a stable-width, centred column matching
+  // the original game's ModalWrapperChoice. Sizes to content but never below
+  // 50rem, and centres every child so width-capped content (the 50rem message
+  // text, the 45rem input) stays centred even when a longer line widens the
+  // modal. Confirmation modals pass this instead of `fitContent` so they no
+  // longer need their own per-modal `text-align: center` rules.
+  centered: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["close"]);
@@ -28,7 +35,7 @@ const emit = defineEmits(["close"]);
     <div class="l-modal">
       <div
         class="c-modal c-modal-text"
-        :class="{ 'c-modal-text--fit': fitContent, 'c-modal-text--compact': compact }"
+        :class="{ 'c-modal-text--fit': fitContent, 'c-modal-text--compact': compact, 'c-modal-text--centered': centered }"
       >
         <div
           class="c-modal__close-btn"
@@ -81,6 +88,30 @@ const emit = defineEmits(["close"]);
    Hotkey List's two columns), defined after the rule above so it wins. */
 .c-modal-text--fit {
   width: fit-content;
+}
+
+/* Confirmation / choice modals, mirroring the original game's ModalWrapperChoice
+   (`.c-modal-message` min-width:50rem + `.l-modal-content--centered`). Sizing to
+   content but never below 50rem keeps the width stable; centring the column
+   means width-capped children (the 50rem message text, the 45rem input) stay
+   centred instead of hugging the left edge when a longer line widens the modal.
+   Defined after the width rules above so it wins. */
+.c-modal-text--centered {
+  width: fit-content;
+  min-width: 50rem;
+}
+
+.c-modal-text--centered .l-modal-text__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  /* Confirmation modals are short and never scroll. Drop the default content
+     clipping (`overflow-y: auto` + max-height) so the "Don't show again"
+     checkbox's upward tooltip isn't cut off at the content's top edge — which
+     sits just below the title and made the tooltip look hidden by it. */
+  overflow: visible;
+  max-height: none;
 }
 
 /* Title spans the full width, stays centred, and is larger than the

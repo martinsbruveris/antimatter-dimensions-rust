@@ -14,28 +14,30 @@
 use ad_core::{Decimal, GameState};
 use ad_fidelity::tolerance::{assert_approx_eq, EPSILON_EXACT};
 
-/// Verify sacrifice unlock condition: requires dim_boosts >= 5.
+/// Verify the two distinct sacrifice gates: *visibility*
+/// (`Sacrifice.isVisible = Achievement(18).isUnlocked`, set by buying an 8th
+/// Antimatter Dimension and persistent forever) and *enable*
+/// (`Sacrifice.canSacrifice`, requiring `DimBoost.purchasedBoosts > 4`).
 #[test]
 fn sacrifice_unlock() {
     let mut state = GameState::new();
 
-    // Fresh game: sacrifice not unlocked
+    // Fresh game: neither visible nor performable.
     assert!(!state.can_sacrifice());
     assert!(!state.sacrifice_unlocked());
 
-    // 4 boosts: still not unlocked
-    state.dim_boosts = 4;
+    // Boosts alone do not make the button visible — visibility is achievement 18.
+    state.dim_boosts = 5;
     assert!(!state.sacrifice_unlocked());
 
-    // 5 boosts: unlocked
-    state.dim_boosts = 5;
+    // Buying an 8th dimension unlocks achievement 18 → the button is visible and
+    // stays so (achievements never re-lock).
+    state.dimensions[6].amount = Decimal::ONE; // own a 7th so the 8th is buyable
+    state.antimatter = Decimal::new(1.0, 70);
+    assert!(state.buy_dimension(7));
     assert!(state.sacrifice_unlocked());
 
-    // But still can't sacrifice without AD8 > 0
-    assert!(!state.can_sacrifice());
-
-    // With AD8 > 0 and a meaningful AD1
-    state.dimensions[7].amount = Decimal::from_float(1.0);
+    // Visible but still not performable until AD8 > 0 with a meaningful AD1.
     state.dimensions[0].amount = Decimal::from_float(1e20);
     assert!(state.can_sacrifice());
 }

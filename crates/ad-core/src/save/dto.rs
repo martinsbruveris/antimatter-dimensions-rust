@@ -27,8 +27,8 @@ use serde::Deserialize;
 use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::{AutobuyerMode, AutobuyerState};
 use crate::options::{
-    Options, MAX_NOTATION_DIGITS, MAX_UPDATE_RATE_MS, MIN_NOTATION_DIGITS,
-    MIN_UPDATE_RATE_MS,
+    Confirmations, Options, MAX_NOTATION_DIGITS, MAX_UPDATE_RATE_MS,
+    MIN_NOTATION_DIGITS, MIN_UPDATE_RATE_MS,
 };
 use crate::state::{DimensionTier, GameState, TickspeedState};
 
@@ -64,6 +64,10 @@ pub struct PlayerDTO {
     pub infinity_points: Decimal,
     /// `player.achievementBits` — one bitmask int per achievement row.
     pub achievement_bits: Vec<u32>,
+    /// `player.tutorialState` — current tutorial-highlight step.
+    pub tutorial_state: u8,
+    /// `player.tutorialActive` — whether the current step's highlight shows.
+    pub tutorial_active: bool,
     pub records: RecordsDTO,
     pub auto: AutoDTO,
     pub options: OptionsDTO,
@@ -133,6 +137,8 @@ pub struct OptionsDTO {
     pub notation: String,
     pub notation_digits: NotationDigitsDTO,
     pub offline_ticks: u32,
+    /// `player.options.confirmations` (modelled subset).
+    pub confirmations: ConfirmationsDTO,
 }
 
 /// `player.options.notationDigits`.
@@ -140,6 +146,18 @@ pub struct OptionsDTO {
 pub struct NotationDigitsDTO {
     pub comma: u32,
     pub notation: u32,
+}
+
+/// `player.options.confirmations` — the four prestige confirmations we model.
+/// All required: a missing one fails the load, surfacing a format change rather
+/// than silently defaulting.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmationsDTO {
+    pub dimension_boost: bool,
+    pub antimatter_galaxy: bool,
+    pub sacrifice: bool,
+    pub big_crunch: bool,
 }
 
 impl GameState {
@@ -185,17 +203,22 @@ impl GameState {
             || dto.infinities > Decimal::ZERO
             || dto.infinity_points > Decimal::ZERO;
 
-        // Achievement bitmask is a fixed-length array, like the dimensions; a
-        // different length signals an unexpected save format.
-        if dto.achievement_bits.len() != ACHIEVEMENT_ROW_COUNT {
+        // Achievement bitmask. The original's `achievementBits` is 17 rows in a
+        // fresh or pre-Pelle save and grows to 18 the moment a row-18 (Pelle)
+        // achievement is touched. Accept either length and zero-fill the missing
+        // Pelle row, so we can load *any* original save — including a Doomed one
+        // — while ignoring the Pelle mechanics we don't model. Any other length
+        // signals an unexpected save format.
+        let bits_len = dto.achievement_bits.len();
+        if bits_len != ACHIEVEMENT_ROW_COUNT && bits_len != ACHIEVEMENT_ROW_COUNT - 1 {
             return Err(SaveError::UnexpectedArrayLength {
                 field: "achievementBits",
                 expected: ACHIEVEMENT_ROW_COUNT,
-                found: dto.achievement_bits.len(),
+                found: bits_len,
             });
         }
         let mut achievement_bits = [0u32; ACHIEVEMENT_ROW_COUNT];
-        achievement_bits.copy_from_slice(&dto.achievement_bits);
+        achievement_bits[..bits_len].copy_from_slice(&dto.achievement_bits);
 
         // The per-tier autobuyer array is fixed-length for the same reason.
         let ad_autobuyers = &dto.auto.antimatter_dims.all;
@@ -251,6 +274,14 @@ impl GameState {
         // diverges from the original's, so we accept any positive value from the
         // save as-is (§ offline-progress design).
         options.set_offline_ticks(dto.options.offline_ticks);
+        // Confirmation toggles are plain booleans (no range checks); read the
+        // modelled subset straight through.
+        options.confirmations = Confirmations {
+            dimension_boost: dto.options.confirmations.dimension_boost,
+            antimatter_galaxy: dto.options.confirmations.antimatter_galaxy,
+            sacrifice: dto.options.confirmations.sacrifice,
+            big_crunch: dto.options.confirmations.big_crunch,
+        };
 
         Ok(GameState {
             antimatter: dto.antimatter,
@@ -262,6 +293,8 @@ impl GameState {
             sacrificed: dto.sacrificed,
             infinity_unlocked,
             achievement_bits,
+            tutorial_state: dto.tutorial_state,
+            tutorial_active: dto.tutorial_active,
             autobuyers,
             options,
         })
@@ -442,6 +475,26 @@ mod tests {
             .unwrap()
             .remove("totalAntimatter");
         assert!(matches!(load(player), Err(SaveError::Json(_))));
+
+        // Newer modelled fields are required too (no serde defaults): a save
+        // missing them is rejected rather than silently defaulted.
+        let mut player = base_player();
+        player.as_object_mut().unwrap().remove("tutorialActive");
+        assert!(matches!(load(player), Err(SaveError::Json(_))));
+
+        let mut player = base_player();
+        player["options"]
+            .as_object_mut()
+            .unwrap()
+            .remove("confirmations");
+        assert!(matches!(load(player), Err(SaveError::Json(_))));
+
+        let mut player = base_player();
+        player["options"]["confirmations"]
+            .as_object_mut()
+            .unwrap()
+            .remove("sacrifice");
+        assert!(matches!(load(player), Err(SaveError::Json(_))));
     }
 
     #[test]
@@ -472,6 +525,45 @@ mod tests {
             Err(SaveError::UnexpectedArrayLength {
                 field: "auto.antimatterDims.all",
                 ..
+            })
+        ));
+    }
+
+    #[test]
+    fn achievement_bits_accepts_17_or_18_rows() {
+        // A fresh/pre-Pelle original save has 17 rows; it loads and the missing
+        // Pelle row is zero-filled.
+        let mut player = base_player();
+        player["achievementBits"] = json!(vec![0u32; 17]);
+        let state = load(player).unwrap();
+        assert_eq!(state.achievement_bits, [0u32; ACHIEVEMENT_ROW_COUNT]);
+
+        // A Doomed (Pelle) save has grown `achievementBits` to 18 rows. We load
+        // it even though we model no Pelle mechanic; row-18 bits round-trip.
+        let mut bits = vec![0u32; 18];
+        bits[0] = 1 << 7; // achievement 18 (row 1, col 8)
+        bits[17] = 0b1010_1010; // some row-18 (Pelle) achievements, ids 182/184/186/188
+        let mut player = base_player();
+        player["achievementBits"] = json!(bits);
+        let state = load(player).unwrap();
+        assert!(state.achievement_unlocked(18));
+        assert!(state.achievement_unlocked(182));
+        assert!(state.achievement_unlocked(188));
+        assert!(!state.achievement_unlocked(181));
+        assert_eq!(state.achievement_bits[17], 0b1010_1010);
+    }
+
+    #[test]
+    fn achievement_bits_wrong_length_errors() {
+        // Anything other than 17 or 18 rows is still an unexpected shape.
+        let mut player = base_player();
+        player["achievementBits"] = json!(vec![0u32; 16]);
+        assert!(matches!(
+            load(player),
+            Err(SaveError::UnexpectedArrayLength {
+                field: "achievementBits",
+                expected: ACHIEVEMENT_ROW_COUNT,
+                found: 16,
             })
         ));
     }

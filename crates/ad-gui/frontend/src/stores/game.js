@@ -93,6 +93,55 @@ export const useGameStore = defineStore("game", {
     bigCrunch() {
       return invoke("big_crunch");
     },
+    // --- Confirmation-gated requests ---
+    // Each click handler routes through one of these: if the matching
+    // confirmation option is on, open the explanatory modal (whose Confirm
+    // button performs the action); otherwise perform it directly. Mirrors the
+    // original's `manualRequest*` / `sacrificeBtnClick` indirection.
+    requestDimBoost() {
+      if (!this.snapshot?.can_dim_boost) return;
+      const ui = useUiStore();
+      if (this.snapshot?.options?.confirmations?.dimension_boost) {
+        ui.showModal("dimboostConfirm");
+      } else {
+        this.buyDimBoost();
+      }
+    },
+    requestGalaxy() {
+      if (!this.snapshot?.can_buy_galaxy) return;
+      const ui = useUiStore();
+      if (this.snapshot?.options?.confirmations?.antimatter_galaxy) {
+        ui.showModal("galaxyConfirm");
+      } else {
+        this.buyGalaxy();
+      }
+    },
+    requestSacrifice() {
+      if (!this.snapshot?.can_sacrifice) return;
+      const ui = useUiStore();
+      if (this.snapshot?.options?.confirmations?.sacrifice) {
+        ui.showModal("sacrificeConfirm");
+      } else {
+        this.sacrifice();
+      }
+    },
+    // Pre-Infinity the Big Crunch modal is the first-infinity explanation; it is
+    // shown whenever the bigCrunch confirmation is on (the only state reachable
+    // here, since its checkbox is absent on the first infinity).
+    requestBigCrunch() {
+      if (!this.snapshot?.can_big_crunch) return;
+      const ui = useUiStore();
+      if (this.snapshot?.options?.confirmations?.big_crunch) {
+        ui.showModal("bigCrunchConfirm");
+      } else {
+        this.bigCrunch();
+      }
+    },
+    // Flip a confirmation toggle (original `player.options.confirmations.*`);
+    // `kind` is the camelCase action name the engine expects.
+    setConfirmation(kind, enabled) {
+      return invoke("set_confirmation", { kind, enabled });
+    },
     // Hard reset: wipes the game back to a completely fresh state.
     async hardReset() {
       this.snapshot = await invoke("hard_reset");

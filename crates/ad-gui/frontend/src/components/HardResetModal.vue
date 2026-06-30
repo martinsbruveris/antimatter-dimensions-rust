@@ -27,10 +27,10 @@ async function doReset() {
   <Modal
     title="HARD RESET"
     compact
-    fit-content
+    centered
     @close="$emit('close')"
   >
-    <div class="c-modal-message__text c-hard-reset-text">
+    <div class="c-modal-message__text">
       Please confirm your desire to hard reset this save slot.
       <span class="c-modal-hard-reset-danger">Deleting your save will not unlock anything secret.</span>
       Type in "Shrek is love, Shrek is life" to confirm.
@@ -72,15 +72,3 @@ async function doReset() {
     </div>
   </Modal>
 </template>
-
-<style scoped>
-.c-hard-reset-text {
-  text-align: center;
-}
-
-/* The original centres the whole modal body via ModalWrapperChoice; our Modal
-   defaults to left-aligned, so centre the confirm/prompt line explicitly too. */
-.c-modal-hard-reset-info {
-  text-align: center;
-}
-</style>

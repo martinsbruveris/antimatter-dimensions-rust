@@ -1,7 +1,10 @@
 <script setup>
+import { computed } from "vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
+import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
+import { emphasizeH2P } from "../util/tutorial";
 import Modal from "./Modal.vue";
 import H2PModal from "./H2PModal.vue";
 import CreditsDisplay from "./CreditsDisplay.vue";
@@ -9,6 +12,15 @@ import CreditsDisplay from "./CreditsDisplay.vue";
 // Modal open/close state lives in the ui store so the keyboard shortcuts
 // (e.g. H for "How to play") drive the same popups as these buttons.
 const ui = useUiStore();
+const game = useGameStore();
+
+// Pulse the How-To-Play link until the first Dimension Boost (the original's
+// Tutorial.emphasizeH2P): a gold glow overlay + "Click for info" tooltip.
+// Suppressed while `h2pEmphasisShown` is set (currently always, so it doesn't
+// overlay the dev controls — see the ui store flag).
+const emphasizeHelp = computed(
+  () => !ui.h2pEmphasisShown && emphasizeH2P(game.snapshot)
+);
 
 // Open a URL in the system default browser. Uses the Tauri opener plugin
 // when running in the app; falls back to window.open in a plain browser
@@ -62,12 +74,26 @@ function close() {
 
 <template>
   <div class="l-info-buttons">
-    <div
-      class="o-questionmark"
-      title="How to play"
-      @click="show('help')"
-    >
-      ?
+    <div class="h2p-wrapper">
+      <div
+        class="o-questionmark"
+        title="How to play"
+        @click="show('help')"
+      >
+        ?
+      </div>
+      <!-- Tutorial emphasis: pulsing gold overlay + tooltip on the "?" link
+           until the first Dimension Boost (mirrors HowToPlay.vue). -->
+      <div
+        v-if="emphasizeHelp"
+        class="h2p-tutorial--glow"
+      />
+      <div
+        v-if="emphasizeHelp"
+        class="h2p-tooltip"
+      >
+        Click for info
+      </div>
     </div>
     <div
       class="o-questionmark"
@@ -150,6 +176,53 @@ function close() {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+/* Anchor for the H2P tutorial overlay/tooltip, so they position over the
+   "?" button. */
+.h2p-wrapper {
+  position: relative;
+}
+
+/* Pulsing gold overlay covering the "?" button while the tutorial emphasises
+   it (mirrors HowToPlay.vue's .h2p-tutorial--glow; reuses the vendored
+   a-opacity keyframe). */
+.h2p-tutorial--glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  background: gold;
+  animation: a-opacity 3s infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* "Click for info" tooltip to the left of the button. */
+.h2p-tooltip {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  width: fit-content;
+  white-space: nowrap;
+  color: #fff;
+  background: #000;
+  border: 0.1rem solid var(--color-text, #cccccc);
+  border-radius: 0.5rem;
+  transform: translate(-0.7rem, -0.4rem);
+  padding: 0.2rem 0.4rem;
+  z-index: 3;
+}
+
+.h2p-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 0.6rem;
+  left: 100%;
+  border-top: 0.5rem solid transparent;
+  border-left: 0.5rem solid var(--color-text, #cccccc);
+  border-bottom: 0.5rem solid transparent;
 }
 
 /* Slightly larger than the vendored default, matching the JS version's

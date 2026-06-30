@@ -98,17 +98,19 @@ export function handleShortcut(e, game, ui) {
       game.maxAll();
       break;
     case "KeyS":
-      game.sacrifice();
+      // Route through the confirm gate, like the original's hotkeys
+      // (sacrificeBtnClick / manualRequest*): shows the modal if enabled.
+      game.requestSacrifice();
       break;
     case "KeyD":
-      game.buyDimBoost();
+      game.requestDimBoost();
       break;
     case "KeyG":
-      game.buyGalaxy();
+      game.requestGalaxy();
       break;
     case "KeyC":
       // Big Crunch; the engine no-ops unless antimatter is at the threshold.
-      game.bigCrunch();
+      game.requestBigCrunch();
       break;
     default:
       break;

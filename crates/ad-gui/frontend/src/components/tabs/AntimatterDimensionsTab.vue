@@ -45,7 +45,7 @@ const sacrificeTooltip = computed(
         <button
           class="o-primary-btn o-primary-btn--sacrifice"
           :class="{ 'o-primary-btn--disabled': !s.can_sacrifice }"
-          @click="game.sacrifice()"
+          @click="game.requestSacrifice()"
         >
           <span v-if="s.can_sacrifice">
             Dimensional Sacrifice (×{{ formatMultiplier(s.next_sacrifice_boost) }})
