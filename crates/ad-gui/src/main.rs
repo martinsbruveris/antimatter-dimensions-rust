@@ -234,8 +234,15 @@ fn build_game_view(game: &GameState) -> GameView {
         let bulk_count = how_many_can_buy.max(1);
         let until_10_cost = cost * Decimal::from_float(bulk_count as f64);
 
+        // Per-second growth rate shown as "+X%/s", mirroring the JS
+        // `AntimatterDimension.rateOfChange`: this tier is fed by the dimension
+        // *above* it, so the rate is `production(tier+1) × 10 / max(amount, 1)`
+        // (the 8th dimension, tier 7, has nothing above it → 0). Game-speed
+        // scaling (`getGameSpeedupForDisplay`) is 1 pre-Infinity.
         let rate_percent = if tier < 7 && *amount > Decimal::ZERO {
-            (production / *amount).to_f64() * 100.0
+            let to_gain = game.dimension_production_per_second(tier + 1);
+            let denom = if *amount > Decimal::ONE { *amount } else { Decimal::ONE };
+            (to_gain * Decimal::from_float(10.0) / denom).to_f64()
         } else {
             0.0
         };

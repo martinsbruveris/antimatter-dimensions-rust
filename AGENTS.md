@@ -233,6 +233,7 @@ Located in `design-docs/`:
 | `2026-06-28-js-frontend-rust-wasm-engine.md` | Feasibility analysis of keeping the original JS/Vue app and swapping its engine for Rust/WASM (rejected; recommends a WASM target for `ad-core` instead) |
 | `2026-06-30-offline-progress.md` | How the original simulates offline progress, how it maps onto our `simulate`/`ticks` primitives, the game-speed/timestamp implications, and a design for a manual Offline-mode button |
 | `2026-06-30-ui-reveal-and-tutorial.md` | Progressive UI reveal (hiding/showing AD rows, tickspeed, sacrifice), first-time/disable-able confirmation modals (boost/galaxy/sacrifice/crunch), and the tutorial glow + exclamation highlight; how the original implements each and a phased plan |
+| `2026-06-30-achievements.md` | Normal achievements: bitmask state on `GameState`, inline unlock hooks at the `apply_action` seam (rows 1–2 minus News), per-achievement effects + the global achievement-power multiplier, `achievementBits` save round-trip, and the sprite-driven tab; phased plan |
 
 The table lists key documents; see the `design-docs/` folder for the full,
 date-prefixed set. Read these before making architectural decisions. The
