@@ -457,7 +457,7 @@ fn big_crunch(state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn hard_reset(state: State<'_, Mutex<GameState>>) -> GameView {
     let mut game = state.lock().unwrap();
-    *game = GameState::new();
+    *game = fresh_game();
     build_game_view(&game)
 }
 
@@ -631,12 +631,34 @@ async fn import_save_from_file(
     }
 }
 
+/// Constructs a fresh game for the running app.
+///
+/// In debug builds this applies developer conveniences (skip the tutorial,
+/// disable confirmation modals) to speed up iteration. These are gated behind
+/// `#[cfg(debug_assertions)]`, so any release build (`--release`, packaged
+/// bundles) is compiled without them and always starts from the production
+/// defaults in `GameState::new()`. There is nothing to remember to revert.
+fn fresh_game() -> GameState {
+    #[allow(unused_mut)]
+    let mut game = GameState::new();
+    #[cfg(debug_assertions)]
+    {
+        game.tutorial_state = 5;
+        game.tutorial_active = false;
+        game.options.confirmations.dimension_boost = false;
+        game.options.confirmations.antimatter_galaxy = false;
+        game.options.confirmations.sacrifice = false;
+        game.options.confirmations.big_crunch = false;
+    }
+    game
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(Mutex::new(GameState::new()))
+        .manage(Mutex::new(fresh_game()))
         .invoke_handler(tauri::generate_handler![
             tick_and_get_state,
             simulate_offline,
