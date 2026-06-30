@@ -43,9 +43,11 @@ frontend/
     config/tabs.js          # tab/subtab structure -> page components
     stores/game.js          # Pinia: Rust snapshot + action dispatchers
     stores/ui.js            # Pinia: navigation + open modal + dev speed
-    data/                   # TEMP frontend data (moves into ad-core later):
-                            #   achievements.js, credits.js,
-                            #   shortcuts.js (Hotkey List content)
+    data/                   # frontend display data:
+                            #   achievements.js (id/name/description/reward —
+                            #     strings live frontend-side by design; the
+                            #     engine owns only unlock state + effects),
+                            #   credits.js, shortcuts.js (Hotkey List content)
     util/                   # small helpers: dimensionText, responsive,
                             #   shortcuts.js (keyboard handler)
     components/
@@ -318,8 +320,12 @@ frontend/
   modal is done — see Options tabs above). `inf_threshold` is left at its default
   (never "Infinite") — fine pre-Infinity since antimatter caps before
   `NUMBER_MAX_VALUE`.
-- Achievements live in `data/achievements.js` for display only; unlock state and
-  real tiles come once `ad-core` owns achievements.
+- Achievements: `data/achievements.js` holds display strings (name/description/
+  reward) only; the engine owns unlock state and effects. The tab renders real
+  tiles (sprite + grey/green) from the snapshot `unlocked_achievements` list, and
+  the `game` store fires an unlock toast by diffing that list between snapshots
+  (seeded silently on load/import/reset). Rows 1–2 are implemented; later rows
+  show as locked placeholders. See `design-docs/2026-06-30-achievements.md`.
 - Responsive dimension rows use the "narrow" stacked layout unconditionally
   below 1573px (matches the original at the default window size).
 - Big Crunch resets all pre-Infinity progress but awards no Infinity Points

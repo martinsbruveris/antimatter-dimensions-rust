@@ -1,8 +1,6 @@
 use break_infinity::Decimal;
 
-use crate::data::constants::{
-    FIRST_GALAXY_REQUIREMENT, GALAXY_REQUIREMENT_INCREMENT, INITIAL_ANTIMATTER,
-};
+use crate::data::constants::{FIRST_GALAXY_REQUIREMENT, GALAXY_REQUIREMENT_INCREMENT};
 use crate::state::{DimensionTier, GameState, TickspeedState};
 
 impl GameState {
@@ -32,15 +30,22 @@ impl GameState {
             return false;
         }
 
+        // 26: buy an Antimatter Galaxy (fires before the reset, like the
+        // original's GALAXY_RESET_BEFORE).
+        self.unlock_achievement(26);
         self.galaxies += 1;
         self.galaxy_reset();
+        // 27: have ≥ 2 Antimatter Galaxies (after the increment).
+        if self.galaxies >= 2 {
+            self.unlock_achievement(27);
+        }
         true
     }
 
     /// Perform a galaxy reset: reset all dimensions,
-    /// tickspeed, and dim boosts. Antimatter is reset to 10.
+    /// tickspeed, and dim boosts. Antimatter is reset to its starting value.
     fn galaxy_reset(&mut self) {
-        self.antimatter = Decimal::from_float(INITIAL_ANTIMATTER);
+        self.antimatter = self.starting_antimatter();
         self.dim_boosts = 0;
         self.sacrificed = Decimal::ZERO;
 
@@ -95,13 +100,17 @@ impl GameState {
 
         self.dim_boosts += 1;
         self.dim_boost_reset();
+        // 25: buy 10 Dimension Boosts.
+        if self.dim_boosts >= 10 {
+            self.unlock_achievement(25);
+        }
         true
     }
 
     /// Perform a dimension boost reset: reset antimatter and
     /// all dimensions. Tickspeed and galaxies are kept.
     fn dim_boost_reset(&mut self) {
-        self.antimatter = Decimal::from_float(INITIAL_ANTIMATTER);
+        self.antimatter = self.starting_antimatter();
         self.sacrificed = Decimal::ZERO;
 
         for i in 0..8 {

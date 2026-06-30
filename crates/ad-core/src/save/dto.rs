@@ -24,6 +24,7 @@
 use break_infinity::Decimal;
 use serde::Deserialize;
 
+use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::{AutobuyerMode, AutobuyerState};
 use crate::options::{
     Options, MAX_NOTATION_DIGITS, MAX_UPDATE_RATE_MS, MIN_NOTATION_DIGITS,
@@ -61,6 +62,8 @@ pub struct PlayerDTO {
     pub infinities: Decimal,
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_points: Decimal,
+    /// `player.achievementBits` — one bitmask int per achievement row.
+    pub achievement_bits: Vec<u32>,
     pub records: RecordsDTO,
     pub auto: AutoDTO,
     pub options: OptionsDTO,
@@ -182,6 +185,18 @@ impl GameState {
             || dto.infinities > Decimal::ZERO
             || dto.infinity_points > Decimal::ZERO;
 
+        // Achievement bitmask is a fixed-length array, like the dimensions; a
+        // different length signals an unexpected save format.
+        if dto.achievement_bits.len() != ACHIEVEMENT_ROW_COUNT {
+            return Err(SaveError::UnexpectedArrayLength {
+                field: "achievementBits",
+                expected: ACHIEVEMENT_ROW_COUNT,
+                found: dto.achievement_bits.len(),
+            });
+        }
+        let mut achievement_bits = [0u32; ACHIEVEMENT_ROW_COUNT];
+        achievement_bits.copy_from_slice(&dto.achievement_bits);
+
         // The per-tier autobuyer array is fixed-length for the same reason.
         let ad_autobuyers = &dto.auto.antimatter_dims.all;
         if ad_autobuyers.len() != DIMENSION_COUNT {
@@ -246,6 +261,7 @@ impl GameState {
             galaxies: dto.galaxies,
             sacrificed: dto.sacrificed,
             infinity_unlocked,
+            achievement_bits,
             autobuyers,
             options,
         })

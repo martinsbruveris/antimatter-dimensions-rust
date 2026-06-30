@@ -2,7 +2,8 @@
 
 Date: 2026-06-30
 
-**Status: proposed.**
+**Status: implemented** (rows 1–2, minus the News achievement 22; all five
+phases landed). Later rows and secret achievements remain deferred.
 
 ## Goal
 
@@ -116,17 +117,19 @@ name / description / reward.
 
 ---
 
-## What our codebase already has
+## What our codebase had (starting point, before this work)
 
-- **No achievement state at all.** `GameState` has no achievement field;
-  `save/encode.rs` overlays only modelled fields onto a fresh-start template, so
-  `achievementBits` round-trips as all-zeros. Any achievement-gated visibility or
-  effect is currently lost.
-- **The tab is scaffolded but inert.** `frontend/components/tabs/
-  NormalAchievementsTab.vue` + `frontend/data/achievements.js` exist and render
+This section describes the pre-implementation state the design started from.
+
+- **No achievement state at all.** `GameState` had no achievement field;
+  `save/encode.rs` overlaid only modelled fields onto a fresh-start template, so
+  `achievementBits` round-tripped as all-zeros. Any achievement-gated visibility or
+  effect was lost.
+- **The tab was scaffolded but inert.** `frontend/components/tabs/
+  NormalAchievementsTab.vue` + `frontend/data/achievements.js` existed and rendered
   every tile `o-achievement--locked`, with no sprite and no engine link. The
-  extracted data is lossy (id 22 description blank, id 32 description is the
-  literal `"Achievement32"`) — re-extract cleanly when wiring real data.
+  extracted data was lossy (id 22 description blank, id 32 description the literal
+  `"Achievement32"`) — re-extracted cleanly when wiring real data.
 - **Clean inline unlock points** in `dimensions.rs` (`buy_one_dimension`),
   `galaxy.rs`, `dim boost`, `crunch.rs` (`big_crunch`), and `tick.rs`.
 - **`dimension_multiplier(tier)`** (`dimensions.rs`, 0-indexed tier) is the single
@@ -155,8 +158,13 @@ with helpers (a dedicated `achievements.rs` module):
 ```rust
 pub fn achievement_unlocked(&self, id: u16) -> bool;
 fn unlock_achievement(&mut self, id: u16);                 // idempotent set
-fn try_unlock_achievement(&mut self, id: u16, cond: bool); // set iff !set && cond
 ```
+
+There is deliberately **no** `try_unlock(id, cond)` wrapper. The original's
+`tryUnlock` guards an event dispatch (`if !isUnlocked && checkRequirement`); we
+dispatch no events and `unlock_achievement` is idempotent, so a wrapper would
+collapse to `if cond { unlock }` while splitting one logical condition across a
+guard and an argument. Call sites just write the `if` directly.
 
 `u32` per row is deliberate (a row is 8 bits, but `achievementBits` ints are
 unbounded in JS and this keeps the bit math obvious). Default is all-zeros via
@@ -169,14 +177,14 @@ scope (22 excluded):
 
 | id | Condition | Hook |
 |----|-----------|------|
-| 11–18 | buy an Nth AD | end of `buy_one_dimension(tier)`: `unlock(10 + tier)` |
+| 11–18 | buy an Nth AD | end of `buy_one_dimension(tier)`: `unlock(11 + tier)` |
 | 21 | go Infinite | `big_crunch`, **before** the reset: `unlock(21)` |
-| 23 | exactly 99 eighth ADs | after buying the 8th AD: `try_unlock(23, amt == 99)` |
-| 24 | antimatter ≥ 1e80 | end of `tick()`: `try_unlock(24, exponent ≥ 80)` |
-| 25 | ≥ 10 Dimension Boosts | after dim boost: `try_unlock(25, purchased ≥ 10)` |
+| 23 | exactly 99 eighth ADs | after buying the 8th AD: `if amt == 99 { unlock(23) }` |
+| 24 | antimatter ≥ 1e80 | end of `tick()`: `if exponent ≥ 80 { unlock(24) }` |
+| 25 | ≥ 10 Dimension Boosts | after dim boost: `if purchased ≥ 10 { unlock(25) }` |
 | 26 | buy an Antimatter Galaxy | `buy_galaxy`, before reset: `unlock(26)` |
-| 27 | ≥ 2 Antimatter Galaxies | after `buy_galaxy`: `try_unlock(27, galaxies ≥ 2)` |
-| 28 | buy a 1st AD while holding ≥ 1e150 | end of tier-1 buy: `try_unlock(28, exp ≥ 150)` |
+| 27 | ≥ 2 Antimatter Galaxies | after `buy_galaxy`: `if galaxies ≥ 2 { unlock(27) }` |
+| 28 | buy a 1st AD while holding ≥ 1e150 | end of tier-1 buy: `if exp ≥ 150 { unlock(28) }` |
 
 Notes:
 - 23 is an **exact-equality** check — only re-test it when the 8th-dimension
@@ -209,23 +217,43 @@ Notes:
 - `encode.rs`: write `achievement_bits` verbatim into the `achievementBits`
   array (replaces today's all-zeros). This automatically carries achievement 18,
   so a save we write keeps the sacrifice button visible.
-- `dto.rs`: read `achievementBits` back into `achievement_bits`, defaulting to
-  all-zeros when absent (old saves / fresh games stay valid).
+- `dto.rs`: read `achievementBits` into `achievement_bits`. Like the other
+  modelled fields it is **required** (no serde default — a missing one fails the
+  load, surfacing a format change) and its length is validated to be exactly 17
+  (`SaveError::UnexpectedArrayLength`, mirroring the dimensions array). Every real
+  AD save always has it, so this is strict by design. (`GameState`'s *own* serde
+  derive does carry `#[serde(default)]` so an internally-serialized state without
+  the field still loads as all-zeros — that is the internal-state path, not the
+  save-file path.)
 
 ### 5. Snapshot (`observed.rs`)
 
-Expose unlock state once at the top level — simplest is the raw array; the
-frontend derives per-tile state and counts:
+The raw `[u32; 17]` bitmask stays in `GameState` (it must serialize that way), but
+the presentation layer gets a semantically meaningful shape instead of the bits.
+Expose a sorted list of unlocked ids plus the derived power, built from the
+bitmask:
 
 ```rust
-pub achievement_bits: [u32; 17],
+pub unlocked_achievements: Vec<u16>,   // sorted; frontend builds a Set
+pub achievement_power: Decimal,        // 1.25^rows * 1.03^count, for the tab's boost display
 ```
 
-Replace the UI-reveal stopgap: `sacrifice_unlocked`'s *visibility* term reads
-`achievement_unlocked(18)` instead of a bespoke `bought_8th_dimension` bool. (The
-*enable* gate, `dim_boosts >= 5`, is unchanged — see that doc's Feature 1.) Bits
-persist across a crunch, fixing the "sacrifice button vanishes after a
-boost-resetting crunch" bug.
+Both fields are added to **`ObservedState`** (the `ad-sim`/Python snapshot) and to
+the GUI's own **`GameView`** in `ad-gui/src/main.rs`, where `achievement_power` is
+serialized through the frontend's `Num { m, e }` number shape like every other
+displayed `Decimal`.
+
+The tab renders every tile from its own `data/achievements.js` and marks a tile
+unlocked iff its id is in `unlocked_achievements` — so unmodelled (later-row)
+achievements simply stay locked. The list is also what Phase 5's toast diffs.
+
+The substrate also enables retiring the UI-reveal stopgap: `sacrifice_unlocked`'s
+*visibility* term can read `achievement_unlocked(18)` instead of a bespoke
+`bought_8th_dimension` bool (the *enable* gate `dim_boosts >= 5` stays). Bits
+persist across a crunch, which is what fixes the "sacrifice button vanishes after
+a boost-resetting crunch" bug. **This rewire is deferred to the UI-reveal feature
+that owns the visible/enable split — this milestone leaves sacrifice gating
+untouched (see Phase 2).**
 
 ### 6. Tab (`ad-gui` frontend)
 
@@ -234,7 +262,8 @@ boost-resetting crunch" bug.
 - Port `NormalAchievement.vue`'s sprite positioning (`background-position:
   -(col-1)*104px -(row-1)*104px`), `o-achievement--locked/--unlocked` classes,
   the `fa-star` reward badge, and the tooltip (name / description / reward).
-- Drive each tile's unlocked state from the snapshot `achievement_bits`.
+- Drive each tile's unlocked state from the snapshot `unlocked_achievements` list
+  (build a `Set` once per update); show the boost from `achievement_power`.
 - Re-extract clean `name`/`description`/`reward` strings into the frontend
   `data/achievements.js` (decided: strings stay frontend-side — see Open
   Question 1); fix the lossy entries (id 22 blank, id 32 = `"Achievement32"`).
@@ -255,7 +284,7 @@ Ordered foundation-first; the substrate underpins everything that reads it.
 ### Phase 1 — substrate + persistence
 
 - `state.rs` / `achievements.rs`: `achievement_bits`, `achievement_unlocked`,
-  `unlock_achievement`, `try_unlock_achievement`.
+  `unlock_achievement`.
 - `save/encode.rs` + `save/dto.rs`: round-trip `achievementBits`. Test the
   round-trip and the "bits survive a crunch" property.
 
@@ -265,7 +294,11 @@ Ordered foundation-first; the substrate underpins everything that reads it.
   condition unlocks at its boundary and not before; 23's exact-99 check; 18
   persists across a crunch.
 - Point `sacrifice_unlocked` visibility at `achievement_unlocked(18)`; drop the
-  `bought_8th_dimension` plan from the UI-reveal doc.
+  `bought_8th_dimension` plan from the UI-reveal doc. **(Substrate landed —
+  `achievement_unlocked(18)` works and persists across a crunch — but the actual
+  rewire of the sacrifice button's visible/enable split is left to the UI-reveal
+  feature, which owns that split. This milestone does not change sacrifice
+  gating.)**
 
 ### Phase 3 — effects
 
@@ -277,8 +310,23 @@ Ordered foundation-first; the substrate underpins everything that reads it.
 
 ### Phase 4 — tab
 
-- Vendor the sprite; wire `NormalAchievementsTab.vue` to snapshot bits; add
-  star badges + reward tooltips; re-extract the display strings.
+- Vendor the sprite; wire `NormalAchievementsTab.vue` to the snapshot
+  `unlocked_achievements` list; add star badges + reward tooltips; re-extract the
+  display strings.
+
+### Phase 5 — unlock notification toast
+
+Mirror the original's `GameUI.notify.success(\`Achievement: ${name}\`)`. The
+infrastructure already exists — `ui.notify(text, type, duration)` in the `ui`
+store + `NotificationContainer.vue`, with an `o-notification--success` style — so
+this is **frontend-only** and needs no engine changes.
+
+- In the `game` store, diff `unlocked_achievements` against the previous
+  snapshot's list on each update; for each newly-added id, look up its name in
+  `data/achievements.js` and call `ui.notify(\`Achievement: ${name}\`, 'success')`.
+- **Seed, don't spam:** on the first snapshot after load/import, record the
+  unlocked set **without** notifying, so importing a save full of achievements
+  doesn't fire a wall of toasts. Notify only on transitions after that.
 
 ## Other considerations
 
@@ -288,9 +336,9 @@ Ordered foundation-first; the substrate underpins everything that reads it.
    cover it with a test and call it out.
 2. **`isEffectActive` simplifies to `isUnlocked`** for us (only Pelle disables,
    out of scope). Don't model disabling.
-3. **Deferred, none blocking:** unlock toast notifications
-   (`GameUI.notify.success`), the `hideCompletedAchievementRows` option, Reality
-   auto-achieve, and secret achievements.
+3. **Deferred, none blocking:** the `hideCompletedAchievementRows` option,
+   Reality auto-achieve, and secret achievements. (Unlock toast notifications are
+   **in scope** — Phase 5.)
 4. **Replaces the UI-reveal stopgap** — do not implement `bought_8th_dimension`;
    read `achievement_unlocked(18)`.
 
@@ -306,10 +354,10 @@ Ordered foundation-first; the substrate underpins everything that reads it.
    cleanly (id 22 blank, id 32 = `"Achievement32"`) rather than relying on the
    lossy current entries. (`ad-core/src/data/` remains an option if Python ever
    needs the strings, but nothing requires it now.)
-2. **Snapshot shape** — raw `achievement_bits: [u32; 17]` (frontend derives
-   tiles + counts) vs. a pre-computed per-id `unlocked` list / `achievement_power`
-   value. Raw is least code and matches the original's `Achievement(N).isUnlocked`
-   call site; leaning raw, possibly with a derived `achievement_power` for the
-   tab's boost display.
-3. **Unlock notifications** — add the success toast in Phase 4 or defer? It is
-   cosmetic and independent; default defer.
+2. **Snapshot shape** — *(Decided: list.)* The raw `[u32; 17]` bitmask stays in
+   `GameState` for serialization, but the snapshot exposes a semantic
+   `unlocked_achievements: Vec<u16>` (+ derived `achievement_power`) rather than
+   the bits, so the presentation layer never touches bit math.
+3. **Unlock notifications** — *(Decided: implement, Phase 5.)* Frontend-only,
+   reusing the existing `ui.notify` toast; diff the `unlocked_achievements` list
+   between snapshots and seed on first load to avoid spamming on import.

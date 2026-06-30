@@ -29,9 +29,27 @@ impl GameState {
             self.antimatter -= cost;
             self.dimensions[tier].amount += Decimal::from_float(1.0);
             self.dimensions[tier].bought += 1;
+            self.on_buy_dimension(tier);
             true
         } else {
             false
+        }
+    }
+
+    /// Achievement checks fired after buying one of `tier` (0-indexed). Mirrors
+    /// the original's `onBuyDimension` unlocks: "buy an Nth dimension" (11–18),
+    /// the exactly-99 eighth-dimension achievement (23), and the over-1e150
+    /// first-dimension achievement (28).
+    fn on_buy_dimension(&mut self, tier: usize) {
+        // 11–18: buy a 1st..8th Antimatter Dimension (tier is 0-indexed).
+        self.unlock_achievement(11 + tier as u16);
+        // 23: have exactly 99 eighth dimensions (only buying AD8 can reach it).
+        if tier == 7 && self.dimensions[7].amount == Decimal::from_float(99.0) {
+            self.unlock_achievement(23);
+        }
+        // 28: buy a 1st dimension while holding over 1e150 of them.
+        if tier == 0 && self.dimensions[0].amount.exponent() >= 150 {
+            self.unlock_achievement(28);
         }
     }
 
@@ -116,6 +134,16 @@ impl GameState {
         // Sacrifice multiplier applies only to 8th dimension
         if tier == 7 {
             mult *= self.sacrifice_multiplier();
+        }
+
+        // Achievement effects. The global achievement power applies to every
+        // dimension; achievements 28 / 23 boost the 1st / 8th dimension by 10%.
+        mult *= self.achievement_power();
+        if tier == 0 && self.achievement_unlocked(28) {
+            mult *= Decimal::from_float(1.1);
+        }
+        if tier == 7 && self.achievement_unlocked(23) {
+            mult *= Decimal::from_float(1.1);
         }
 
         mult

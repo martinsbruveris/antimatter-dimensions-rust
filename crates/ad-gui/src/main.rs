@@ -135,6 +135,11 @@ struct GameView {
     autobuyers: AutobuyersView,
     /// Player options (UI/UX preferences), surfaced for the options tabs.
     options: OptionsView,
+    /// Sorted ids of unlocked normal achievements; drives the Achievements tab
+    /// and the unlock-toast diff in the frontend.
+    unlocked_achievements: Vec<u16>,
+    /// Global achievement-power multiplier (shown as the tab's boost).
+    achievement_power: Num,
 }
 
 /// Serializable view of the player options the frontend reads/writes.
@@ -241,7 +246,11 @@ fn build_game_view(game: &GameState) -> GameView {
         // scaling (`getGameSpeedupForDisplay`) is 1 pre-Infinity.
         let rate_percent = if tier < 7 && *amount > Decimal::ZERO {
             let to_gain = game.dimension_production_per_second(tier + 1);
-            let denom = if *amount > Decimal::ONE { *amount } else { Decimal::ONE };
+            let denom = if *amount > Decimal::ONE {
+                *amount
+            } else {
+                Decimal::ONE
+            };
             (to_gain * Decimal::from_float(10.0) / denom).to_f64()
         } else {
             0.0
@@ -304,6 +313,8 @@ fn build_game_view(game: &GameState) -> GameView {
         can_big_crunch: game.can_big_crunch(),
         infinity_unlocked: game.infinity_unlocked,
         autobuyers: build_autobuyers_view(game),
+        unlocked_achievements: game.unlocked_achievement_ids(),
+        achievement_power: num(&game.achievement_power()),
         options: OptionsView {
             hotkeys: game.options.hotkeys,
             update_rate: game.options.update_rate,

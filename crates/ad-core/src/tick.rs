@@ -51,6 +51,12 @@ impl GameState {
         if self.antimatter > BIG_CRUNCH_THRESHOLD {
             self.antimatter = BIG_CRUNCH_THRESHOLD;
         }
+
+        // 24: "Antimatter Apocalypse" — reach 1e80 antimatter (original's
+        // GAME_TICK_AFTER check).
+        if self.antimatter.exponent() >= 80 {
+            self.unlock_achievement(24);
+        }
     }
 
     /// Advance the game by `repeats` discrete steps of `dt_ms` each.

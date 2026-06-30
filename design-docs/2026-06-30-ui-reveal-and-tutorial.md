@@ -136,7 +136,10 @@ floor(id/10)`, `column = id%10`). Achievement 18 → row 1, column 8 →
   original game **hides the sacrifice button** even for a player who has
   sacrificed. (Observed in testing — this is what surfaced the bug.) This is a
   general save-fidelity gap: any achievement-gated visibility/effect is lost on
-  round-trip.
+  round-trip. **(No longer true as of 2026-06-30 — achievements are now modelled
+  and round-tripped; see `design-docs/2026-06-30-achievements.md`. Achievement 18
+  unlocks and persists, so the remaining step for this feature is to point
+  sacrifice visibility at `achievement_unlocked(18)`.)**
 - The snapshot (`ObservedDimensionState`) exposes per-tier `unlocked`; the tab
   snapshot exposes `unlocked_dimensions`, `sacrifice_unlocked`.
 
@@ -201,6 +204,16 @@ achievement bit 18. Everything else (AD rows, tickspeed) is derived from existin
 fields.
 
 ### Note: a general achievement model
+
+> **Update (2026-06-30): this has since been built** — see
+> `design-docs/2026-06-30-achievements.md`. `GameState` now has
+> `achievement_bits: [u32; 17]`, round-tripped verbatim through `achievementBits`,
+> with `achievement_unlocked(id)` and inline unlocks (including 18 on buying an
+> 8th AD). So **drop `bought_8th_dimension`**: Feature 1's sacrifice *visibility*
+> should read `self.achievement_unlocked(18)` directly. The achievement milestone
+> deliberately left sacrifice gating untouched, so wiring that visibility term is
+> the small remaining step that belongs to this feature. The note below is the
+> original pre-implementation reasoning, kept for context.
 
 `bought_8th_dimension` is really "achievement 18 unlocked." Several pre-Infinity
 achievements gate UI or carry production effects, and all of them currently
@@ -486,10 +499,13 @@ Ordered cheapest-first; the three features are independent.
 
 ## Open questions
 
-1. **Achievements: minimal substrate first, or stopgap?** (Material — the only
-   one that affects sequencing.) Feature 1's sacrifice *visibility* needs
-   achievement 18, which is persisted state we don't model. Two paths: (a) build a
-   minimal **achievement-bit substrate** first — `achievement_bits` on
+1. **Achievements: minimal substrate first, or stopgap?** *(Resolved: built the
+   substrate — option (a).)* The full achievement model (substrate + tab +
+   rewards) landed; see `design-docs/2026-06-30-achievements.md`. So Feature 1
+   drops `bought_8th_dimension` and reads `achievement_unlocked(18)` directly.
+   Original framing kept below for context. Feature 1's sacrifice *visibility*
+   needs achievement 18, which is persisted state we don't model. Two paths: (a)
+   build a minimal **achievement-bit substrate** first — `achievement_bits` on
    `GameState`, event-driven `unlock(id)`, `achievementBits` round-tripped in
    `encode.rs`/`dto.rs` — and have sacrifice read `achievement(18)`; or (b) ship a
    one-off `bought_8th_dimension` bool now and swap later. (a) also closes the

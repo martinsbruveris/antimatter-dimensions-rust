@@ -89,8 +89,10 @@ fn test_ad1_produces_antimatter() {
     let mut game = GameState::new();
     game.buy_dimension(0); // 1 AD1, 0 antimatter
     game.tick(1000.0); // 1 second
-                       // Production = 1 * 1.0 (mult) * 1.0 (tickspeed_effect) * 1s = 1
-    assert_eq!(game.antimatter, Decimal::from_float(1.0));
+                       // Buying AD1 unlocks achievement 11, whose power (1.03^1)
+                       // multiplies all dimensions, so production over 1 s is
+                       // 1 * 1.03 (mult) * 1.0 (tickspeed) = 1.03.
+    assert_eq!(game.antimatter, Decimal::from_float(1.03));
 }
 
 #[test]

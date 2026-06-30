@@ -1,3 +1,4 @@
+pub mod achievements;
 pub mod action;
 pub mod autobuyers;
 pub mod crunch;

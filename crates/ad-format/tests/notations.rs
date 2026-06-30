@@ -190,8 +190,14 @@ fn mixed_scientific_places_2() {
     assert_eq!(mixed_sci(Decimal::new(1.0, 100), 2), "1.00e100");
     assert_eq!(mixed_sci(Decimal::new(1.0, 100_000), 2), "1.00e100,000");
     // Recursive exponent renders Standard-style (Mixed recurses into itself).
-    assert_eq!(mixed_sci(Decimal::new(1.0, 1_000_000_000), 2), "1.00e1.000 B");
-    assert_eq!(mixed_sci(Decimal::new(1.23, 1_000_000_000), 2), "1.23e1.000 B");
+    assert_eq!(
+        mixed_sci(Decimal::new(1.0, 1_000_000_000), 2),
+        "1.00e1.000 B"
+    );
+    assert_eq!(
+        mixed_sci(Decimal::new(1.23, 1_000_000_000), 2),
+        "1.23e1.000 B"
+    );
     assert_eq!(
         mixed_sci(Decimal::new(1.0, 1_230_000_000_000_000), 2),
         "1.00e1.230 Qa"
@@ -229,7 +235,10 @@ fn mixed_engineering_places_2() {
 #[test]
 fn mixed_engineering_places_0() {
     assert_eq!(mixed_eng(Decimal::new(1.0, 100), 0), "10e99");
-    assert_eq!(mixed_eng(Decimal::new(1.23, 1_000_000_000), 0), "12e999,999,999");
+    assert_eq!(
+        mixed_eng(Decimal::new(1.23, 1_000_000_000), 0),
+        "12e999,999,999"
+    );
 }
 
 #[test]
@@ -268,7 +277,10 @@ fn infinity_notation_places_2() {
     assert_eq!(infinity(Decimal::new(1.0, 100), 2), "0.3244\u{221e}");
     // Three decimals (and commas) once the count passes 1000.
     assert_eq!(infinity(Decimal::new(1.0, 100_000), 2), "324.4070\u{221e}");
-    assert_eq!(infinity(Decimal::new(1.0, 1_234_567), 2), "4,005.022\u{221e}");
+    assert_eq!(
+        infinity(Decimal::new(1.0, 1_234_567), 2),
+        "4,005.022\u{221e}"
+    );
     assert_eq!(
         infinity(Decimal::new(1.0, 1_000_000_000), 2),
         "3,244,070.405\u{221e}"
@@ -283,7 +295,10 @@ fn infinity_notation_places_2() {
 fn infinity_notation_places_0() {
     // `places` only matters once it exceeds the built-in `infPlaces` (4 or 3).
     assert_eq!(infinity(Decimal::new(1.0, 3), 0), "0.0097\u{221e}");
-    assert_eq!(infinity(Decimal::new(1.0, 1_234_567), 0), "4,005.022\u{221e}");
+    assert_eq!(
+        infinity(Decimal::new(1.0, 1_234_567), 0),
+        "4,005.022\u{221e}"
+    );
 }
 
 #[test]

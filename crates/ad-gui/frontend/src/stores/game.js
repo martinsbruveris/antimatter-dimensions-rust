@@ -1,6 +1,12 @@
 import { defineStore } from "pinia";
 import { invoke } from "@tauri-apps/api/core";
 
+import { useUiStore } from "./ui";
+import { NORMAL_ACHIEVEMENTS } from "../data/achievements";
+
+// id → display name, for the unlock toast.
+const ACHIEVEMENT_NAMES = new Map(NORMAL_ACHIEVEMENTS.map((a) => [a.id, a.name]));
+
 // The Rust engine is authoritative. This store holds the latest
 // per-tick snapshot for display and dispatches actions over Tauri IPC.
 // `buyUntil10` is UI-only state (never part of the engine's GameState).
@@ -8,19 +14,44 @@ export const useGameStore = defineStore("game", {
   state: () => ({
     snapshot: null,
     buyUntil10: true,
+    // Ids of achievements unlocked as of the last snapshot we diffed, so a
+    // freshly-unlocked one fires exactly one toast. `null` until first seeded.
+    seenAchievements: null,
   }),
   actions: {
+    // Fire a success toast (mirroring the original's
+    // `GameUI.notify.success`) for each achievement newly present in the
+    // current snapshot. Seeds silently the first time and whenever the state
+    // is replaced wholesale (load/import/reset), so those don't spam toasts.
+    notifyNewAchievements(seedOnly = false) {
+      const ids = this.snapshot?.unlocked_achievements ?? [];
+      if (!seedOnly && this.seenAchievements !== null) {
+        const prev = new Set(this.seenAchievements);
+        const ui = useUiStore();
+        for (const id of ids) {
+          if (!prev.has(id)) {
+            const name = ACHIEVEMENT_NAMES.get(id) ?? `Achievement ${id}`;
+            ui.notify(`Achievement: ${name}`, "success", 3000);
+          }
+        }
+      }
+      this.seenAchievements = ids;
+    },
     // Advance the engine by `repeats` discrete ticks of `dtMs` each (the dev
     // game-speed control passes the multiplier as `repeats`), returning a
     // single snapshot. Looping in Rust avoids one IPC round-trip per tick.
     async tick(dtMs, repeats = 1) {
       this.snapshot = await invoke("tick_and_get_state", { dtMs, repeats });
+      this.notifyNewAchievements();
     },
     // Replay `gameMs` of accumulated offline game-time (already speed-scaled) at
     // the resolution set by `offlineTicks`. Called when Offline mode is switched
     // off; returns nothing but updates the snapshot.
     async simulateOffline(gameMs, offlineTicks) {
       this.snapshot = await invoke("simulate_offline", { gameMs, offlineTicks });
+      // Offline gains are summarised by the offline modal, not per-achievement
+      // toasts — reseed silently so the next tick doesn't fire a storm.
+      this.notifyNewAchievements(true);
     },
     toggleBuyMode() {
       this.buyUntil10 = !this.buyUntil10;
@@ -65,6 +96,7 @@ export const useGameStore = defineStore("game", {
     // Hard reset: wipes the game back to a completely fresh state.
     async hardReset() {
       this.snapshot = await invoke("hard_reset");
+      this.notifyNewAchievements(true);
     },
     // --- Autobuyers ---
     // Unlock an AD autobuyer's slow version (no antimatter cost; only succeeds
@@ -127,6 +159,7 @@ export const useGameStore = defineStore("game", {
     // Imports a save from a text string. Replaces the running game state.
     async importSave(text) {
       this.snapshot = await invoke("import_save", { text });
+      this.notifyNewAchievements(true);
     },
     // Exports the save to a user-chosen file via native Save As dialog.
     exportSaveToFile(saveFileName = "") {
@@ -135,6 +168,7 @@ export const useGameStore = defineStore("game", {
     // Imports a save from a user-chosen file via native Open dialog.
     async importSaveFromFile() {
       this.snapshot = await invoke("import_save_from_file");
+      this.notifyNewAchievements(true);
     },
   },
 });

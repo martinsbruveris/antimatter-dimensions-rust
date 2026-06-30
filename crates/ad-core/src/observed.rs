@@ -98,6 +98,11 @@ pub struct ObservedState {
     /// Gain ratio the next sacrifice would yield (the
     /// `nextBoost` value). 1 when sacrifice is not worthwhile.
     pub next_sacrifice_boost: Decimal,
+    /// Sorted ids of unlocked normal achievements (the semantic view of
+    /// `GameState::achievement_bits`).
+    pub unlocked_achievements: Vec<u16>,
+    /// Global achievement-power multiplier applied to every dimension.
+    pub achievement_power: Decimal,
 }
 
 impl ObservedState {
@@ -126,6 +131,8 @@ impl ObservedState {
             can_dim_boost: game.can_dim_boost(),
             can_sacrifice: game.can_sacrifice(),
             next_sacrifice_boost: game.next_sacrifice_boost(),
+            unlocked_achievements: game.unlocked_achievement_ids(),
+            achievement_power: game.achievement_power(),
         }
     }
 }

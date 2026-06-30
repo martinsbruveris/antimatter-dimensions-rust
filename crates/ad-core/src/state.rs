@@ -1,5 +1,6 @@
 use break_infinity::Decimal;
 
+use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::AutobuyerState;
 use crate::data::constants::{
     INITIAL_ANTIMATTER, TICKSPEED_BASE_COST, TICKSPEED_COST_MULTIPLIER,
@@ -101,6 +102,11 @@ pub struct GameState {
     /// the "Infinity" How To Play entry).
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinity_unlocked: bool,
+    /// Normal-achievement unlock state. Mirrors `player.achievementBits`: 17
+    /// rows, one bitmask each (`achievement_bits[row-1]` bit `1 << (col-1)`).
+    /// Persists forever, including across a Big Crunch. See `achievements.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub achievement_bits: [u32; ACHIEVEMENT_ROW_COUNT],
     /// Autobuyer state for dimensions and tickspeed.
     pub autobuyers: AutobuyerState,
     /// Player options (UI/UX preferences). Not pre-Infinity progress, so they
@@ -122,6 +128,7 @@ impl GameState {
             galaxies: 0,
             sacrificed: Decimal::ZERO,
             infinity_unlocked: false,
+            achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],
             autobuyers: AutobuyerState::new(),
             options: Options::new(),
         }

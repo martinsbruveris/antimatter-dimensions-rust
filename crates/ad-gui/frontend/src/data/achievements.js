@@ -1,23 +1,26 @@
-// Auto-extracted from the original normal-achievements.js (id, name,
-// description). TEMPORARY frontend data: this moves into the Rust
-// engine (ad-core) when achievements are implemented there.
+// Display data for the Achievements tab (id, name, description, optional
+// reward). Strings live frontend-side by design (see
+// design-docs/2026-06-30-achievements.md); the engine owns only unlock state
+// (snapshot `unlocked_achievements`) and the effect numbers. Rows 1-2 are
+// implemented and verified against the original; later rows are display-only
+// placeholders (some descriptions still rough) until their mechanics land.
 export const NORMAL_ACHIEVEMENTS = [
   { id: 11, name: "You gotta start somewhere", description: "Buy a 1st Antimatter Dimension." },
   { id: 12, name: "100 antimatter is a lot", description: "Buy a 2nd Antimatter Dimension." },
   { id: 13, name: "Half life 3 CONFIRMED", description: "Buy a 3rd Antimatter Dimension." },
   { id: 14, name: "L4D: Left 4 Dimensions", description: "Buy a 4th Antimatter Dimension." },
   { id: 15, name: "5 Dimension Antimatter Punch", description: "Buy a 5th Antimatter Dimension." },
-  { id: 16, name: "We couldn't afford 9", description: "Buy a 6th Antimatter Dimension (they never amount to anything)" },
+  { id: 16, name: "We couldn't afford 9", description: "Buy a 6th Antimatter Dimension." },
   { id: 17, name: "Not a luck related achievement", description: "Buy a 7th Antimatter Dimension." },
-  { id: 18, name: "90 degrees to infinity", description: "Buy an 8th Antimatter Dimension (don't get used to it)" },
-  { id: 21, name: "To infinity!", description: "Go Infinite." },
-  { id: 22, name: "FAKE NEWS!", description: "" },
-  { id: 23, name: "The 9th Dimension is a lie", description: "" },
-  { id: 24, name: "Antimatter Apocalypse", description: "" },
-  { id: 25, name: "Boosting to the max", description: "" },
+  { id: 18, name: "90 degrees to infinity", description: "Buy an 8th Antimatter Dimension." },
+  { id: 21, name: "To infinity!", description: "Go Infinite.", reward: "Start with 100 antimatter." },
+  { id: 22, name: "FAKE NEWS!", description: "Encounter 50 different news messages." },
+  { id: 23, name: "The 9th Dimension is a lie", description: "Have exactly 99 8th Antimatter Dimensions.", reward: "8th Antimatter Dimensions are 10% stronger." },
+  { id: 24, name: "Antimatter Apocalypse", description: "Get over 1e80 antimatter." },
+  { id: 25, name: "Boosting to the max", description: "Buy 10 Dimension Boosts." },
   { id: 26, name: "You got past The Big Wall", description: "Buy an Antimatter Galaxy." },
-  { id: 27, name: "Double Galaxy", description: "" },
-  { id: 28, name: "There's no point in doing that...", description: "" },
+  { id: 27, name: "Double Galaxy", description: "Buy 2 Antimatter Galaxies." },
+  { id: 28, name: "There's no point in doing that...", description: "Buy a single 1st Antimatter Dimension when you have over 1e150 of them.", reward: "1st Antimatter Dimensions are 10% stronger." },
   { id: 31, name: "I forgot to nerf that", description: "" },
   { id: 32, name: "The Gods are pleased", description: "Achievement32" },
   { id: 33, name: "That's a lot of infinites", description: "" },

@@ -67,6 +67,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // §4.3 inverse: carry the Infinity-unlocked flag via `break`. We don't model
     // an infinity count, so `infinities` is left at the template's "0".
     player["break"] = json!(state.infinity_unlocked);
+    // Achievement bitmask, written back verbatim (one int per row).
+    player["achievementBits"] = json!(state.achievement_bits);
     // Stamp the save time so the game computes ~0 offline progress on import.
     player["lastUpdate"] = json!(now_ms);
 
@@ -211,6 +213,9 @@ mod tests {
         state.infinity_unlocked = true;
         state.dimensions[2].bought = 42;
         state.options.set_notation("Engineering");
+        // Unlock a couple of achievements (18 → bits[0] bit 7; 21 → bits[1] bit 0).
+        state.unlock_achievement(18);
+        state.unlock_achievement(21);
 
         let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
         assert_eq!(reloaded.galaxies, 7);
@@ -218,6 +223,10 @@ mod tests {
         assert!(reloaded.infinity_unlocked);
         assert_eq!(reloaded.dimensions[2].bought, 42);
         assert_eq!(reloaded.options.notation, "Engineering");
+        // Achievement bits survive the round-trip verbatim.
+        assert_eq!(reloaded.achievement_bits, state.achievement_bits);
+        assert!(reloaded.achievement_unlocked(18));
+        assert!(reloaded.achievement_unlocked(21));
         // `break` reflects the Infinity-unlocked flag in the raw JSON.
         let player: Value =
             serde_json::from_str(&decode_pipeline(&encode_save(&state, 0)).unwrap())

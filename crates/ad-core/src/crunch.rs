@@ -1,6 +1,6 @@
 use break_infinity::Decimal;
 
-use crate::data::constants::{BIG_CRUNCH_THRESHOLD, INITIAL_ANTIMATTER};
+use crate::data::constants::BIG_CRUNCH_THRESHOLD;
 use crate::state::{DimensionTier, GameState, TickspeedState};
 
 impl GameState {
@@ -25,7 +25,11 @@ impl GameState {
             return false;
         }
 
-        self.antimatter = Decimal::from_float(INITIAL_ANTIMATTER);
+        // 21: "To infinity!" — unlocks on the crunch itself (the original's
+        // BIG_CRUNCH_BEFORE), so the post-reset starting antimatter already
+        // reflects its 100-antimatter reward.
+        self.unlock_achievement(21);
+        self.antimatter = self.starting_antimatter();
         self.dimensions = std::array::from_fn(|_| DimensionTier::new());
         self.tickspeed = TickspeedState::new();
         self.dim_boosts = 0;
@@ -64,9 +68,11 @@ mod tests {
         assert!(game.can_big_crunch());
         assert!(game.big_crunch());
 
-        // Everything back to a fresh game.
-        let fresh = GameState::new();
-        assert_eq!(game.antimatter, fresh.antimatter);
+        // Progress is back to a fresh game, except antimatter starts at 100:
+        // the crunch unlocks achievement 21 ("To infinity!"), whose reward is a
+        // 100-antimatter starting value.
+        assert!(game.achievement_unlocked(21));
+        assert_eq!(game.antimatter, Decimal::from_float(100.0));
         assert_eq!(game.dim_boosts, 0);
         assert_eq!(game.galaxies, 0);
         assert_eq!(game.sacrificed, Decimal::ZERO);
