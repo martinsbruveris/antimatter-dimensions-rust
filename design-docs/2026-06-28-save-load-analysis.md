@@ -6,7 +6,10 @@ slots, autosave, persistence remain). Scope: design how `ad-gui` persists a
 game and, crucially, how it interoperates with **external Antimatter Dimensions
 saves** — both directions — while only a slice of the game is implemented.
 
-See §9 for the phase checklist and §10 for the now-resolved open decisions.
+See §9 for the phase checklist, §10 for the now-resolved open decisions,
+§11 for the original game's full persistence architecture (localStorage,
+save slots, backup slots, autosave, clipboard/file, cloud saves), and §12
+for our Tauri persistence design.
 
 ## 1. Goals & constraints
 
@@ -552,3 +555,248 @@ All three resolved by the user (2026-06-29):
 - **Legacy saves:** **reject** pre-`AAB` (pre-Reality) saves. Only the latest
   format (`AAB`) needs to be supported, in both directions. The `atob`-only
   legacy decode path is out of scope.
+
+## 11. Original game persistence architecture
+
+Source: `../antimatter-dimensions/src/core/storage/storage.js`,
+`intervals.js`, `cloud-saving.js`, `player.js`.
+
+This section documents how the browser game persists saves —
+`localStorage`, save slots, automatic backups, clipboard/file
+export, and (briefly) cloud saves — as context for our Tauri
+analogue in §12.
+
+### 11.1 localStorage: the primary store
+
+All local persistence goes through the browser `localStorage` API.
+The root key is `"dimensionSave"` (`"dimensionTestSave"` in dev
+mode), keyed via `GameStorage.localStorageKey`.
+
+The root value is a `GameSaveSerializer`-encoded (§2.1 pipeline)
+JSON object with this shape:
+
+```json
+{
+  "current": 0,
+  "saves": {
+    "0": { …full player… },
+    "1": { …full player… },
+    "2": null
+  }
+}
+```
+
+`current` is the active slot index (0–2). `saves` holds up to **3
+save slots**, each either a full `player` object or `null`/`undefined`
+(empty slot). The game encodes the entire root into a single
+`localStorage` entry on every save.
+
+There is also a legacy format (a bare `player` with no `saves`
+wrapper); on first load, `loadRoot()` migrates it into the new
+format.
+
+### 11.2 Save slots (3 slots)
+
+The player can switch between 3 save slots via **Options → Saving →
+Choose save** (`LoadGameModal`). Switching:
+
+1. Saves the current slot first (`this.save(true)`).
+2. Loads the target slot's `player` (or `Player.defaultStart` if
+   empty).
+3. Reloads backup times and fires offline backup checks.
+
+### 11.3 Automatic backups (8 slots per save slot)
+
+Each of the 3 save slots has its own independent set of **8 backup
+slots**, stored in separate `localStorage` keys:
+
+- Data: `backupSave-{saveSlot}-{backupSlot}` (each is a
+  `GameSaveSerializer`-encoded single `player`).
+- Timers: `backupTimes-{saveSlot}` (an encoded map of timing
+  metadata: `{ backupTimer, date }` per backup slot).
+
+The 8 backup slots are typed:
+
+| Id | Type | Interval |
+|----|------|----------|
+| 1 | ONLINE | 1 minute |
+| 2 | ONLINE | 5 minutes |
+| 3 | ONLINE | 20 minutes |
+| 4 | ONLINE | 1 hour |
+| 5 | OFFLINE | 10 minutes |
+| 6 | OFFLINE | 1 hour |
+| 7 | OFFLINE | 5 hours |
+| 8 | RESERVE | (manual only) |
+
+**ONLINE** backups are checked every second by
+`GameIntervals.checkEverySecond` (a `setInterval(…, 1000)` timer).
+`tryOnlineBackups()` scans all ONLINE slots, and for each one where
+`player.backupTimer - lastBackupTimes[id].backupTimer >=
+interval × 1000 - 800` (the 800 ms grace prevents timer drift from
+the save I/O itself), it writes the current `player` into that
+backup slot's `localStorage` key.
+
+**OFFLINE** backups fire once on game load. `backupOfflineSlots()`
+compares `Date.now()` against `lastUpdateOnLoad` (the `lastUpdate`
+from the loaded save). If the offline gap exceeds a slot's interval,
+the **longest matching** offline slot is written (only one offline
+slot is saved per load, the longest applicable).
+
+The **RESERVE** slot (id 8) is written manually via
+`saveToReserveSlot()`, triggered before risky operations (e.g.
+before applying a cloud save).
+
+`player.backupTimer` is an in-game-time counter (incremented in the
+game loop) that serves as the logical clock for online backup
+intervals; it is not wall-clock time. This prevents paused or
+offline time from skewing the intervals.
+
+### 11.4 Autosave
+
+`GameIntervals.save` is a `setInterval` timer calling
+`GameStorage.save()`. Its interval is
+`player.options.autosaveInterval` (default 30 000 ms = 30 s),
+adjustable via the UI slider from **10 s to 60 s** in 1 s steps.
+The timer accounts for drift: on restart, its effective interval
+subtracts the time already elapsed since `lastSaveTime`.
+
+`GameStorage.save()` encodes the entire root (`{ current, saves }`)
+and writes it to the single `localStorage` key. It respects a
+`canSave()` guard that blocks saving during glyph selection, offline
+progress simulation, and certain endgame states.
+
+### 11.5 Export/import: clipboard and file
+
+**Clipboard export** (`GameStorage.export()`): encodes the current
+slot's `player` via `GameSaveSerializer.serialize(player)`, copies
+the string to the system clipboard via `document.execCommand("copy")`
+(a hidden `<textarea>`).
+
+**Clipboard import** (`GameStorage.import(saveData)`): deserializes
+the pasted string, validates (§6 `checkPlayerObject`), and loads it
+into the current slot. Then fires an immediate save so the import
+persists.
+
+**File export** (`GameStorage.exportAsFile()`): same as clipboard
+export, but writes to a downloaded `.txt` file. The filename
+includes the slot number, an optional user-chosen `saveFileName`,
+an incrementing `exportedFileCount`, and the date:
+`AD Save, Slot 1 - myname, #3 (2026-7-1).txt`.
+
+**File import** (`GameStorage.importAsFile()`): reads a user-
+selected file via `FileReader`, then calls `import()`.
+
+**Backup file export/import** (`exportBackupsAsFile` /
+`importBackupsFromFile`): bundles all populated backup slots for the
+current save slot into a single encoded file (see §2.4 for the
+bundle format). Import writes each slot back to its `localStorage`
+key.
+
+### 11.6 "Time since last save" indicator
+
+When `player.options.showTimeSinceSave` is enabled (default `true`),
+the bottom-left of the game header shows the elapsed time since
+the last autosave. This is a display-only concern driven by
+`Date.now() - GameStorage.lastSaveTime`, rendered in the game's
+time-span format.
+
+### 11.7 Cloud saves (Firebase — not replicated)
+
+The original offers optional **cloud saves** via **Firebase Realtime
+Database** with Google OAuth authentication. The Firebase project
+(`antimatter-dimensions-a00f2`) is hosted by the game developer;
+its API keys are embedded in the production JS bundle (Firebase API
+keys are public client-side identifiers — access is controlled by
+server-side security rules scoping each user to their own
+`users/{uid}/` path).
+
+Cloud saves:
+- Store only the **current slot** (not all 3, not backups) at
+  `users/{uid}/web/{slotNumber}`.
+- Auto-sync every 10 minutes (`GameIntervals.checkCloudSave`,
+  600 s), with conflict detection (SHA-512/256 hash comparison +
+  `ProgressChecker` for which save is farther/older) and a modal
+  for the player to resolve conflicts.
+- Use the same `GameSaveSerializer` codec as local saves.
+
+**We do not plan to replicate cloud saving.** The Firebase
+integration, Google OAuth, and conflict-resolution modals are out
+of scope for our standalone version. The UI omits the entire Cloud
+save section of the Saving tab.
+
+## 12. Our Tauri persistence design
+
+### 12.1 Storage location
+
+Instead of `localStorage`, we use the filesystem via Tauri's
+`path::app_data_dir()`, which resolves to the OS-appropriate
+application data directory:
+
+| OS | Path |
+|----|------|
+| macOS | `~/Library/Application Support/com.antimatter-dimensions.rust/` |
+| Linux | `~/.config/com.antimatter-dimensions.rust/` (or `$XDG_CONFIG_HOME/…`) |
+| Windows | `C:\Users\{user}\AppData\Roaming\com.antimatter-dimensions.rust\` |
+
+The bundle identifier comes from `tauri.conf.json` (`"identifier":
+"com.antimatter-dimensions.rust"`).
+
+### 12.2 File layout (proposed)
+
+```
+{app_data_dir}/
+├── saves.dat          # Root save: encoded { current, saves }
+├── backups/
+│   ├── 0/             # Backups for save slot 0
+│   │   ├── 1.dat      # Backup slot 1 (online, 1 min)
+│   │   ├── 2.dat      # …
+│   │   ├── …
+│   │   ├── 8.dat      # Backup slot 8 (reserve)
+│   │   └── times.dat  # Backup timing metadata
+│   ├── 1/             # Backups for save slot 1
+│   │   └── …
+│   └── 2/             # Backups for save slot 2
+│       └── …
+```
+
+Each `.dat` file contains a `GameSaveSerializer`-encoded string
+(the same `AAB` format), matching our resolved decision (§10) to
+use the AD-compatible codec everywhere. This means any `.dat` can
+be pasted into the original game's import box.
+
+Alternatively, a simpler flat layout using the same naming as the
+original's `localStorage` keys (`backupSave-0-1.dat`, etc.) would
+also work.
+
+### 12.3 Features to replicate
+
+All local save functionalities from §11 should be faithfully
+replicated:
+
+1. **3 save slots** with a "Choose save" modal to switch between
+   them (§11.2).
+2. **Autosave** on a configurable interval (10–60 s slider, default
+   30 s), writing the root `{ current, saves }` to `saves.dat`
+   (§11.4).
+3. **8 backup slots per save slot** with the same ONLINE/OFFLINE/
+   RESERVE types and intervals (§11.3). ONLINE backups checked
+   every second; OFFLINE backups on app start; RESERVE on demand.
+4. **Clipboard export/import** (§11.5) — the webview uses
+   `navigator.clipboard` (already wired in phase 5).
+5. **File export/import** (§11.5) — Tauri native file dialogs
+   (already wired in phase 5 via `tauri-plugin-dialog`).
+6. **Backup file export/import** (§11.5, §2.4) — the bundle format.
+7. **"Time since last save"** display (§11.6).
+8. **Manual "Save game" button** and `S` keyboard shortcut.
+9. **Hard reset** (already wired in phase 5).
+
+### 12.4 What we omit
+
+- Cloud saves / Firebase / Google OAuth (§11.7).
+- The Cloud-related UI (save/load cloud buttons, conflict modals,
+  `hideGoogleName`, `forceCloudOverwrite`, `syncSaveIntervals`).
+- Secret import easter eggs (`tryImportSecret`).
+- Speedrun-specific save modifications (`exportModifiedSave`
+  segmented flag).
+- The `canSave()` guards for glyph selection and endgame states
+  (not yet relevant at our implementation frontier).
