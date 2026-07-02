@@ -327,12 +327,24 @@ frontend/
   `tab-container` with `BigCrunchScreen.vue` — the "world has collapsed" message
   plus the vendored `.btn-big-crunch` button (mirrors ModernUi's `tab-container`
   being hidden while the crunch button shows).
-- The button and the `C` key both call `game.requestBigCrunch()`, which (with
-  the `bigCrunch` confirmation on) opens `BigCrunchConfirmModal.vue` — the
-  first-infinity explanation, no disable checkbox; its Confirm invokes the
+- The button and the `C` key both call `game.requestBigCrunch()`. Mirroring the
+  original `manualBigCrunchResetRequest`, the confirm modal opens only when the
+  `bigCrunch` confirmation is on **and** it is the first infinity (`||
+  player.break` once Break Infinity lands) — so pre-break the *first* crunch pops
+  `BigCrunchConfirmModal.vue` (the first-infinity explanation, no disable
+  checkbox) and every later crunch goes through directly. Confirm invokes the
   `big_crunch` command → `GameState::big_crunch`, which resets all pre-Infinity
-  progress. The next snapshot clears `can_big_crunch`, so the normal view
-  returns. Infinity Points are **not** awarded yet (planned next).
+  progress **and awards Infinity Points + an Infinity** (`gained_infinity_points`
+  / `gained_infinities`, both 1 pre-break; IP/infinities persist). The next
+  snapshot clears `can_big_crunch`, so the normal view returns.
+- On the **first** crunch the store's `bigCrunch` action navigates to the new
+  **Infinity** tab (mirrors `Tab.infinity.upgrades.show()`); the tab is
+  conditional on `snapshot.infinity_unlocked` in `config/tabs.js` and shows the
+  `InfinityUpgradesTab.vue` — for now just the Infinity-Points header ("You have
+  _X_ Infinity Points."). The upgrade grid arrives with Feature 2.2. `GameView`
+  surfaces `infinity_points`; the post-break "IP/infinities gained" modal + disable
+  checkbox and the Statistics `infinities` display come later. See
+  `design-docs/2026-07-02-infinity-points-and-records.md`.
 
 ## Progressive reveal, tutorial highlights & confirmations
 
@@ -428,9 +440,11 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md`.
   show as locked placeholders. See `design-docs/2026-06-30-achievements.md`.
 - Responsive dimension rows use the "narrow" stacked layout unconditionally
   below 1573px (matches the original at the default window size).
-- Big Crunch resets all pre-Infinity progress but awards no Infinity Points
-  yet, and shows the first-crunch (non-"small") screen unconditionally; IP and
-  the post-`break` header button come next.
+- Big Crunch awards Infinity Points + an Infinity and opens the Infinity tab on
+  the first crunch (Feature 2.1 complete). Still shows the first-crunch
+  (non-"small") screen unconditionally; the post-`break` header button, the
+  <60 s "small crunch" flow, and the crunch animation come later. The Infinity
+  Upgrades grid (Feature 2.2) and Break Infinity (2.3) are the next steps.
 - Save/load: fully wired — clipboard/file export-import, hard reset, on-disk
   persistence, 3 save slots, autosave, 8 backup slots/slot (+ bundle
   export/import), "time since last save", and `Ctrl/Cmd+S`. The one gap is real

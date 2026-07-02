@@ -51,7 +51,14 @@ antimatter-dimensions-rust/
 - `src/tickspeed.rs` — Tickspeed upgrades and effects
 - `src/galaxy.rs` — Antimatter galaxy purchases
 - `src/sacrifice.rs` — Dimension sacrifice
-- `src/crunch.rs` — First Big Crunch (Infinity): `can_big_crunch` + `big_crunch` reset
+- `src/crunch.rs` — First Big Crunch (Infinity): `can_big_crunch` + `big_crunch`
+  reset. Awards Infinity Points (`gained_infinity_points`, pre-break = 1) and
+  Infinities (`gained_infinities`), and updates the fastest-infinity record; IP /
+  infinities / total-time-played persist across the reset. See
+  `design-docs/2026-07-02-infinity-points-and-records.md`.
+- `src/records.rs` — `Records`: the modelled slice of `player.records` (total time
+  played, this-infinity time/`maxAM`, best-infinity time). Advanced in `tick`; the
+  current-infinity records reset on a Big Crunch.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
@@ -244,6 +251,7 @@ Located in `design-docs/`:
 | `2026-06-30-offline-progress.md` | How the original simulates offline progress, how it maps onto our `simulate`/`ticks` primitives, the game-speed/timestamp implications, and a design for a manual Offline-mode button |
 | `2026-06-30-ui-reveal-and-tutorial.md` | Progressive UI reveal (hiding/showing AD rows, tickspeed, sacrifice), first-time/disable-able confirmation modals (boost/galaxy/sacrifice/crunch), and the tutorial glow + exclamation highlight; how the original implements each and a phased plan |
 | `2026-06-30-achievements.md` | Normal achievements: bitmask state on `GameState`, unlock hooks inline in the buy/galaxy/boost/crunch/tick methods (rows 1–2 minus News), per-achievement effects + the global achievement-power multiplier, `achievementBits` save round-trip, the sprite-driven tab, and the unlock toast; phased plan |
+| `2026-07-02-infinity-points-and-records.md` | Completing Feature 2.1: Infinity Points / Infinities currency, the `Records` struct (time played, this/best infinity), the IP gain formula (pre-break = 1), Big Crunch reward+reset semantics, save/load round-trip, and the Infinity tab + IP header |
 
 The table lists key documents; see the `design-docs/` folder for the full,
 date-prefixed set. Read these before making architectural decisions. The

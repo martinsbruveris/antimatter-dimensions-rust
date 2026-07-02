@@ -120,10 +120,16 @@ export const useGameStore = defineStore("game", {
     maxAll() {
       return invoke("max_all");
     },
-    // First Big Crunch (Infinity): resets all pre-Infinity progress in the
-    // engine. Available once `snapshot.can_big_crunch` is true.
-    bigCrunch() {
-      return invoke("big_crunch");
+    // Big Crunch (Infinity): resets all pre-Infinity progress in the engine and
+    // awards Infinity Points. On the *first* crunch, navigate to the new Infinity
+    // tab (mirrors the original's `Tab.infinity.upgrades.show()` in
+    // `bigCrunchTabChange`); the tab becomes visible on the next snapshot.
+    async bigCrunch() {
+      const wasFirstInfinity = !this.snapshot?.infinity_unlocked;
+      await invoke("big_crunch");
+      if (wasFirstInfinity) {
+        useUiStore().setSubtab("infinity", "upgrades");
+      }
     },
     // --- Confirmation-gated requests ---
     // Each click handler routes through one of these: if the matching
@@ -157,13 +163,17 @@ export const useGameStore = defineStore("game", {
         this.sacrifice();
       }
     },
-    // Pre-Infinity the Big Crunch modal is the first-infinity explanation; it is
-    // shown whenever the bigCrunch confirmation is on (the only state reachable
-    // here, since its checkbox is absent on the first infinity).
+    // Big Crunch request. Mirrors the original `manualBigCrunchResetRequest`:
+    // the modal shows only when the bigCrunch confirmation is on AND it is the
+    // first infinity (or, once Break Infinity lands, `player.break`). So pre-break
+    // the first crunch pops the explanatory modal and every later crunch goes
+    // through directly. The post-break "IP/infinities gained" modal + disable
+    // checkbox arrive with Feature 2.3.
     requestBigCrunch() {
       if (!this.snapshot?.can_big_crunch) return;
       const ui = useUiStore();
-      if (this.snapshot?.options?.confirmations?.big_crunch) {
+      const firstInfinity = !this.snapshot?.infinity_unlocked;
+      if (this.snapshot?.options?.confirmations?.big_crunch && firstInfinity) {
         ui.showModal("bigCrunchConfirm");
       } else {
         this.bigCrunch();

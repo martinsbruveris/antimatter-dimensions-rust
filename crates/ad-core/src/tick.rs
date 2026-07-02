@@ -52,6 +52,19 @@ impl GameState {
             self.antimatter = BIG_CRUNCH_THRESHOLD;
         }
 
+        // Advance time records. Pre-Infinity the game-speed multiplier is 1, so
+        // game time and real time both advance by `dt_ms` (mirrors the original's
+        // `records.totalTimePlayed += diff` in the game loop). Runs during offline
+        // replay too, since that loops `tick`.
+        self.records.total_time_played_ms += dt_ms;
+        self.records.real_time_played_ms += dt_ms;
+        self.records.this_infinity.time_ms += dt_ms;
+        self.records.this_infinity.real_time_ms += dt_ms;
+        // Track the peak antimatter this infinity (capped value), mirroring the
+        // antimatter setter's `thisInfinity.maxAM = maxAM.max(value)`.
+        self.records.this_infinity.max_am =
+            self.records.this_infinity.max_am.max(&self.antimatter);
+
         // 24: "Antimatter Apocalypse" — reach 1e80 antimatter (original's
         // GAME_TICK_AFTER check).
         if self.antimatter.exponent() >= 80 {

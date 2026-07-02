@@ -31,6 +31,7 @@ use crate::options::{
     MAX_UPDATE_RATE_MS, MIN_AUTOSAVE_INTERVAL_MS, MIN_NOTATION_DIGITS,
     MIN_UPDATE_RATE_MS,
 };
+use crate::records::{BestInfinity, Records, ThisInfinity};
 use crate::state::{DimensionTier, GameState, TickspeedState};
 
 use super::SaveError;
@@ -89,12 +90,44 @@ pub struct DimensionDTO {
     // `costBumps` exists in the save but is always 0 at our frontier; ignored.
 }
 
-/// `player.records` — only the all-time antimatter total is modelled.
+/// `player.records` — the modelled slice: all-time antimatter, total time
+/// played, and the current/fastest infinity timing.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordsDTO {
     #[serde(with = "break_infinity::serde_string")]
     pub total_antimatter: Decimal,
+    /// `player.records.totalTimePlayed` — game time (ms), monotonic.
+    pub total_time_played: f64,
+    /// `player.records.realTimePlayed` — real time (ms), monotonic.
+    pub real_time_played: f64,
+    pub this_infinity: ThisInfinityDTO,
+    pub best_infinity: BestInfinityDTO,
+}
+
+/// `player.records.thisInfinity` (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThisInfinityDTO {
+    /// Game time in this infinity (ms).
+    pub time: f64,
+    /// Real time in this infinity (ms).
+    pub real_time: f64,
+    /// Peak antimatter this infinity. The save key is `maxAM` (capital AM),
+    /// which `camelCase` would render as `maxAm`, so it is renamed explicitly.
+    #[serde(rename = "maxAM", with = "break_infinity::serde_string")]
+    pub max_am: Decimal,
+}
+
+/// `player.records.bestInfinity` (modelled subset). Times are `Number.MAX_VALUE`
+/// when no infinity has been performed.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BestInfinityDTO {
+    /// Fastest infinity by game time (ms).
+    pub time: f64,
+    /// Fastest infinity by real time (ms).
+    pub real_time: f64,
 }
 
 /// `player.auto` — autobuyer state (modelled subset).
@@ -204,11 +237,27 @@ impl GameState {
         });
 
         // §4.3: Infinity is unlocked once `break` is set or any infinity / IP has
-        // ever been gained. We reset everything past the frontier, so this only
-        // carries the unlock flag, not late-game progress.
+        // ever been gained. We reset the pre-Infinity *mechanics* past the frontier,
+        // but Infinity Points, the infinities count, and the time/infinity records
+        // are within our frontier now, so they carry over verbatim (they are just
+        // numbers our `Decimal`/`f64` hold fine, even for a late-game save).
         let infinity_unlocked = dto.break_unlocked
             || dto.infinities > Decimal::ZERO
             || dto.infinity_points > Decimal::ZERO;
+
+        let records = Records {
+            total_time_played_ms: dto.records.total_time_played,
+            real_time_played_ms: dto.records.real_time_played,
+            this_infinity: ThisInfinity {
+                time_ms: dto.records.this_infinity.time,
+                real_time_ms: dto.records.this_infinity.real_time,
+                max_am: dto.records.this_infinity.max_am,
+            },
+            best_infinity: BestInfinity {
+                time_ms: dto.records.best_infinity.time,
+                real_time_ms: dto.records.best_infinity.real_time,
+            },
+        };
 
         // Achievement bitmask. The original's `achievementBits` is 17 rows in a
         // fresh or pre-Pelle save and grows to 18 the moment a row-18 (Pelle)
@@ -308,7 +357,10 @@ impl GameState {
             dim_boosts: dto.dimension_boosts,
             galaxies: dto.galaxies,
             sacrificed: dto.sacrificed,
+            infinity_points: dto.infinity_points,
+            infinities: dto.infinities,
             infinity_unlocked,
+            records,
             achievement_bits,
             tutorial_state: dto.tutorial_state,
             tutorial_active: dto.tutorial_active,
@@ -401,6 +453,11 @@ mod tests {
         assert_eq!(state.tickspeed.bought, 0);
         assert_eq!(state.sacrificed, Decimal::ZERO);
         assert!(!state.infinity_unlocked);
+        // Fresh-start Infinity currency is zero; best infinity is the "none yet"
+        // sentinel (Number.MAX_VALUE == f64::MAX).
+        assert_eq!(state.infinity_points, Decimal::ZERO);
+        assert_eq!(state.infinities, Decimal::ZERO);
+        assert_eq!(state.records.best_infinity.time_ms, f64::MAX);
         assert!(state.dimensions.iter().all(|d| d.bought == 0));
 
         // Autobuyers: globally on, none unlocked yet, dims default to buy-max.
@@ -446,6 +503,27 @@ mod tests {
 
         assert_eq!(state.options.notation, DEFAULT_NOTATION);
         assert_eq!(state.options.update_rate, DEFAULT_UPDATE_RATE_MS);
+    }
+
+    #[test]
+    fn loads_infinity_points_infinities_and_records() {
+        let mut player = base_player();
+        player["infinityPoints"] = json!("1.5e3");
+        player["infinities"] = json!("42");
+        player["records"]["totalTimePlayed"] = json!(600_000.0);
+        player["records"]["thisInfinity"]["time"] = json!(12_345.0);
+        player["records"]["thisInfinity"]["maxAM"] = json!("1e100");
+        player["records"]["bestInfinity"]["time"] = json!(30_000.0);
+
+        let state = load(player).unwrap();
+        assert_eq!(state.infinity_points, dec("1.5e3"));
+        assert_eq!(state.infinities, dec("42"));
+        assert_eq!(state.records.total_time_played_ms, 600_000.0);
+        assert_eq!(state.records.this_infinity.time_ms, 12_345.0);
+        assert_eq!(state.records.this_infinity.max_am, dec("1e100"));
+        assert_eq!(state.records.best_infinity.time_ms, 30_000.0);
+        // Any IP/infinities gained implies Infinity is unlocked.
+        assert!(state.infinity_unlocked);
     }
 
     #[test]

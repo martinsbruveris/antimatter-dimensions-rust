@@ -82,6 +82,12 @@ impl ObservedTickspeedState {
 pub struct ObservedState {
     /// Current antimatter amount.
     pub antimatter: Decimal,
+    /// Current Infinity Points (cumulative across crunches).
+    pub infinity_points: Decimal,
+    /// Number of Infinities performed.
+    pub infinities: Decimal,
+    /// Infinity Points a Big Crunch would grant right now.
+    pub gained_infinity_points: Decimal,
     /// All 8 antimatter dimension tiers with computed fields.
     pub dimensions: [ObservedDimensionTier; 8],
     /// Tickspeed state with computed fields.
@@ -126,6 +132,9 @@ impl ObservedState {
     pub fn from_game_state(game: &GameState) -> Self {
         Self {
             antimatter: game.antimatter,
+            infinity_points: game.infinity_points,
+            infinities: game.infinities,
+            gained_infinity_points: game.gained_infinity_points(),
             dimensions: std::array::from_fn(|tier| {
                 ObservedDimensionTier::from_game_state(game, tier)
             }),

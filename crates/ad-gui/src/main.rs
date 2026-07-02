@@ -104,6 +104,11 @@ struct AutobuyersView {
 struct GameView {
     antimatter: Num,
     antimatter_per_sec: Num,
+    /// Current Infinity Points (shown in the Infinity tab header once unlocked).
+    /// `infinities` and the per-crunch IP gain live in the engine snapshot
+    /// (`ObservedState`) but aren't surfaced here yet — they gain consumers with
+    /// the Statistics tab and the post-break crunch modal (Feature 2.3).
+    infinity_points: Num,
     tickspeed_cost: Num,
     tickspeed_bought: u64,
     tickspeed_effect: Num,
@@ -325,6 +330,7 @@ fn build_game_view(game: &GameState) -> GameView {
     GameView {
         antimatter: num(&game.antimatter),
         antimatter_per_sec: num(&game.antimatter_per_second()),
+        infinity_points: num(&game.infinity_points),
         tickspeed_cost: num(tickspeed_cost),
         tickspeed_bought: game.tickspeed.bought,
         tickspeed_effect: num(&game.tickspeed_effect()),

@@ -7,6 +7,7 @@ pub mod dimensions;
 pub mod galaxy;
 pub mod observed;
 pub mod options;
+pub mod records;
 pub mod sacrifice;
 #[cfg(feature = "serde")]
 pub mod save;
@@ -20,5 +21,6 @@ pub use autobuyers::{Autobuyer, AutobuyerMode, AutobuyerState};
 pub use break_infinity::Decimal;
 pub use observed::{ObservedDimensionTier, ObservedState, ObservedTickspeedState};
 pub use options::Options;
+pub use records::{BestInfinity, Records, ThisInfinity};
 pub use state::{DimensionTier, GameState, TickspeedState};
 pub use tick::offline_plan;

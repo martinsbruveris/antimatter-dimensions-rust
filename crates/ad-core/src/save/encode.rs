@@ -73,9 +73,24 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     player["dimensionBoosts"] = json!(state.dim_boosts);
     player["galaxies"] = json!(state.galaxies);
     player["totalTickBought"] = json!(state.tickspeed.bought);
-    // §4.3 inverse: carry the Infinity-unlocked flag via `break`. We don't model
-    // an infinity count, so `infinities` is left at the template's "0".
+    // §4.3 inverse: carry the Infinity-unlocked flag via `break`.
     player["break"] = json!(state.infinity_unlocked);
+    // Infinity currency (Decimal strings, matching the save schema).
+    player["infinityPoints"] = decimal(&state.infinity_points);
+    player["infinities"] = decimal(&state.infinities);
+
+    // Time / infinity records. `records.totalAntimatter` is written above; here we
+    // add the time and infinity-timing slice.
+    let records = &mut player["records"];
+    records["totalTimePlayed"] = json!(state.records.total_time_played_ms);
+    records["realTimePlayed"] = json!(state.records.real_time_played_ms);
+    records["thisInfinity"]["time"] = json!(state.records.this_infinity.time_ms);
+    records["thisInfinity"]["realTime"] =
+        json!(state.records.this_infinity.real_time_ms);
+    records["thisInfinity"]["maxAM"] = decimal(&state.records.this_infinity.max_am);
+    records["bestInfinity"]["time"] = json!(state.records.best_infinity.time_ms);
+    records["bestInfinity"]["realTime"] =
+        json!(state.records.best_infinity.real_time_ms);
     // Achievement bitmask, written back verbatim (one int per row).
     player["achievementBits"] = json!(state.achievement_bits);
     // Tutorial-highlight progress (at the player root, not under options).
@@ -209,6 +224,9 @@ mod tests {
             assert_eq!(reloaded.galaxies, state.galaxies);
             assert_eq!(reloaded.tickspeed.bought, state.tickspeed.bought);
             assert_eq!(reloaded.infinity_unlocked, state.infinity_unlocked);
+            assert_eq!(reloaded.infinity_points, state.infinity_points);
+            assert_eq!(reloaded.infinities, state.infinities);
+            assert_eq!(reloaded.records, state.records);
             for tier in 0..8 {
                 assert_eq!(
                     reloaded.dimensions[tier].amount,
@@ -232,6 +250,12 @@ mod tests {
         state.galaxies = 7;
         state.dim_boosts = 3;
         state.infinity_unlocked = true;
+        state.infinity_points = Decimal::from_float(5.0);
+        state.infinities = Decimal::from_float(3.0);
+        state.records.total_time_played_ms = 123_456.0;
+        state.records.this_infinity.time_ms = 7_890.0;
+        state.records.this_infinity.max_am = Decimal::new(1.0, 250);
+        state.records.best_infinity.time_ms = 42_000.0;
         state.dimensions[2].bought = 42;
         state.options.set_notation("Engineering");
         // Unlock a couple of achievements (18 → bits[0] bit 7; 21 → bits[1] bit 0).
@@ -247,6 +271,15 @@ mod tests {
         assert_eq!(reloaded.galaxies, 7);
         assert_eq!(reloaded.dim_boosts, 3);
         assert!(reloaded.infinity_unlocked);
+        assert_eq!(reloaded.infinity_points, Decimal::from_float(5.0));
+        assert_eq!(reloaded.infinities, Decimal::from_float(3.0));
+        assert_eq!(reloaded.records.total_time_played_ms, 123_456.0);
+        assert_eq!(reloaded.records.this_infinity.time_ms, 7_890.0);
+        assert_eq!(
+            reloaded.records.this_infinity.max_am,
+            Decimal::new(1.0, 250)
+        );
+        assert_eq!(reloaded.records.best_infinity.time_ms, 42_000.0);
         assert_eq!(reloaded.dimensions[2].bought, 42);
         assert_eq!(reloaded.options.notation, "Engineering");
         // Tutorial fields survive the round-trip.

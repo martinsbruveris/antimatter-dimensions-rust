@@ -12,7 +12,7 @@ const ui = useUiStore();
       v-for="tab in ui.visibleTabs"
       :key="tab.key"
       class="o-tab-btn o-tab-btn--modern-tabs o-tab-btn--subtabs"
-      :class="{ 'o-tab-btn--active': ui.currentTabKey === tab.key }"
+      :class="[tab.uiClass, { 'o-tab-btn--active': ui.currentTabKey === tab.key }]"
     >
       <div
         class="l-tab-btn-inner"

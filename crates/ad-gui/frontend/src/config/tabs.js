@@ -1,4 +1,5 @@
 import AntimatterDimensionsTab from "../components/tabs/AntimatterDimensionsTab.vue";
+import InfinityUpgradesTab from "../components/tabs/InfinityUpgradesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
@@ -16,6 +17,19 @@ export const TABS = [
     name: "Dimensions",
     subtabs: [
       { key: "antimatter", name: "Antimatter Dimensions", symbol: "Ω", component: AntimatterDimensionsTab },
+    ],
+  },
+  {
+    key: "infinity",
+    name: "Infinity",
+    // JS: `condition: () => PlayerProgress.infinityUnlocked()` — appears after the
+    // first Big Crunch and stays. `uiClass` gives the tab its infinity coloring
+    // (original `UIClass: "o-tab-btn--infinity"`). Only the Infinity Upgrades
+    // subtab is built; Break Infinity and Replicanti come later.
+    condition: (s) => Boolean(s?.infinity_unlocked),
+    uiClass: "o-tab-btn--infinity",
+    subtabs: [
+      { key: "upgrades", name: "Infinity Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: InfinityUpgradesTab },
     ],
   },
   {

@@ -6,6 +6,7 @@ use crate::data::constants::{
     INITIAL_ANTIMATTER, TICKSPEED_BASE_COST, TICKSPEED_COST_MULTIPLIER,
 };
 use crate::options::Options;
+use crate::records::Records;
 
 /// serde default for boolean fields that default to `true` (e.g.
 /// `tutorial_active`), since `bool`'s own `Default` is `false`.
@@ -103,12 +104,28 @@ pub struct GameState {
     /// Total antimatter sacrificed (cumulative across all
     /// sacrifices).
     pub sacrificed: Decimal,
+    /// Current Infinity Points. Mirrors `Currency.infinityPoints`: gained on a
+    /// Big Crunch, cumulative, and **not** reset by subsequent crunches (reset
+    /// only on Eternity, a later feature). The currency the Infinity Upgrades
+    /// tab spends. See `crunch.rs::gained_infinity_points`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub infinity_points: Decimal,
+    /// Number of Infinities performed. Mirrors `Currency.infinities`:
+    /// incremented on each Big Crunch and persists across crunches. Shown in the
+    /// Statistics tab and feeds later infinity-count multipliers.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub infinities: Decimal,
     /// Whether the player has performed at least one Big Crunch. Mirrors JS
     /// `PlayerProgress.infinityUnlocked()`: set on the first crunch and
     /// **not** reset by subsequent crunches. Gates Infinity-related UI (e.g.
     /// the "Infinity" How To Play entry).
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinity_unlocked: bool,
+    /// Time and prestige records (total time played, this/best infinity). Mirrors
+    /// the modelled slice of `player.records`. Advanced in `tick`; the current
+    /// infinity's records reset on a Big Crunch. See [`Records`].
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub records: Records,
     /// Normal-achievement unlock state. Mirrors `player.achievementBits`: 18
     /// rows, one bitmask each (`achievement_bits[row-1]` bit `1 << (col-1)`).
     /// Row 18 (the Pelle achievements) is held only so original saves round-trip;
@@ -147,7 +164,10 @@ impl GameState {
             dim_boosts: 0,
             galaxies: 0,
             sacrificed: Decimal::ZERO,
+            infinity_points: Decimal::ZERO,
+            infinities: Decimal::ZERO,
             infinity_unlocked: false,
+            records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],
             tutorial_state: 0,
             tutorial_active: true,
