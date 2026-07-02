@@ -238,9 +238,12 @@ purchased), achievements.
 - Total infinities performed
 - Total antimatter produced (all-time)
 
-**Status:** ⚠️ Partially implemented (Big Crunch trigger + reset works;
-IP formula not yet implemented, no records tracking beyond
-total_antimatter)
+**Status:** ✅ Implemented (Big Crunch awards IP — pre-break = 1 — and an
+Infinity; `Records` tracks total time played, this/best-infinity time, and
+this-infinity maxAM; IP/infinities/records persist across a crunch and
+round-trip through the save; Infinity tab + IP header in the GUI). See
+`design-docs/2026-07-02-infinity-points-and-records.md`. Best-IP/min and the
+Statistics view are deferred until a consumer exists.
 
 ---
 
@@ -273,12 +276,34 @@ earlier ones.
 | `ipMult` | 1e8 IP | ×2 IP from all sources |
 
 **Grid structure:** 4 columns × 4 rows. Each column requires the previous column.
+(Correction: each *column* is an independent top-to-bottom chain — an upgrade
+requires the one directly above it in the same column, not "the previous column".)
+
+**Status:** ✅ Implemented (all 16 grid upgrades: bitmask state, IP-gated purchase
+with column prerequisites, every effect wired into the engine — dim multipliers,
+buy-10 base, dim-boost power, boost/galaxy requirement reduction, galaxy strength,
+skip-reset starting boosts, passive `ipGen`; save/load; the vendored 4×4 grid UI).
+The **bottom row** (`ipMult` rebuyable + `ipOffline`, unlocked by Achievement 41)
+is deferred to land with Break Infinity (§2.3), where `totalIPMult` also grows. See
+`design-docs/2026-07-03-infinity-upgrades.md`.
 
 ---
 
 ### Feature 2.3: Break Infinity
 
-**Dependencies:** Feature 2.2
+**Dependencies:** Feature 2.2 — **and, in true gameplay order, Features 2.5 + 2.6.**
+
+> **Ordering correction (found during the 2.2 port).** Despite its "2.3" number,
+> Break Infinity is gated *later* than this document's linear order implies. The
+> "Break Infinity" button unlocks only once the **Big Crunch Autobuyer** reaches a
+> 0.1 s interval (`Autobuyer.bigCrunch.hasMaxedInterval`), and that autobuyer's
+> interval can only be upgraded after **Normal Challenge 12 is completed**
+> (`BigCrunchAutobuyerState.canBeUpgraded = NormalChallenge(12).isCompleted`). So
+> the faithful implementation order is **2.1 → 2.2 → 2.5 (Normal Challenges) → 2.6
+> (Autobuyers, incl. the Big Crunch autobuyer + IP interval upgrades) → 2.3 (Break
+> Infinity) → 2.7 (Infinity Challenges)**. A future Break-Infinity design doc should
+> either build that prerequisite chain first or, if an out-of-order slice is wanted,
+> introduce a temporary unlock gate and flag the divergence from the original.
 
 **Scope:** An upgrade that allows antimatter to exceed `1e308`. Before breaking, the game
 forces a Big Crunch at exactly `1e308`. After breaking, antimatter can grow without limit
