@@ -3,7 +3,7 @@
 // `OptionsSavingTab.vue` (../antimatter-dimensions/src/components/tabs/
 // options-saving), reproducing the top half only — everything related to Cloud
 // saves (and the post-Reality Speedrun row) is omitted.
-import { ref } from "vue";
+import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
 import { useUiStore } from "../../stores/ui";
@@ -14,17 +14,31 @@ import OpenHotkeysButton from "../options/OpenHotkeysButton.vue";
 const game = useGameStore();
 const ui = useUiStore();
 
-// Local-only placeholders until saving options are engine-owned.
-const autosaveInterval = ref(30);
-const showTimeSinceSave = ref(false);
-const saveFileName = ref("");
+// Autosave interval / time-since-save are engine-owned options (round-tripped
+// through the save); read them from the snapshot, write via the store actions.
+// The slider is in seconds; the option is stored in milliseconds.
+const autosaveInterval = computed(() =>
+  Math.round((game.snapshot?.options?.autosave_interval ?? 30000) / 1000)
+);
+const showTimeSinceSave = computed(
+  () => game.snapshot?.options?.show_time_since_save ?? true
+);
+// Custom save-file name is engine-owned (stored per save slot), so read it from
+// the snapshot rather than a local ref.
+const saveFileName = computed(() => game.snapshot?.options?.save_file_name ?? "");
 
-// Mirror the original SaveFileName input filter: strip anything that is not
-// alphanumeric, space or hyphen.
+async function saveGame() {
+  await game.saveGame();
+  ui.notify("Game saved");
+}
+
+// Mirror the original SaveFileName input handler: strip anything that is not
+// alphanumeric, space or hyphen for immediate feedback, then persist to the
+// engine (which sanitizes again and stores it on the current save slot).
 function handleNameChange(event) {
   const newName = event.target.value.trim().replace(/[^a-zA-Z0-9 -]/gu, "");
-  saveFileName.value = newName;
   event.target.value = newName;
+  game.setSaveFileName(newName);
 }
 
 async function exportToClipboard() {
@@ -35,7 +49,7 @@ async function exportToClipboard() {
 
 async function exportToFile() {
   try {
-    await game.exportSaveToFile(saveFileName.value);
+    await game.exportSaveToFile();
     ui.notify("Save exported to file");
   } catch (e) {
     if (e !== "Cancelled") {
@@ -47,7 +61,7 @@ async function exportToFile() {
 async function importFromFile() {
   try {
     await game.importSaveFromFile();
-    ui.notify("Save loaded from file");
+    ui.notify("Game loaded");
   } catch (e) {
     if (e !== "Cancelled") {
       ui.notify(`Import failed: ${e}`, "error");
@@ -80,7 +94,10 @@ async function importFromFile() {
         </button>
       </div>
       <div class="l-options-grid__row">
-        <button class="o-primary-btn o-primary-btn--option o-primary-btn--option_font-x-large l-options-grid__button">
+        <button
+          class="o-primary-btn o-primary-btn--option o-primary-btn--option_font-x-large l-options-grid__button"
+          @click="saveGame"
+        >
           Save game
         </button>
         <button
@@ -97,7 +114,7 @@ async function importFromFile() {
             :max="60"
             :interval="1"
             :model-value="autosaveInterval"
-            @update:model-value="autosaveInterval = $event"
+            @update:model-value="game.setAutosaveInterval($event * 1000)"
           />
         </div>
       </div>
@@ -118,7 +135,7 @@ async function importFromFile() {
           class="o-primary-btn--option l-options-grid__button"
           label="Display time since save:"
           :model-value="showTimeSinceSave"
-          @update:model-value="showTimeSinceSave = $event"
+          @update:model-value="game.setShowTimeSinceSave($event)"
         />
       </div>
       <div class="l-options-grid__row">
@@ -141,7 +158,6 @@ async function importFromFile() {
             >
           </span>
         </div>
-        <div class="l-options-grid__button l-options-grid__button--hidden" />
       </div>
       <OpenHotkeysButton />
     </div>

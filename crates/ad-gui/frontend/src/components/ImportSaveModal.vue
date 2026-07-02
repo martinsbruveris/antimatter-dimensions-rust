@@ -23,7 +23,7 @@ async function doImport() {
   error.value = "";
   try {
     await game.importSave(input.value);
-    ui.notify("Save imported successfully");
+    ui.notify("Game loaded");
     ui.closeModal();
   } catch (e) {
     error.value = typeof e === "string" ? e : e.message || "Import failed";

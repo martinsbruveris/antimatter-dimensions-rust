@@ -17,7 +17,19 @@ export const useGameStore = defineStore("game", {
     // Ids of achievements unlocked as of the last snapshot we diffed, so a
     // freshly-unlocked one fires exactly one toast. `null` until first seeded.
     seenAchievements: null,
+    // Wall-clock (ms) of the last successful save and a "now" clock refreshed
+    // every animation frame by App.vue's loop, for the bottom-left save timer
+    // (SaveTimer.vue). Keeping `nowMs` reactive lets `msSinceSave` re-render
+    // without a separate interval, and it advances even while paused/offline.
+    lastSaveTime: Date.now(),
+    nowMs: Date.now(),
   }),
+  getters: {
+    // Milliseconds elapsed since the last save (>= 0).
+    msSinceSave(state) {
+      return Math.max(0, state.nowMs - state.lastSaveTime);
+    },
+  },
   actions: {
     // Fire a success toast (mirroring the original's
     // `GameUI.notify.success`) for each achievement newly present in the
@@ -142,9 +154,10 @@ export const useGameStore = defineStore("game", {
     setConfirmation(kind, enabled) {
       return invoke("set_confirmation", { kind, enabled });
     },
-    // Hard reset: wipes the game back to a completely fresh state.
+    // Hard reset: wipes the current save slot back to a fresh state (persisted).
     async hardReset() {
       this.snapshot = await invoke("hard_reset");
+      this.lastSaveTime = Date.now();
       this.notifyNewAchievements(true);
     },
     // --- Autobuyers ---
@@ -205,19 +218,75 @@ export const useGameStore = defineStore("game", {
     exportSave() {
       return invoke("export_save");
     },
-    // Imports a save from a text string. Replaces the running game state.
+    // Imports a save from a text string. Replaces the running game state
+    // (persisted immediately by the backend).
     async importSave(text) {
       this.snapshot = await invoke("import_save", { text });
+      this.lastSaveTime = Date.now();
       this.notifyNewAchievements(true);
     },
-    // Exports the save to a user-chosen file via native Save As dialog.
-    exportSaveToFile(saveFileName = "") {
-      return invoke("export_save_to_file", { saveFileName });
+    // Exports the save to a user-chosen file via native Save As dialog. The
+    // backend uses the engine-owned `saveFileName` option as the default name.
+    exportSaveToFile() {
+      return invoke("export_save_to_file");
     },
     // Imports a save from a user-chosen file via native Open dialog.
     async importSaveFromFile() {
       this.snapshot = await invoke("import_save_from_file");
+      this.lastSaveTime = Date.now();
       this.notifyNewAchievements(true);
+    },
+    // --- On-disk persistence (save slots + backups) ---
+    // Writes the current game to disk (manual "Save game", autosave, Cmd/Ctrl+S).
+    async saveGame() {
+      await invoke("save_game");
+      this.lastSaveTime = Date.now();
+    },
+    // Switches the active save slot (persists current, loads target).
+    async switchSaveSlot(index) {
+      this.snapshot = await invoke("switch_save_slot", { index });
+      this.lastSaveTime = Date.now();
+      this.notifyNewAchievements(true);
+    },
+    // Per-slot summaries for the "Choose save" modal.
+    getSaveSlots() {
+      return invoke("get_save_slots");
+    },
+    // Writes the current game into one automatic backup slot (online timers +
+    // the manual reserve slot).
+    triggerBackup(slot) {
+      return invoke("trigger_backup", { slot });
+    },
+    // Per-backup-slot summaries for the Backup menu.
+    getBackups() {
+      return invoke("get_backups");
+    },
+    // Loads a backup slot into the running game (reserves the current save first).
+    async loadBackup(slot) {
+      this.snapshot = await invoke("load_backup", { slot });
+      this.lastSaveTime = Date.now();
+      this.notifyNewAchievements(true);
+    },
+    // Exports all populated backups of the current slot as one file.
+    exportBackupsToFile() {
+      return invoke("export_backups_to_file");
+    },
+    // Imports a backup-bundle file into the current slot's backup slots.
+    importBackupsFromFile() {
+      return invoke("import_backups_from_file");
+    },
+    // --- Saving options ---
+    // Autosave cadence in ms (original `autosaveInterval`; engine clamps 10–60 s).
+    setAutosaveInterval(interval) {
+      return invoke("set_autosave_interval", { interval });
+    },
+    // Header "time since save" indicator (original `showTimeSinceSave`).
+    setShowTimeSinceSave(enabled) {
+      return invoke("set_show_time_since_save", { enabled });
+    },
+    // Custom save-file name (original `saveFileName`); the engine sanitizes it.
+    setSaveFileName(name) {
+      return invoke("set_save_file_name", { name });
     },
   },
 });

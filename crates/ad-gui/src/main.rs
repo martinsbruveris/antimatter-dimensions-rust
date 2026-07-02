@@ -1,5 +1,7 @@
+mod persistence;
+
+use std::path::PathBuf;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use ad_core::data::constants::{
     BIG_CRUNCH_THRESHOLD, BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER,
@@ -7,8 +9,10 @@ use ad_core::data::constants::{
 use ad_core::save::{decode_save, encode_save};
 use ad_core::{AutobuyerMode, Decimal, GameState};
 use serde::Serialize;
-use tauri::State;
+use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
+
+use persistence::{now_ms, SaveManager};
 
 /// Ordinal names for the eight antimatter dimensions, used to label the
 /// per-dimension autobuyers (mirrors `AntimatterDimension(tier).shortDisplayName`).
@@ -167,6 +171,15 @@ struct OptionsView {
     /// Offline replay resolution (original `offlineTicks`); drives the Gameplay
     /// tab slider and the Offline-mode replay budget.
     offline_ticks: u32,
+    /// Autosave cadence in milliseconds (original `autosaveInterval`); drives the
+    /// Saving-tab slider and the frontend autosave loop.
+    autosave_interval: u32,
+    /// Whether the header shows the elapsed time since the last save (original
+    /// `showTimeSinceSave`).
+    show_time_since_save: bool,
+    /// Custom save-file name (original `saveFileName`); shown per slot in the
+    /// "Choose save" modal and used as the default export filename.
+    save_file_name: String,
     /// Per-action confirmation toggles; the action handlers branch on these to
     /// decide whether to show the explanatory modal.
     confirmations: ConfirmationsView,
@@ -349,6 +362,9 @@ fn build_game_view(game: &GameState) -> GameView {
             notation_digits_comma: game.options.notation_digits_comma,
             notation_digits_notation: game.options.notation_digits_notation,
             offline_ticks: game.options.offline_ticks,
+            autosave_interval: game.options.autosave_interval,
+            show_time_since_save: game.options.show_time_since_save,
+            save_file_name: game.options.save_file_name.clone(),
             confirmations: ConfirmationsView {
                 dimension_boost: game.options.confirmations.dimension_boost,
                 antimatter_galaxy: game.options.confirmations.antimatter_galaxy,
@@ -453,11 +469,17 @@ fn big_crunch(state: State<'_, Mutex<GameState>>) {
     game.big_crunch();
 }
 
-/// Resets the game to a fresh state (the "HARD RESET" option).
+/// Resets the current save slot to a fresh state (the "HARD RESET" option) and
+/// persists it to disk.
 #[tauri::command]
-fn hard_reset(state: State<'_, Mutex<GameState>>) -> GameView {
+fn hard_reset(
+    state: State<'_, Mutex<GameState>>,
+    save: State<'_, Mutex<SaveManager>>,
+) -> GameView {
     let mut game = state.lock().unwrap();
     *game = fresh_game();
+    let mut save = save.lock().unwrap();
+    let _ = save.save_root(&game, now_ms());
     build_game_view(&game)
 }
 
@@ -543,12 +565,27 @@ fn set_confirmation(kind: String, enabled: bool, state: State<'_, Mutex<GameStat
     game.options.set_confirmation(&kind, enabled);
 }
 
-/// Returns the current epoch-millisecond timestamp for save encoding.
-fn now_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as i64
+/// Sets the autosave cadence in milliseconds (original `autosaveInterval`); the
+/// engine clamps to the 10–60 s slider range.
+#[tauri::command]
+fn set_autosave_interval(interval: u32, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_autosave_interval(interval);
+}
+
+/// Toggles the header "time since save" indicator (original `showTimeSinceSave`).
+#[tauri::command]
+fn set_show_time_since_save(enabled: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.show_time_since_save = enabled;
+}
+
+/// Sets the custom save-file name (original `saveFileName`); the engine sanitizes
+/// it (alphanumerics/space/hyphen, capped at 16 chars).
+#[tauri::command]
+fn set_save_file_name(name: String, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_save_file_name(&name);
 }
 
 /// Exports the current game state as an AD-compatible save string (for
@@ -566,24 +603,28 @@ fn export_save(state: State<'_, Mutex<GameState>>) -> String {
 fn import_save(
     text: String,
     state: State<'_, Mutex<GameState>>,
+    save: State<'_, Mutex<SaveManager>>,
 ) -> Result<GameView, String> {
     let new_state = decode_save(text.trim()).map_err(|e| e.to_string())?;
     let mut game = state.lock().unwrap();
     *game = new_state;
+    // Mirror the original: an import fires an immediate save so it persists.
+    let mut save = save.lock().unwrap();
+    let _ = save.save_root(&game, now_ms());
     Ok(build_game_view(&game))
 }
 
-/// Exports the current save to a file chosen via a native "Save As" dialog.
-/// The `save_file_name` is used as the default filename suggestion.
+/// Exports the current save to a file chosen via a native "Save As" dialog. The
+/// engine-owned custom save-file name (`options.saveFileName`) is used as the
+/// default filename suggestion.
 #[tauri::command]
 async fn export_save_to_file(
     app: tauri::AppHandle,
-    save_file_name: String,
     state: State<'_, Mutex<GameState>>,
 ) -> Result<(), String> {
-    let save_str = {
+    let (save_str, save_file_name) = {
         let game = state.lock().unwrap();
-        encode_save(&game, now_ms())
+        (encode_save(&game, now_ms()), game.options.save_file_name.clone())
     };
 
     let default_name = if save_file_name.is_empty() {
@@ -611,6 +652,7 @@ async fn export_save_to_file(
 async fn import_save_from_file(
     app: tauri::AppHandle,
     state: State<'_, Mutex<GameState>>,
+    save: State<'_, Mutex<SaveManager>>,
 ) -> Result<GameView, String> {
     let path = app
         .dialog()
@@ -625,9 +667,185 @@ async fn import_save_from_file(
             let new_state = decode_save(contents.trim()).map_err(|e| e.to_string())?;
             let mut game = state.lock().unwrap();
             *game = new_state;
+            let mut save = save.lock().unwrap();
+            let _ = save.save_root(&game, now_ms());
             Ok(build_game_view(&game))
         }
         None => Err("Cancelled".to_string()),
+    }
+}
+
+/// Serializable summary of one save slot for the "Choose save" modal.
+#[derive(Serialize)]
+struct SlotMetaView {
+    id: usize,
+    /// Whether the slot holds a save.
+    exists: bool,
+    /// The slot's antimatter (only meaningful when `exists`).
+    antimatter: Num,
+    /// The slot's custom save-file name (empty if unset), shown per the original
+    /// "Choose save" modal.
+    save_file_name: String,
+    /// Whether this is the active slot.
+    is_current: bool,
+}
+
+/// Serializable summary of one automatic backup slot for the Backup menu.
+#[derive(Serialize)]
+struct BackupMetaView {
+    id: u8,
+    /// Whether the backup slot holds a save.
+    exists: bool,
+    /// The backup's antimatter (only meaningful when `exists`).
+    antimatter: Num,
+    /// When the backup was written (epoch ms), or `null` when empty. The frontend
+    /// subtracts this from its live clock so "Last saved … ago" ticks in real time.
+    last_backup_ms: Option<i64>,
+}
+
+/// Manually saves the current game state to disk (the "Save game" button, the
+/// autosave loop, and the Ctrl/Cmd+S shortcut all route here).
+#[tauri::command]
+fn save_game(state: State<'_, Mutex<GameState>>, save: State<'_, Mutex<SaveManager>>) {
+    let game = state.lock().unwrap();
+    let mut save = save.lock().unwrap();
+    let _ = save.save_root(&game, now_ms());
+}
+
+/// Switches the active save slot, persisting the current slot first and loading
+/// the target (or a fresh game for an empty slot). Returns the new view.
+#[tauri::command]
+fn switch_save_slot(
+    index: usize,
+    state: State<'_, Mutex<GameState>>,
+    save: State<'_, Mutex<SaveManager>>,
+) -> GameView {
+    let mut game = state.lock().unwrap();
+    let mut save = save.lock().unwrap();
+    *game = save.switch_slot(&game.clone(), index, fresh_game(), now_ms());
+    build_game_view(&game)
+}
+
+/// Returns per-slot summaries for the "Choose save" modal.
+#[tauri::command]
+fn get_save_slots(
+    state: State<'_, Mutex<GameState>>,
+    save: State<'_, Mutex<SaveManager>>,
+) -> Vec<SlotMetaView> {
+    let game = state.lock().unwrap();
+    let mut save = save.lock().unwrap();
+    save.slot_metas(&game)
+        .into_iter()
+        .map(|m| SlotMetaView {
+            id: m.id,
+            exists: m.antimatter.is_some(),
+            antimatter: me_to_num(m.antimatter),
+            save_file_name: m.save_file_name,
+            is_current: m.is_current,
+        })
+        .collect()
+}
+
+/// Writes the current state into a backup slot (online backups from the loop,
+/// and the manual reserve slot).
+#[tauri::command]
+fn trigger_backup(
+    slot: u8,
+    state: State<'_, Mutex<GameState>>,
+    save: State<'_, Mutex<SaveManager>>,
+) {
+    let game = state.lock().unwrap();
+    let save = save.lock().unwrap();
+    let _ = save.write_backup(slot, &game, now_ms());
+}
+
+/// Returns per-backup-slot summaries for the Backup menu.
+#[tauri::command]
+fn get_backups(save: State<'_, Mutex<SaveManager>>) -> Vec<BackupMetaView> {
+    let save = save.lock().unwrap();
+    save.backup_metas()
+        .into_iter()
+        .map(|m| BackupMetaView {
+            id: m.id,
+            exists: m.antimatter.is_some(),
+            antimatter: me_to_num(m.antimatter),
+            last_backup_ms: m.last_backup_ms,
+        })
+        .collect()
+}
+
+/// Loads a backup slot into the running game (saving the current state to the
+/// reserve slot first). Returns the new view.
+#[tauri::command]
+fn load_backup(
+    slot: u8,
+    state: State<'_, Mutex<GameState>>,
+    save: State<'_, Mutex<SaveManager>>,
+) -> Result<GameView, String> {
+    let mut game = state.lock().unwrap();
+    let mut save = save.lock().unwrap();
+    let loaded = save.load_backup(slot, &game.clone(), now_ms())?;
+    *game = loaded;
+    Ok(build_game_view(&game))
+}
+
+/// Exports every populated backup of the current save slot as a single
+/// backup-bundle file via a native "Save As" dialog (§2.4).
+#[tauri::command]
+async fn export_backups_to_file(
+    app: tauri::AppHandle,
+    save: State<'_, Mutex<SaveManager>>,
+) -> Result<(), String> {
+    let bundle = {
+        let save = save.lock().unwrap();
+        save.export_backups(now_ms())
+    };
+    let bundle = bundle.ok_or_else(|| "No backups to export".to_string())?;
+
+    let path = app
+        .dialog()
+        .file()
+        .set_file_name("Antimatter Dimensions Backups.txt")
+        .add_filter("Text files", &["txt"])
+        .blocking_save_file();
+
+    match path {
+        Some(file_path) => std::fs::write(file_path.as_path().unwrap(), bundle)
+            .map_err(|e| format!("Failed to write file: {e}")),
+        None => Err("Cancelled".to_string()),
+    }
+}
+
+/// Imports a backup-bundle file into the current save slot's backup slots via a
+/// native "Open" dialog (§2.4). Returns how many slots were written.
+#[tauri::command]
+async fn import_backups_from_file(
+    app: tauri::AppHandle,
+    save: State<'_, Mutex<SaveManager>>,
+) -> Result<usize, String> {
+    let path = app
+        .dialog()
+        .file()
+        .add_filter("Text files", &["txt"])
+        .blocking_pick_file();
+
+    match path {
+        Some(file_path) => {
+            let contents = std::fs::read_to_string(file_path.as_path().unwrap())
+                .map_err(|e| format!("Failed to read file: {e}"))?;
+            let mut save = save.lock().unwrap();
+            save.import_backups(&contents, now_ms())
+        }
+        None => Err("Cancelled".to_string()),
+    }
+}
+
+/// Converts an optional `(mantissa, exponent)` pair into the snapshot's [`Num`].
+/// An empty slot maps to zero, which the frontend hides behind the `exists` flag.
+fn me_to_num(me: Option<(f64, f64)>) -> Num {
+    match me {
+        Some((m, e)) => Num { m, e },
+        None => Num { m: 0.0, e: 0.0 },
     }
 }
 
@@ -659,6 +877,20 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(fresh_game()))
+        .setup(|app| {
+            // Resolve the OS app-data dir (§12.1), load the on-disk root save into
+            // the running game, and install the SaveManager. A missing/corrupt
+            // save just starts fresh.
+            let dir = app
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| PathBuf::from("."));
+            let mut manager = SaveManager::new(dir);
+            let loaded = manager.load(fresh_game(), now_ms());
+            *app.state::<Mutex<GameState>>().lock().unwrap() = loaded;
+            app.manage(Mutex::new(manager));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             tick_and_get_state,
             simulate_offline,
@@ -685,10 +917,21 @@ pub fn run() {
             set_notation_digits,
             set_offline_ticks,
             set_confirmation,
+            set_autosave_interval,
+            set_show_time_since_save,
+            set_save_file_name,
             export_save,
             import_save,
             export_save_to_file,
             import_save_from_file,
+            save_game,
+            switch_save_slot,
+            get_save_slots,
+            trigger_backup,
+            get_backups,
+            load_backup,
+            export_backups_to_file,
+            import_backups_from_file,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

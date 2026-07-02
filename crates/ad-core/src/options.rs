@@ -41,6 +41,17 @@ pub const DEFAULT_OFFLINE_TICKS: u32 = 100_000;
 pub const MIN_OFFLINE_TICKS: u32 = 10_000;
 pub const MAX_OFFLINE_TICKS: u32 = 10_000_000;
 
+/// Autosave cadence in milliseconds (original `autosaveInterval`). The frontend
+/// autosave loop writes the on-disk root this often; the Saving-tab slider runs
+/// 10..=60 s in 1 s steps (matching the original), so the stored value is in
+/// `[MIN_AUTOSAVE_INTERVAL_MS, MAX_AUTOSAVE_INTERVAL_MS]`.
+pub const DEFAULT_AUTOSAVE_INTERVAL_MS: u32 = 30_000;
+pub const MIN_AUTOSAVE_INTERVAL_MS: u32 = 10_000;
+pub const MAX_AUTOSAVE_INTERVAL_MS: u32 = 60_000;
+
+/// Maximum length of the custom save-file name (original input `maxlength="16"`).
+pub const MAX_SAVE_FILE_NAME_LEN: usize = 16;
+
 /// Per-action confirmation toggles, mirroring the subset of
 /// `player.options.confirmations` we model. Each is "show the explanatory modal
 /// before performing this action"; all default `true`. The modal's "Don't show
@@ -93,6 +104,16 @@ pub struct Options {
     /// Offline replay resolution (original `offlineTicks`): the maximum number of
     /// discrete ticks an offline interval is spread across. Higher = finer.
     pub offline_ticks: u32,
+    /// Autosave cadence in milliseconds (original `autosaveInterval`). Drives the
+    /// frontend autosave loop and the Saving-tab slider.
+    pub autosave_interval: u32,
+    /// Whether the header shows the elapsed time since the last save (original
+    /// `showTimeSinceSave`).
+    pub show_time_since_save: bool,
+    /// Custom save-file name (original `saveFileName`). Stored per save, so each
+    /// save slot carries its own; shown per slot in the "Choose save" modal and
+    /// used as the default filename when exporting the save to a file.
+    pub save_file_name: String,
     /// Per-action confirmation toggles (original `confirmations`).
     pub confirmations: Confirmations,
 }
@@ -106,6 +127,9 @@ impl Options {
             notation_digits_comma: DEFAULT_NOTATION_DIGITS_COMMA,
             notation_digits_notation: DEFAULT_NOTATION_DIGITS_NOTATION,
             offline_ticks: DEFAULT_OFFLINE_TICKS,
+            autosave_interval: DEFAULT_AUTOSAVE_INTERVAL_MS,
+            show_time_since_save: true,
+            save_file_name: String::new(),
             confirmations: Confirmations::new(),
         }
     }
@@ -134,6 +158,26 @@ impl Options {
     /// Set the update rate, clamped to the original game's slider range.
     pub fn set_update_rate(&mut self, rate: u32) {
         self.update_rate = rate.clamp(MIN_UPDATE_RATE_MS, MAX_UPDATE_RATE_MS);
+    }
+
+    /// Set the autosave interval, clamped to the Saving-tab slider range
+    /// (10..=60 s).
+    pub fn set_autosave_interval(&mut self, interval_ms: u32) {
+        self.autosave_interval =
+            interval_ms.clamp(MIN_AUTOSAVE_INTERVAL_MS, MAX_AUTOSAVE_INTERVAL_MS);
+    }
+
+    /// Set the custom save-file name, sanitized like the original's
+    /// `SaveFileName` input: trimmed, restricted to alphanumerics, spaces and
+    /// hyphens (`[^a-zA-Z0-9 -]` stripped), and capped at
+    /// [`MAX_SAVE_FILE_NAME_LEN`] characters (the input's `maxlength`).
+    pub fn set_save_file_name(&mut self, name: &str) {
+        self.save_file_name = name
+            .trim()
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == ' ' || *c == '-')
+            .take(MAX_SAVE_FILE_NAME_LEN)
+            .collect();
     }
 
     /// Set the notation, ignoring any name not in [`NOTATIONS`].
@@ -195,6 +239,35 @@ mod tests {
         assert!(o.confirmations.antimatter_galaxy);
         o.set_confirmation("nope", false);
         assert!(o.confirmations.antimatter_galaxy);
+    }
+
+    #[test]
+    fn autosave_interval_clamps_to_slider_range() {
+        let mut o = Options::new();
+        assert_eq!(o.autosave_interval, DEFAULT_AUTOSAVE_INTERVAL_MS);
+        assert!(o.show_time_since_save);
+
+        o.set_autosave_interval(5_000);
+        assert_eq!(o.autosave_interval, MIN_AUTOSAVE_INTERVAL_MS);
+        o.set_autosave_interval(999_999);
+        assert_eq!(o.autosave_interval, MAX_AUTOSAVE_INTERVAL_MS);
+        o.set_autosave_interval(45_000);
+        assert_eq!(o.autosave_interval, 45_000);
+    }
+
+    #[test]
+    fn save_file_name_is_sanitized_and_capped() {
+        let mut o = Options::new();
+        assert_eq!(o.save_file_name, "");
+
+        // Strips disallowed characters, keeps spaces/hyphens, trims ends.
+        o.set_save_file_name("  My Save!@# - 2  ");
+        assert_eq!(o.save_file_name, "My Save - 2");
+
+        // Capped at 16 characters (the input's maxlength).
+        o.set_save_file_name("abcdefghijklmnopqrstuvwxyz");
+        assert_eq!(o.save_file_name, "abcdefghijklmnop");
+        assert_eq!(o.save_file_name.len(), MAX_SAVE_FILE_NAME_LEN);
     }
 
     #[test]

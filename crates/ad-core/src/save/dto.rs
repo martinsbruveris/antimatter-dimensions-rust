@@ -27,8 +27,9 @@ use serde::Deserialize;
 use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::{AutobuyerMode, AutobuyerState};
 use crate::options::{
-    Confirmations, Options, MAX_NOTATION_DIGITS, MAX_UPDATE_RATE_MS,
-    MIN_NOTATION_DIGITS, MIN_UPDATE_RATE_MS,
+    Confirmations, Options, MAX_AUTOSAVE_INTERVAL_MS, MAX_NOTATION_DIGITS,
+    MAX_UPDATE_RATE_MS, MIN_AUTOSAVE_INTERVAL_MS, MIN_NOTATION_DIGITS,
+    MIN_UPDATE_RATE_MS,
 };
 use crate::state::{DimensionTier, GameState, TickspeedState};
 
@@ -137,6 +138,12 @@ pub struct OptionsDTO {
     pub notation: String,
     pub notation_digits: NotationDigitsDTO,
     pub offline_ticks: u32,
+    /// `player.options.autosaveInterval` — autosave cadence in milliseconds.
+    pub autosave_interval: u32,
+    /// `player.options.showTimeSinceSave` — header time-since-save indicator.
+    pub show_time_since_save: bool,
+    /// `player.options.saveFileName` — custom per-save export/display name.
+    pub save_file_name: String,
     /// `player.options.confirmations` (modelled subset).
     pub confirmations: ConfirmationsDTO,
 }
@@ -274,6 +281,16 @@ impl GameState {
         // diverges from the original's, so we accept any positive value from the
         // save as-is (§ offline-progress design).
         options.set_offline_ticks(dto.options.offline_ticks);
+        // Autosave interval matches the original's slider range, so it *is*
+        // range-checked (reject rather than clamp), like updateRate.
+        options.set_autosave_interval(check_range(
+            "options.autosaveInterval",
+            dto.options.autosave_interval,
+            MIN_AUTOSAVE_INTERVAL_MS,
+            MAX_AUTOSAVE_INTERVAL_MS,
+        )?);
+        options.show_time_since_save = dto.options.show_time_since_save;
+        options.set_save_file_name(&dto.options.save_file_name);
         // Confirmation toggles are plain booleans (no range checks); read the
         // modelled subset straight through.
         options.confirmations = Confirmations {

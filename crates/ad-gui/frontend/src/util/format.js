@@ -68,6 +68,34 @@ export function formatTime(ms) {
   return `${parts.slice(0, -1).join(", ")} and ${parts.slice(-1)[0]}`;
 }
 
+// Short duration form, mirroring the original `TimeSpan.toStringShort` (used by
+// `timeDisplayShort`, e.g. the bottom-left save timer): sub-second → "N ms",
+// under 10 s → 3 decimals, under a minute → 2 decimals, then HH:MM:SS (MM:SS
+// under an hour) up to 100 hours, then days/years. Values here stay small (the
+// save timer resets each autosave), so plain number formatting matches the
+// original's `format(...)` output without the notation machinery.
+export function timeDisplayShort(ms) {
+  const totalSeconds = ms / 1000;
+  if (totalSeconds < 1) return `${Math.round(1000 * totalSeconds)} ms`;
+  if (totalSeconds < 10) return `${totalSeconds.toFixed(3)} seconds`;
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(2)} seconds`;
+
+  const totalHours = ms / 36e5;
+  const pad = (v) => (v < 10 ? `0${v}` : `${v}`);
+  if (totalHours < 100) {
+    const hours = Math.floor(totalHours);
+    const minutes = Math.floor((ms / 6e4) % 60);
+    const seconds = Math.floor((ms / 1e3) % 60);
+    return hours === 0
+      ? `${pad(minutes)}:${pad(seconds)}`
+      : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+
+  const totalDays = ms / 864e5;
+  if (totalDays < 500) return `${totalDays.toFixed(2)} days`;
+  return `${(ms / 31536e6).toFixed(2)} years`;
+}
+
 // Format a sample number for the Exponent Notation modal's live preview, using
 // the slider's in-flight `commaDigits`/`notationDigits` (not the stored ones, so
 // dragging updates immediately) with the current notation. Mirrors the

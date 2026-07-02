@@ -41,17 +41,24 @@ const AUTOBUYER_MODE_BUY_10: i64 = 10;
 /// `player.lastUpdate`; passing the real import time avoids spurious offline
 /// progress when the save is loaded. The engine itself never reads the clock.
 pub fn encode_save(state: &GameState, now_ms: i64) -> String {
-    encode_pipeline(&build_player_json(state, now_ms))
+    let player = to_player_value(state, now_ms);
+    encode_pipeline(&serde_json::to_string(&player).expect("player Value always serializes"))
 }
 
-/// Overlays `state` onto a fresh copy of the template and serializes it to JSON.
-fn build_player_json(state: &GameState, now_ms: i64) -> String {
+/// Overlays `state` onto a fresh copy of the template, returning the complete
+/// `player` JSON [`Value`].
+///
+/// This is the shared building block for both a single-player save
+/// ([`encode_save`]) and the multi-player bundles (the localStorage-root and
+/// backup-bundle shapes in [`super::bundle`]), which assemble several of these
+/// player objects into one JSON document before running the byte pipeline.
+pub fn to_player_value(state: &GameState, now_ms: i64) -> Value {
     let mut player: Value = serde_json::from_str(DEFAULT_PLAYER_TEMPLATE)
         .expect("vendored default_player.json is valid JSON");
 
     overlay(&mut player, state, now_ms);
 
-    serde_json::to_string(&player).expect("player Value always serializes")
+    player
 }
 
 /// Writes our modelled fields onto the complete template `player` object,
@@ -92,6 +99,9 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     options["notationDigits"]["notation"] =
         json!(state.options.notation_digits_notation);
     options["offlineTicks"] = json!(state.options.offline_ticks);
+    options["autosaveInterval"] = json!(state.options.autosave_interval);
+    options["showTimeSinceSave"] = json!(state.options.show_time_since_save);
+    options["saveFileName"] = json!(state.options.save_file_name);
     let confirmations = &mut options["confirmations"];
     confirmations["dimensionBoost"] =
         json!(state.options.confirmations.dimension_boost);

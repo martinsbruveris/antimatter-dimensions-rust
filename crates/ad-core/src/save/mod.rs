@@ -12,13 +12,18 @@
 //! - *(later)* DTO + `from_save_dto` (read path) and a vendored `defaultStart`
 //!   template + overlay (write path), which sit on top of [`codec`].
 
+mod bundle;
 mod codec;
 mod dto;
 mod encode;
 
+pub use bundle::{
+    decode_root, decode_save_file, encode_backup_bundle, encode_root, BackupSlotSave,
+    ImportedSave, RootSave, SAVE_SLOT_COUNT,
+};
 pub use codec::{decode_pipeline, encode_pipeline};
 pub use dto::PlayerDTO;
-pub use encode::encode_save;
+pub use encode::{encode_save, to_player_value};
 
 use std::fmt;
 
@@ -40,6 +45,18 @@ pub fn decode_save(save: &str) -> Result<GameState, SaveError> {
     GameState::from_save_dto(&dto)
 }
 
+/// Maps an already-parsed `player` JSON [`Value`](serde_json::Value) into a
+/// [`GameState`].
+///
+/// This is the [`decode_save`] tail without the byte pipeline — used by the
+/// bundle decoders ([`decode_root`], [`decode_save_file`]), which parse a
+/// multi-player JSON document once and then map each contained `player` object
+/// through here. Applies the same strict validation as [`decode_save`].
+pub fn from_player_value(value: &serde_json::Value) -> Result<GameState, SaveError> {
+    let dto: PlayerDTO = serde_json::from_value(value.clone())?;
+    GameState::from_save_dto(&dto)
+}
+
 /// An error produced while decoding a save string.
 #[derive(Debug)]
 pub enum SaveError {
@@ -53,6 +70,9 @@ pub enum SaveError {
     /// The trailing `EndOfSavefile` marker is missing — the save is truncated or
     /// corrupt (a valid `AAB` save always ends with it).
     MissingEndMarker,
+    /// A localStorage-root save (`saves.dat`) had neither the `{ current, saves }`
+    /// wrapper nor a bare-`player` shape, so it can't be interpreted as a root.
+    MissingSavesWrapper,
     /// The base64 payload could not be decoded (after reversing the cleanup).
     Base64(base64::DecodeError),
     /// The zlib (deflate) stream could not be inflated.
@@ -95,6 +115,9 @@ impl fmt::Display for SaveError {
             SaveError::MissingEndMarker => f.write_str(
                 "corrupt or truncated save: missing the trailing EndOfSavefile marker",
             ),
+            SaveError::MissingSavesWrapper => f.write_str(
+                "not a root save: missing the { current, saves } wrapper",
+            ),
             SaveError::Base64(e) => write!(f, "base64 decode failed: {e}"),
             SaveError::Inflate(e) => write!(f, "zlib inflate failed: {e}"),
             SaveError::Utf8(e) => write!(f, "save payload was not valid UTF-8: {e}"),
@@ -129,6 +152,7 @@ impl std::error::Error for SaveError {
             SaveError::UnrecognizedFormat => None,
             SaveError::UnsupportedVersion => None,
             SaveError::MissingEndMarker => None,
+            SaveError::MissingSavesWrapper => None,
             SaveError::Base64(e) => Some(e),
             SaveError::Inflate(e) => Some(e),
             SaveError::Utf8(e) => Some(e),

@@ -17,6 +17,7 @@ import BackupWindowModal from "./components/BackupWindowModal.vue";
 import BigCrunchScreen from "./components/BigCrunchScreen.vue";
 import OfflineSummaryModal from "./components/OfflineSummaryModal.vue";
 import NotificationContainer from "./components/NotificationContainer.vue";
+import SaveTimer from "./components/SaveTimer.vue";
 import DimensionBoostConfirmModal from "./components/DimensionBoostConfirmModal.vue";
 import AntimatterGalaxyConfirmModal from "./components/AntimatterGalaxyConfirmModal.vue";
 import SacrificeConfirmModal from "./components/SacrificeConfirmModal.vue";
@@ -31,8 +32,55 @@ let last = performance.now();
 // Default cadence until the first snapshot arrives (original `updateRate: 33`).
 const DEFAULT_UPDATE_RATE = 33;
 
+// Default autosave cadence until the first snapshot arrives (30 s).
+const DEFAULT_AUTOSAVE_INTERVAL = 30000;
+
+// Online automatic-backup slots and their wall-clock intervals (ms), mirroring
+// the original's ONLINE `AutoBackupSlots` (§11.3). Checked while the app runs.
+const ONLINE_BACKUP_SLOTS = [
+  { id: 1, interval: 60000 },
+  { id: 2, interval: 300000 },
+  { id: 3, interval: 1200000 },
+  { id: 4, interval: 3600000 },
+];
+
+// Wall-clock timestamps of the last autosave / last online backup per slot.
+// Seeded to "now" so nothing fires the instant the app opens.
+let lastAutosave = Date.now();
+const lastBackup = { 1: Date.now(), 2: Date.now(), 3: Date.now(), 4: Date.now() };
+
+// Autosave and online backups are wall-clock driven and independent of the
+// engine tick: fire each when its interval has elapsed. Only runs once the first
+// snapshot exists (so we never save before the on-disk state has loaded).
+function maybePersist(nowWall) {
+  if (!game.snapshot) return;
+
+  const interval =
+    game.snapshot.options?.autosave_interval ?? DEFAULT_AUTOSAVE_INTERVAL;
+  if (nowWall - lastAutosave >= interval) {
+    lastAutosave = nowWall;
+    game.saveGame();
+  }
+
+  for (const slot of ONLINE_BACKUP_SLOTS) {
+    if (nowWall - lastBackup[slot.id] >= slot.interval) {
+      lastBackup[slot.id] = nowWall;
+      game.triggerBackup(slot.id);
+    }
+  }
+}
+
 function loop() {
   const now = performance.now();
+
+  // Keep the store's wall clock current every frame so the save timer advances
+  // in real time even while the engine is paused or in offline mode.
+  game.nowMs = Date.now();
+
+  // Autosave + online backups run on the wall clock, independent of the engine
+  // tick / dev pause / offline mode (the original checks them while the app is
+  // open regardless of game state).
+  maybePersist(Date.now());
 
   // Absolute pause (dev) freezes everything: no live ticks and no offline
   // accumulation. Consume the elapsed wall time so unpausing doesn't jump.
@@ -160,7 +208,7 @@ onUnmounted(() => {
     @close="ui.closeModal()"
   />
 
-  <!-- Saving-tab popups (visual only; save/load not wired up yet). -->
+  <!-- Saving-tab popups (wired to the engine's save/load + backup commands). -->
   <ImportSaveModal
     v-if="ui.openModal === 'importSave'"
     @close="ui.closeModal()"
@@ -196,6 +244,10 @@ onUnmounted(() => {
 
   <!-- Transient top-right toast popups (e.g. autobuyer pause/resume). -->
   <NotificationContainer />
+
+  <!-- Bottom-left "time since last save" timer (fixed overlay; click to save),
+       gated by the Display-time-since-save option. -->
+  <SaveTimer />
 </template>
 
 <style scoped>

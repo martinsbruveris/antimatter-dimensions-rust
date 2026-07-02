@@ -1,10 +1,11 @@
 # Save / Load: Analysis
 
-Status: in progress (§9 phases 1–4 done; phase 5 core save/load buttons
-**wired** to the codec — export/import clipboard + file + hard reset; save
-slots, autosave, persistence remain). Scope: design how `ad-gui` persists a
-game and, crucially, how it interoperates with **external Antimatter Dimensions
-saves** — both directions — while only a slice of the game is implemented.
+Status: in progress (§9 phases 1–5 done; phase 6 **done** — on-disk
+persistence, 3 save slots, autosave, 8 backup slots/slot, backup-bundle
+file import/export, time-since-save, and the Ctrl/Cmd+S shortcut are all
+wired). Scope: design how `ad-gui` persists a game and, crucially, how it
+interoperates with **external Antimatter Dimensions saves** — both directions —
+while only a slice of the game is implemented.
 
 See §9 for the phase checklist, §10 for the now-resolved open decisions,
 §11 for the original game's full persistence architecture (localStorage,
@@ -364,8 +365,9 @@ persistence. Proposed additions:
 2. **[DONE]** Encode/decode *pipeline* (steps 1–7) with fixture tests, JSON ⇄ string only.
 3. **[DONE]** Read path: DTO + `from_save_dto`, decode an external save into `GameState`.
 4. **[DONE]** Write path: vendored template + overlay + `encode_save`.
-5. Tauri commands + webview import/export modals.
-6. Autosave, on-disk persistence, "time since last save", keyboard shortcuts.
+5. **[DONE]** Tauri commands + webview import/export modals.
+6. **[DONE]** Autosave, on-disk persistence, save slots + backups, "time since
+   last save", keyboard shortcuts (§12).
 
 Phases 1–4 live entirely in `ad-core`/`break_infinity` and are testable headless
 before any UI work.
@@ -533,12 +535,51 @@ before any UI work.
     by the native dialog), but `BackupWindowModal.vue` still uses the
     `<input type="file">` + `overflow: hidden` pattern for its per-slot import.
 
-- **Deferred — backup-bundle file support (§2.4).** The Backup menu's
-  "Export/Import as File" uses the same `AAB` codec but bundles multiple `player`
-  objects in one file (`{ "<slotId>": player, …, "time": {…} }`). Documented in
-  §2.4; implementation (a `decode_save_file` dispatch layer over `decode_save`,
-  and whether we also *write* bundles) is left for the implementation/UI phase,
-  along with the import-pick decision.
+- **Phase 6 — done (§12 local persistence).** On-disk save/load, save slots,
+  automatic backups, and the remaining Saving-tab wiring.
+  - **Engine (`ad-core::save`, still pure).** Added the multi-player *bundle*
+    codec in `save/bundle.rs`: the localStorage-root shape `{ current, saves }`
+    (`RootSave` + `encode_root`/`decode_root`, §11.1, tolerating a legacy bare
+    `player` in slot 0) and the backup-bundle file shape (§2.4) via
+    `ImportedSave`/`BackupSlotSave` + `decode_save_file` (dispatches single vs
+    bundle on the top-level shape) + `encode_backup_bundle`. Both reuse the
+    existing byte pipeline; the shared building blocks `to_player_value`
+    (overlay → `Value`) and `from_player_value` (`Value` → `GameState`) were
+    factored out of `encode`/`decode`. `RootSave` carries each slot's
+    `lastUpdate` for offline-gap detection. `SaveError` gained
+    `MissingSavesWrapper`.
+  - **Engine-owned Saving options.** `autosave_interval` (ms, 10–60 s slider,
+    range-checked on load) and `show_time_since_save` were added to `Options`
+    (DTO + overlay + setter), so they round-trip through saves like the other
+    options.
+  - **GUI backend (`ad-gui/src/persistence.rs`).** `SaveManager` owns the
+    app-data dir (§12.1), the active slot, and the slot cache. It does all the
+    IO and wall-clock work `ad-core` deliberately avoids: `saves.dat` (encoded
+    root, all 3 slots), `backups/{slot}/{1..8}.dat` (encoded single players),
+    atomic temp-file+rename writes, backup ages from file mtime (no separate
+    `times.dat`). On startup (`.setup`) it loads the root into the live
+    `Mutex<GameState>` and fires the longest applicable **offline** backup from
+    the load gap; **online** backups (slots 1–4) and **autosave** are driven on
+    the wall clock by the `App.vue` rAF loop; the **reserve** slot (8) is written
+    before any backup load. New Tauri commands: `save_game`, `switch_save_slot`,
+    `get_save_slots`, `trigger_backup`, `get_backups`, `load_backup`,
+    `export_backups_to_file`, `import_backups_from_file`, plus
+    `set_autosave_interval`/`set_show_time_since_save`; `import_save*` and
+    `hard_reset` now persist the root immediately (mirroring the original's
+    save-after-import).
+  - **Frontend.** `LoadGameModal` and `BackupWindowModal` are wired (fetch
+    summaries on open, Load switches slot / loads backup); the backup modal's
+    Export/Import-as-file now use native dialogs (dropping the last
+    `<input type=file>`/`.c-file-import` WebKit hack). The Saving tab's *Save
+    game* button, autosave slider, and *Display time since save* toggle drive the
+    engine; a bottom-left `SaveTimer.vue` (faithful replica of the original's
+    fixed `o-save-timer`, click-to-save, `timeDisplayShort`/HH:MM:SS format, gated
+    by `show_time_since_save`) shows the elapsed time; `Ctrl/Cmd+S` saves
+    (original `mod+s`, a `bind` so it ignores the Hotkeys option).
+  - **Deferred still:** offline *progress* on real startup (only the offline
+    *backup* fires; the game itself doesn't replay the gap yet — the Offline-mode
+    dev control remains the only replay path), and the Backup modal's "Load with
+    offline progress disabled" toggle is inert for the same reason.
 
 ## 10. Open decisions (RESOLVED)
 

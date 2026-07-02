@@ -33,6 +33,7 @@ via `beforeBuildCommand`. Run from `crates/ad-gui/` (requires
 
 ```
 src/main.rs                 # Tauri commands + GameView snapshot (build_game_view)
+src/persistence.rs          # SaveManager: on-disk saves, slots, backups (§12)
 tauri.conf.json             # frontendDist = ./frontend/dist (no devUrl)
 frontend/
   index.html                # <body class="t-normal s-base--dark"> + vendored <link>s
@@ -219,6 +220,7 @@ frontend/
   Open dialog, reads + decodes + swaps state), `hard_reset` (replaces state
   with `GameState::new()`). Mirrored by `stores/game.js` `exportSave` /
   `importSave` / `exportSaveToFile` / `importSaveFromFile` / `hardReset`.
+  `import_save*`/`hard_reset` also persist the root to disk immediately.
 - **File dialogs** use `tauri-plugin-dialog` (`blocking_save_file` /
   `blocking_pick_file`), registered in `main.rs` and permitted via
   `dialog:default` in `capabilities/default.json`. This replaced the original's
@@ -231,9 +233,57 @@ frontend/
   confirmation-phrase gate ("Shrek is love, Shrek is life") controls whether
   the HARD RESET button appears; clicking it calls `hardReset`, toasts, and
   closes the modal.
-- **Not yet wired:** Save game button, Choose save / save slots, backup slots,
-  autosave, on-disk persistence, "time since last save" display, the `S`
-  keyboard shortcut (save).
+
+### On-disk persistence, save slots & backups (§12)
+
+- **`persistence.rs` / `SaveManager`** (a managed `Mutex<SaveManager>`) owns all
+  filesystem + wall-clock work `ad-core` deliberately avoids: the app-data-dir
+  layout, the 3 save slots, and 8 automatic backup slots per save slot. Layout:
+  `{app_data_dir}/saves.dat` (encoded `{ current, saves }` root) and
+  `backups/{slot}/{1..8}.dat` (encoded single players). Writes are atomic (temp
+  file + rename); backup ages come from file mtime (no separate `times.dat`).
+- **Startup** (`.setup` in `main.rs`): resolves `app.path().app_data_dir()`,
+  loads the root into the live `Mutex<GameState>`, and fires the longest
+  applicable **offline** backup from the load gap. A missing/corrupt save starts
+  fresh.
+- **Cadence lives in the frontend** (`App.vue` rAF loop, `maybePersist`):
+  **autosave** every `options.autosave_interval` ms and **online** backups
+  (slots 1–4, wall-clock intervals) call `save_game` / `trigger_backup`. The
+  **reserve** slot (8) is written by the backend before any backup load.
+- **Commands:** `save_game`, `switch_save_slot(index) -> GameView`,
+  `get_save_slots -> [{id,exists,antimatter,is_current}]`, `trigger_backup(slot)`,
+  `get_backups -> [{id,exists,antimatter,last_backup_ms}]` (absolute mtime so the
+  modal's "Last saved … ago" ticks in real time off the store clock),
+  `load_backup(slot) ->
+  GameView`, `export_backups_to_file` / `import_backups_from_file` (§2.4 bundle,
+  native dialogs), `set_autosave_interval` / `set_show_time_since_save`. Mirrored
+  by the like-named `stores/game.js` actions.
+- **Engine-owned Saving options.** `autosave_interval`, `show_time_since_save`,
+  and `save_file_name` live in `ad-core`'s `Options` (round-tripped through the
+  save), surfaced in the snapshot's `options`. The Saving tab's autosave slider,
+  "Display time since save" toggle, and "Save file name" input read/write them
+  (`set_save_file_name` sanitizes to alphanumerics/space/hyphen, ≤16 chars).
+  `save_file_name` is stored **per save slot** (it's a `player.options` field), so
+  each slot carries its own — the "Choose save" modal shows it per slot
+  (`get_save_slots` returns it), and it's the default filename for export-to-file.
+- **SaveTimer.vue** — the bottom-left "Time since last save: HH:MM:SS" overlay,
+  replicating the original's `SaveTimer.vue` (fixed `o-save-timer` at
+  `bottom:0;left:0`, click to save, gated by `show_time_since_save`). It formats
+  with `util/format.js` `timeDisplayShort` (the original's `TimeSpan.toStringShort`)
+  and reads the store's `msSinceSave` (`nowMs - lastSaveTime`), where `nowMs` is
+  refreshed every frame by `App.vue`'s loop so it advances even while
+  paused/offline.
+- **LoadGameModal / BackupWindowModal** fetch summaries on open (`getSaveSlots` /
+  `getBackups`) and Load via `switchSaveSlot` / `loadBackup`. The backup modal's
+  Export/Import-as-file use native dialogs (the last `<input type=file>` /
+  `.c-file-import` WebKit hack is gone).
+- **`Ctrl/Cmd+S` saves** (`util/shortcuts.js`, original `mod+s`): handled before
+  the Ctrl/Cmd guard and independent of the Hotkeys option (a `bind`, not
+  `bindHotkey`), and calls `preventDefault` to suppress the browser Save dialog.
+- **Not yet wired:** real offline *progress* on startup (only the offline
+  *backup* fires; the game doesn't replay the gap — the Offline-mode dev control
+  is still the only replay path), so the Backup modal's "Load with offline
+  progress disabled" toggle is currently inert.
 
 ## Keyboard shortcuts & popups
 
@@ -381,7 +431,8 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md`.
 - Big Crunch resets all pre-Infinity progress but awards no Infinity Points
   yet, and shows the first-crunch (non-"small") screen unconditionally; IP and
   the post-`break` header button come next.
-- Save/load: export/import (clipboard + file) and hard reset are wired; save
-  slots, autosave, on-disk persistence, "time since last save", and the `S`
-  keyboard shortcut remain. See `design-docs/2026-06-28-save-load-analysis.md`
-  §9.
+- Save/load: fully wired — clipboard/file export-import, hard reset, on-disk
+  persistence, 3 save slots, autosave, 8 backup slots/slot (+ bundle
+  export/import), "time since last save", and `Ctrl/Cmd+S`. The one gap is real
+  offline *progress* on startup (only the offline *backup* fires). See
+  `design-docs/2026-06-28-save-load-analysis.md` §9/§12.

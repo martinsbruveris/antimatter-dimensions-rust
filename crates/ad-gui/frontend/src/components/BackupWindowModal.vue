@@ -3,28 +3,99 @@
 // the original game's BackupWindowModal.vue + BackupEntry.vue
 // (../antimatter-dimensions/src/components/modals/options) — the explanatory
 // text, the "load without offline" toggle, the grid of backup-slot entries and
-// the import/export file buttons. Backups are not wired up yet, so every slot
-// shows the empty state. Renders inside our shared Modal.vue wrapper.
-import { ref } from "vue";
+// the import/export file buttons. Wired to the engine's per-save-slot backup
+// files: it fetches per-slot summaries on open, loads a backup on click, and
+// exports/imports the whole backup set as a file (§2.4 bundle). Renders inside
+// our shared Modal.vue wrapper.
+import { onMounted, onUnmounted, ref } from "vue";
 
+import { useGameStore } from "../stores/game";
+import { useUiStore } from "../stores/ui";
+import { formatDecimal, formatTime } from "../util/format";
 import Modal from "./Modal.vue";
 
 defineEmits(["close"]);
+
+const game = useGameStore();
+const ui = useUiStore();
 
 const ignoreOffline = ref(false);
 
 // The eight automatic backup slots, mirroring core/storage `AutoBackupSlots`.
 // `desc` is the original BackupEntry `slotType` string for each slot.
-const backupSlots = [
-  { id: 1, desc: "Saves every 1 minute online" },
-  { id: 2, desc: "Saves every 5 minutes online" },
-  { id: 3, desc: "Saves every 20 minutes online" },
-  { id: 4, desc: "Saves every 1 hour online" },
-  { id: 5, desc: "Saves after 10 minutes offline" },
-  { id: 6, desc: "Saves after 1 hour offline" },
-  { id: 7, desc: "Saves after 5 hours offline" },
-  { id: 8, desc: "Pre-loading save" },
-];
+const BACKUP_DESCRIPTIONS = {
+  1: "Saves every 1 minute online",
+  2: "Saves every 5 minutes online",
+  3: "Saves every 20 minutes online",
+  4: "Saves every 1 hour online",
+  5: "Saves after 10 minutes offline",
+  6: "Saves after 1 hour offline",
+  7: "Saves after 5 hours offline",
+  8: "Pre-loading save",
+};
+
+// Per-slot summaries from the engine:
+// { id, exists, antimatter: {m,e}, last_backup_ms }.
+const slots = ref([]);
+
+async function refresh() {
+  slots.value = await game.getBackups();
+}
+
+// The elapsed "Last saved … ago" ticks off the store clock every frame, but the
+// backups themselves only change when one is written (an online backup fires, or
+// a load reserves slot 8). Re-poll while the modal is open so a new backup's
+// timestamp (reset to ~0) and antimatter are picked up; 1 s is plenty responsive
+// for the minute-plus online intervals and avoids re-decoding the files per frame.
+let pollId = null;
+
+onMounted(() => {
+  refresh();
+  pollId = setInterval(refresh, 1000);
+});
+
+onUnmounted(() => {
+  if (pollId) clearInterval(pollId);
+});
+
+function description(id) {
+  return BACKUP_DESCRIPTIONS[id];
+}
+
+// "Last saved: X ago", mirroring the original BackupEntry. Reading the store's
+// per-frame `nowMs` clock inside the render makes it a reactive dependency, so
+// the elapsed time ticks in real time (the backup's own timestamp is fixed).
+function lastSaved(slot) {
+  if (!slot.exists) return "Slot not currently in use";
+  const elapsed = Math.max(0, game.nowMs - slot.last_backup_ms);
+  return `Last saved: ${formatTime(elapsed)} ago`;
+}
+
+async function loadBackup(slot) {
+  if (!slot.exists) return;
+  await game.loadBackup(slot.id);
+  ui.notify("Game loaded");
+  ui.closeModal();
+}
+
+async function exportBackups() {
+  try {
+    await game.exportBackupsToFile();
+    ui.notify("Backups exported to file");
+  } catch (e) {
+    if (e !== "Cancelled") ui.notify(`Export failed: ${e}`, "error");
+  }
+}
+
+async function importBackups() {
+  try {
+    const count = await game.importBackupsFromFile();
+    ui.notify(`Imported ${count} backup${count === 1 ? "" : "s"}`);
+    await refresh();
+  } catch (e) {
+    if (e !== "Cancelled") ui.notify(`Import failed: ${e}`, "error");
+  }
+}
 </script>
 
 <template>
@@ -58,15 +129,22 @@ const backupSlots = [
       </div>
       <div class="c-entry-container">
         <div
-          v-for="slot in backupSlots"
+          v-for="slot in slots"
           :key="slot.id"
           class="l-backup-entry c-bordered-entry"
         >
           <h3>Slot #{{ slot.id }}:</h3>
-          <span>(Empty)</span>
-          <span>{{ slot.desc }}</span>
-          <span class="c-fixed-height">Slot not currently in use</span>
-          <button class="o-primary-btn o-primary-btn--width-medium o-primary-btn--disabled">
+          <span v-if="slot.exists">Antimatter: {{ formatDecimal(slot.antimatter, 2, 1) }}</span>
+          <span v-else>(Empty)</span>
+          <span>{{ description(slot.id) }}</span>
+          <span class="c-fixed-height">
+            {{ lastSaved(slot) }}
+          </span>
+          <button
+            class="o-primary-btn o-primary-btn--width-medium"
+            :class="{ 'o-primary-btn--disabled': !slot.exists }"
+            @click="loadBackup(slot)"
+          >
             Load
           </button>
         </div>
@@ -75,16 +153,17 @@ const backupSlots = [
       external to the game which would delete your save itself, such as clearing your browser cookies. You can
       import/export all backups at once as files, using these buttons:
       <div class="c-backup-file-ops">
-        <button class="o-primary-btn o-btn-file-ops">
+        <button
+          class="o-primary-btn o-btn-file-ops"
+          @click="exportBackups"
+        >
           Export as file
         </button>
-        <button class="o-primary-btn o-btn-file-ops c-file-import-button">
-          <input
-            class="c-file-import"
-            type="file"
-            accept=".txt"
-          >
-          <label for="file">Import from file</label>
+        <button
+          class="o-primary-btn o-btn-file-ops"
+          @click="importBackups"
+        >
+          Import from file
         </button>
       </div>
       Each of your three save slots has its own separate set of backups.
@@ -108,15 +187,6 @@ const backupSlots = [
 
 .c-backup-file-ops {
   margin: 0.5rem;
-}
-
-/* The "Import from file" button uses the vendored `.c-file-import` hack, whose
-   invisible `::before` (font-size: 100rem) overflows hugely. Inside the modal's
-   scrollable content that overflow becomes scrollable empty space far past the
-   end. Clip it to the button (the input still fills its own button, so import
-   stays clickable). Same fix as the Saving tab's file-import button. */
-.c-file-import-button {
-  overflow: hidden;
 }
 
 .o-btn-file-ops {

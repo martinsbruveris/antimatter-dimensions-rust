@@ -16,9 +16,17 @@ export function handleShortcut(e, game, ui) {
   const tag = e.target?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-  // Ignore Ctrl/Cmd/Alt combos: in the original these map to other binds we
-  // don't implement yet (save/export, autobuyer toggles), and swallowing
-  // them would break browser/OS shortcuts.
+  // Ctrl/Cmd+S saves the game (original "Save game" bind = mod+s). Handle it
+  // before the general Ctrl/Cmd guard below, and stop the browser's own Save.
+  if (e.code === "KeyS" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+    game.saveGame();
+    e.preventDefault();
+    return;
+  }
+
+  // Ignore other Ctrl/Cmd/Alt combos: in the original these map to binds we
+  // don't implement yet (export, autobuyer toggles), and swallowing them would
+  // break browser/OS shortcuts.
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 
   // Popups.
