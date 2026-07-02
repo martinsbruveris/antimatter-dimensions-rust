@@ -1,8 +1,6 @@
 use break_infinity::Decimal;
 
-use crate::data::constants::{
-    AD_BASE_COSTS, AD_COST_MULTIPLIERS, BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER,
-};
+use crate::data::constants::{AD_BASE_COSTS, AD_COST_MULTIPLIERS};
 use crate::state::GameState;
 
 impl GameState {
@@ -112,23 +110,25 @@ impl GameState {
     pub fn dimension_multiplier(&self, tier: usize) -> Decimal {
         let mut mult = Decimal::from_float(1.0);
 
-        // Buy-10 multiplier: 2^(bought / 10)
+        // Buy-10 multiplier: base^(bought / 10). Base is 2, or 2.2 with the
+        // `buy10Mult` Infinity Upgrade (`buy_ten_multiplier`).
         let buy10_groups = self.dimensions[tier].bought / 10;
         if buy10_groups > 0 {
-            let buy10_mult = Decimal::from_float(BUY_TEN_MULTIPLIER)
+            mult *= self
+                .buy_ten_multiplier()
                 .pow(&Decimal::from_float(buy10_groups as f64));
-            mult *= buy10_mult;
         }
 
         // Dim boost: power^max(0, boosts - tier)
         // tier is 0-indexed; JS formula is
         // power^(boosts + 1 - js_tier) where js_tier = tier+1
-        // so exponent = boosts + 1 - (tier + 1) = boosts - tier
+        // so exponent = boosts + 1 - (tier + 1) = boosts - tier.
+        // Power is 2, or 2.5 with the `dimboostMult` Infinity Upgrade.
         let exponent = (self.dim_boosts as i64 - tier as i64).max(0);
         if exponent > 0 {
-            let boost_mult = Decimal::from_float(DIM_BOOST_MULTIPLIER)
+            mult *= self
+                .dim_boost_power()
                 .pow(&Decimal::from_float(exponent as f64));
-            mult *= boost_mult;
         }
 
         // Sacrifice multiplier applies only to 8th dimension
@@ -146,7 +146,16 @@ impl GameState {
             mult *= Decimal::from_float(1.1);
         }
 
-        mult
+        // Infinity Upgrade multipliers: the common (all-tier) time multipliers and
+        // the per-tier dim-pair / unspent-IP multipliers.
+        mult *= self.infinity_upgrade_common_mult();
+        mult *= self.infinity_upgrade_tier_mult(tier);
+
+        // The original clamps the final per-tier multiplier to >= 1
+        // (applyNDMultipliers). Pre-Infinity every term was >= 1, but
+        // `totalTimeMult` can dip below 1 for a very short total play time, so
+        // clamp to stay faithful.
+        mult.max(&Decimal::ONE)
     }
 
     /// Get the per-second production rate for a dimension tier.

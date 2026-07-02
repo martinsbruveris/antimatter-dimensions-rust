@@ -1,3 +1,4 @@
+use crate::infinity_upgrades::InfinityUpgrade;
 use crate::state::GameState;
 
 /// A single legal player action.
@@ -32,6 +33,8 @@ pub enum Action {
     Sacrifice,
     /// Perform a Big Crunch (first Infinity).
     Crunch,
+    /// Buy an Infinity Upgrade from the grid.
+    BuyInfinityUpgrade(InfinityUpgrade),
     /// Unlock the antimatter-dimension autobuyer for the tier (0-indexed).
     UnlockAdAutobuyer(usize),
     /// Unlock the tickspeed autobuyer.
@@ -92,6 +95,9 @@ impl GameState {
             Action::DimBoost => ActionOutcome::single(self.buy_dim_boost()),
             Action::Sacrifice => ActionOutcome::single(self.sacrifice()),
             Action::Crunch => ActionOutcome::single(self.big_crunch()),
+            Action::BuyInfinityUpgrade(upgrade) => {
+                ActionOutcome::single(self.buy_infinity_upgrade(upgrade))
+            }
             Action::UnlockAdAutobuyer(tier) => {
                 ActionOutcome::single(self.unlock_ad_autobuyer(tier))
             }

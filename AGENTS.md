@@ -59,6 +59,15 @@ antimatter-dimensions-rust/
 - `src/records.rs` — `Records`: the modelled slice of `player.records` (total time
   played, this-infinity time/`maxAM`, best-infinity time). Advanced in `tick`; the
   current-infinity records reset on a Big Crunch.
+- `src/infinity_upgrades.rs` — Infinity Upgrades (Feature 2.2): the `InfinityUpgrade`
+  enum + data table (cost, save-id, column prerequisite), purchase logic
+  (`buy_infinity_upgrade`, IP-gated bitmask on `GameState::infinity_upgrades`), and
+  the effect readers other modules call (`buy_ten_multiplier`, `dim_boost_power`,
+  `galaxy_strength_effect`, `reset_boost_reduction`, the AD-multiplier
+  contributions, `skip_resets_if_possible`, passive `generate_passive_ip`). Effects
+  are *applied* at the original's sites (dimension multiplier, tickspeed, boost/
+  galaxy requirement, reset paths). See
+  `design-docs/2026-07-03-infinity-upgrades.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
@@ -252,6 +261,7 @@ Located in `design-docs/`:
 | `2026-06-30-ui-reveal-and-tutorial.md` | Progressive UI reveal (hiding/showing AD rows, tickspeed, sacrifice), first-time/disable-able confirmation modals (boost/galaxy/sacrifice/crunch), and the tutorial glow + exclamation highlight; how the original implements each and a phased plan |
 | `2026-06-30-achievements.md` | Normal achievements: bitmask state on `GameState`, unlock hooks inline in the buy/galaxy/boost/crunch/tick methods (rows 1–2 minus News), per-achievement effects + the global achievement-power multiplier, `achievementBits` save round-trip, the sprite-driven tab, and the unlock toast; phased plan |
 | `2026-07-02-infinity-points-and-records.md` | Completing Feature 2.1: Infinity Points / Infinities currency, the `Records` struct (time played, this/best infinity), the IP gain formula (pre-break = 1), Big Crunch reward+reset semantics, save/load round-trip, and the Infinity tab + IP header |
+| `2026-07-03-infinity-upgrades.md` | Feature 2.2: the 16-upgrade Infinity grid — data table, bitmask state, purchase/column prereqs, every effect and its engine application site, passive `ipGen`, save/load, and the grid UI; bottom row (`ipMult`/`ipOffline`) deferred |
 
 The table lists key documents; see the `design-docs/` folder for the full,
 date-prefixed set. Read these before making architectural decisions. The

@@ -131,6 +131,10 @@ export const useGameStore = defineStore("game", {
         useUiStore().setSubtab("infinity", "upgrades");
       }
     },
+    // Buy an Infinity Upgrade by its original save id (e.g. "timeMult").
+    buyInfinityUpgrade(id) {
+      return invoke("buy_infinity_upgrade", { id });
+    },
     // --- Confirmation-gated requests ---
     // Each click handler routes through one of these: if the matching
     // confirmation option is on, open the explanatory modal (whose Confirm

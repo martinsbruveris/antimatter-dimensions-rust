@@ -16,6 +16,10 @@ impl GameState {
         // Run autobuyers before production
         self.tick_autobuyers(dt_ms);
 
+        // Passive Infinity-Point generation from the `ipGen` Infinity Upgrade
+        // (mirrors the original's `preProductionGenerateIP`).
+        self.generate_passive_ip(dt_ms);
+
         let dt_seconds = dt_ms / 1000.0;
         let dt = Decimal::from_float(dt_seconds);
 

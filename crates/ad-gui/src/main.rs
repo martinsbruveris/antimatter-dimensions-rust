@@ -7,7 +7,10 @@ use ad_core::data::constants::{
     BIG_CRUNCH_THRESHOLD, BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER,
 };
 use ad_core::save::{decode_save_with_last_update, encode_save};
-use ad_core::{offline_plan as core_offline_plan, AutobuyerMode, Decimal, GameState};
+use ad_core::{
+    offline_plan as core_offline_plan, AutobuyerMode, Decimal, GameState,
+    InfinityUpgrade, ALL_INFINITY_UPGRADES,
+};
 use serde::Serialize;
 use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
@@ -86,6 +89,23 @@ struct AutobuyerView {
     can_change_mode: bool,
 }
 
+/// Serializable view of a single Infinity Upgrade for the grid.
+#[derive(Serialize)]
+struct InfinityUpgradeView {
+    /// Original save id (e.g. "timeMult"); the frontend keys its description/layout
+    /// table on this and passes it back to `buy_infinity_upgrade`.
+    id: String,
+    /// Whether it is owned (lit tile).
+    is_bought: bool,
+    /// Whether it can be bought now (column prerequisite + enough IP).
+    can_be_bought: bool,
+    /// IP cost.
+    cost: Num,
+    /// Numeric effect value (for the tiles whose effect shows a `×value`); the
+    /// frontend ignores it for constant/description-only tiles.
+    effect: Num,
+}
+
 /// Serializable view of the whole autobuyers tab.
 #[derive(Serialize)]
 struct AutobuyersView {
@@ -109,6 +129,8 @@ struct GameView {
     /// (`ObservedState`) but aren't surfaced here yet — they gain consumers with
     /// the Statistics tab and the post-break crunch modal (Feature 2.3).
     infinity_points: Num,
+    /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
+    infinity_upgrades: Vec<InfinityUpgradeView>,
     tickspeed_cost: Num,
     tickspeed_bought: u64,
     tickspeed_effect: Num,
@@ -254,6 +276,21 @@ fn build_autobuyers_view(game: &GameState) -> AutobuyersView {
     }
 }
 
+/// Build the Infinity Upgrades view (grid order = engine's `ALL_INFINITY_UPGRADES`,
+/// column-major). The frontend keys its layout/description table on `id`.
+fn build_infinity_upgrades_view(game: &GameState) -> Vec<InfinityUpgradeView> {
+    ALL_INFINITY_UPGRADES
+        .iter()
+        .map(|&upgrade| InfinityUpgradeView {
+            id: upgrade.save_id().to_string(),
+            is_bought: game.infinity_upgrade_bought(upgrade),
+            can_be_bought: game.can_buy_infinity_upgrade(upgrade),
+            cost: num(&upgrade.cost()),
+            effect: num(&game.infinity_upgrade_effect(upgrade)),
+        })
+        .collect()
+}
+
 fn build_game_view(game: &GameState) -> GameView {
     let unlocked = game.unlocked_dimensions();
     let mut dimensions = Vec::with_capacity(8);
@@ -331,6 +368,7 @@ fn build_game_view(game: &GameState) -> GameView {
         antimatter: num(&game.antimatter),
         antimatter_per_sec: num(&game.antimatter_per_second()),
         infinity_points: num(&game.infinity_points),
+        infinity_upgrades: build_infinity_upgrades_view(game),
         tickspeed_cost: num(tickspeed_cost),
         tickspeed_bought: game.tickspeed.bought,
         tickspeed_effect: num(&game.tickspeed_effect()),
@@ -524,6 +562,16 @@ fn max_all(state: State<'_, Mutex<GameState>>) {
 fn big_crunch(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.big_crunch();
+}
+
+/// Buy an Infinity Upgrade by its original save id (e.g. "timeMult"). An
+/// unrecognized id is a no-op.
+#[tauri::command]
+fn buy_infinity_upgrade(id: String, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    if let Some(upgrade) = InfinityUpgrade::from_save_id(&id) {
+        game.buy_infinity_upgrade(upgrade);
+    }
 }
 
 /// Resets the current save slot to a fresh state (the "HARD RESET" option) and
@@ -993,6 +1041,7 @@ pub fn run() {
             sacrifice,
             max_all,
             big_crunch,
+            buy_infinity_upgrade,
             hard_reset,
             unlock_ad_autobuyer,
             toggle_ad_autobuyer,

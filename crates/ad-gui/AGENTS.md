@@ -340,11 +340,20 @@ frontend/
 - On the **first** crunch the store's `bigCrunch` action navigates to the new
   **Infinity** tab (mirrors `Tab.infinity.upgrades.show()`); the tab is
   conditional on `snapshot.infinity_unlocked` in `config/tabs.js` and shows the
-  `InfinityUpgradesTab.vue` — for now just the Infinity-Points header ("You have
-  _X_ Infinity Points."). The upgrade grid arrives with Feature 2.2. `GameView`
-  surfaces `infinity_points`; the post-break "IP/infinities gained" modal + disable
-  checkbox and the Statistics `infinities` display come later. See
-  `design-docs/2026-07-02-infinity-points-and-records.md`.
+  `InfinityUpgradesTab.vue` — the Infinity-Points header plus the **4×4 Infinity
+  Upgrades grid** (Feature 2.2). `GameView` surfaces `infinity_points`; the
+  post-break "IP/infinities gained" modal + disable checkbox and the Statistics
+  `infinities` display come later. See
+  `design-docs/2026-07-02-infinity-points-and-records.md` and
+  `design-docs/2026-07-03-infinity-upgrades.md`.
+- **Infinity Upgrades grid** (`InfinityUpgradesTab.vue` + `data/infinityUpgrades.js`):
+  the vendored `o-infinity-upgrade-btn` tiles in four column chains, with the
+  per-column lit-band background. Layout + descriptions live frontend-side
+  (`data/infinityUpgrades.js`); the engine owns owned-state / affordability / cost
+  / effect value, shipped per tile in `GameView.infinity_upgrades[]` (`{ id,
+  is_bought, can_be_bought, cost, effect }`, grid/column-major order). Clicking a
+  buyable tile calls the `buy_infinity_upgrade(id)` command (store `buyInfinityUpgrade`).
+  The bottom row (`ipMult`/`ipOffline`, Achievement 41) is not built yet.
 
 ## Progressive reveal, tutorial highlights & confirmations
 
@@ -441,10 +450,11 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md`.
 - Responsive dimension rows use the "narrow" stacked layout unconditionally
   below 1573px (matches the original at the default window size).
 - Big Crunch awards Infinity Points + an Infinity and opens the Infinity tab on
-  the first crunch (Feature 2.1 complete). Still shows the first-crunch
-  (non-"small") screen unconditionally; the post-`break` header button, the
-  <60 s "small crunch" flow, and the crunch animation come later. The Infinity
-  Upgrades grid (Feature 2.2) and Break Infinity (2.3) are the next steps.
+  the first crunch (Feature 2.1); the Infinity Upgrades grid is built (Feature
+  2.2). Still shows the first-crunch (non-"small") screen unconditionally; the
+  post-`break` header button, the <60 s "small crunch" flow, and the crunch
+  animation come later. Break Infinity (Feature 2.3) — including the `ipMult`/
+  `ipOffline` bottom-row upgrades and the post-break crunch modal — is next.
 - Save/load: fully wired — clipboard/file export-import, hard reset, on-disk
   persistence, 3 save slots, autosave, 8 backup slots/slot (+ bundle
   export/import), "time since last save", and `Ctrl/Cmd+S`. The one gap is real

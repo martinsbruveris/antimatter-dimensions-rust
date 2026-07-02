@@ -22,8 +22,9 @@ impl GameState {
     /// The global Infinity-Point multiplier (`GameCache.totalIPMult`). Every
     /// source (the IP-mult Infinity Upgrade, achievements 85/93/116/125, time
     /// studies, …) is a later feature, so this is 1 for now; kept as a method so
-    /// those become multiplicative additions here.
-    fn total_ip_mult(&self) -> Decimal {
+    /// those become multiplicative additions here. Read by
+    /// [`GameState::generate_passive_ip`] too.
+    pub(crate) fn total_ip_mult(&self) -> Decimal {
         Decimal::ONE
     }
 
@@ -86,6 +87,10 @@ impl GameState {
         self.dim_boosts = 0;
         self.galaxies = 0;
         self.sacrificed = Decimal::ZERO;
+        // Re-apply skip-reset Infinity Upgrades (original `secondSoftReset` →
+        // `softReset` → `skipResetsIfPossible`): start the next infinity already at
+        // the highest owned skip level (and with a Galaxy for skipResetGalaxy).
+        self.skip_resets_if_possible();
         // Reset the current infinity's records (time/maxAM back to 0); the
         // fastest-infinity record and total time played persist.
         self.records.this_infinity = ThisInfinity::new();

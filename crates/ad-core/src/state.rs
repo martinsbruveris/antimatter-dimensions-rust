@@ -115,6 +115,15 @@ pub struct GameState {
     /// Statistics tab and feeds later infinity-count multipliers.
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinities: Decimal,
+    /// Owned Infinity Upgrades, one bit per [`InfinityUpgrade`](crate::InfinityUpgrade)
+    /// (the original's `player.infinityUpgrades` string set as a bitmask).
+    /// Persists across a Big Crunch. See `infinity_upgrades.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub infinity_upgrades: u32,
+    /// Fractional Infinity-Point accumulator for the `ipGen` upgrade's passive
+    /// generation (mirrors `player.partInfinityPoint`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub part_infinity_point: f64,
     /// Whether the player has performed at least one Big Crunch. Mirrors JS
     /// `PlayerProgress.infinityUnlocked()`: set on the first crunch and
     /// **not** reset by subsequent crunches. Gates Infinity-related UI (e.g.
@@ -166,6 +175,8 @@ impl GameState {
             sacrificed: Decimal::ZERO,
             infinity_points: Decimal::ZERO,
             infinities: Decimal::ZERO,
+            infinity_upgrades: 0,
+            part_infinity_point: 0.0,
             infinity_unlocked: false,
             records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],

@@ -26,6 +26,7 @@ use serde::Deserialize;
 
 use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::{AutobuyerMode, AutobuyerState};
+use crate::infinity_upgrades::InfinityUpgrade;
 use crate::options::{
     Confirmations, Options, MAX_AUTOSAVE_INTERVAL_MS, MAX_NOTATION_DIGITS,
     MAX_UPDATE_RATE_MS, MIN_AUTOSAVE_INTERVAL_MS, MIN_NOTATION_DIGITS,
@@ -64,6 +65,11 @@ pub struct PlayerDTO {
     pub infinities: Decimal,
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_points: Decimal,
+    /// `player.infinityUpgrades` — owned Infinity Upgrades, by original string id.
+    /// Unmodelled ids (there are none pre-follow-up) are ignored on load.
+    pub infinity_upgrades: Vec<String>,
+    /// `player.partInfinityPoint` — the `ipGen` fractional IP accumulator.
+    pub part_infinity_point: f64,
     /// `player.achievementBits` — one bitmask int per achievement row.
     pub achievement_bits: Vec<u32>,
     /// `player.tutorialState` — current tutorial-highlight step.
@@ -245,6 +251,15 @@ impl GameState {
             || dto.infinities > Decimal::ZERO
             || dto.infinity_points > Decimal::ZERO;
 
+        // Infinity Upgrades: set the bit for each modelled string id; unknown ids
+        // (none pre-follow-up) are ignored so a later-game save still loads.
+        let mut infinity_upgrades = 0u32;
+        for id in &dto.infinity_upgrades {
+            if let Some(upgrade) = InfinityUpgrade::from_save_id(id) {
+                infinity_upgrades |= upgrade.bit();
+            }
+        }
+
         let records = Records {
             total_time_played_ms: dto.records.total_time_played,
             real_time_played_ms: dto.records.real_time_played,
@@ -359,6 +374,8 @@ impl GameState {
             sacrificed: dto.sacrificed,
             infinity_points: dto.infinity_points,
             infinities: dto.infinities,
+            infinity_upgrades,
+            part_infinity_point: dto.part_infinity_point,
             infinity_unlocked,
             records,
             achievement_bits,
@@ -524,6 +541,25 @@ mod tests {
         assert_eq!(state.records.best_infinity.time_ms, 30_000.0);
         // Any IP/infinities gained implies Infinity is unlocked.
         assert!(state.infinity_unlocked);
+    }
+
+    #[test]
+    fn loads_infinity_upgrades_and_part_ip() {
+        let mut player = base_player();
+        player["infinityUpgrades"] = json!(["timeMult", "18Mult", "dimMult"]);
+        player["partInfinityPoint"] = json!(0.75);
+        // An unmodelled id must not fail the load (forward-compat).
+        player["infinityUpgrades"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("someFutureUpgrade"));
+
+        let state = load(player).unwrap();
+        assert!(state.infinity_upgrade_bought(InfinityUpgrade::TotalTimeMult));
+        assert!(state.infinity_upgrade_bought(InfinityUpgrade::Dim18Mult));
+        assert!(state.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult));
+        assert!(!state.infinity_upgrade_bought(InfinityUpgrade::Dim27Mult));
+        assert_eq!(state.part_infinity_point, 0.75);
     }
 
     #[test]

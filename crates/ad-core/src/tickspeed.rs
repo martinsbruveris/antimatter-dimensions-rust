@@ -50,14 +50,18 @@ impl GameState {
     ///   0.8 * 0.965^(galaxies - 4)
     pub fn tickspeed_purchase_multiplier(&self) -> f64 {
         let galaxies = self.galaxies as f64;
+        // The original's `effects` product scales the per-galaxy term; the only
+        // pre-Infinity contributor is the `galaxyBoost` Infinity Upgrade (×2).
+        let effects = self.galaxy_strength_effect();
 
         if self.galaxies < 3 {
             let base = TICKSPEED_BASE_MULTIPLIERS[self.galaxies as usize];
-            (base - galaxies * GALAXY_TICKSPEED_REDUCTION).max(TICKSPEED_MULTIPLIER_MIN)
+            // perGalaxy = 0.02 * effects; reduction = galaxies * perGalaxy.
+            let reduction = galaxies * GALAXY_TICKSPEED_REDUCTION * effects;
+            (base - reduction).max(TICKSPEED_MULTIPLIER_MIN)
         } else {
-            // adjusted = galaxies - 2, then decay^(adjusted-2)
-            // = decay^(galaxies - 4)
-            let adjusted = galaxies - 2.0;
+            // JS: galaxies -= 2; galaxies *= effects; decay^(galaxies - 2) * base.
+            let adjusted = (galaxies - 2.0) * effects;
             (TICKSPEED_GALAXY_BASE * TICKSPEED_GALAXY_DECAY.powf(adjusted - 2.0))
                 .max(TICKSPEED_MULTIPLIER_MIN)
         }

@@ -24,6 +24,7 @@ use break_infinity::Decimal;
 use serde_json::{json, Value};
 
 use crate::autobuyers::AutobuyerMode;
+use crate::infinity_upgrades::ALL_INFINITY_UPGRADES;
 use crate::save::codec::encode_pipeline;
 use crate::state::GameState;
 
@@ -78,6 +79,15 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // Infinity currency (Decimal strings, matching the save schema).
     player["infinityPoints"] = decimal(&state.infinity_points);
     player["infinities"] = decimal(&state.infinities);
+    // Infinity Upgrades: the owned set as original string ids, plus the ipGen
+    // fractional accumulator.
+    let owned_upgrades: Vec<&str> = ALL_INFINITY_UPGRADES
+        .iter()
+        .filter(|u| state.infinity_upgrade_bought(**u))
+        .map(|u| u.save_id())
+        .collect();
+    player["infinityUpgrades"] = json!(owned_upgrades);
+    player["partInfinityPoint"] = json!(state.part_infinity_point);
 
     // Time / infinity records. `records.totalAntimatter` is written above; here we
     // add the time and infinity-timing slice.
@@ -158,6 +168,7 @@ fn mode_to_raw(mode: AutobuyerMode) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::infinity_upgrades::InfinityUpgrade;
     use crate::save::{decode_pipeline, decode_save};
 
     const INITIAL_SAVE: &str = include_str!(concat!(
@@ -226,6 +237,8 @@ mod tests {
             assert_eq!(reloaded.infinity_unlocked, state.infinity_unlocked);
             assert_eq!(reloaded.infinity_points, state.infinity_points);
             assert_eq!(reloaded.infinities, state.infinities);
+            assert_eq!(reloaded.infinity_upgrades, state.infinity_upgrades);
+            assert_eq!(reloaded.part_infinity_point, state.part_infinity_point);
             assert_eq!(reloaded.records, state.records);
             for tier in 0..8 {
                 assert_eq!(
@@ -252,6 +265,12 @@ mod tests {
         state.infinity_unlocked = true;
         state.infinity_points = Decimal::from_float(5.0);
         state.infinities = Decimal::from_float(3.0);
+        // Own a couple of Infinity Upgrades (with their column prereqs) + a partial
+        // ipGen accumulator.
+        state.infinity_upgrades = InfinityUpgrade::TotalTimeMult.bit()
+            | InfinityUpgrade::Dim18Mult.bit()
+            | InfinityUpgrade::Buy10Mult.bit();
+        state.part_infinity_point = 0.42;
         state.records.total_time_played_ms = 123_456.0;
         state.records.this_infinity.time_ms = 7_890.0;
         state.records.this_infinity.max_am = Decimal::new(1.0, 250);
@@ -273,6 +292,10 @@ mod tests {
         assert!(reloaded.infinity_unlocked);
         assert_eq!(reloaded.infinity_points, Decimal::from_float(5.0));
         assert_eq!(reloaded.infinities, Decimal::from_float(3.0));
+        assert_eq!(reloaded.infinity_upgrades, state.infinity_upgrades);
+        assert!(reloaded.infinity_upgrade_bought(InfinityUpgrade::TotalTimeMult));
+        assert!(reloaded.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult));
+        assert_eq!(reloaded.part_infinity_point, 0.42);
         assert_eq!(reloaded.records.total_time_played_ms, 123_456.0);
         assert_eq!(reloaded.records.this_infinity.time_ms, 7_890.0);
         assert_eq!(

@@ -5,6 +5,7 @@ pub mod crunch;
 pub mod data;
 pub mod dimensions;
 pub mod galaxy;
+pub mod infinity_upgrades;
 pub mod observed;
 pub mod options;
 pub mod records;
@@ -19,6 +20,9 @@ pub mod tutorial;
 pub use action::{Action, ActionOutcome};
 pub use autobuyers::{Autobuyer, AutobuyerMode, AutobuyerState};
 pub use break_infinity::Decimal;
+pub use infinity_upgrades::{
+    InfinityUpgrade, ALL_INFINITY_UPGRADES, INFINITY_UPGRADE_COUNT,
+};
 pub use observed::{ObservedDimensionTier, ObservedState, ObservedTickspeedState};
 pub use options::Options;
 pub use records::{BestInfinity, Records, ThisInfinity};

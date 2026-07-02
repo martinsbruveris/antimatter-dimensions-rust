@@ -7,12 +7,14 @@ impl GameState {
     /// Get the number of 8th dimensions required for the next
     /// galaxy.
     pub fn galaxy_requirement(&self) -> u64 {
-        if self.galaxies == 0 {
+        let base = if self.galaxies == 0 {
             FIRST_GALAXY_REQUIREMENT
         } else {
             FIRST_GALAXY_REQUIREMENT
                 + self.galaxies as u64 * GALAXY_REQUIREMENT_INCREMENT
-        }
+        };
+        // The `resetBoost` Infinity Upgrade reduces the requirement by 9.
+        base.saturating_sub(self.reset_boost_reduction())
     }
 
     /// Check if the player can buy an antimatter galaxy.
@@ -57,6 +59,9 @@ impl GameState {
         }
 
         self.tickspeed = TickspeedState::new();
+        // Re-apply skip-reset Infinity Upgrades (original `softReset` calls
+        // `skipResetsIfPossible`), so e.g. skipResetGalaxy restores 4 boosts.
+        self.skip_resets_if_possible();
     }
 
     /// Get the dimension boost requirement for the next boost.
@@ -69,7 +74,7 @@ impl GameState {
             DIM_BOOST_INITIAL_REQUIREMENT, DIM_BOOST_SCALING_REQUIREMENT,
         };
 
-        if self.dim_boosts < 4 {
+        let (tier, base) = if self.dim_boosts < 4 {
             let tier = 3 + self.dim_boosts as usize;
             (tier, DIM_BOOST_INITIAL_REQUIREMENT)
         } else {
@@ -80,7 +85,9 @@ impl GameState {
             let required =
                 DIM_BOOST_INITIAL_REQUIREMENT + extra * DIM_BOOST_SCALING_REQUIREMENT;
             (7, required)
-        }
+        };
+        // The `resetBoost` Infinity Upgrade reduces the requirement by 9.
+        (tier, base.saturating_sub(self.reset_boost_reduction()))
     }
 
     /// Check if the player can perform a dimension boost.
@@ -124,5 +131,8 @@ impl GameState {
         }
 
         self.tickspeed = TickspeedState::new();
+        // Original `softReset` also runs `skipResetsIfPossible`; a no-op unless a
+        // skip level exceeds the just-incremented boost count.
+        self.skip_resets_if_possible();
     }
 }
