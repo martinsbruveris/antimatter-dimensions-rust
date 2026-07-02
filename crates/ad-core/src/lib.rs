@@ -21,3 +21,4 @@ pub use break_infinity::Decimal;
 pub use observed::{ObservedDimensionTier, ObservedState, ObservedTickspeedState};
 pub use options::Options;
 pub use state::{DimensionTier, GameState, TickspeedState};
+pub use tick::offline_plan;

@@ -162,9 +162,7 @@ pub fn decode_save_file(save: &str) -> Result<ImportedSave, SaveError> {
         return Ok(ImportedSave::Single(Box::new(from_player_value(&value)?)));
     }
 
-    let obj = value
-        .as_object()
-        .ok_or(SaveError::UnrecognizedFormat)?;
+    let obj = value.as_object().ok_or(SaveError::UnrecognizedFormat)?;
     let times = obj.get("time").and_then(Value::as_object);
 
     let mut slots = Vec::new();
@@ -173,9 +171,7 @@ pub fn decode_save_file(save: &str) -> Result<ImportedSave, SaveError> {
             continue;
         }
         // Every non-`time` key is a backup-slot id.
-        let id: u8 = key
-            .parse()
-            .map_err(|_| SaveError::UnrecognizedFormat)?;
+        let id: u8 = key.parse().map_err(|_| SaveError::UnrecognizedFormat)?;
         let backup_timer = times
             .and_then(|t| t.get(key))
             .and_then(|meta| meta.get("backupTimer"))
@@ -208,7 +204,8 @@ pub fn encode_backup_bundle(slots: &[BackupSlotSave], now_ms: i64) -> String {
     }
     obj.insert("time".to_string(), Value::Object(time));
     encode_pipeline(
-        &serde_json::to_string(&Value::Object(obj)).expect("bundle Value always serializes"),
+        &serde_json::to_string(&Value::Object(obj))
+            .expect("bundle Value always serializes"),
     )
 }
 
@@ -248,14 +245,8 @@ mod tests {
         assert!(decoded.saves[0].is_some());
         assert!(decoded.saves[1].is_none());
         assert!(decoded.saves[2].is_some());
-        assert_eq!(
-            decoded.saves[0].as_ref().unwrap().antimatter,
-            s0.antimatter
-        );
-        assert_eq!(
-            decoded.saves[2].as_ref().unwrap().galaxies,
-            s2.galaxies
-        );
+        assert_eq!(decoded.saves[0].as_ref().unwrap().antimatter, s0.antimatter);
+        assert_eq!(decoded.saves[2].as_ref().unwrap().galaxies, s2.galaxies);
         // Populated slots carry the stamped lastUpdate.
         assert_eq!(decoded.last_updates[0], Some(1_700_000_000_000));
         assert_eq!(decoded.last_updates[1], None);

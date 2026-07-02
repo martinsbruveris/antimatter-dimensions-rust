@@ -42,7 +42,9 @@ const AUTOBUYER_MODE_BUY_10: i64 = 10;
 /// progress when the save is loaded. The engine itself never reads the clock.
 pub fn encode_save(state: &GameState, now_ms: i64) -> String {
     let player = to_player_value(state, now_ms);
-    encode_pipeline(&serde_json::to_string(&player).expect("player Value always serializes"))
+    encode_pipeline(
+        &serde_json::to_string(&player).expect("player Value always serializes"),
+    )
 }
 
 /// Overlays `state` onto a fresh copy of the template, returning the complete
@@ -103,8 +105,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     options["showTimeSinceSave"] = json!(state.options.show_time_since_save);
     options["saveFileName"] = json!(state.options.save_file_name);
     let confirmations = &mut options["confirmations"];
-    confirmations["dimensionBoost"] =
-        json!(state.options.confirmations.dimension_boost);
+    confirmations["dimensionBoost"] = json!(state.options.confirmations.dimension_boost);
     confirmations["antimatterGalaxy"] =
         json!(state.options.confirmations.antimatter_galaxy);
     confirmations["sacrifice"] = json!(state.options.confirmations.sacrifice);

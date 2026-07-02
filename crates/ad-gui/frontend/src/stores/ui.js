@@ -39,6 +39,14 @@ export const useUiStore = defineStore("ui", {
     // design-docs/2026-06-30-offline-progress.md.
     offlineMode: false,
     accumulatedGameMs: 0,
+    // Live progress of a running offline catch-up: { current, max, startTime }
+    // (ticks done / total, and when the replay began). Drives the
+    // OfflineProgressModal bar; null when no replay is in flight.
+    offlineProgress: null,
+    // True while an offline catch-up is replaying in chunks. The App.vue loop
+    // suspends live ticking while set, so the replay isn't raced by the live
+    // engine (relevant when a catch-up fires mid-session on import/backup load).
+    offlineReplayActive: false,
     // Absolute pause (dev): freezes everything — live ticks AND offline
     // accumulation. Takes priority over offline mode.
     absolutePause: false,
@@ -129,8 +137,7 @@ export const useUiStore = defineStore("ui", {
     },
     // Toggle Offline mode. Turning it on resets the accumulator and freezes the
     // live loop (handled in App.vue). Turning it off replays the accumulated
-    // game-time as one offline batch and, above the threshold, opens the
-    // catch-up summary with before/after snapshots.
+    // game-time as an offline catch-up (progress modal + summary).
     async toggleOfflineMode() {
       if (!this.offlineMode) {
         this.accumulatedGameMs = 0;
@@ -140,22 +147,71 @@ export const useUiStore = defineStore("ui", {
 
       const game = useGameStore();
       const gameMs = this.accumulatedGameMs;
-      const before = game.snapshot;
       const offlineTicks =
         game.snapshot?.options?.offline_ticks ?? DEFAULT_OFFLINE_TICKS;
       this.offlineMode = false;
       this.accumulatedGameMs = 0;
 
-      await game.simulateOffline(gameMs, offlineTicks);
+      await this.runOfflineReplay(gameMs, offlineTicks);
+    },
+    // Replay `gameMs` of offline game-time at `offlineTicks` resolution — the one
+    // path shared by startup, save/backup load, and the dev Offline button.
+    //
+    // Below the 10 s threshold it applies silently in a single engine call. Above
+    // it, the replay is split into 100 batches so the OfflineProgressModal bar
+    // fills visibly (near-instant for short away-times, meaningful for large tick
+    // budgets), then the "While you were away…" summary is shown. The 10 s
+    // summary threshold is a deliberate divergence from the original's 600 s
+    // AwayProgressModal gate — see design-docs/2026-06-30-offline-progress.md.
+    async runOfflineReplay(gameMs, offlineTicks) {
+      if (!(gameMs > 0)) return;
+      const game = useGameStore();
+      const before = game.snapshot;
 
-      if (gameMs >= OFFLINE_SUMMARY_THRESHOLD_MS) {
-        this.offlineSummary = {
-          seconds: gameMs / 1000,
-          before,
-          after: game.snapshot,
-        };
-        this.openModal = "offlineSummary";
+      if (gameMs < OFFLINE_SUMMARY_THRESHOLD_MS) {
+        await game.simulateOffline(gameMs, offlineTicks);
+        return;
       }
+
+      const plan = await game.offlinePlan(gameMs, offlineTicks);
+      const total = plan.ticks;
+      if (total <= 0) return;
+
+      this.offlineReplayActive = true;
+      this.offlineProgress = { current: 0, max: total, startTime: Date.now() };
+      this.openModal = "offlineProgress";
+
+      // Distribute `total` ticks across 100 chunks (remainder front-loaded), so
+      // the summed replay is exactly `total` ticks — identical to one batch.
+      const CHUNKS = 100;
+      const base = Math.floor(total / CHUNKS);
+      const extra = total % CHUNKS;
+      let done = 0;
+      for (let c = 0; c < CHUNKS; c++) {
+        const n = base + (c < extra ? 1 : 0);
+        if (n > 0) {
+          await game.offlineChunk(plan.tick_size_ms, n);
+          done += n;
+          this.offlineProgress.current = done;
+        }
+        // Yield to the browser so the progress bar repaints between chunks.
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+
+      // Reseed achievements silently: offline gains are summarised by the modal,
+      // not fired as a per-achievement toast storm.
+      game.notifyNewAchievements(true);
+
+      this.offlineReplayActive = false;
+      this.offlineProgress = null;
+      if (this.openModal === "offlineProgress") this.openModal = null;
+
+      this.offlineSummary = {
+        seconds: gameMs / 1000,
+        before,
+        after: game.snapshot,
+      };
+      this.openModal = "offlineSummary";
     },
     // Show a transient toast, mirroring core/notify.js: it slides in (enter
     // animation), stays for `duration` ms, then slides out (leave animation)

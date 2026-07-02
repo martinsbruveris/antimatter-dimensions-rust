@@ -190,8 +190,7 @@ impl GameState {
     /// lookahead reveals the next couple of rows just before they're purchasable
     /// once the first boost is bought.
     pub fn dim_is_shown(&self, tier: usize) -> bool {
-        let lookahead =
-            self.dim_boosts > 0 && self.dim_boosts as usize + 2 >= tier;
+        let lookahead = self.dim_boosts > 0 && self.dim_boosts as usize + 2 >= tier;
         lookahead || self.infinity_unlocked || self.dim_available_for_purchase(tier)
     }
 
@@ -248,7 +247,7 @@ mod tests {
     fn unlock_band_gates_purchasability() {
         let mut game = GameState::new();
         game.dimensions[3].amount = Decimal::ONE; // own a 4th
-        // The 5th (index 4) needs the first dim boost regardless of ownership.
+                                                  // The 5th (index 4) needs the first dim boost regardless of ownership.
         assert!(!game.dim_available_for_purchase(4));
         game.dim_boosts = 1;
         assert!(game.dim_available_for_purchase(4));
@@ -267,7 +266,7 @@ mod tests {
     fn shown_row_unfolds_with_ownership() {
         let mut game = GameState::new();
         game.dimensions[0].amount = Decimal::ONE; // own a 1st
-        // The 2nd row becomes shown because it is now purchasable.
+                                                  // The 2nd row becomes shown because it is now purchasable.
         assert!(game.dim_is_shown(1));
         assert!(!game.dim_is_shown(2));
     }

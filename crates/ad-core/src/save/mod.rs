@@ -45,6 +45,22 @@ pub fn decode_save(save: &str) -> Result<GameState, SaveError> {
     GameState::from_save_dto(&dto)
 }
 
+/// Decodes an AD save string into a [`GameState`] and its `player.lastUpdate`
+/// timestamp (epoch ms), if present.
+///
+/// Same strict decode as [`decode_save`], but also reads the raw `lastUpdate`
+/// field so the caller (the persistence layer) can compute the offline gap when
+/// loading or importing a save. `None` when the save carries no `lastUpdate`.
+pub fn decode_save_with_last_update(
+    save: &str,
+) -> Result<(GameState, Option<i64>), SaveError> {
+    let json = decode_pipeline(save)?;
+    let value: serde_json::Value = serde_json::from_str(&json)?;
+    let last_update = value.get("lastUpdate").and_then(serde_json::Value::as_i64);
+    let state = from_player_value(&value)?;
+    Ok((state, last_update))
+}
+
 /// Maps an already-parsed `player` JSON [`Value`](serde_json::Value) into a
 /// [`GameState`].
 ///

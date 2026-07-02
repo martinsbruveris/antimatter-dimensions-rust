@@ -6,8 +6,8 @@ use std::sync::Mutex;
 use ad_core::data::constants::{
     BIG_CRUNCH_THRESHOLD, BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER,
 };
-use ad_core::save::{decode_save, encode_save};
-use ad_core::{AutobuyerMode, Decimal, GameState};
+use ad_core::save::{decode_save_with_last_update, encode_save};
+use ad_core::{offline_plan as core_offline_plan, AutobuyerMode, Decimal, GameState};
 use serde::Serialize;
 use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
@@ -402,8 +402,8 @@ fn tick_and_get_state(
 
 /// Replays `game_ms` of accumulated offline game-time (already speed-scaled by
 /// the caller) at the resolution set by `offline_ticks`, returning the new view.
-/// Used by the Offline-mode button when it is switched off. See
-/// `design-docs/2026-06-30-offline-progress.md`.
+/// The all-at-once path, used for sub-threshold catch-ups where no progress modal
+/// is shown. See `design-docs/2026-06-30-offline-progress.md`.
 #[tauri::command]
 fn simulate_offline(
     game_ms: f64,
@@ -413,6 +413,57 @@ fn simulate_offline(
     let mut game = state.lock().unwrap();
     game.simulate_offline(game_ms, offline_ticks);
     build_game_view(&game)
+}
+
+/// The engine's offline replay plan for `game_ms`: the total discrete tick count
+/// and per-tick size (ms). The frontend splits `ticks` into batches, running
+/// `tick_size_ms`-sized ticks itself to drive the offline catch-up progress bar.
+#[derive(Serialize)]
+struct OfflinePlan {
+    ticks: u32,
+    tick_size_ms: f64,
+}
+
+/// Returns the offline replay plan for `game_ms` at the chosen resolution, so the
+/// GUI can run the catch-up in progress-bar-sized chunks (the budget policy stays
+/// in the engine; the pacing lives in the webview).
+#[tauri::command]
+fn offline_plan(game_ms: f64, offline_ticks: u32) -> OfflinePlan {
+    let (ticks, tick_size_ms) = core_offline_plan(game_ms, offline_ticks);
+    OfflinePlan {
+        ticks,
+        tick_size_ms,
+    }
+}
+
+/// Returns the current game view without advancing the engine. Used at startup to
+/// seed the first snapshot before running any offline catch-up.
+#[tauri::command]
+fn get_state(state: State<'_, Mutex<GameState>>) -> GameView {
+    let game = state.lock().unwrap();
+    build_game_view(&game)
+}
+
+/// The offline gap (ms) detected at startup from the loaded save's `lastUpdate`,
+/// awaiting replay. Consumed once by the frontend via [`take_pending_offline`];
+/// zero when there is nothing to catch up.
+#[derive(Default)]
+struct PendingOffline(Mutex<f64>);
+
+/// Returns the startup offline gap (ms) once, then clears it, so a reload of the
+/// webview doesn't replay the same interval twice.
+#[tauri::command]
+fn take_pending_offline(pending: State<'_, PendingOffline>) -> f64 {
+    let mut ms = pending.0.lock().unwrap();
+    std::mem::take(&mut *ms)
+}
+
+/// A freshly loaded/imported state paired with the offline gap (ms) to replay.
+/// The frontend installs `view`, then runs the catch-up over `offline_ms`.
+#[derive(Serialize)]
+struct LoadResult {
+    view: GameView,
+    offline_ms: f64,
 }
 
 #[tauri::command]
@@ -604,14 +655,28 @@ fn import_save(
     text: String,
     state: State<'_, Mutex<GameState>>,
     save: State<'_, Mutex<SaveManager>>,
-) -> Result<GameView, String> {
-    let new_state = decode_save(text.trim()).map_err(|e| e.to_string())?;
+) -> Result<LoadResult, String> {
+    let now = now_ms();
+    let (new_state, last_update) =
+        decode_save_with_last_update(text.trim()).map_err(|e| e.to_string())?;
     let mut game = state.lock().unwrap();
     *game = new_state;
     // Mirror the original: an import fires an immediate save so it persists.
     let mut save = save.lock().unwrap();
-    let _ = save.save_root(&game, now_ms());
-    Ok(build_game_view(&game))
+    let _ = save.save_root(&game, now);
+    Ok(LoadResult {
+        view: build_game_view(&game),
+        offline_ms: offline_gap_ms(last_update, now),
+    })
+}
+
+/// The offline gap (ms) between a save's `lastUpdate` and now, clamped at 0.
+/// `None`/future timestamps yield 0 (nothing to replay).
+fn offline_gap_ms(last_update: Option<i64>, now_ms: i64) -> f64 {
+    match last_update {
+        Some(t) => (now_ms - t).max(0) as f64,
+        None => 0.0,
+    }
 }
 
 /// Exports the current save to a file chosen via a native "Save As" dialog. The
@@ -624,7 +689,10 @@ async fn export_save_to_file(
 ) -> Result<(), String> {
     let (save_str, save_file_name) = {
         let game = state.lock().unwrap();
-        (encode_save(&game, now_ms()), game.options.save_file_name.clone())
+        (
+            encode_save(&game, now_ms()),
+            game.options.save_file_name.clone(),
+        )
     };
 
     let default_name = if save_file_name.is_empty() {
@@ -653,7 +721,7 @@ async fn import_save_from_file(
     app: tauri::AppHandle,
     state: State<'_, Mutex<GameState>>,
     save: State<'_, Mutex<SaveManager>>,
-) -> Result<GameView, String> {
+) -> Result<LoadResult, String> {
     let path = app
         .dialog()
         .file()
@@ -662,14 +730,19 @@ async fn import_save_from_file(
 
     match path {
         Some(file_path) => {
+            let now = now_ms();
             let contents = std::fs::read_to_string(file_path.as_path().unwrap())
                 .map_err(|e| format!("Failed to read file: {e}"))?;
-            let new_state = decode_save(contents.trim()).map_err(|e| e.to_string())?;
+            let (new_state, last_update) = decode_save_with_last_update(contents.trim())
+                .map_err(|e| e.to_string())?;
             let mut game = state.lock().unwrap();
             *game = new_state;
             let mut save = save.lock().unwrap();
-            let _ = save.save_root(&game, now_ms());
-            Ok(build_game_view(&game))
+            let _ = save.save_root(&game, now);
+            Ok(LoadResult {
+                view: build_game_view(&game),
+                offline_ms: offline_gap_ms(last_update, now),
+            })
         }
         None => Err("Cancelled".to_string()),
     }
@@ -781,12 +854,16 @@ fn load_backup(
     slot: u8,
     state: State<'_, Mutex<GameState>>,
     save: State<'_, Mutex<SaveManager>>,
-) -> Result<GameView, String> {
+) -> Result<LoadResult, String> {
+    let now = now_ms();
     let mut game = state.lock().unwrap();
     let mut save = save.lock().unwrap();
-    let loaded = save.load_backup(slot, &game.clone(), now_ms())?;
+    let (loaded, last_update) = save.load_backup(slot, &game.clone(), now)?;
     *game = loaded;
-    Ok(build_game_view(&game))
+    Ok(LoadResult {
+        view: build_game_view(&game),
+        offline_ms: offline_gap_ms(last_update, now),
+    })
 }
 
 /// Exports every populated backup of the current save slot as a single
@@ -877,6 +954,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(fresh_game()))
+        .manage(PendingOffline::default())
         .setup(|app| {
             // Resolve the OS app-data dir (§12.1), load the on-disk root save into
             // the running game, and install the SaveManager. A missing/corrupt
@@ -886,14 +964,20 @@ pub fn run() {
                 .app_data_dir()
                 .unwrap_or_else(|_| PathBuf::from("."));
             let mut manager = SaveManager::new(dir);
-            let loaded = manager.load(fresh_game(), now_ms());
+            let (loaded, offline_ms) = manager.load(fresh_game(), now_ms());
             *app.state::<Mutex<GameState>>().lock().unwrap() = loaded;
+            // Stash the away-time for the frontend to replay as offline progress
+            // once it has mounted (see take_pending_offline).
+            *app.state::<PendingOffline>().0.lock().unwrap() = offline_ms as f64;
             app.manage(Mutex::new(manager));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             tick_and_get_state,
             simulate_offline,
+            offline_plan,
+            get_state,
+            take_pending_offline,
             buy_dimension,
             buy_until_10,
             buy_tickspeed,

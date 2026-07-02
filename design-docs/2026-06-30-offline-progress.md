@@ -10,6 +10,48 @@ controls and the live readout (`App.vue`, `stores/ui.js`), the `OfflineSummaryMo
 catch-up, and the Gameplay-tab offline-ticks slider. The benchmark for the 10M
 ceiling (open question below) is the one deferred item.
 
+## Offline-on-load & the progress-bar modal (added 2026-07-02)
+
+The original runs offline progress through a single hook — `loadPlayerObject`
+(`storage.js`) — hit by **every** load (startup, slot switch, import, backup
+load): it diffs `Date.now() - player.lastUpdate` and, above 10 s, replays it via
+`simulateTime`, showing the "Offline Progress Simulation" progress-bar modal
+(`ModalProgressBar.vue`) during the async replay and the away-summary
+(`AwayProgressModal.vue`) after (>600 s). We previously only ran offline from the
+dev button. This change adds the load-time entry points and the progress modal:
+
+- **Engine** — `pub fn offline_plan(game_ms, offline_ticks) -> (ticks, tick_size)`
+  (`tick.rs`) exposes the budget so the GUI can drive a chunked, progress-backed
+  replay; `simulate_offline` now shares it. `save::decode_save_with_last_update`
+  returns a save's `lastUpdate` so the gap can be computed on import/backup load.
+- **Persistence** — `SaveManager::load` now returns `(GameState, offline_ms)`
+  (the startup gap, already computed for the offline backup); `load_backup`
+  returns the backup's `lastUpdate`.
+- **Commands** (`main.rs`) — `offline_plan`, `get_state` (startup seed),
+  `take_pending_offline` (consumes the startup gap once, stashed by `setup` in a
+  `PendingOffline` state), and `import_save` / `import_save_from_file` /
+  `load_backup` now return `{ view, offline_ms }`.
+- **Frontend** — one shared `ui.runOfflineReplay(gameMs, offlineTicks)` used by
+  startup (`App.vue onMounted`, before the live loop), import/backup
+  (`game.applyLoadResult`), and the dev button. Below 10 s it applies silently in
+  one call; above 10 s it splits `offline_plan`'s tick budget into **100 chunks**
+  (fixed increments, one `tick_and_get_state` call each, yielding to `rAF`
+  between them), driving the ported `OfflineProgressModal.vue` (bar + text, **no
+  Speed up/SKIP buttons** — the Rust engine replays even a large budget nearly
+  instantly), then shows the `OfflineSummaryModal`. The live loop suspends while
+  `ui.offlineReplayActive` is set so a mid-session catch-up isn't raced.
+
+**Divergences from the original (revisit later):**
+- **Summary threshold is 10 s, not 600 s.** The original only shows the away
+  summary above 10 minutes; we show it above 10 s (matching our existing dev
+  button). Deliberate; revisit alongside the away-modal options.
+- **Offline is ungated.** The `offlineProgress` player option and the
+  import/backup "apply offline" checkbox are not modelled yet — offline always
+  runs on load. Deferred (the checkbox was explicitly out of scope for this pass).
+- **Slot switch** does not replay offline yet: our autosave restamps every slot's
+  `lastUpdate` on each save, so a switched-to slot's gap is ~0. Faithful
+  per-slot `lastUpdate` tracking is future work.
+
 ## Goal
 
 Two related things:

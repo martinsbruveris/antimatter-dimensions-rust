@@ -56,14 +56,34 @@ export const useGameStore = defineStore("game", {
       this.snapshot = await invoke("tick_and_get_state", { dtMs, repeats });
       this.notifyNewAchievements();
     },
-    // Replay `gameMs` of accumulated offline game-time (already speed-scaled) at
-    // the resolution set by `offlineTicks`. Called when Offline mode is switched
-    // off; returns nothing but updates the snapshot.
+    // Replay `gameMs` of offline game-time (already speed-scaled) at the
+    // resolution set by `offlineTicks`, all at once. Used for sub-threshold
+    // catch-ups (no progress modal). Reseeds achievements silently.
     async simulateOffline(gameMs, offlineTicks) {
       this.snapshot = await invoke("simulate_offline", { gameMs, offlineTicks });
-      // Offline gains are summarised by the offline modal, not per-achievement
-      // toasts — reseed silently so the next tick doesn't fire a storm.
       this.notifyNewAchievements(true);
+    },
+    // The engine's offline replay plan for `gameMs`: { ticks, tick_size_ms }.
+    // The UI store uses it to chunk the catch-up behind the progress bar.
+    offlinePlan(gameMs, offlineTicks) {
+      return invoke("offline_plan", { gameMs, offlineTicks });
+    },
+    // One offline replay batch: advance `repeats` discrete ticks of `tickSizeMs`
+    // and update the snapshot. Achievement toasts are suppressed here (the
+    // caller reseeds once at the end); the offline modal summarises the gains.
+    async offlineChunk(tickSizeMs, repeats) {
+      this.snapshot = await invoke("tick_and_get_state", {
+        dtMs: tickSizeMs,
+        repeats,
+      });
+    },
+    // The current engine snapshot without advancing time (startup seed).
+    getState() {
+      return invoke("get_state");
+    },
+    // Consumes the startup offline gap (ms) detected at load, once.
+    takePendingOffline() {
+      return invoke("take_pending_offline");
     },
     toggleBuyMode() {
       this.buyUntil10 = !this.buyUntil10;
@@ -218,12 +238,23 @@ export const useGameStore = defineStore("game", {
     exportSave() {
       return invoke("export_save");
     },
-    // Imports a save from a text string. Replaces the running game state
-    // (persisted immediately by the backend).
-    async importSave(text) {
-      this.snapshot = await invoke("import_save", { text });
+    // Installs a freshly loaded/imported state ({ view, offline_ms }) and replays
+    // the offline gap the save carried (from its lastUpdate). Shared by the
+    // paste/file import and backup-load paths.
+    async applyLoadResult(res) {
+      this.snapshot = res.view;
       this.lastSaveTime = Date.now();
       this.notifyNewAchievements(true);
+      const ui = useUiStore();
+      await ui.runOfflineReplay(
+        res.offline_ms,
+        this.snapshot?.options?.offline_ticks ?? 100000,
+      );
+    },
+    // Imports a save from a text string. Replaces the running game state
+    // (persisted immediately by the backend), then catches up offline progress.
+    async importSave(text) {
+      await this.applyLoadResult(await invoke("import_save", { text }));
     },
     // Exports the save to a user-chosen file via native Save As dialog. The
     // backend uses the engine-owned `saveFileName` option as the default name.
@@ -232,9 +263,7 @@ export const useGameStore = defineStore("game", {
     },
     // Imports a save from a user-chosen file via native Open dialog.
     async importSaveFromFile() {
-      this.snapshot = await invoke("import_save_from_file");
-      this.lastSaveTime = Date.now();
-      this.notifyNewAchievements(true);
+      await this.applyLoadResult(await invoke("import_save_from_file"));
     },
     // --- On-disk persistence (save slots + backups) ---
     // Writes the current game to disk (manual "Save game", autosave, Cmd/Ctrl+S).
@@ -261,11 +290,10 @@ export const useGameStore = defineStore("game", {
     getBackups() {
       return invoke("get_backups");
     },
-    // Loads a backup slot into the running game (reserves the current save first).
+    // Loads a backup slot into the running game (reserves the current save
+    // first), then catches up the offline gap the backup carried.
     async loadBackup(slot) {
-      this.snapshot = await invoke("load_backup", { slot });
-      this.lastSaveTime = Date.now();
-      this.notifyNewAchievements(true);
+      await this.applyLoadResult(await invoke("load_backup", { slot }));
     },
     // Exports all populated backups of the current slot as one file.
     exportBackupsToFile() {

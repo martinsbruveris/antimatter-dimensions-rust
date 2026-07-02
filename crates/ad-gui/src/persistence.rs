@@ -27,8 +27,9 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ad_core::save::{
-    decode_root, decode_save, decode_save_file, encode_backup_bundle, encode_root,
-    encode_save, BackupSlotSave, ImportedSave, RootSave, SAVE_SLOT_COUNT,
+    decode_root, decode_save, decode_save_file, decode_save_with_last_update,
+    encode_backup_bundle, encode_root, encode_save, BackupSlotSave, ImportedSave,
+    RootSave, SAVE_SLOT_COUNT,
 };
 use ad_core::GameState;
 
@@ -50,14 +51,46 @@ pub enum BackupKind {
 
 /// The eight backup slots, matching the original's `AutoBackupSlots`.
 pub const BACKUP_SLOTS: [BackupSlotSpec; 8] = [
-    BackupSlotSpec { id: 1, interval_ms: 60_000, kind: BackupKind::Online },
-    BackupSlotSpec { id: 2, interval_ms: 300_000, kind: BackupKind::Online },
-    BackupSlotSpec { id: 3, interval_ms: 1_200_000, kind: BackupKind::Online },
-    BackupSlotSpec { id: 4, interval_ms: 3_600_000, kind: BackupKind::Online },
-    BackupSlotSpec { id: 5, interval_ms: 600_000, kind: BackupKind::Offline },
-    BackupSlotSpec { id: 6, interval_ms: 3_600_000, kind: BackupKind::Offline },
-    BackupSlotSpec { id: 7, interval_ms: 18_000_000, kind: BackupKind::Offline },
-    BackupSlotSpec { id: 8, interval_ms: 0, kind: BackupKind::Reserve },
+    BackupSlotSpec {
+        id: 1,
+        interval_ms: 60_000,
+        kind: BackupKind::Online,
+    },
+    BackupSlotSpec {
+        id: 2,
+        interval_ms: 300_000,
+        kind: BackupKind::Online,
+    },
+    BackupSlotSpec {
+        id: 3,
+        interval_ms: 1_200_000,
+        kind: BackupKind::Online,
+    },
+    BackupSlotSpec {
+        id: 4,
+        interval_ms: 3_600_000,
+        kind: BackupKind::Online,
+    },
+    BackupSlotSpec {
+        id: 5,
+        interval_ms: 600_000,
+        kind: BackupKind::Offline,
+    },
+    BackupSlotSpec {
+        id: 6,
+        interval_ms: 3_600_000,
+        kind: BackupKind::Offline,
+    },
+    BackupSlotSpec {
+        id: 7,
+        interval_ms: 18_000_000,
+        kind: BackupKind::Offline,
+    },
+    BackupSlotSpec {
+        id: 8,
+        interval_ms: 0,
+        kind: BackupKind::Reserve,
+    },
 ];
 
 /// Metadata for one backup slot, for the Backup menu display.
@@ -121,12 +154,13 @@ impl SaveManager {
     }
 
     /// Loads `saves.dat` at startup, returning the active slot's [`GameState`]
-    /// (or a fresh one if there is no save yet). Populates the slot cache and the
-    /// active-slot index, then fires any applicable offline backup (§11.3).
+    /// and the **offline gap** (ms since the slot's `lastUpdate`, clamped at 0)
+    /// for the caller to replay as offline progress. Populates the slot cache and
+    /// the active-slot index, then fires any applicable offline backup (§11.3).
     ///
     /// `fresh` supplies a starting state for an empty active slot (so debug
     /// conveniences apply on a truly first run). `now_ms` is the wall clock.
-    pub fn load(&mut self, fresh: GameState, now_ms: i64) -> GameState {
+    pub fn load(&mut self, fresh: GameState, now_ms: i64) -> (GameState, i64) {
         let root = match fs::read_to_string(self.root_path()) {
             Ok(text) => match decode_root(text.trim()) {
                 Ok(root) => root,
@@ -141,15 +175,21 @@ impl SaveManager {
 
         let live = self.slots[self.current].clone().unwrap_or(fresh);
 
-        // Offline backup: if the app was closed for longer than an offline slot's
-        // interval, back up the loaded (pre-offline) state into the longest
-        // applicable slot (matching the original's `backupOfflineSlots`).
-        if let Some(last_update) = root.last_updates[self.current] {
-            let gap_ms = now_ms - last_update;
-            self.write_offline_backup(&live, gap_ms, now_ms);
-        }
+        // The offline gap for startup catch-up: how long the active slot sat since
+        // its last save. Also drives the offline backup below.
+        let gap_ms = match root.last_updates[self.current] {
+            Some(last_update) => {
+                let gap_ms = now_ms - last_update;
+                // Offline backup: if the app was closed for longer than an offline
+                // slot's interval, back up the loaded (pre-offline) state into the
+                // longest applicable slot (matching `backupOfflineSlots`).
+                self.write_offline_backup(&live, gap_ms, now_ms);
+                gap_ms
+            }
+            None => 0,
+        };
 
-        live
+        (live, gap_ms.max(0))
     }
 
     /// Assembles the `{ current, saves }` root from the slot cache (with the
@@ -211,23 +251,26 @@ impl SaveManager {
         }
     }
 
-    /// Loads a backup slot into a new live state. Before loading, the current
-    /// state is written to the reserve slot (8), matching the original ("your
-    /// current save is saved into the last slot any time a backup is loaded").
+    /// Loads a backup slot into a new live state, returning it alongside the
+    /// backup's `lastUpdate` (epoch ms, if present) so the caller can replay the
+    /// offline gap. Before loading, the current state is written to the reserve
+    /// slot (8), matching the original ("your current save is saved into the last
+    /// slot any time a backup is loaded").
     pub fn load_backup(
         &mut self,
         backup_slot: u8,
         live: &GameState,
         now_ms: i64,
-    ) -> Result<GameState, String> {
+    ) -> Result<(GameState, Option<i64>), String> {
         let text = fs::read_to_string(self.backup_path(self.current, backup_slot))
             .map_err(|e| format!("Failed to read backup: {e}"))?;
-        let loaded = decode_save(text.trim()).map_err(|e| e.to_string())?;
+        let (loaded, last_update) =
+            decode_save_with_last_update(text.trim()).map_err(|e| e.to_string())?;
         // Save the current state into the reserve slot before replacing it.
         let _ = self.write_backup(8, live, now_ms);
         // Persist the newly-loaded state as the current slot too.
         let _ = self.save_root(&loaded, now_ms);
-        Ok(loaded)
+        Ok((loaded, last_update))
     }
 
     /// Reads metadata for all three save slots (current taken from `live`).
@@ -261,7 +304,11 @@ impl SaveManager {
                     }
                     Err(_) => (None, None),
                 };
-                BackupMeta { id: spec.id, antimatter, last_backup_ms }
+                BackupMeta {
+                    id: spec.id,
+                    antimatter,
+                    last_backup_ms,
+                }
             })
             .collect()
     }
@@ -384,7 +431,7 @@ mod tests {
 
         // A fresh manager over the same dir loads the saved current slot.
         let mut sm2 = SaveManager::new(dir);
-        let loaded = sm2.load(GameState::new(), 2000);
+        let (loaded, _gap) = sm2.load(GameState::new(), 2000);
         assert_eq!(loaded.antimatter, dec("12345"));
     }
 
@@ -423,7 +470,7 @@ mod tests {
         sm.save_root(&named, 1000).unwrap();
 
         let mut sm2 = SaveManager::new(dir);
-        let live = sm2.load(GameState::new(), 2000);
+        let (live, _gap) = sm2.load(GameState::new(), 2000);
         let metas = sm2.slot_metas(&live);
         assert_eq!(metas[0].save_file_name, "My File");
         // Empty slots report no name.
@@ -438,15 +485,30 @@ mod tests {
 
         sm.write_backup(3, &state_with_am("777"), 1000).unwrap();
         let metas = sm.backup_metas();
-        assert!(metas.iter().find(|m| m.id == 3).unwrap().antimatter.is_some());
-        assert!(metas.iter().find(|m| m.id == 1).unwrap().antimatter.is_none());
+        assert!(metas
+            .iter()
+            .find(|m| m.id == 3)
+            .unwrap()
+            .antimatter
+            .is_some());
+        assert!(metas
+            .iter()
+            .find(|m| m.id == 1)
+            .unwrap()
+            .antimatter
+            .is_none());
 
         // Loading the backup replaces the live state and reserves the old one.
-        let loaded = sm.load_backup(3, &state_with_am("42"), 1000).unwrap();
+        let (loaded, _last) = sm.load_backup(3, &state_with_am("42"), 1000).unwrap();
         assert_eq!(loaded.antimatter, dec("777"));
         // The reserve slot (8) now holds the pre-load state.
         let reserve = sm.backup_metas();
-        assert!(reserve.iter().find(|m| m.id == 8).unwrap().antimatter.is_some());
+        assert!(reserve
+            .iter()
+            .find(|m| m.id == 8)
+            .unwrap()
+            .antimatter
+            .is_some());
     }
 
     #[test]
@@ -465,8 +527,18 @@ mod tests {
         b.save_root(&state_with_am("2"), 1000).unwrap();
         assert_eq!(b.import_backups(&bundle, 1000).unwrap(), 2);
         let metas = b.backup_metas();
-        assert!(metas.iter().find(|m| m.id == 1).unwrap().antimatter.is_some());
-        assert!(metas.iter().find(|m| m.id == 5).unwrap().antimatter.is_some());
+        assert!(metas
+            .iter()
+            .find(|m| m.id == 1)
+            .unwrap()
+            .antimatter
+            .is_some());
+        assert!(metas
+            .iter()
+            .find(|m| m.id == 5)
+            .unwrap()
+            .antimatter
+            .is_some());
     }
 
     #[test]
@@ -479,9 +551,21 @@ mod tests {
         // Reopen 20 minutes later: exceeds the 10-min offline slot (5), not the
         // 1-hour one (6), so slot 5 (the longest applicable) is written.
         let mut sm2 = SaveManager::new(dir);
-        sm2.load(GameState::new(), 20 * 60_000);
+        let (_live, gap) = sm2.load(GameState::new(), 20 * 60_000);
+        // The returned offline gap (20 min) is what startup catch-up replays.
+        assert_eq!(gap, 20 * 60_000);
         let metas = sm2.backup_metas();
-        assert!(metas.iter().find(|m| m.id == 5).unwrap().antimatter.is_some());
-        assert!(metas.iter().find(|m| m.id == 6).unwrap().antimatter.is_none());
+        assert!(metas
+            .iter()
+            .find(|m| m.id == 5)
+            .unwrap()
+            .antimatter
+            .is_some());
+        assert!(metas
+            .iter()
+            .find(|m| m.id == 6)
+            .unwrap()
+            .antimatter
+            .is_none());
     }
 }

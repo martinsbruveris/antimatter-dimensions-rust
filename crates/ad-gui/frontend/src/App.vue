@@ -16,6 +16,7 @@ import LoadGameModal from "./components/LoadGameModal.vue";
 import BackupWindowModal from "./components/BackupWindowModal.vue";
 import BigCrunchScreen from "./components/BigCrunchScreen.vue";
 import OfflineSummaryModal from "./components/OfflineSummaryModal.vue";
+import OfflineProgressModal from "./components/OfflineProgressModal.vue";
 import NotificationContainer from "./components/NotificationContainer.vue";
 import SaveTimer from "./components/SaveTimer.vue";
 import DimensionBoostConfirmModal from "./components/DimensionBoostConfirmModal.vue";
@@ -82,6 +83,15 @@ function loop() {
   // open regardless of game state).
   maybePersist(Date.now());
 
+  // While an offline catch-up is replaying in chunks (e.g. after importing a
+  // save or loading a backup mid-session), don't also live-tick the engine — the
+  // replay drives the snapshot. Advance `last` so resuming doesn't jump.
+  if (ui.offlineReplayActive) {
+    last = now;
+    raf = requestAnimationFrame(loop);
+    return;
+  }
+
   // Absolute pause (dev) freezes everything: no live ticks and no offline
   // accumulation. Consume the elapsed wall time so unpausing doesn't jump.
   if (ui.absolutePause) {
@@ -117,10 +127,23 @@ function onKeydown(e) {
   handleShortcut(e, game, ui);
 }
 
-onMounted(() => {
+onMounted(async () => {
+  window.addEventListener("keydown", onKeydown);
+
+  // Seed the first snapshot, then replay any away-time (from the loaded save's
+  // lastUpdate) as offline progress before the live loop starts — so the startup
+  // catch-up runs to completion without being raced by live ticks.
+  game.snapshot = await game.getState();
+  const pendingMs = await game.takePendingOffline();
+  if (pendingMs > 0) {
+    const offlineTicks = game.snapshot?.options?.offline_ticks ?? 100000;
+    await ui.runOfflineReplay(pendingMs, offlineTicks);
+    // Stamp lastUpdate = now so a quick relaunch doesn't replay the same gap.
+    await game.saveGame();
+  }
+
   last = performance.now();
   raf = requestAnimationFrame(loop);
-  window.addEventListener("keydown", onKeydown);
 });
 
 onUnmounted(() => {
@@ -229,7 +252,10 @@ onUnmounted(() => {
     @close="ui.closeModal()"
   />
 
-  <!-- Catch-up summary after an Offline-mode replay of >= 10 s. -->
+  <!-- Live progress bar shown while an offline catch-up of >= 10 s replays. -->
+  <OfflineProgressModal v-if="ui.openModal === 'offlineProgress'" />
+
+  <!-- Catch-up summary after an offline replay of >= 10 s. -->
   <OfflineSummaryModal
     v-if="ui.openModal === 'offlineSummary'"
     @close="ui.closeModal()"

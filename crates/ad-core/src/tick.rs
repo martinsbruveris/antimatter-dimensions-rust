@@ -95,13 +95,29 @@ impl GameState {
     /// `game_ms` is a no-op. See
     /// `design-docs/2026-06-30-offline-progress.md`.
     pub fn simulate_offline(&mut self, game_ms: f64, offline_ticks: u32) {
-        if game_ms <= 0.0 {
+        let (ticks, tick_size) = offline_plan(game_ms, offline_ticks);
+        if ticks == 0 {
             return;
         }
-        let ticks = offline_tick_count(game_ms, offline_ticks);
-        let tick_size = game_ms / ticks as f64; // >= 50 ms once saturated
         self.ticks(tick_size, ticks);
     }
+}
+
+/// The replay plan for `game_ms` of offline time at `offline_ticks` resolution:
+/// the discrete tick count and the per-tick size in ms. Returns `(0, 0.0)` when
+/// there is nothing to replay (`game_ms <= 0`).
+///
+/// The GUI uses this to drive a chunked, progress-bar-backed replay (the offline
+/// catch-up modal): it splits `ticks` into batches and runs `tick_size`-sized
+/// ticks itself, so the budget policy stays in the engine while the pacing/UI
+/// lives above it. [`GameState::simulate_offline`] is the all-at-once path over
+/// the same plan. See `design-docs/2026-06-30-offline-progress.md`.
+pub fn offline_plan(game_ms: f64, offline_ticks: u32) -> (u32, f64) {
+    if game_ms <= 0.0 {
+        return (0, 0.0);
+    }
+    let ticks = offline_tick_count(game_ms, offline_ticks);
+    (ticks, game_ms / ticks as f64) // tick_size >= 50 ms once saturated
 }
 
 /// The discrete tick budget for replaying `game_ms` of offline time:
@@ -141,6 +157,48 @@ mod tests {
         // Sub-tick intervals and a zero budget both clamp up to a single tick.
         assert_eq!(offline_tick_count(10.0, 1000), 1);
         assert_eq!(offline_tick_count(1_000_000.0, 0), 1);
+    }
+
+    #[test]
+    fn offline_plan_splits_game_time_across_the_budget() {
+        // Nothing to replay for a non-positive interval.
+        assert_eq!(offline_plan(0.0, 1000), (0, 0.0));
+        assert_eq!(offline_plan(-5.0, 1000), (0, 0.0));
+
+        // Below the budget: native 50 ms resolution, tick_size == 50 ms and
+        // ticks × tick_size reconstructs the full interval.
+        let (ticks, tick_size) = offline_plan(50_000.0, 100_000);
+        assert_eq!(ticks, 1000);
+        assert_eq!(tick_size, 50.0);
+        assert_eq!(ticks as f64 * tick_size, 50_000.0);
+
+        // Past the budget: the count saturates and each tick stretches, but the
+        // product still covers the whole interval.
+        let (ticks, tick_size) = offline_plan(50_000_000.0, 1000);
+        assert_eq!(ticks, 1000);
+        assert_eq!(tick_size, 50_000.0);
+        assert!(tick_size >= OFFLINE_BASE_TICK_MS);
+    }
+
+    #[test]
+    fn offline_plan_chunked_matches_all_at_once() {
+        // Driving the plan in batches (as the GUI progress modal does) is
+        // identical to one `simulate_offline` call, since both loop `ticks`.
+        let mut base = GameState::new();
+        base.dimensions[1].amount = Decimal::new(1.0, 3);
+
+        let mut all_at_once = base.clone();
+        all_at_once.simulate_offline(50_000.0, 100_000);
+
+        let (ticks, tick_size) = offline_plan(50_000.0, 100_000);
+        let mut chunked = base;
+        let (base_ticks, extra) = (ticks / 100, ticks % 100);
+        for c in 0..100 {
+            let n = base_ticks + if c < extra { 1 } else { 0 };
+            chunked.ticks(tick_size, n);
+        }
+
+        assert_eq!(chunked.antimatter, all_at_once.antimatter);
     }
 
     #[test]
