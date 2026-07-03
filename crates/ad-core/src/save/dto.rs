@@ -26,6 +26,7 @@ use serde::Deserialize;
 
 use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::{AutobuyerMode, AutobuyerState};
+use crate::break_infinity_upgrades::BreakInfinityUpgrade;
 use crate::challenges::NormalChallengeState;
 use crate::infinity_upgrades::InfinityUpgrade;
 use crate::options::{
@@ -68,9 +69,13 @@ pub struct PlayerDTO {
     pub infinities: Decimal,
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_points: Decimal,
-    /// `player.infinityUpgrades` — owned Infinity Upgrades, by original string id.
-    /// Unmodelled ids (there are none pre-follow-up) are ignored on load.
+    /// `player.infinityUpgrades` — owned Infinity Upgrades **and** the one-time
+    /// Break Infinity Upgrades (they share this string set), by original id.
+    /// Unmodelled ids are ignored on load.
     pub infinity_upgrades: Vec<String>,
+    /// `player.infinityRebuyables` — purchase counts of the 3 rebuyable Break
+    /// Infinity Upgrades.
+    pub infinity_rebuyables: Vec<u32>,
     /// `player.partInfinityPoint` — the `ipGen` fractional IP accumulator.
     pub part_infinity_point: f64,
     /// `player.achievementBits` — one bitmask int per achievement row.
@@ -314,14 +319,30 @@ impl GameState {
             || dto.infinities > Decimal::ZERO
             || dto.infinity_points > Decimal::ZERO;
 
-        // Infinity Upgrades: set the bit for each modelled string id; unknown ids
-        // (none pre-follow-up) are ignored so a later-game save still loads.
+        // Infinity Upgrades + one-time Break Infinity Upgrades share the string
+        // set: set the bit in whichever bitmask a modelled id belongs to; unknown
+        // ids are ignored so a later-game save still loads.
         let mut infinity_upgrades = 0u32;
+        let mut break_infinity_upgrades = 0u32;
         for id in &dto.infinity_upgrades {
             if let Some(upgrade) = InfinityUpgrade::from_save_id(id) {
                 infinity_upgrades |= upgrade.bit();
+            } else if let Some(upgrade) = BreakInfinityUpgrade::from_save_id(id) {
+                break_infinity_upgrades |= upgrade.bit();
             }
         }
+
+        // The 3 rebuyable Break Infinity Upgrade counts. A different length is an
+        // unexpected save shape.
+        let rebuyables = &dto.infinity_rebuyables;
+        if rebuyables.len() != 3 {
+            return Err(SaveError::UnexpectedArrayLength {
+                field: "infinityRebuyables",
+                expected: 3,
+                found: rebuyables.len(),
+            });
+        }
+        let infinity_rebuyables = [rebuyables[0], rebuyables[1], rebuyables[2]];
 
         let records = Records {
             total_time_played_ms: dto.records.total_time_played,
@@ -468,6 +489,8 @@ impl GameState {
             matter: dto.matter,
             infinity_unlocked,
             broke_infinity,
+            break_infinity_upgrades,
+            infinity_rebuyables,
             records,
             achievement_bits,
             tutorial_state: dto.tutorial_state,

@@ -100,21 +100,22 @@ impl Autobuyer {
         self.interval_ms <= AUTOBUYER_MIN_INTERVAL_MS
     }
 
-    /// Advance the timer by `dt_ms`. Returns true if the autobuyer should fire
-    /// this step. Does nothing (and never fires) while inactive. The *unlocked*
+    /// Advance the timer by `dt_ms`, firing when it reaches `effective_interval_ms`
+    /// (the stored interval after the `autobuyerSpeed` Break Infinity Upgrade's
+    /// halving). Does nothing (and never fires) while inactive. The *unlocked*
     /// check lives in the caller ([`GameState::tick_autobuyers`]) via
     /// `autobuyer_is_unlocked`, since some autobuyers unlock by challenge rather
     /// than the `is_bought` flag.
-    fn advance(&mut self, dt_ms: f64) -> bool {
+    fn advance(&mut self, dt_ms: f64, effective_interval_ms: f64) -> bool {
         if !self.is_active {
             return false;
         }
 
         self.timer_ms += dt_ms;
-        if self.timer_ms >= self.interval_ms {
-            self.timer_ms -= self.interval_ms;
+        if self.timer_ms >= effective_interval_ms {
+            self.timer_ms -= effective_interval_ms;
             // Clamp timer to prevent unbounded accumulation if dt is very large.
-            if self.timer_ms >= self.interval_ms {
+            if self.timer_ms >= effective_interval_ms {
                 self.timer_ms = 0.0;
             }
             true
@@ -378,10 +379,15 @@ impl GameState {
             return;
         }
 
+        // The `autobuyerSpeed` Break Infinity Upgrade halves every autobuyer's
+        // effective interval.
+        let speedup = self.break_infinity_autobuyer_speedup();
+
         // Antimatter dimension autobuyers.
         for tier in 0..8 {
             let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::AdTier(tier));
-            if unlocked && self.autobuyers.dimensions[tier].advance(dt_ms) {
+            let eff = self.autobuyers.dimensions[tier].interval_ms * speedup;
+            if unlocked && self.autobuyers.dimensions[tier].advance(dt_ms, eff) {
                 match self.autobuyers.dimensions[tier].mode {
                     AutobuyerMode::BuySingle => {
                         self.buy_dimension(tier);
@@ -397,7 +403,8 @@ impl GameState {
 
         // Tickspeed autobuyer.
         let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::Tickspeed);
-        if unlocked && self.autobuyers.tickspeed.advance(dt_ms) {
+        let eff = self.autobuyers.tickspeed.interval_ms * speedup;
+        if unlocked && self.autobuyers.tickspeed.advance(dt_ms, eff) {
             match self.autobuyers.tickspeed.mode {
                 AutobuyerMode::BuySingle => {
                     self.buy_tickspeed();
@@ -412,19 +419,22 @@ impl GameState {
         // fixed action, which is a no-op when its precondition isn't met — the
         // original gates the tick on the same `canBeBought`/`canCrunch` conditions.
         let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost);
-        if unlocked && self.autobuyers.dim_boost.advance(dt_ms) {
+        let eff = self.autobuyers.dim_boost.interval_ms * speedup;
+        if unlocked && self.autobuyers.dim_boost.advance(dt_ms, eff) {
             self.buy_dim_boost();
         }
 
         let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy);
-        if unlocked && self.autobuyers.galaxy.advance(dt_ms) {
+        let eff = self.autobuyers.galaxy.interval_ms * speedup;
+        if unlocked && self.autobuyers.galaxy.advance(dt_ms, eff) {
             self.buy_galaxy();
         }
 
         // Big Crunch: pre-break `willInfinity` is always true, so it crunches as
         // soon as the goal is reached (`big_crunch` no-ops otherwise).
         let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch);
-        if unlocked && self.autobuyers.big_crunch.advance(dt_ms) {
+        let eff = self.autobuyers.big_crunch.interval_ms * speedup;
+        if unlocked && self.autobuyers.big_crunch.advance(dt_ms, eff) {
             self.big_crunch();
         }
     }

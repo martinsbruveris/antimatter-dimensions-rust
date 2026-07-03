@@ -24,6 +24,7 @@ use break_infinity::Decimal;
 use serde_json::{json, Value};
 
 use crate::autobuyers::AutobuyerMode;
+use crate::break_infinity_upgrades::ALL_BREAK_INFINITY_UPGRADES;
 use crate::infinity_upgrades::ALL_INFINITY_UPGRADES;
 use crate::save::codec::encode_pipeline;
 use crate::state::GameState;
@@ -80,14 +81,22 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // Infinity currency (Decimal strings, matching the save schema).
     player["infinityPoints"] = decimal(&state.infinity_points);
     player["infinities"] = decimal(&state.infinities);
-    // Infinity Upgrades: the owned set as original string ids, plus the ipGen
-    // fractional accumulator.
-    let owned_upgrades: Vec<&str> = ALL_INFINITY_UPGRADES
+    // Infinity Upgrades + one-time Break Infinity Upgrades share the id set:
+    // write the owned ids from both, plus the ipGen fractional accumulator and the
+    // rebuyable Break Infinity Upgrade counts.
+    let mut owned_upgrades: Vec<&str> = ALL_INFINITY_UPGRADES
         .iter()
         .filter(|u| state.infinity_upgrade_bought(**u))
         .map(|u| u.save_id())
         .collect();
+    owned_upgrades.extend(
+        ALL_BREAK_INFINITY_UPGRADES
+            .iter()
+            .filter(|u| state.break_infinity_upgrade_bought(**u))
+            .map(|u| u.save_id()),
+    );
     player["infinityUpgrades"] = json!(owned_upgrades);
+    player["infinityRebuyables"] = json!(state.infinity_rebuyables);
     player["partInfinityPoint"] = json!(state.part_infinity_point);
     // Normal-challenge run state.
     player["challenge"]["normal"]["current"] = json!(state.challenge.current);
@@ -300,6 +309,35 @@ mod tests {
         assert_eq!(reloaded.chall3_pow, Decimal::from_float(1234.5));
         assert_eq!(reloaded.matter, Decimal::new(1.0, 200));
         assert_eq!(reloaded.chall8_total_sacrifice, Decimal::new(2.5, 50));
+    }
+
+    #[test]
+    fn break_infinity_upgrades_round_trip() {
+        // The one-time Break Infinity Upgrades (sharing the `infinityUpgrades`
+        // array with the Infinity Upgrades) and the 3 rebuyable counts round-trip.
+        use crate::{BreakInfinityUpgrade, InfinityUpgrade};
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.broke_infinity = true;
+        state.infinity_upgrades = InfinityUpgrade::TotalTimeMult.bit();
+        state.break_infinity_upgrades = BreakInfinityUpgrade::TotalAmMult.bit()
+            | BreakInfinityUpgrade::GalaxyBoost.bit()
+            | BreakInfinityUpgrade::AutobuyerSpeed.bit();
+        state.infinity_rebuyables = [3, 1, 5];
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        // Both upgrade sets survive the shared array without cross-contamination.
+        assert_eq!(reloaded.infinity_upgrades, state.infinity_upgrades);
+        assert_eq!(
+            reloaded.break_infinity_upgrades,
+            state.break_infinity_upgrades
+        );
+        assert!(
+            reloaded.break_infinity_upgrade_bought(BreakInfinityUpgrade::GalaxyBoost)
+        );
+        assert!(
+            !reloaded.break_infinity_upgrade_bought(BreakInfinityUpgrade::CurrentAmMult)
+        );
+        assert_eq!(reloaded.infinity_rebuyables, [3, 1, 5]);
     }
 
     #[test]

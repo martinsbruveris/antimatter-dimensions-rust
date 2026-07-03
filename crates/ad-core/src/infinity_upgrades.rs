@@ -233,14 +233,16 @@ impl GameState {
     }
 
     /// The galaxy-strength effect that scales the tickspeed formula's per-galaxy
-    /// term: `2.0` once `galaxyBoost` is owned, else `1.0` (the `InfinityUpgrade
-    /// .galaxyBoost` entry of the original's `effects` product).
+    /// term — the original's `effects` product: `×2` from the Infinity Upgrade
+    /// `galaxyBoost` and `×1.5` from the Break Infinity Upgrade `postGalaxy`.
     pub fn galaxy_strength_effect(&self) -> f64 {
-        if self.infinity_upgrade_bought(InfinityUpgrade::GalaxyBoost) {
-            2.0
-        } else {
-            1.0
-        }
+        let infinity_boost =
+            if self.infinity_upgrade_bought(InfinityUpgrade::GalaxyBoost) {
+                2.0
+            } else {
+                1.0
+            };
+        infinity_boost * self.break_infinity_galaxy_boost()
     }
 
     /// Amount subtracted from the Dimension-Boost and Antimatter-Galaxy

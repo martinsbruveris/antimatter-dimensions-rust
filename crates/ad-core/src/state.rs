@@ -215,6 +215,17 @@ pub struct GameState {
     /// `crunch.rs` / `tick.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub broke_infinity: bool,
+    /// Owned one-time Break Infinity Upgrades, one bit per
+    /// [`BreakInfinityUpgrade`](crate::BreakInfinityUpgrade). Shares the original's
+    /// `player.infinityUpgrades` string set with the [`InfinityUpgrade`]s but is a
+    /// distinct bitmask here. Persists across a Big Crunch. See
+    /// `break_infinity_upgrades.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub break_infinity_upgrades: u32,
+    /// Purchase counts of the three rebuyable Break Infinity Upgrades
+    /// (`player.infinityRebuyables`): `[tickspeedCostMult, dimCostMult, ipGen]`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub infinity_rebuyables: [u32; 3],
     /// Time and prestige records (total time played, this/best infinity). Mirrors
     /// the modelled slice of `player.records`. Advanced in `tick`; the current
     /// infinity's records reset on a Big Crunch. See [`Records`].
@@ -269,6 +280,8 @@ impl GameState {
             matter: Decimal::ONE,
             infinity_unlocked: false,
             broke_infinity: false,
+            break_infinity_upgrades: 0,
+            infinity_rebuyables: [0; 3],
             records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],
             tutorial_state: 0,

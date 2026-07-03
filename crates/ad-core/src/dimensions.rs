@@ -200,6 +200,10 @@ impl GameState {
         mult *= self.infinity_upgrade_common_mult();
         mult *= self.infinity_upgrade_tier_mult(tier);
 
+        // Break Infinity Upgrade multipliers (all-tier): total/current-AM,
+        // infinitied, and achievement multipliers.
+        mult *= self.break_infinity_upgrade_common_mult();
+
         // The original clamps the final per-tier multiplier to >= 1
         // (applyNDMultipliers). Pre-Infinity every term was >= 1, but
         // `totalTimeMult` can dip below 1 for a very short total play time, so
