@@ -32,9 +32,14 @@ pub struct NormalChallengeState {
 }
 
 impl GameState {
-    /// Whether normal challenge `id` is the one currently running.
+    /// Whether normal challenge `id` is the one currently running — directly, or
+    /// as part of Infinity Challenge 1 (which runs every Normal Challenge except
+    /// NC9 and NC12 simultaneously, mirroring `NormalChallenge(id).isRunning`).
     pub fn challenge_running(&self, id: u8) -> bool {
-        self.challenge.current == id
+        if self.challenge.current == id {
+            return true;
+        }
+        id != 9 && id != 12 && self.infinity_challenge_running(1)
     }
 
     /// Whether any normal challenge is currently running.
@@ -147,10 +152,15 @@ impl GameState {
         true
     }
 
-    /// Exit the current challenge: clear it and force a Big Crunch reset (no
-    /// rewards below goal). Mirrors `NormalChallengeState.exit` →
+    /// Exit the current challenge (normal or infinity): clear it and force a Big
+    /// Crunch reset (no rewards below goal). Mirrors `…ChallengeState.exit` →
     /// `bigCrunchReset(true, false)`.
     pub fn exit_challenge(&mut self) -> bool {
+        if self.infinity_challenge.current != 0 {
+            self.infinity_challenge.current = 0;
+            self.big_crunch_reset(true, false);
+            return true;
+        }
         if self.challenge.current == 0 {
             return false;
         }
@@ -175,6 +185,13 @@ impl GameState {
     /// NC1 on the first-ever Infinity performed outside a challenge, then exits the
     /// challenge (no `retryChallenge` modelled). Mirrors `handleChallengeCompletion`.
     pub(crate) fn handle_challenge_completion(&mut self) {
+        // An Infinity Challenge takes precedence (the two never run at once).
+        if self.infinity_challenge.current != 0 {
+            let ic = self.infinity_challenge.current;
+            self.complete_infinity_challenge(ic);
+            self.infinity_challenge.current = 0;
+            return;
+        }
         let current = self.challenge.current;
         if current == 0 {
             if !self.challenge_completed(1) {

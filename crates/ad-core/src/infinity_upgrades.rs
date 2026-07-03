@@ -342,7 +342,7 @@ impl GameState {
     /// `Player.isInAntimatterChallenge`, since a challenge run always starts fresh
     /// (skip-resets and the free Galaxy would defeat the challenge's reset).
     pub fn skip_resets_if_possible(&mut self) {
-        if self.any_challenge_running() {
+        if self.in_any_antimatter_challenge() {
             return;
         }
         if self.infinity_upgrade_bought(InfinityUpgrade::SkipResetGalaxy)

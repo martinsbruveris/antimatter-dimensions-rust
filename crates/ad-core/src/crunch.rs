@@ -5,10 +5,22 @@ use crate::records::ThisInfinity;
 use crate::state::{DimensionTier, GameState, TickspeedState};
 
 impl GameState {
-    /// Whether the player can perform a Big Crunch: antimatter has reached the
-    /// Big Crunch threshold (where it is capped, see `tick`).
+    /// The antimatter goal for the current run — an Infinity Challenge's own goal
+    /// while one runs, else the `1e308` Big Crunch threshold (which is also the
+    /// Normal Challenge goal). Mirrors `Player.infinityGoal`.
+    pub fn infinity_goal(&self) -> Decimal {
+        if self.infinity_challenge.current != 0 {
+            Self::infinity_challenge_goal(self.infinity_challenge.current)
+        } else {
+            BIG_CRUNCH_THRESHOLD
+        }
+    }
+
+    /// Whether the player can perform a Big Crunch: the peak antimatter this
+    /// infinity has reached the goal (`Player.canCrunch`). Peak (not current) so a
+    /// mid-run Dimension Boost/Galaxy reset doesn't revoke it.
     pub fn can_big_crunch(&self) -> bool {
-        self.antimatter >= BIG_CRUNCH_THRESHOLD
+        self.records.this_infinity.max_am.max(&self.antimatter) >= self.infinity_goal()
     }
 
     /// The Infinity-Point formula divisor (`Effects.min(308, Achievement(103),

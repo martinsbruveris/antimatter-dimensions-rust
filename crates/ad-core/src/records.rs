@@ -88,6 +88,11 @@ pub struct Records {
     pub this_infinity: ThisInfinity,
     /// The fastest infinity's records (kept on crunch).
     pub best_infinity: BestInfinity,
+    /// Peak antimatter reached this eternity (`player.records.thisEternity.maxAM`).
+    /// Persists across a Big Crunch (would reset on Eternity, a later feature);
+    /// gates Infinity-Challenge unlocks. Pre-Eternity it is an all-time max.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub max_am_this_eternity: Decimal,
 }
 
 impl Records {
@@ -97,6 +102,7 @@ impl Records {
             real_time_played_ms: 0.0,
             this_infinity: ThisInfinity::new(),
             best_infinity: BestInfinity::new(),
+            max_am_this_eternity: Decimal::ZERO,
         }
     }
 }

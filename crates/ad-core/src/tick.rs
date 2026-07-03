@@ -62,15 +62,18 @@ impl GameState {
             }
         }
 
-        // Cap antimatter at the Big Crunch threshold while the crunch goal is in
-        // force: pre-break the player must Crunch at `1e308` to progress, and even
-        // post-break a normal challenge still targets `1e308`. Mirrors
-        // `hasBigCrunchGoal = !player.break || isInAntimatterChallenge`. Post-break
-        // and outside a challenge, antimatter grows without bound.
-        if (!self.broke_infinity || self.any_challenge_running())
-            && self.antimatter > BIG_CRUNCH_THRESHOLD
+        // Cap antimatter at the current goal while a crunch goal is in force:
+        // pre-break the player must Crunch to progress, and even post-break any
+        // antimatter challenge still targets its goal (`1e308` for Normal
+        // Challenges, the IC's own goal for Infinity Challenges). Mirrors
+        // `hasBigCrunchGoal = !player.break || isInAntimatterChallenge` capping at
+        // `Player.infinityGoal`. Post-break and outside a challenge, antimatter
+        // grows without bound.
+        let goal = self.infinity_goal();
+        if (!self.broke_infinity || self.in_any_antimatter_challenge())
+            && self.antimatter > goal
         {
-            self.antimatter = BIG_CRUNCH_THRESHOLD;
+            self.antimatter = goal;
         }
 
         // Advance time records. Pre-Infinity the game-speed multiplier is 1, so
@@ -85,6 +88,10 @@ impl GameState {
         // antimatter setter's `thisInfinity.maxAM = maxAM.max(value)`.
         self.records.this_infinity.max_am =
             self.records.this_infinity.max_am.max(&self.antimatter);
+        // Peak antimatter this eternity (persists across crunches; gates Infinity
+        // Challenge unlocks).
+        self.records.max_am_this_eternity =
+            self.records.max_am_this_eternity.max(&self.antimatter);
 
         // 24: "Antimatter Apocalypse" — reach 1e80 antimatter (original's
         // GAME_TICK_AFTER check).

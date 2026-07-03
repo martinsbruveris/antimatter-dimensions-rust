@@ -28,6 +28,7 @@ use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::{AutobuyerMode, AutobuyerState};
 use crate::break_infinity_upgrades::BreakInfinityUpgrade;
 use crate::challenges::NormalChallengeState;
+use crate::infinity_challenges::InfinityChallengeState;
 use crate::infinity_upgrades::InfinityUpgrade;
 use crate::options::{
     Confirmations, Options, MAX_AUTOSAVE_INTERVAL_MS, MAX_NOTATION_DIGITS,
@@ -103,11 +104,22 @@ pub struct PlayerDTO {
     pub matter: Decimal,
 }
 
-/// `player.challenge` — only the `normal` sub-object is modelled (infinity /
-/// eternity challenges are later features).
+/// `player.challenge` — the `normal` and `infinity` run states (eternity
+/// challenges are a later feature).
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChallengeDTO {
     pub normal: NormalChallengeDTO,
+    pub infinity: InfinityChallengeDTO,
+}
+
+/// `player.challenge.infinity` (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InfinityChallengeDTO {
+    /// Active challenge id (`0` = none).
+    pub current: u8,
+    /// Completed-challenge bitmask (bit `1 << id`).
+    pub completed_bits: u16,
 }
 
 /// `player.challenge.normal` (modelled subset). `bestTimes` is ignored until a
@@ -152,6 +164,17 @@ pub struct RecordsDTO {
     pub real_time_played: f64,
     pub this_infinity: ThisInfinityDTO,
     pub best_infinity: BestInfinityDTO,
+    pub this_eternity: ThisEternityDTO,
+}
+
+/// `player.records.thisEternity` (modelled subset): the peak antimatter this
+/// eternity, which gates Infinity-Challenge unlocks.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThisEternityDTO {
+    /// Peak antimatter this eternity. Save key `maxAM` (capital AM).
+    #[serde(rename = "maxAM", with = "break_infinity::serde_string")]
+    pub max_am: Decimal,
 }
 
 /// `player.records.thisInfinity` (modelled subset).
@@ -356,6 +379,7 @@ impl GameState {
                 time_ms: dto.records.best_infinity.time,
                 real_time_ms: dto.records.best_infinity.real_time,
             },
+            max_am_this_eternity: dto.records.this_eternity.max_am,
         };
 
         // Achievement bitmask. The original's `achievementBits` is 17 rows in a
@@ -482,6 +506,10 @@ impl GameState {
             challenge: NormalChallengeState {
                 current: dto.challenge.normal.current,
                 completed: dto.challenge.normal.completed_bits,
+            },
+            infinity_challenge: InfinityChallengeState {
+                current: dto.challenge.infinity.current,
+                completed: dto.challenge.infinity.completed_bits,
             },
             chall8_total_sacrifice: dto.chall8_total_sacrifice,
             chall2_pow: dto.chall2_pow,

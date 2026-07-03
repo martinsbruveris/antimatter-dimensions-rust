@@ -98,9 +98,12 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     player["infinityUpgrades"] = json!(owned_upgrades);
     player["infinityRebuyables"] = json!(state.infinity_rebuyables);
     player["partInfinityPoint"] = json!(state.part_infinity_point);
-    // Normal-challenge run state.
+    // Normal- and infinity-challenge run state.
     player["challenge"]["normal"]["current"] = json!(state.challenge.current);
     player["challenge"]["normal"]["completedBits"] = json!(state.challenge.completed);
+    player["challenge"]["infinity"]["current"] = json!(state.infinity_challenge.current);
+    player["challenge"]["infinity"]["completedBits"] =
+        json!(state.infinity_challenge.completed);
     // Per-run challenge accumulators: NC8's running sacrifice product, NC2's
     // production factor (a plain number), NC3's 1st-dim multiplier, and NC11
     // normal matter (Decimal strings).
@@ -121,6 +124,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     records["bestInfinity"]["time"] = json!(state.records.best_infinity.time_ms);
     records["bestInfinity"]["realTime"] =
         json!(state.records.best_infinity.real_time_ms);
+    records["thisEternity"]["maxAM"] = decimal(&state.records.max_am_this_eternity);
     // Achievement bitmask, written back verbatim (one int per row).
     player["achievementBits"] = json!(state.achievement_bits);
     // Tutorial-highlight progress (at the player root, not under options).
@@ -309,6 +313,24 @@ mod tests {
         assert_eq!(reloaded.chall3_pow, Decimal::from_float(1234.5));
         assert_eq!(reloaded.matter, Decimal::new(1.0, 200));
         assert_eq!(reloaded.chall8_total_sacrifice, Decimal::new(2.5, 50));
+    }
+
+    #[test]
+    fn infinity_challenge_state_round_trips() {
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.infinity_challenge.current = 3;
+        state.infinity_challenge.completed = (1 << 1) | (1 << 5);
+        state.records.max_am_this_eternity = Decimal::new(1.0, 14000);
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.infinity_challenge.current, 3);
+        assert!(reloaded.infinity_challenge_completed(1));
+        assert!(reloaded.infinity_challenge_completed(5));
+        assert!(!reloaded.infinity_challenge_completed(2));
+        assert_eq!(
+            reloaded.records.max_am_this_eternity,
+            Decimal::new(1.0, 14000)
+        );
     }
 
     #[test]

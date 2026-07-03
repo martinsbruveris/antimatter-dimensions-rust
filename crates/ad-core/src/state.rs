@@ -6,6 +6,7 @@ use crate::challenges::NormalChallengeState;
 use crate::data::constants::{
     INITIAL_ANTIMATTER, TICKSPEED_BASE_COST, TICKSPEED_COST_MULTIPLIER,
 };
+use crate::infinity_challenges::InfinityChallengeState;
 use crate::options::Options;
 use crate::records::Records;
 
@@ -174,6 +175,11 @@ pub struct GameState {
     /// `player.challenge.normal`; persists across a Big Crunch. See `challenges.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub challenge: NormalChallengeState,
+    /// Infinity-challenge run state (active challenge + completed bitmask). Mirrors
+    /// `player.challenge.infinity`; persists across a Big Crunch. See
+    /// `infinity_challenges.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub infinity_challenge: InfinityChallengeState,
     /// Normal-Challenge-8 accumulated sacrifice boost (`player.chall8TotalSacrifice`).
     /// Under NC8 dimensional sacrifice uses a running product kept across
     /// sacrifice resets rather than the log-based total-boost formula; this holds
@@ -274,6 +280,7 @@ impl GameState {
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),
+            infinity_challenge: InfinityChallengeState::default(),
             chall8_total_sacrifice: Decimal::ONE,
             chall2_pow: 1.0,
             chall3_pow: Decimal::from_float(0.01),
