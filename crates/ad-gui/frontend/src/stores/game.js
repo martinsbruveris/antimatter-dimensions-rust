@@ -154,6 +154,22 @@ export const useGameStore = defineStore("game", {
     buyMaxAllInfinityDimensions() {
       return invoke("buy_max_all_infinity_dimensions");
     },
+    // Replicanti: unlock (1e140 IP), the 3 IP upgrades, and a Replicanti Galaxy.
+    unlockReplicanti() {
+      return invoke("unlock_replicanti");
+    },
+    buyReplicantiChance() {
+      return invoke("buy_replicanti_chance");
+    },
+    buyReplicantiInterval() {
+      return invoke("buy_replicanti_interval");
+    },
+    buyReplicantiGalaxyCap() {
+      return invoke("buy_replicanti_galaxy_cap");
+    },
+    buyReplicantiGalaxy() {
+      return invoke("buy_replicanti_galaxy");
+    },
     // Buy an Infinity Upgrade by its original save id (e.g. "timeMult").
     buyInfinityUpgrade(id) {
       return invoke("buy_infinity_upgrade", { id });

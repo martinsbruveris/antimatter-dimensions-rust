@@ -2,6 +2,7 @@ import AntimatterDimensionsTab from "../components/tabs/AntimatterDimensionsTab.
 import InfinityUpgradesTab from "../components/tabs/InfinityUpgradesTab.vue";
 import BreakInfinityTab from "../components/tabs/BreakInfinityTab.vue";
 import InfinityDimensionsTab from "../components/tabs/InfinityDimensionsTab.vue";
+import ReplicantiTab from "../components/tabs/ReplicantiTab.vue";
 import ChallengesTab from "../components/tabs/ChallengesTab.vue";
 import InfinityChallengesTab from "../components/tabs/InfinityChallengesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
@@ -50,6 +51,14 @@ export const TABS = [
         symbol: "<i class='fas fa-arrows-alt-h'></i>",
         component: BreakInfinityTab,
         condition: (s) => Boolean(s?.break_infinity?.unlocked),
+      },
+      // Replicanti: visible from the first Infinity (JS `infinityUnlocked()`); the
+      // in-tab button unlocks the mechanic once 1e140 IP is affordable.
+      {
+        key: "replicanti",
+        name: "Replicanti",
+        symbol: "Ξ",
+        component: ReplicantiTab,
       },
     ],
   },

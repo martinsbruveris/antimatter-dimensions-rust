@@ -12,6 +12,7 @@ use ad_core::{
     BreakInfinityRebuyable, BreakInfinityUpgrade, Decimal, GameState, InfinityUpgrade,
     ALL_BREAK_INFINITY_REBUYABLES, ALL_BREAK_INFINITY_UPGRADES, ALL_INFINITY_UPGRADES,
     INFINITY_CHALLENGE_COUNT, INFINITY_DIMENSION_COUNT, NORMAL_CHALLENGE_COUNT,
+    REPLICANTI_UNLOCK_COST,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
@@ -215,6 +216,39 @@ struct BreakRebuyableView {
     can_be_bought: bool,
 }
 
+/// Serializable view of the Replicanti tab.
+#[derive(Serialize)]
+struct ReplicantiView {
+    /// Whether Replicanti are unlocked (else the tab shows the unlock button).
+    unlocked: bool,
+    /// IP cost of the unlock (1e140), and whether it's affordable.
+    unlock_cost: Num,
+    can_unlock: bool,
+    /// Current amount and its `×` multiplier to all Infinity Dimensions.
+    amount: Num,
+    mult: Num,
+    /// Reproduction chance (a fraction 0…1) and interval (ms).
+    chance: f64,
+    interval_ms: f64,
+    /// Chance upgrade (`+1%`): next cost, capped at 100%, affordability.
+    chance_cost: Num,
+    chance_capped: bool,
+    can_buy_chance: bool,
+    /// Interval upgrade (`×0.9`, floor 50 ms).
+    interval_cost: Num,
+    interval_capped: bool,
+    can_buy_interval: bool,
+    /// Max-galaxies upgrade (`+1`): value, next cost, affordability.
+    galaxy_cap: u32,
+    galaxy_cost: Num,
+    can_buy_galaxy_cap: bool,
+    /// Replicanti Galaxies made, and whether one can be bought now (amount at cap,
+    /// below the cap). The galaxy button shows once the cap is ≥ 1.
+    galaxies: u32,
+    can_buy_galaxy: bool,
+    can_see_galaxy_button: bool,
+}
+
 /// Serializable view of the whole autobuyers tab.
 #[derive(Serialize)]
 struct AutobuyersView {
@@ -308,6 +342,8 @@ struct GameView {
     break_infinity: BreakInfinityView,
     /// Infinity Dimensions tab state (8 tiers + Infinity Power).
     infinity_dimensions: InfinityDimensionsView,
+    /// Replicanti tab state (unlock, amount/mult, 3 upgrades, galaxies).
+    replicanti: ReplicantiView,
     /// Player options (UI/UX preferences), surfaced for the options tabs.
     options: OptionsView,
     /// Sorted ids of unlocked normal achievements; drives the Achievements tab
@@ -519,6 +555,33 @@ fn build_infinity_dimensions_view(game: &GameState) -> InfinityDimensionsView {
     }
 }
 
+/// Build the Replicanti view (unlock, amount + ID multiplier, the 3 IP upgrades,
+/// and the Replicanti Galaxy button).
+fn build_replicanti_view(game: &GameState) -> ReplicantiView {
+    let r = &game.replicanti;
+    ReplicantiView {
+        unlocked: r.unlocked,
+        unlock_cost: num(&REPLICANTI_UNLOCK_COST),
+        can_unlock: game.can_unlock_replicanti(),
+        amount: num(&r.amount),
+        mult: num(&game.replicanti_mult()),
+        chance: r.chance,
+        interval_ms: r.interval_ms,
+        chance_cost: num(&r.chance_cost),
+        chance_capped: game.replicanti_chance_capped(),
+        can_buy_chance: game.can_buy_replicanti_chance(),
+        interval_cost: num(&r.interval_cost),
+        interval_capped: game.replicanti_interval_capped(),
+        can_buy_interval: game.can_buy_replicanti_interval(),
+        galaxy_cap: r.galaxy_cap,
+        galaxy_cost: num(&game.replicanti_galaxy_cost()),
+        can_buy_galaxy_cap: game.can_buy_replicanti_galaxy_cap(),
+        galaxies: r.galaxies,
+        can_buy_galaxy: game.can_buy_replicanti_galaxy(),
+        can_see_galaxy_button: r.galaxy_cap >= 1,
+    }
+}
+
 /// Build the Break Infinity view (the 9 one-time + 3 rebuyable upgrades). Static
 /// per-upgrade display data (descriptions) lives frontend-side, keyed on the id.
 fn build_break_infinity_view(game: &GameState) -> BreakInfinityView {
@@ -662,6 +725,7 @@ fn build_game_view(game: &GameState) -> GameView {
         autobuyers: build_autobuyers_view(game),
         break_infinity: build_break_infinity_view(game),
         infinity_dimensions: build_infinity_dimensions_view(game),
+        replicanti: build_replicanti_view(game),
         unlocked_achievements: game.unlocked_achievement_ids(),
         achievement_power: num(&game.achievement_power()),
         tutorial_state: game.tutorial_state,
@@ -879,6 +943,37 @@ fn buy_max_infinity_dimension(tier: usize, state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn buy_max_all_infinity_dimensions(state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().buy_max_all_infinity_dimensions();
+}
+
+/// Unlock Replicanti (spends 1e140 IP); a no-op if already unlocked or unaffordable.
+#[tauri::command]
+fn unlock_replicanti(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().unlock_replicanti();
+}
+
+/// Buy one Replicanti chance upgrade (`+1%`).
+#[tauri::command]
+fn buy_replicanti_chance(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_replicanti_chance();
+}
+
+/// Buy one Replicanti interval upgrade (`×0.9`).
+#[tauri::command]
+fn buy_replicanti_interval(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_replicanti_interval();
+}
+
+/// Buy one Replicanti max-galaxies upgrade (`+1`).
+#[tauri::command]
+fn buy_replicanti_galaxy_cap(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_replicanti_galaxy_cap();
+}
+
+/// Buy a Replicanti Galaxy (resets Replicanti; a no-op unless at the cap and below
+/// the bought-galaxy cap).
+#[tauri::command]
+fn buy_replicanti_galaxy(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_replicanti_galaxy();
 }
 
 /// Buy an Infinity Upgrade by its original save id (e.g. "timeMult"). An
@@ -1415,6 +1510,11 @@ pub fn run() {
             buy_infinity_dimension,
             buy_max_infinity_dimension,
             buy_max_all_infinity_dimensions,
+            unlock_replicanti,
+            buy_replicanti_chance,
+            buy_replicanti_interval,
+            buy_replicanti_galaxy_cap,
+            buy_replicanti_galaxy,
             buy_infinity_upgrade,
             start_challenge,
             exit_challenge,
