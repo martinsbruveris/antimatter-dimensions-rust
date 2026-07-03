@@ -91,7 +91,14 @@ antimatter-dimensions-rust/
   action. Advances passively in `tick()` and on the boost/galaxy/tickspeed
   actions; the frontend renders the highlight. See
   `design-docs/2026-06-30-ui-reveal-and-tutorial.md`.
-- `src/autobuyers.rs` — Automation system
+- `src/autobuyers.rs` — Automation system (Feature 2.6). The 8 AD + Tickspeed
+  autobuyers (antimatter-unlocked "slow versions") plus the Dim Boost / Galaxy /
+  Big Crunch autobuyers (challenge-only, from NC10/11/12). The IP-cost
+  **interval-upgrade** machinery (`cost ×2`, `interval ×0.6`, 100 ms floor) is
+  addressed via the `AutobuyerTarget` handle (`autobuyer_can_be_upgraded`,
+  `upgrade_autobuyer_interval`, `has_maxed_interval`). `break_infinity_unlockable()`
+  exposes the NC12-completed + maxed-Big-Crunch-interval gate that Feature 2.3
+  (Break Infinity) consumes. See `design-docs/2026-07-03-autobuyers.md`.
 - `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
   `player.options`), held in `GameState`, preserved across a Big Crunch.
   Includes the per-action `Confirmations` toggles (boost/galaxy/sacrifice/crunch)

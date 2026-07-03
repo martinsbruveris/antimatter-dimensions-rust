@@ -231,6 +231,16 @@ export const useGameStore = defineStore("game", {
     setAllAutobuyersActive(active) {
       return invoke("set_all_autobuyers_active", { active });
     },
+    // Reduce an autobuyer's interval one step, spending Infinity Points. `target`
+    // is the string handle ("ad0".."ad7", "tickspeed", "dimBoost", "galaxy",
+    // "bigCrunch"). Only works once the autobuyer's challenge is completed.
+    upgradeAutobuyerInterval(target) {
+      return invoke("upgrade_autobuyer_interval", { target });
+    },
+    // Toggle a prestige autobuyer (Dim Boost / Galaxy / Big Crunch) on/off.
+    toggleAutobuyer(target) {
+      return invoke("toggle_autobuyer", { target });
+    },
     // --- Options ---
     // Enable/disable keyboard shortcuts (original `player.options.hotkeys`).
     setHotkeys(enabled) {

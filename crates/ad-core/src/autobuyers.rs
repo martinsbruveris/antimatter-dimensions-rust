@@ -312,7 +312,7 @@ impl GameState {
     /// The Normal Challenge whose completion makes `target` interval-upgradeable
     /// (`canBeUpgraded`): AD tier `n` → NC`n`, Tickspeed → NC9, Dim Boost → NC10,
     /// Galaxy → NC11, Big Crunch → NC12.
-    fn autobuyer_challenge(target: AutobuyerTarget) -> u8 {
+    pub fn autobuyer_challenge(target: AutobuyerTarget) -> u8 {
         match target {
             AutobuyerTarget::AdTier(tier) => tier as u8 + 1,
             AutobuyerTarget::Tickspeed => 9,
@@ -320,6 +320,13 @@ impl GameState {
             AutobuyerTarget::Galaxy => 11,
             AutobuyerTarget::BigCrunch => 12,
         }
+    }
+
+    /// Toggle the `is_active` flag of `target` (used by the prestige autobuyers'
+    /// on/off checkbox; the AD/Tickspeed ones have their own tier-keyed toggles).
+    pub fn toggle_autobuyer_active(&mut self, target: AutobuyerTarget) {
+        let ab = self.autobuyer_mut(target);
+        ab.is_active = !ab.is_active;
     }
 
     /// Whether `target`'s interval can be reduced with Infinity Points — i.e. its

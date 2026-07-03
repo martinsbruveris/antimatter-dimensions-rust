@@ -221,20 +221,32 @@ Vendor the `AutobuyerBox` / interval-upgrade styles from the original.
 
 ## 8. Incremental plan
 
-1. **Interval machinery + `AutobuyerTarget`**: `cost` field, `can_be_upgraded`,
-   `is_unlocked`, `upgrade_autobuyer_interval`, `has_maxed_interval`; wire
-   `can_be_upgraded` into the existing AD/Tickspeed autobuyers; save/load the
-   per-autobuyer `interval`/`cost`. Tests. Commit.
-2. **Dim Boost + Galaxy autobuyers**: state, `tick_autobuyers` firing behind
-   `can_dim_boost`/`can_buy_galaxy`, NC10/NC11 unlock, save/load, tests. Commit.
-3. **Big Crunch autobuyer**: state (mode/amount/time/xHighest), always-fire
-   pre-break, NC12 unlock, `break_infinity_unlockable()` hook, save/load, tests.
-   Commit.
-4. **UI**: the three boxes + interval-upgrade buttons; snapshot additions. Commit.
+1. ✅ **Interval machinery + `AutobuyerTarget`**: `cost` field, `can_be_upgraded`,
+   `is_unlocked`, `upgrade_autobuyer_interval`, `has_maxed_interval`; wired into
+   the AD/Tickspeed autobuyers; per-autobuyer `interval`/`cost` round-trip. *(part 1.)*
+2. ✅ **Dim Boost + Galaxy + Big Crunch autobuyers**: state + `tick_autobuyers`
+   firing behind `can_dim_boost`/`can_buy_galaxy`/`can_big_crunch`, NC10/11/12
+   unlock, `break_infinity_unlockable()` hook, save/load. *(part 2; the three ship
+   together since they share the prestige shape and firing loop. Big Crunch's
+   mode/amount/time config is inert pre-break, so it stays at the template default
+   rather than being modelled.)*
+3. ✅ **UI**: `IntervalUpgradeButton.vue` wired into the AD/Tickspeed boxes (the old
+   disabled placeholder), plus `PrestigeAutobuyerBox.vue` for the three new
+   autobuyers (row when `is_unlocked`, locked hint before their NC is completed).
+   Snapshot gains the per-autobuyer upgrade fields (`can_be_upgraded`,
+   `has_maxed_interval`, `upgrade_cost`, `can_afford_upgrade`, `is_unlocked`) and
+   the three prestige entries; two string-keyed Tauri commands
+   (`upgrade_autobuyer_interval`, `toggle_autobuyer`). *(part 3.)*
 
 Records/`thisEternity.maxAM`, the buy-max/limit config behaviours, and the
 `autobuyerSpeed` halving stay stubbed until their prerequisite features (Eternity,
 Break Infinity) land.
+
+**Feature 2.6 is complete.** The remaining timing nuance (our `advance` resets the
+timer per interval, so the Big Crunch autobuyer at its 150 s base can lag the goal
+by up to one interval vs. the original's continuously-accumulating
+`timeSinceLastTick`) matches how the existing AD autobuyers already behave and
+vanishes once the interval is upgraded toward the 100 ms floor.
 
 ---
 

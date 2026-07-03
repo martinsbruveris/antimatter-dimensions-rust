@@ -3,6 +3,7 @@ import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
 import AutobuyerBox from "./AutobuyerBox.vue";
+import IntervalUpgradeButton from "./IntervalUpgradeButton.vue";
 
 const game = useGameStore();
 const entry = computed(() => game.snapshot.autobuyers.tickspeed);
@@ -15,11 +16,10 @@ const entry = computed(() => game.snapshot.autobuyers.tickspeed);
     @toggle="game.toggleTickspeedAutobuyer()"
   >
     <template #intervalSlot>
-      <button
-        class="o-autobuyer-btn l-autobuyer-box__button o-autobuyer-btn--unavailable"
-      >
-        Complete the challenge to upgrade interval
-      </button>
+      <IntervalUpgradeButton
+        :entry="entry"
+        target="tickspeed"
+      />
     </template>
     <template #toggleSlot>
       <!-- Pre-Infinity the tickspeed autobuyer is locked to "Buys singles". -->

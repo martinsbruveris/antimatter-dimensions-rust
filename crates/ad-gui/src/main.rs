@@ -8,8 +8,8 @@ use ad_core::data::constants::{
 };
 use ad_core::save::{decode_save_with_last_update, encode_save};
 use ad_core::{
-    offline_plan as core_offline_plan, AutobuyerMode, Decimal, GameState,
-    InfinityUpgrade, ALL_INFINITY_UPGRADES, NORMAL_CHALLENGE_COUNT,
+    offline_plan as core_offline_plan, AutobuyerMode, AutobuyerTarget, Decimal,
+    GameState, InfinityUpgrade, ALL_INFINITY_UPGRADES, NORMAL_CHALLENGE_COUNT,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
@@ -74,12 +74,31 @@ struct AutobuyerView {
     name: String,
     /// Whether the slow version is unlocked (full row vs. purchase box).
     is_bought: bool,
+    /// Whether it runs at all: antimatter-unlocked (`is_bought`) or challenge-
+    /// unlocked (`can_be_upgraded`). Drives the row-vs-locked display for the
+    /// prestige autobuyers (which have no antimatter path).
+    is_unlocked: bool,
+    /// Whether this autobuyer has an antimatter "slow version" (AD/Tickspeed);
+    /// the prestige autobuyers (Dim Boost / Galaxy / Big Crunch) do not.
+    antimatter_unlockable: bool,
+    /// The Normal Challenge whose completion unlocks/upgrades this autobuyer
+    /// (shown in the locked hint, e.g. "Complete Normal Challenge 10").
+    unlock_challenge: u8,
     /// Whether the antimatter requirement is met (purchase box enabled).
     can_unlock: bool,
     /// Requirement amount shown on the purchase box.
     requirement: Num,
     /// Interval between purchases, formatted in seconds (e.g. "0.50").
     interval_seconds: String,
+    /// Whether the interval can be reduced with IP (its challenge is completed).
+    can_be_upgraded: bool,
+    /// Whether the interval is already at the 100 ms floor.
+    has_maxed_interval: bool,
+    /// IP cost of the next interval upgrade.
+    upgrade_cost: Num,
+    /// Whether that upgrade is affordable right now (upgradeable, not maxed, and
+    /// enough IP).
+    can_afford_upgrade: bool,
     /// Whether the autobuyer is toggled on.
     is_active: bool,
     /// Current purchase mode: "single" or "max".
@@ -130,6 +149,12 @@ struct AutobuyersView {
     dimensions: Vec<AutobuyerView>,
     /// The tickspeed autobuyer.
     tickspeed: AutobuyerView,
+    /// The Dimension Boost autobuyer (unlocked by completing NC10).
+    dim_boost: AutobuyerView,
+    /// The Antimatter Galaxy autobuyer (unlocked by completing NC11).
+    galaxy: AutobuyerView,
+    /// The Big Crunch (Infinity) autobuyer (unlocked by completing NC12).
+    big_crunch: AutobuyerView,
 }
 
 /// Serializable game view sent to the frontend each frame.
@@ -240,20 +265,37 @@ struct ConfirmationsView {
     big_crunch: bool,
 }
 
-/// Build the serializable view for one autobuyer.
+/// Build the serializable view for one autobuyer, including its interval-upgrade
+/// state (cost / affordability / maxed) derived from `target`.
 fn build_autobuyer_view(
-    autobuyer: &ad_core::Autobuyer,
+    game: &GameState,
+    target: AutobuyerTarget,
     name: String,
     requirement: Decimal,
     can_unlock: bool,
     can_change_mode: bool,
+    antimatter_unlockable: bool,
 ) -> AutobuyerView {
+    let autobuyer = game.autobuyer(target);
+    let can_be_upgraded = game.autobuyer_can_be_upgraded(target);
+    let has_maxed_interval = game.autobuyer_has_maxed_interval(target);
+    let cost = Decimal::from_float(autobuyer.cost);
+    let can_afford_upgrade =
+        can_be_upgraded && !has_maxed_interval && game.infinity_points >= cost;
+
     AutobuyerView {
         name,
         is_bought: autobuyer.is_bought,
+        is_unlocked: game.autobuyer_is_unlocked(target),
+        antimatter_unlockable,
+        unlock_challenge: GameState::autobuyer_challenge(target),
         can_unlock,
         requirement: num(&requirement),
         interval_seconds: format!("{:.2}", autobuyer.interval_ms / 1000.0),
+        can_be_upgraded,
+        has_maxed_interval,
+        upgrade_cost: num(&cost),
+        can_afford_upgrade,
         is_active: autobuyer.is_active,
         mode: match autobuyer.mode {
             AutobuyerMode::BuySingle => "single".to_string(),
@@ -267,31 +309,52 @@ fn build_autobuyers_view(game: &GameState) -> AutobuyersView {
     let dimensions = (0..8)
         .map(|tier| {
             build_autobuyer_view(
-                &game.autobuyers.dimensions[tier],
+                game,
+                AutobuyerTarget::AdTier(tier),
                 format!("{} Dimension Autobuyer", DIMENSION_ORDINALS[tier]),
                 GameState::ad_autobuyer_requirement(tier),
                 game.can_unlock_ad_autobuyer(tier),
                 // AD autobuyer mode ("Buys singles"/"Buys max") is always
                 // changeable, even pre-Infinity.
                 true,
+                true,
             )
         })
         .collect();
 
     let tickspeed = build_autobuyer_view(
-        &game.autobuyers.tickspeed,
+        game,
+        AutobuyerTarget::Tickspeed,
         "Tickspeed Autobuyer".to_string(),
         GameState::tickspeed_autobuyer_requirement(),
         game.can_unlock_tickspeed_autobuyer(),
         // Pre-Infinity the tickspeed autobuyer is locked to single.
         false,
+        true,
     );
+
+    // The prestige autobuyers have no antimatter "slow version" (no requirement,
+    // no purchase box) and no single/max mode — they unlock by challenge only.
+    let prestige = |target, name: &str| {
+        build_autobuyer_view(
+            game,
+            target,
+            name.to_string(),
+            Decimal::ZERO,
+            false,
+            false,
+            false,
+        )
+    };
 
     AutobuyersView {
         tab_unlocked: game.autobuyer_tab_unlocked(),
         enabled: game.autobuyers.enabled,
         dimensions,
         tickspeed,
+        dim_boost: prestige(AutobuyerTarget::DimBoost, "Dimension Boost Autobuyer"),
+        galaxy: prestige(AutobuyerTarget::Galaxy, "Antimatter Galaxy Autobuyer"),
+        big_crunch: prestige(AutobuyerTarget::BigCrunch, "Big Crunch Autobuyer"),
     }
 }
 
@@ -677,6 +740,36 @@ fn toggle_autobuyers(state: State<'_, Mutex<GameState>>) {
 fn set_all_autobuyers_active(active: bool, state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.set_all_autobuyers_active(active);
+}
+
+/// Parse the frontend's string autobuyer handle (`ad0`..`ad7`, `tickspeed`,
+/// `dimBoost`, `galaxy`, `bigCrunch`) into an [`AutobuyerTarget`].
+fn parse_autobuyer_target(target: &str) -> Option<AutobuyerTarget> {
+    match target {
+        "tickspeed" => Some(AutobuyerTarget::Tickspeed),
+        "dimBoost" => Some(AutobuyerTarget::DimBoost),
+        "galaxy" => Some(AutobuyerTarget::Galaxy),
+        "bigCrunch" => Some(AutobuyerTarget::BigCrunch),
+        other => other
+            .strip_prefix("ad")
+            .and_then(|n| n.parse::<usize>().ok())
+            .filter(|&tier| tier < 8)
+            .map(AutobuyerTarget::AdTier),
+    }
+}
+
+#[tauri::command]
+fn upgrade_autobuyer_interval(target: String, state: State<'_, Mutex<GameState>>) {
+    if let Some(target) = parse_autobuyer_target(&target) {
+        state.lock().unwrap().upgrade_autobuyer_interval(target);
+    }
+}
+
+#[tauri::command]
+fn toggle_autobuyer(target: String, state: State<'_, Mutex<GameState>>) {
+    if let Some(target) = parse_autobuyer_target(&target) {
+        state.lock().unwrap().toggle_autobuyer_active(target);
+    }
 }
 
 #[tauri::command]
@@ -1101,6 +1194,8 @@ pub fn run() {
             toggle_tickspeed_autobuyer,
             toggle_autobuyers,
             set_all_autobuyers_active,
+            upgrade_autobuyer_interval,
+            toggle_autobuyer,
             set_hotkeys,
             set_update_rate,
             set_notation,
