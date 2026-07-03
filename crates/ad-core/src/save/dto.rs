@@ -191,12 +191,11 @@ pub struct AntimatterDimsDTO {
 
 /// A single autobuyer entry (`auto.antimatterDims.all[t]` or `auto.tickspeed`).
 ///
-/// We read only `isActive`/`isBought`/`mode`. The save's other fields are
-/// intentionally ignored: `interval` and `bulk` are only ever changed by
-/// Infinity-era upgrades we don't model, so we use our fixed constructor
-/// defaults instead of the saved values; `lastTick` is transient timer phase
-/// (an absolute timestamp in the original; an elapsed-time accumulator for us)
-/// which we just reset to 0 on load.
+/// We read `isActive`/`isBought`/`mode` plus the interval-upgrade state
+/// (`interval`/`cost`), which round-trips now that interval upgrades are modelled
+/// (Feature 2.6). `bulk` is still ignored (its upgrades are Break-Infinity-era);
+/// `lastTick` is transient timer phase (an absolute timestamp in the original; an
+/// elapsed-time accumulator for us) reset to 0 on load.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutobuyerDTO {
@@ -204,6 +203,10 @@ pub struct AutobuyerDTO {
     pub is_bought: bool,
     /// Original `AUTOBUYER_MODE` (`1` = single, `10` = buy-10/max).
     pub mode: i64,
+    /// Current tick interval in ms (reduced by interval upgrades).
+    pub interval: f64,
+    /// IP cost of the next interval upgrade (a plain number).
+    pub cost: f64,
 }
 
 /// `player.options` — UI/UX preferences (modelled subset).
@@ -348,11 +351,16 @@ impl GameState {
             ab.is_active = src.is_active;
             ab.is_bought = src.is_bought;
             ab.mode = autobuyer_mode_from_raw(src.mode)?;
+            // Interval-upgrade state round-trips (Feature 2.6).
+            ab.interval_ms = src.interval;
+            ab.cost = src.cost;
         }
         // The tickspeed autobuyer's mode is locked to single pre-Infinity for us,
-        // so only its active/bought flags are taken from the save.
+        // so only its active/bought flags (and interval-upgrade state) are taken.
         autobuyers.tickspeed.is_active = dto.auto.tickspeed.is_active;
         autobuyers.tickspeed.is_bought = dto.auto.tickspeed.is_bought;
+        autobuyers.tickspeed.interval_ms = dto.auto.tickspeed.interval;
+        autobuyers.tickspeed.cost = dto.auto.tickspeed.cost;
 
         // Options: numeric values must be in range — we reject rather than clamp.
         // Notation is the one intentional exception: a name we don't model (the

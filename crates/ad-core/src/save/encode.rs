@@ -148,19 +148,23 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     confirmations["sacrifice"] = json!(state.options.confirmations.sacrifice);
     confirmations["bigCrunch"] = json!(state.options.confirmations.big_crunch);
 
-    // Autobuyers. Intervals/timers are the original's derived state — we leave the
-    // template's values and only write the flags/modes we model (§4.4).
+    // Autobuyers. `lastTick`/`bulk` stay the template's derived state; we write the
+    // flags/modes plus the interval-upgrade state (interval + IP cost, Feature 2.6).
     player["auto"]["autobuyersOn"] = json!(state.autobuyers.enabled);
     for (tier, ab) in state.autobuyers.dimensions.iter().enumerate() {
         let entry = &mut player["auto"]["antimatterDims"]["all"][tier];
         entry["isActive"] = json!(ab.is_active);
         entry["isBought"] = json!(ab.is_bought);
         entry["mode"] = json!(mode_to_raw(ab.mode));
+        entry["interval"] = json!(ab.interval_ms);
+        entry["cost"] = json!(ab.cost);
     }
     let tickspeed = &mut player["auto"]["tickspeed"];
     tickspeed["isActive"] = json!(state.autobuyers.tickspeed.is_active);
     tickspeed["isBought"] = json!(state.autobuyers.tickspeed.is_bought);
     tickspeed["mode"] = json!(mode_to_raw(state.autobuyers.tickspeed.mode));
+    tickspeed["interval"] = json!(state.autobuyers.tickspeed.interval_ms);
+    tickspeed["cost"] = json!(state.autobuyers.tickspeed.cost);
 }
 
 /// A `Decimal` as the JSON string the original stores (`Decimal::toJSON =
@@ -283,6 +287,23 @@ mod tests {
         assert_eq!(reloaded.chall3_pow, Decimal::from_float(1234.5));
         assert_eq!(reloaded.matter, Decimal::new(1.0, 200));
         assert_eq!(reloaded.chall8_total_sacrifice, Decimal::new(2.5, 50));
+    }
+
+    #[test]
+    fn autobuyer_interval_upgrades_round_trip() {
+        // Interval-upgrade state (interval + IP cost) survives encode → decode,
+        // for both AD tiers and the tickspeed autobuyer.
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.autobuyers.dimensions[0].interval_ms = 108.0;
+        state.autobuyers.dimensions[0].cost = 8.0;
+        state.autobuyers.tickspeed.interval_ms = 180.0;
+        state.autobuyers.tickspeed.cost = 4.0;
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.autobuyers.dimensions[0].interval_ms, 108.0);
+        assert_eq!(reloaded.autobuyers.dimensions[0].cost, 8.0);
+        assert_eq!(reloaded.autobuyers.tickspeed.interval_ms, 180.0);
+        assert_eq!(reloaded.autobuyers.tickspeed.cost, 4.0);
     }
 
     #[test]

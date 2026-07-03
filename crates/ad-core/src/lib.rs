@@ -19,7 +19,7 @@ pub mod tickspeed;
 pub mod tutorial;
 
 pub use action::{Action, ActionOutcome};
-pub use autobuyers::{Autobuyer, AutobuyerMode, AutobuyerState};
+pub use autobuyers::{Autobuyer, AutobuyerMode, AutobuyerState, AutobuyerTarget};
 pub use break_infinity::Decimal;
 pub use challenges::{NormalChallengeState, NORMAL_CHALLENGE_COUNT};
 pub use infinity_upgrades::{

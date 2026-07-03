@@ -20,12 +20,32 @@ pub enum AutobuyerMode {
     BuyMax,
 }
 
+/// A handle to any single autobuyer, for a uniform toggle/upgrade API across the
+/// AD, Tickspeed (and later Dim Boost / Galaxy / Big Crunch) autobuyers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutobuyerTarget {
+    /// One of the 8 Antimatter Dimension autobuyers (0-indexed tier).
+    AdTier(usize),
+    /// The Tickspeed autobuyer.
+    Tickspeed,
+}
+
+/// The 100 ms floor an autobuyer's interval can be reduced to. Reaching it is
+/// `hasMaxedInterval`; the Big Crunch autobuyer hitting it is what unlocks Break
+/// Infinity (Feature 2.3).
+pub const AUTOBUYER_MIN_INTERVAL_MS: f64 = 100.0;
+
+/// Each interval upgrade multiplies the interval by this factor (floored at
+/// [`AUTOBUYER_MIN_INTERVAL_MS`]) and doubles the IP cost.
+const INTERVAL_UPGRADE_FACTOR: f64 = 0.6;
+
 /// State for a single autobuyer.
 ///
-/// Pre-Infinity, an autobuyer must first be unlocked (`is_bought`) by clicking
-/// its purchase box once the antimatter requirement is met — unlocking costs no
-/// antimatter. `interval_ms` is fixed pre-Infinity (interval upgrades cost
-/// Infinity Points and are not modelled yet).
+/// Pre-Infinity, an autobuyer is unlocked either by antimatter (`is_bought`, once
+/// the requirement is met — no antimatter is spent) or by completing its Normal
+/// Challenge (`can_be_upgraded`, which additionally lets its `interval_ms` be
+/// reduced with Infinity Points, down to the 100 ms floor). See the interval-
+/// upgrade methods on [`GameState`].
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Autobuyer {
@@ -35,10 +55,23 @@ pub struct Autobuyer {
     pub is_active: bool,
     /// Purchase mode (single or max).
     pub mode: AutobuyerMode,
-    /// Interval between purchases in milliseconds.
+    /// Interval between purchases in milliseconds. Starts at the tier's base and
+    /// is reduced by interval upgrades toward [`AUTOBUYER_MIN_INTERVAL_MS`].
     pub interval_ms: f64,
+    /// Infinity-Point cost of the next interval upgrade (JS `data.cost`, a plain
+    /// number); starts at 1 and doubles per upgrade. Stays small (≤ 2^15 or so,
+    /// since the interval floors after ~15 upgrades), so an `f64` matching the
+    /// save's number form is exact.
+    #[cfg_attr(feature = "serde", serde(default = "default_autobuyer_cost"))]
+    pub cost: f64,
     /// Current timer tracking elapsed time since the last purchase.
     pub timer_ms: f64,
+}
+
+/// serde default for [`Autobuyer::cost`] (1 IP), since `f64`'s `Default` is 0.
+#[cfg(feature = "serde")]
+fn default_autobuyer_cost() -> f64 {
+    1.0
 }
 
 impl Autobuyer {
@@ -48,8 +81,14 @@ impl Autobuyer {
             is_active: true,
             mode,
             interval_ms,
+            cost: 1.0,
             timer_ms: 0.0,
         }
+    }
+
+    /// Whether the interval is at its 100 ms floor (JS `hasMaxedInterval`).
+    pub fn has_maxed_interval(&self) -> bool {
+        self.interval_ms <= AUTOBUYER_MIN_INTERVAL_MS
     }
 
     /// Advance the timer by `dt_ms`. Returns true if the autobuyer should fire
@@ -199,6 +238,72 @@ impl GameState {
         }
     }
 
+    /// The [`Autobuyer`] addressed by `target`.
+    pub fn autobuyer(&self, target: AutobuyerTarget) -> &Autobuyer {
+        match target {
+            AutobuyerTarget::AdTier(tier) => &self.autobuyers.dimensions[tier],
+            AutobuyerTarget::Tickspeed => &self.autobuyers.tickspeed,
+        }
+    }
+
+    fn autobuyer_mut(&mut self, target: AutobuyerTarget) -> &mut Autobuyer {
+        match target {
+            AutobuyerTarget::AdTier(tier) => &mut self.autobuyers.dimensions[tier],
+            AutobuyerTarget::Tickspeed => &mut self.autobuyers.tickspeed,
+        }
+    }
+
+    /// The Normal Challenge whose completion makes `target` interval-upgradeable
+    /// (`canBeUpgraded`): AD tier `n` → NC`n`, Tickspeed → NC9.
+    fn autobuyer_challenge(target: AutobuyerTarget) -> u8 {
+        match target {
+            AutobuyerTarget::AdTier(tier) => tier as u8 + 1,
+            AutobuyerTarget::Tickspeed => 9,
+        }
+    }
+
+    /// Whether `target`'s interval can be reduced with Infinity Points — i.e. its
+    /// Normal Challenge is completed (JS `canBeUpgraded`).
+    pub fn autobuyer_can_be_upgraded(&self, target: AutobuyerTarget) -> bool {
+        self.challenge_completed(Self::autobuyer_challenge(target))
+    }
+
+    /// Whether `target` runs at all (JS `isUnlocked`): unlocked by antimatter
+    /// (`is_bought`) or by completing its challenge (`can_be_upgraded`).
+    pub fn autobuyer_is_unlocked(&self, target: AutobuyerTarget) -> bool {
+        self.autobuyer(target).is_bought || self.autobuyer_can_be_upgraded(target)
+    }
+
+    /// Whether `target`'s interval is already at the 100 ms floor.
+    pub fn autobuyer_has_maxed_interval(&self, target: AutobuyerTarget) -> bool {
+        self.autobuyer(target).has_maxed_interval()
+    }
+
+    /// Reduce `target`'s interval one step, spending its Infinity-Point cost.
+    /// Requires the autobuyer to be challenge-upgradeable, not already at the
+    /// floor, and affordable. Mirrors `upgradeInterval`: `cost ×2`,
+    /// `interval = max(interval × 0.6, 100)`. Returns whether it happened.
+    ///
+    /// (Achievements 52/53 fire here in the original but have their own unlock
+    /// conditions; they are wired with the achievements integration, not forced.)
+    pub fn upgrade_autobuyer_interval(&mut self, target: AutobuyerTarget) -> bool {
+        if !self.autobuyer_can_be_upgraded(target)
+            || self.autobuyer_has_maxed_interval(target)
+        {
+            return false;
+        }
+        let cost = Decimal::from_float(self.autobuyer(target).cost);
+        if self.infinity_points < cost {
+            return false;
+        }
+        self.infinity_points -= cost;
+        let ab = self.autobuyer_mut(target);
+        ab.cost *= 2.0;
+        ab.interval_ms =
+            (ab.interval_ms * INTERVAL_UPGRADE_FACTOR).max(AUTOBUYER_MIN_INTERVAL_MS);
+        true
+    }
+
     /// Advance all autobuyers by `dt_ms` and execute any triggered purchases.
     /// Does nothing if autobuyers are globally disabled.
     pub fn tick_autobuyers(&mut self, dt_ms: f64) {
@@ -233,5 +338,93 @@ impl GameState {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data::constants::BIG_CRUNCH_THRESHOLD;
+
+    /// Complete NC1 (the tutorial) via the first Big Crunch, so the 1st AD
+    /// autobuyer becomes interval-upgradeable.
+    fn game_with_nc1_done() -> GameState {
+        let mut game = GameState::new();
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        game.big_crunch();
+        assert!(game.challenge_completed(1));
+        game
+    }
+
+    #[test]
+    fn interval_upgrade_requires_challenge_completion() {
+        let mut game = GameState::new();
+        let target = AutobuyerTarget::AdTier(0);
+        game.infinity_points = Decimal::from_float(100.0);
+
+        // NC1 not completed → not upgradeable even with IP.
+        assert!(!game.autobuyer_can_be_upgraded(target));
+        assert!(!game.upgrade_autobuyer_interval(target));
+        assert_eq!(game.autobuyer(target).interval_ms, 500.0);
+
+        // After completing NC1 the interval can be reduced: ×0.6, cost ×2.
+        let mut game = game_with_nc1_done();
+        game.infinity_points = Decimal::from_float(100.0);
+        assert!(game.autobuyer_can_be_upgraded(target));
+        assert!(game.upgrade_autobuyer_interval(target));
+        assert!((game.autobuyer(target).interval_ms - 300.0).abs() < 1e-9);
+        assert_eq!(game.autobuyer(target).cost, 2.0);
+        assert_eq!(game.infinity_points, Decimal::from_float(99.0));
+    }
+
+    #[test]
+    fn interval_upgrade_floors_at_100ms() {
+        let target = AutobuyerTarget::AdTier(0);
+        let mut game = game_with_nc1_done();
+        game.infinity_points = Decimal::from_float(1e9);
+
+        for _ in 0..50 {
+            game.upgrade_autobuyer_interval(target);
+        }
+        assert!(game.autobuyer_has_maxed_interval(target));
+        assert_eq!(
+            game.autobuyer(target).interval_ms,
+            AUTOBUYER_MIN_INTERVAL_MS
+        );
+
+        // Further upgrades are no-ops (no IP spent).
+        let ip = game.infinity_points;
+        assert!(!game.upgrade_autobuyer_interval(target));
+        assert_eq!(game.infinity_points, ip);
+    }
+
+    #[test]
+    fn interval_upgrade_needs_infinity_points() {
+        let target = AutobuyerTarget::AdTier(0);
+        let mut game = game_with_nc1_done();
+        // The crunch awarded exactly 1 IP; the first upgrade (cost 1) spends it.
+        assert_eq!(game.infinity_points, Decimal::ONE);
+        assert!(game.upgrade_autobuyer_interval(target));
+        assert_eq!(game.infinity_points, Decimal::ZERO);
+        // The next upgrade costs 2 but there is no IP left.
+        assert!(!game.upgrade_autobuyer_interval(target));
+    }
+
+    #[test]
+    fn autobuyer_unlocked_by_antimatter_or_challenge() {
+        let mut game = GameState::new();
+        let target = AutobuyerTarget::AdTier(2); // 3rd AD → NC3
+        assert!(!game.autobuyer_is_unlocked(target));
+
+        // Antimatter unlock alone runs the autobuyer but does not allow upgrades.
+        game.autobuyers.dimensions[2].is_bought = true;
+        assert!(game.autobuyer_is_unlocked(target));
+        assert!(!game.autobuyer_can_be_upgraded(target));
+
+        // Challenge completion alone also unlocks it, and enables upgrades.
+        game.autobuyers.dimensions[2].is_bought = false;
+        game.complete_challenge(3);
+        assert!(game.autobuyer_is_unlocked(target));
+        assert!(game.autobuyer_can_be_upgraded(target));
     }
 }
