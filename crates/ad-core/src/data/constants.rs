@@ -132,6 +132,14 @@ pub const AD_AUTOBUYER_REQUIREMENTS: [Decimal; 8] = [
 /// Base interval (ms) for the tickspeed autobuyer. Fixed pre-Infinity.
 pub const TICKSPEED_AUTOBUYER_INTERVAL_MS: f64 = 500.0;
 
+/// Base intervals (ms) for the Dim Boost / Galaxy / Big Crunch autobuyers
+/// (`player.auto.{dimBoost,galaxy,bigCrunch}.interval`). These have no antimatter
+/// "slow version"; they unlock by completing NC10 / NC11 / NC12 and are then
+/// interval-upgradeable with Infinity Points.
+pub const DIM_BOOST_AUTOBUYER_INTERVAL_MS: f64 = 4000.0;
+pub const GALAXY_AUTOBUYER_INTERVAL_MS: f64 = 20000.0;
+pub const BIG_CRUNCH_AUTOBUYER_INTERVAL_MS: f64 = 150000.0;
+
 /// Antimatter required to unlock the tickspeed autobuyer's "slow
 /// version". JS: `antimatterCost = DC.E140`.
 pub const TICKSPEED_AUTOBUYER_REQUIREMENT: Decimal = Decimal::new_unchecked(1.0, 140);

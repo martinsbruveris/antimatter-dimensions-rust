@@ -2,7 +2,9 @@ use break_infinity::Decimal;
 
 use crate::data::constants::{
     AD_AUTOBUYER_INTERVALS_MS, AD_AUTOBUYER_REQUIREMENTS, AUTOMATION_TAB_REQUIREMENT,
-    TICKSPEED_AUTOBUYER_INTERVAL_MS, TICKSPEED_AUTOBUYER_REQUIREMENT,
+    BIG_CRUNCH_AUTOBUYER_INTERVAL_MS, DIM_BOOST_AUTOBUYER_INTERVAL_MS,
+    GALAXY_AUTOBUYER_INTERVAL_MS, TICKSPEED_AUTOBUYER_INTERVAL_MS,
+    TICKSPEED_AUTOBUYER_REQUIREMENT,
 };
 use crate::state::GameState;
 
@@ -28,6 +30,13 @@ pub enum AutobuyerTarget {
     AdTier(usize),
     /// The Tickspeed autobuyer.
     Tickspeed,
+    /// The Dimension Boost autobuyer (unlocked by NC10).
+    DimBoost,
+    /// The Antimatter Galaxy autobuyer (unlocked by NC11).
+    Galaxy,
+    /// The Big Crunch (Infinity) autobuyer (unlocked by NC12) — the one whose
+    /// maxed interval gates Break Infinity.
+    BigCrunch,
 }
 
 /// The 100 ms floor an autobuyer's interval can be reduced to. Reaching it is
@@ -92,10 +101,12 @@ impl Autobuyer {
     }
 
     /// Advance the timer by `dt_ms`. Returns true if the autobuyer should fire
-    /// this step. Does nothing (and never fires) unless the autobuyer is both
-    /// unlocked and active.
+    /// this step. Does nothing (and never fires) while inactive. The *unlocked*
+    /// check lives in the caller ([`GameState::tick_autobuyers`]) via
+    /// `autobuyer_is_unlocked`, since some autobuyers unlock by challenge rather
+    /// than the `is_bought` flag.
     fn advance(&mut self, dt_ms: f64) -> bool {
-        if !self.is_bought || !self.is_active {
+        if !self.is_active {
             return false;
         }
 
@@ -125,6 +136,32 @@ pub struct AutobuyerState {
     /// Autobuyer for tickspeed upgrades. Pre-Infinity its mode is locked to
     /// `BuySingle` (the "Buys max" toggle requires completing a challenge).
     pub tickspeed: Autobuyer,
+    /// Dimension Boost autobuyer (unlocked by completing NC10). No antimatter
+    /// path — `is_bought` stays false; runs off `can_be_upgraded`.
+    #[cfg_attr(feature = "serde", serde(default = "default_dim_boost_autobuyer"))]
+    pub dim_boost: Autobuyer,
+    /// Antimatter Galaxy autobuyer (unlocked by completing NC11).
+    #[cfg_attr(feature = "serde", serde(default = "default_galaxy_autobuyer"))]
+    pub galaxy: Autobuyer,
+    /// Big Crunch autobuyer (unlocked by completing NC12). Its maxed interval
+    /// gates Break Infinity.
+    #[cfg_attr(feature = "serde", serde(default = "default_big_crunch_autobuyer"))]
+    pub big_crunch: Autobuyer,
+}
+
+/// serde defaults for the three challenge-only autobuyers (so an older serialized
+/// `AutobuyerState` still deserializes).
+#[cfg(feature = "serde")]
+fn default_dim_boost_autobuyer() -> Autobuyer {
+    Autobuyer::new(DIM_BOOST_AUTOBUYER_INTERVAL_MS, AutobuyerMode::BuySingle)
+}
+#[cfg(feature = "serde")]
+fn default_galaxy_autobuyer() -> Autobuyer {
+    Autobuyer::new(GALAXY_AUTOBUYER_INTERVAL_MS, AutobuyerMode::BuySingle)
+}
+#[cfg(feature = "serde")]
+fn default_big_crunch_autobuyer() -> Autobuyer {
+    Autobuyer::new(BIG_CRUNCH_AUTOBUYER_INTERVAL_MS, AutobuyerMode::BuySingle)
 }
 
 impl AutobuyerState {
@@ -137,6 +174,19 @@ impl AutobuyerState {
             }),
             tickspeed: Autobuyer::new(
                 TICKSPEED_AUTOBUYER_INTERVAL_MS,
+                AutobuyerMode::BuySingle,
+            ),
+            // The prestige autobuyers have a fixed action (no single/max mode).
+            dim_boost: Autobuyer::new(
+                DIM_BOOST_AUTOBUYER_INTERVAL_MS,
+                AutobuyerMode::BuySingle,
+            ),
+            galaxy: Autobuyer::new(
+                GALAXY_AUTOBUYER_INTERVAL_MS,
+                AutobuyerMode::BuySingle,
+            ),
+            big_crunch: Autobuyer::new(
+                BIG_CRUNCH_AUTOBUYER_INTERVAL_MS,
                 AutobuyerMode::BuySingle,
             ),
         }
@@ -243,6 +293,9 @@ impl GameState {
         match target {
             AutobuyerTarget::AdTier(tier) => &self.autobuyers.dimensions[tier],
             AutobuyerTarget::Tickspeed => &self.autobuyers.tickspeed,
+            AutobuyerTarget::DimBoost => &self.autobuyers.dim_boost,
+            AutobuyerTarget::Galaxy => &self.autobuyers.galaxy,
+            AutobuyerTarget::BigCrunch => &self.autobuyers.big_crunch,
         }
     }
 
@@ -250,15 +303,22 @@ impl GameState {
         match target {
             AutobuyerTarget::AdTier(tier) => &mut self.autobuyers.dimensions[tier],
             AutobuyerTarget::Tickspeed => &mut self.autobuyers.tickspeed,
+            AutobuyerTarget::DimBoost => &mut self.autobuyers.dim_boost,
+            AutobuyerTarget::Galaxy => &mut self.autobuyers.galaxy,
+            AutobuyerTarget::BigCrunch => &mut self.autobuyers.big_crunch,
         }
     }
 
     /// The Normal Challenge whose completion makes `target` interval-upgradeable
-    /// (`canBeUpgraded`): AD tier `n` → NC`n`, Tickspeed → NC9.
+    /// (`canBeUpgraded`): AD tier `n` → NC`n`, Tickspeed → NC9, Dim Boost → NC10,
+    /// Galaxy → NC11, Big Crunch → NC12.
     fn autobuyer_challenge(target: AutobuyerTarget) -> u8 {
         match target {
             AutobuyerTarget::AdTier(tier) => tier as u8 + 1,
             AutobuyerTarget::Tickspeed => 9,
+            AutobuyerTarget::DimBoost => 10,
+            AutobuyerTarget::Galaxy => 11,
+            AutobuyerTarget::BigCrunch => 12,
         }
     }
 
@@ -311,9 +371,10 @@ impl GameState {
             return;
         }
 
-        // Process dimension autobuyers
+        // Antimatter dimension autobuyers.
         for tier in 0..8 {
-            if self.autobuyers.dimensions[tier].advance(dt_ms) {
+            let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::AdTier(tier));
+            if unlocked && self.autobuyers.dimensions[tier].advance(dt_ms) {
                 match self.autobuyers.dimensions[tier].mode {
                     AutobuyerMode::BuySingle => {
                         self.buy_dimension(tier);
@@ -327,8 +388,9 @@ impl GameState {
             }
         }
 
-        // Process tickspeed autobuyer
-        if self.autobuyers.tickspeed.advance(dt_ms) {
+        // Tickspeed autobuyer.
+        let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::Tickspeed);
+        if unlocked && self.autobuyers.tickspeed.advance(dt_ms) {
             match self.autobuyers.tickspeed.mode {
                 AutobuyerMode::BuySingle => {
                     self.buy_tickspeed();
@@ -338,6 +400,35 @@ impl GameState {
                 }
             }
         }
+
+        // Prestige autobuyers (unlocked by completing NC10/11/12). Each fires its
+        // fixed action, which is a no-op when its precondition isn't met — the
+        // original gates the tick on the same `canBeBought`/`canCrunch` conditions.
+        let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost);
+        if unlocked && self.autobuyers.dim_boost.advance(dt_ms) {
+            self.buy_dim_boost();
+        }
+
+        let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy);
+        if unlocked && self.autobuyers.galaxy.advance(dt_ms) {
+            self.buy_galaxy();
+        }
+
+        // Big Crunch: pre-break `willInfinity` is always true, so it crunches as
+        // soon as the goal is reached (`big_crunch` no-ops otherwise).
+        let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch);
+        if unlocked && self.autobuyers.big_crunch.advance(dt_ms) {
+            self.big_crunch();
+        }
+    }
+
+    /// Whether Break Infinity (Feature 2.3) is unlockable: the Big Crunch
+    /// autobuyer is unlocked (NC12 completed) **and** its interval is upgraded to
+    /// the 100 ms floor (`Autobuyer.bigCrunch.hasMaxedInterval`). Feature 2.3
+    /// reads this to reveal the Break Infinity button; exposed here now.
+    pub fn break_infinity_unlockable(&self) -> bool {
+        self.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch)
+            && self.autobuyer_has_maxed_interval(AutobuyerTarget::BigCrunch)
     }
 }
 
@@ -426,5 +517,70 @@ mod tests {
         game.complete_challenge(3);
         assert!(game.autobuyer_is_unlocked(target));
         assert!(game.autobuyer_can_be_upgraded(target));
+    }
+
+    #[test]
+    fn prestige_autobuyers_unlock_by_challenge_completion() {
+        let mut game = GameState::new();
+        for t in [
+            AutobuyerTarget::DimBoost,
+            AutobuyerTarget::Galaxy,
+            AutobuyerTarget::BigCrunch,
+        ] {
+            assert!(!game.autobuyer_is_unlocked(t));
+        }
+
+        game.complete_challenge(10);
+        game.complete_challenge(11);
+        game.complete_challenge(12);
+
+        assert!(game.autobuyer_is_unlocked(AutobuyerTarget::DimBoost));
+        assert!(game.autobuyer_is_unlocked(AutobuyerTarget::Galaxy));
+        assert!(game.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch));
+    }
+
+    #[test]
+    fn dim_boost_autobuyer_boosts_when_possible() {
+        let mut game = GameState::new();
+        game.complete_challenge(10); // unlock the Dim Boost autobuyer
+        game.autobuyers.dim_boost.interval_ms = 100.0;
+        // A satisfiable boost: 20 of the 4th dimension.
+        game.dimensions[3].amount = Decimal::from_float(20.0);
+        assert!(game.can_dim_boost());
+
+        game.tick_autobuyers(150.0);
+        assert_eq!(game.dim_boosts, 1);
+    }
+
+    #[test]
+    fn big_crunch_autobuyer_crunches_when_unlocked_and_at_goal() {
+        let mut game = GameState::new();
+        game.complete_challenge(12); // unlock the Big Crunch autobuyer
+        game.autobuyers.big_crunch.interval_ms = 100.0;
+        game.antimatter = BIG_CRUNCH_THRESHOLD; // at the goal
+        let inf_before = game.infinities;
+
+        game.tick_autobuyers(150.0);
+
+        assert!(game.infinities > inf_before);
+        assert!(game.antimatter < BIG_CRUNCH_THRESHOLD); // reset by the crunch
+    }
+
+    #[test]
+    fn break_infinity_unlockable_requires_nc12_and_maxed_interval() {
+        let mut game = GameState::new();
+        assert!(!game.break_infinity_unlockable());
+
+        // NC12 completed, but the interval is still the 150 s base.
+        game.complete_challenge(12);
+        assert!(!game.break_infinity_unlockable());
+
+        // Max the Big Crunch interval to the 100 ms floor.
+        game.infinity_points = Decimal::from_float(1e9);
+        for _ in 0..50 {
+            game.upgrade_autobuyer_interval(AutobuyerTarget::BigCrunch);
+        }
+        assert!(game.autobuyer_has_maxed_interval(AutobuyerTarget::BigCrunch));
+        assert!(game.break_infinity_unlockable());
     }
 }

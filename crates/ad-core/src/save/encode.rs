@@ -165,6 +165,18 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     tickspeed["mode"] = json!(mode_to_raw(state.autobuyers.tickspeed.mode));
     tickspeed["interval"] = json!(state.autobuyers.tickspeed.interval_ms);
     tickspeed["cost"] = json!(state.autobuyers.tickspeed.cost);
+    // Prestige autobuyers (Dim Boost / Galaxy / Big Crunch): active flag +
+    // interval-upgrade state. Their limit/mode config stays at the template default.
+    for (key, ab) in [
+        ("dimBoost", &state.autobuyers.dim_boost),
+        ("galaxy", &state.autobuyers.galaxy),
+        ("bigCrunch", &state.autobuyers.big_crunch),
+    ] {
+        let entry = &mut player["auto"][key];
+        entry["isActive"] = json!(ab.is_active);
+        entry["interval"] = json!(ab.interval_ms);
+        entry["cost"] = json!(ab.cost);
+    }
 }
 
 /// A `Decimal` as the JSON string the original stores (`Decimal::toJSON =
@@ -304,6 +316,27 @@ mod tests {
         assert_eq!(reloaded.autobuyers.dimensions[0].cost, 8.0);
         assert_eq!(reloaded.autobuyers.tickspeed.interval_ms, 180.0);
         assert_eq!(reloaded.autobuyers.tickspeed.cost, 4.0);
+    }
+
+    #[test]
+    fn prestige_autobuyers_round_trip() {
+        // The Dim Boost / Galaxy / Big Crunch autobuyers' active flag +
+        // interval-upgrade state survive encode → decode.
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.autobuyers.dim_boost.interval_ms = 2400.0;
+        state.autobuyers.dim_boost.cost = 4.0;
+        state.autobuyers.dim_boost.is_active = false;
+        state.autobuyers.galaxy.interval_ms = 12000.0;
+        state.autobuyers.big_crunch.interval_ms = 100.0;
+        state.autobuyers.big_crunch.cost = 32768.0;
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.autobuyers.dim_boost.interval_ms, 2400.0);
+        assert_eq!(reloaded.autobuyers.dim_boost.cost, 4.0);
+        assert!(!reloaded.autobuyers.dim_boost.is_active);
+        assert_eq!(reloaded.autobuyers.galaxy.interval_ms, 12000.0);
+        assert_eq!(reloaded.autobuyers.big_crunch.interval_ms, 100.0);
+        assert_eq!(reloaded.autobuyers.big_crunch.cost, 32768.0);
     }
 
     #[test]

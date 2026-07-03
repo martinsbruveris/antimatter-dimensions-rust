@@ -181,6 +181,26 @@ pub struct AutoDTO {
     pub autobuyers_on: bool,
     pub antimatter_dims: AntimatterDimsDTO,
     pub tickspeed: AutobuyerDTO,
+    /// `player.auto.dimBoost` (NC10 autobuyer). Only the interval-upgrade state +
+    /// active flag are modelled; the limit config is ignored (inert pre-break).
+    pub dim_boost: PrestigeAutobuyerDTO,
+    /// `player.auto.galaxy` (NC11 autobuyer).
+    pub galaxy: PrestigeAutobuyerDTO,
+    /// `player.auto.bigCrunch` (NC12 autobuyer). Its mode/amount/time config is
+    /// ignored (pre-break it always crunches at the goal).
+    pub big_crunch: PrestigeAutobuyerDTO,
+}
+
+/// A Dim Boost / Galaxy / Big Crunch autobuyer entry. These have no antimatter
+/// "slow version" (`isBought`) or single/max `mode`, so we read only the
+/// active flag and interval-upgrade state; the rest of each object (limit config,
+/// crunch mode) is ignored.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrestigeAutobuyerDTO {
+    pub is_active: bool,
+    pub interval: f64,
+    pub cost: f64,
 }
 
 /// `player.auto.antimatterDims` — the `all` array holds the 8 tier autobuyers.
@@ -361,6 +381,17 @@ impl GameState {
         autobuyers.tickspeed.is_bought = dto.auto.tickspeed.is_bought;
         autobuyers.tickspeed.interval_ms = dto.auto.tickspeed.interval;
         autobuyers.tickspeed.cost = dto.auto.tickspeed.cost;
+        // The prestige autobuyers (Dim Boost / Galaxy / Big Crunch): active flag +
+        // interval-upgrade state. They unlock by challenge, not `is_bought`.
+        for (ab, src) in [
+            (&mut autobuyers.dim_boost, &dto.auto.dim_boost),
+            (&mut autobuyers.galaxy, &dto.auto.galaxy),
+            (&mut autobuyers.big_crunch, &dto.auto.big_crunch),
+        ] {
+            ab.is_active = src.is_active;
+            ab.interval_ms = src.interval;
+            ab.cost = src.cost;
+        }
 
         // Options: numeric values must be in range — we reject rather than clamp.
         // Notation is the one intentional exception: a name we don't model (the
