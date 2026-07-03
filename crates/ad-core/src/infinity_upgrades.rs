@@ -335,7 +335,14 @@ impl GameState {
     /// skip level (and give a first Galaxy for `skipResetGalaxy`). Mirrors the
     /// original's `skipResetsIfPossible`; called after each reset and when a skip
     /// upgrade is bought. Only ever raises state.
+    ///
+    /// No-op while a challenge is running: the original guards on
+    /// `Player.isInAntimatterChallenge`, since a challenge run always starts fresh
+    /// (skip-resets and the free Galaxy would defeat the challenge's reset).
     pub fn skip_resets_if_possible(&mut self) {
+        if self.any_challenge_running() {
+            return;
+        }
         if self.infinity_upgrade_bought(InfinityUpgrade::SkipResetGalaxy)
             && self.dim_boosts < 4
         {

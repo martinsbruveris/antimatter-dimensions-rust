@@ -17,6 +17,10 @@ impl GameState {
             self.antimatter -= self.tickspeed.cost;
             self.tickspeed.bought += 1;
             self.tickspeed.cost *= self.tickspeed.cost_multiplier;
+            // Normal Challenge 2: buying a Tickspeed upgrade also halts production.
+            if self.challenge_running(2) {
+                self.chall2_pow = 0.0;
+            }
             true
         } else {
             false

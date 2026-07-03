@@ -72,10 +72,14 @@ impl GameState {
     }
 
     /// Reset the per-run challenge accumulators (`resetChallengeStuff`), run on
-    /// every soft reset (Dimension Boost, Antimatter Galaxy) and Big Crunch. For
-    /// now just NC8's running sacrifice product; NC2/NC3 powers and NC11 matter
-    /// join it in later batches.
+    /// every soft reset (Dimension Boost, Antimatter Galaxy) and Big Crunch:
+    /// NC2's production factor back to full, NC3's 1st-dim multiplier back to its
+    /// weak `0.01` start, NC8's running sacrifice product to `1`, and normal
+    /// matter to `0` (`Currency.matter.reset()`).
     pub(crate) fn reset_challenge_stuff(&mut self) {
+        self.chall2_pow = 1.0;
+        self.chall3_pow = Decimal::from_float(0.01);
+        self.matter = Decimal::ZERO;
         self.chall8_total_sacrifice = Decimal::ONE;
     }
 
@@ -413,5 +417,148 @@ mod tests {
         game.dim_boosts = 6;
         game.dimensions[7].amount = Decimal::from_float(100.0);
         assert!(!game.can_sacrifice());
+    }
+
+    // --- NC2: buying halts production, which recovers over 3 minutes.
+
+    #[test]
+    fn nc2_buying_halts_production_then_recovers() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.start_challenge(2);
+        game.autobuyers.enabled = false;
+        // Starts at full production.
+        assert_eq!(game.chall2_pow, 1.0);
+
+        // Buying a dimension (or tickspeed) halts production.
+        game.antimatter = Decimal::from_float(1e6);
+        assert!(game.buy_dimension(0));
+        assert_eq!(game.chall2_pow, 0.0);
+
+        // Recovers linearly: dt/100/1800 per ms, i.e. full after 3 minutes.
+        game.tick(90_000.0);
+        assert!((game.chall2_pow - 0.5).abs() < 1e-9, "{}", game.chall2_pow);
+        game.tick(90_000.0);
+        assert!((game.chall2_pow - 1.0).abs() < 1e-9, "{}", game.chall2_pow);
+    }
+
+    #[test]
+    fn nc2_scales_all_dimension_production() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.start_challenge(2);
+        game.dimensions[0].amount = Decimal::from_float(100.0);
+        game.dimensions[0].bought = 10;
+
+        let full = game.dimension_production_per_second(0);
+        game.chall2_pow = 0.5;
+        let halved = game.dimension_production_per_second(0);
+        assert!((halved.to_f64() / full.to_f64() - 0.5).abs() < 1e-9);
+    }
+
+    // --- NC3: 1st dimension weakened to ×0.01 but grows exponentially.
+
+    #[test]
+    fn nc3_grows_first_dimension_multiplier() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.start_challenge(3);
+        game.autobuyers.enabled = false;
+        // Starts weak.
+        assert_eq!(game.chall3_pow, Decimal::from_float(0.01));
+
+        // Grows ×1.00038 per 100 ms. After 100 s: 0.01 × 1.00038^1000.
+        game.tick(100_000.0);
+        let expected = Decimal::from_float(0.01 * 1.000_38_f64.powf(1000.0));
+        assert!(
+            (game.chall3_pow.to_f64() / expected.to_f64() - 1.0).abs() < 1e-6,
+            "{:?} vs {:?}",
+            game.chall3_pow,
+            expected
+        );
+    }
+
+    #[test]
+    fn nc3_scales_only_the_first_dimension() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.start_challenge(3);
+        game.dimensions[0].amount = Decimal::from_float(100.0);
+        game.dimensions[0].bought = 10;
+        game.dimensions[1].amount = Decimal::from_float(100.0);
+        game.dimensions[1].bought = 10;
+
+        let ad1_weak = game.dimension_production_per_second(0);
+        let ad2_weak = game.dimension_production_per_second(1);
+        game.chall3_pow = Decimal::ONE;
+        let ad1_strong = game.dimension_production_per_second(0);
+        let ad2_strong = game.dimension_production_per_second(1);
+
+        // AD1 scales by chall3Pow (1.0 / 0.01 = 100×); AD2 is unaffected.
+        assert!((ad1_strong.to_f64() / ad1_weak.to_f64() - 100.0).abs() < 1e-6);
+        assert_eq!(ad2_weak, ad2_strong);
+    }
+
+    // --- NC11: normal matter rises and can annihilate antimatter.
+
+    #[test]
+    fn nc11_matter_rises_only_with_a_second_dimension() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinities = Decimal::from_float(16.0);
+        game.start_challenge(11);
+        game.autobuyers.enabled = false;
+        // Reset to 0 on entry; stays 0 without a 2nd dimension.
+        assert_eq!(game.matter, Decimal::ZERO);
+        game.antimatter = Decimal::from_float(1e100);
+        game.tick(1000.0);
+        assert_eq!(game.matter, Decimal::ZERO);
+
+        // With a 2nd dimension it bumps to 1 and grows above it.
+        game.dimensions[1].amount = Decimal::from_float(5.0);
+        game.tick(1000.0);
+        assert!(game.matter > Decimal::ONE, "{:?}", game.matter);
+    }
+
+    #[test]
+    fn nc11_annihilation_soft_resets_keeping_boosts_and_galaxies() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinities = Decimal::from_float(16.0);
+        game.start_challenge(11);
+        game.autobuyers.enabled = false;
+        game.dim_boosts = 2;
+        game.galaxies = 1;
+        game.dimensions[1].amount = Decimal::from_float(5.0); // AD2 exists
+        game.dimensions[0].amount = Decimal::from_float(50.0);
+        game.dimensions[0].bought = 20;
+        game.tickspeed.bought = 5;
+        // Matter already exceeds a low antimatter, and we cannot Crunch.
+        game.matter = Decimal::from_float(1e6);
+        game.antimatter = Decimal::from_float(100.0);
+
+        game.tick(50.0);
+
+        // Dimensions/tickspeed/antimatter reset; boosts and galaxies preserved.
+        assert_eq!(game.dim_boosts, 2);
+        assert_eq!(game.galaxies, 1);
+        assert_eq!(game.dimensions[0].bought, 0);
+        assert_eq!(game.tickspeed.bought, 0);
+        assert_eq!(game.antimatter, game.starting_antimatter());
+        // resetChallengeStuff zeroes matter.
+        assert_eq!(game.matter, Decimal::ZERO);
+    }
+
+    #[test]
+    fn crunch_resets_challenge_powers_and_matter() {
+        let mut game = GameState::new();
+        game.chall2_pow = 0.3;
+        game.chall3_pow = Decimal::from_float(5.0);
+        game.matter = Decimal::from_float(1e10);
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+        assert_eq!(game.chall2_pow, 1.0);
+        assert_eq!(game.chall3_pow, Decimal::from_float(0.01));
+        assert_eq!(game.matter, Decimal::ZERO);
     }
 }

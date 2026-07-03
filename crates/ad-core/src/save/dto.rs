@@ -86,6 +86,14 @@ pub struct PlayerDTO {
     /// string in the save). See `sacrifice.rs`.
     #[serde(with = "break_infinity::serde_string")]
     pub chall8_total_sacrifice: Decimal,
+    /// `player.chall2Pow` — NC2's production factor (a plain number in the save).
+    pub chall2_pow: f64,
+    /// `player.chall3Pow` — NC3's 1st-dimension multiplier (a Decimal string).
+    #[serde(with = "break_infinity::serde_string")]
+    pub chall3_pow: Decimal,
+    /// `player.matter` — normal matter for NC11 (a Decimal string).
+    #[serde(with = "break_infinity::serde_string")]
+    pub matter: Decimal,
 }
 
 /// `player.challenge` — only the `normal` sub-object is modelled (infinity /
@@ -406,6 +414,9 @@ impl GameState {
                 completed: dto.challenge.normal.completed_bits,
             },
             chall8_total_sacrifice: dto.chall8_total_sacrifice,
+            chall2_pow: dto.chall2_pow,
+            chall3_pow: dto.chall3_pow,
+            matter: dto.matter,
             infinity_unlocked,
             records,
             achievement_bits,

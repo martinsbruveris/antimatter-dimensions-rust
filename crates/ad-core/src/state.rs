@@ -17,10 +17,24 @@ fn default_true() -> bool {
 }
 
 /// serde default for `Decimal` fields whose neutral value is `1` (e.g.
-/// `chall8_total_sacrifice`), since `Decimal`'s own `Default` is `0`.
+/// `chall8_total_sacrifice`, `matter`), since `Decimal`'s own `Default` is `0`.
 #[cfg(feature = "serde")]
 fn default_decimal_one() -> Decimal {
     Decimal::ONE
+}
+
+/// serde default for `chall2_pow` (`1` = full production), since `f64`'s own
+/// `Default` is `0`.
+#[cfg(feature = "serde")]
+fn default_f64_one() -> f64 {
+    1.0
+}
+
+/// serde default for `chall3_pow` — NC3's 1st-dimension multiplier starts at
+/// `0.01` (`player.chall3Pow` default).
+#[cfg(feature = "serde")]
+fn default_chall3_pow() -> Decimal {
+    Decimal::from_float(0.01)
 }
 
 /// A single antimatter dimension tier.
@@ -143,6 +157,27 @@ pub struct GameState {
     /// [`reset_challenge_stuff`](GameState::reset_challenge_stuff). See `sacrifice.rs`.
     #[cfg_attr(feature = "serde", serde(default = "default_decimal_one"))]
     pub chall8_total_sacrifice: Decimal,
+    /// Normal-Challenge-2 production factor (`player.chall2Pow`, a plain number in
+    /// `[0, 1]`). NC2 halts all Antimatter Dimension production on any AD/tickspeed
+    /// purchase (set to 0) and recovers linearly to 1 over 3 minutes. `1` = full
+    /// production. Advanced in `tick`, reset by [`reset_challenge_stuff`]
+    /// (GameState::reset_challenge_stuff). See `tick.rs` / `dimensions.rs`.
+    #[cfg_attr(feature = "serde", serde(default = "default_f64_one"))]
+    pub chall2_pow: f64,
+    /// Normal-Challenge-3 first-dimension multiplier (`player.chall3Pow`). NC3
+    /// weakens AD1 to ×0.01 but grows this multiplier exponentially over time
+    /// (×1.00038 per 100 ms), uncapped up to `Number.MAX_VALUE`. Reset to `0.01`
+    /// by [`reset_challenge_stuff`](GameState::reset_challenge_stuff) (i.e. after
+    /// Dimension Boosts and Galaxies). See `tick.rs` / `dimensions.rs`.
+    #[cfg_attr(feature = "serde", serde(default = "default_chall3_pow"))]
+    pub chall3_pow: Decimal,
+    /// Normal-matter amount (`Currency.matter` / `player.matter`). Rises under
+    /// Normal Challenge 11 once a 2nd Antimatter Dimension exists; if it exceeds
+    /// antimatter (and you cannot yet Crunch) it annihilates — a Dimension-Boost-
+    /// style soft reset with no boost. `reset_challenge_stuff` resets it to `0`
+    /// (`Currency.matter.reset()`). See `tick.rs`.
+    #[cfg_attr(feature = "serde", serde(default = "default_decimal_one"))]
+    pub matter: Decimal,
     /// Whether the player has performed at least one Big Crunch. Mirrors JS
     /// `PlayerProgress.infinityUnlocked()`: set on the first crunch and
     /// **not** reset by subsequent crunches. Gates Infinity-related UI (e.g.
@@ -198,6 +233,9 @@ impl GameState {
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),
             chall8_total_sacrifice: Decimal::ONE,
+            chall2_pow: 1.0,
+            chall3_pow: Decimal::from_float(0.01),
+            matter: Decimal::ONE,
             infinity_unlocked: false,
             records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],

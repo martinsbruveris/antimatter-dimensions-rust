@@ -160,7 +160,11 @@ impl GameState {
 
     /// Perform a dimension boost reset: reset antimatter and
     /// all dimensions. Tickspeed and galaxies are kept.
-    fn dim_boost_reset(&mut self) {
+    ///
+    /// This is the shared "soft reset that keeps boosts and galaxies"
+    /// (`softReset(0, true, true)`); NC11's matter annihilation reuses it (a
+    /// Dimension Boost that grants no boost level).
+    pub(crate) fn dim_boost_reset(&mut self) {
         self.antimatter = self.starting_antimatter();
         self.sacrificed = Decimal::ZERO;
 

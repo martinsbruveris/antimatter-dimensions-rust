@@ -91,8 +91,13 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // Normal-challenge run state.
     player["challenge"]["normal"]["current"] = json!(state.challenge.current);
     player["challenge"]["normal"]["completedBits"] = json!(state.challenge.completed);
-    // NC8's running sacrifice product (a Decimal string in the save schema).
+    // Per-run challenge accumulators: NC8's running sacrifice product, NC2's
+    // production factor (a plain number), NC3's 1st-dim multiplier, and NC11
+    // normal matter (Decimal strings).
     player["chall8TotalSacrifice"] = decimal(&state.chall8_total_sacrifice);
+    player["chall2Pow"] = json!(state.chall2_pow);
+    player["chall3Pow"] = decimal(&state.chall3_pow);
+    player["matter"] = decimal(&state.matter);
 
     // Time / infinity records. `records.totalAntimatter` is written above; here we
     // add the time and infinity-timing slice.
@@ -259,6 +264,23 @@ mod tests {
             assert_eq!(reloaded.autobuyers.enabled, state.autobuyers.enabled);
             assert_eq!(reloaded.options, state.options);
         }
+    }
+
+    #[test]
+    fn challenge_accumulators_round_trip() {
+        // The per-run challenge accumulators survive encode → decode: chall2Pow
+        // as a plain number, chall3Pow / matter / chall8TotalSacrifice as Decimals.
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.chall2_pow = 0.375;
+        state.chall3_pow = Decimal::from_float(1234.5);
+        state.matter = Decimal::new(1.0, 200);
+        state.chall8_total_sacrifice = Decimal::new(2.5, 50);
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.chall2_pow, 0.375);
+        assert_eq!(reloaded.chall3_pow, Decimal::from_float(1234.5));
+        assert_eq!(reloaded.matter, Decimal::new(1.0, 200));
+        assert_eq!(reloaded.chall8_total_sacrifice, Decimal::new(2.5, 50));
     }
 
     #[test]

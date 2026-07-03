@@ -13,6 +13,11 @@ impl GameState {
     /// Production chain: AD[n+1] produces AD[n], AD1 produces antimatter.
     /// All production is scaled by the dimension's multiplier and tickspeed effect.
     pub fn tick(&mut self, dt_ms: f64) {
+        // Advance the per-run challenge accumulators first, matching the original
+        // game loop (`updateNormalAndInfinityChallenges` runs before autobuyers
+        // and production).
+        self.update_challenges(dt_ms);
+
         // Run autobuyers before production
         self.tick_autobuyers(dt_ms);
 
@@ -78,6 +83,49 @@ impl GameState {
         // Advance the tutorial highlight if the next step's condition now holds
         // (mirrors the original's game-loop-driven `tutorialLoop`).
         self.tutorial_loop();
+    }
+
+    /// Advance the per-run challenge accumulators (`updateNormalAndInfinityChallenges`):
+    /// NC11 matter growth (and its annihilation soft reset), NC3's exponential
+    /// 1st-dimension multiplier, and NC2's linear production recovery. Called at
+    /// the top of [`tick`](Self::tick), before autobuyers and production. A no-op
+    /// unless the corresponding challenge is running.
+    fn update_challenges(&mut self, dt_ms: f64) {
+        // NC11: normal matter rises once a 2nd Antimatter Dimension exists; if it
+        // overtakes antimatter (and you cannot yet Crunch) it annihilates.
+        if self.challenge_running(11) {
+            if self.dimensions[1].amount != Decimal::ZERO {
+                // `Currency.matter.bumpTo(1)` — never let it drop below 1 here.
+                self.matter = self.matter.max(&Decimal::ONE);
+                // Caps are the values reached at ~1e308 IP.
+                let capped_base = 1.03
+                    + (self.dim_boosts.min(400) as f64) / 200.0
+                    + (self.galaxies.min(100) as f64) / 100.0;
+                let growth = Decimal::from_float(capped_base)
+                    .pow(&Decimal::from_float(dt_ms / 20.0));
+                // The `Currency.matter` setter clamps to Number.MAX_VALUE.
+                self.matter = (self.matter * growth).min(&BIG_CRUNCH_THRESHOLD);
+            }
+            if self.matter > self.antimatter && !self.can_big_crunch() {
+                // Annihilation: a Dimension-Boost-style soft reset that grants no
+                // boost (`softReset(0, true, true)`), keeping boosts and galaxies.
+                self.dim_boost_reset();
+            }
+        }
+
+        // NC3: the 1st dimension's exponential multiplier grows ×1.00038 per
+        // 100 ms, uncapped up to Number.MAX_VALUE.
+        if self.challenge_running(3) {
+            let growth =
+                Decimal::from_float(1.000_38).pow(&Decimal::from_float(dt_ms / 100.0));
+            self.chall3_pow = (self.chall3_pow * growth).min(&BIG_CRUNCH_THRESHOLD);
+        }
+
+        // NC2: production recovers linearly to full (1) over 3 minutes since the
+        // last AD/tickspeed purchase (which resets it to 0).
+        if self.challenge_running(2) {
+            self.chall2_pow = (self.chall2_pow + dt_ms / 100.0 / 1800.0).min(1.0);
+        }
     }
 
     /// Advance the game by `repeats` discrete steps of `dt_ms` each.

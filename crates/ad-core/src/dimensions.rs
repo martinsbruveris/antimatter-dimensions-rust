@@ -39,6 +39,12 @@ impl GameState {
     /// the exactly-99 eighth-dimension achievement (23), and the over-1e150
     /// first-dimension achievement (28).
     fn on_buy_dimension(&mut self, tier: usize) {
+        // Normal Challenge 2: any Antimatter Dimension purchase halts production
+        // (resets the recovering `chall2Pow` factor to 0).
+        if self.challenge_running(2) {
+            self.chall2_pow = 0.0;
+        }
+
         // 11–18: buy a 1st..8th Antimatter Dimension (tier is 0-indexed).
         self.unlock_achievement(11 + tier as u16);
         // 23: have exactly 99 eighth dimensions (only buying AD8 can reach it).
@@ -170,7 +176,19 @@ impl GameState {
         let amount = self.dimensions[tier].amount;
         let multiplier = self.dimension_multiplier(tier);
         let tickspeed_effect = self.tickspeed_effect();
+        let mut production = amount * multiplier * tickspeed_effect;
 
-        amount * multiplier * tickspeed_effect
+        // Normal Challenge 2 halts all production by the recovering `chall2Pow`
+        // factor (0 right after a purchase, back to 1 over 3 minutes).
+        if self.challenge_running(2) {
+            production *= Decimal::from_float(self.chall2_pow);
+        }
+        // Normal Challenge 3 multiplies the 1st dimension by its uncapped
+        // exponential `chall3Pow` (which also weakens it to ×0.01 at the start).
+        if tier == 0 && self.challenge_running(3) {
+            production *= self.chall3_pow;
+        }
+
+        production
     }
 }
