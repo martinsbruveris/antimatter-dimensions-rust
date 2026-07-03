@@ -122,14 +122,18 @@ Start/Running/Completed button, and the unlock hint. `start_infinity_challenge(i
 
 ## 6. Incremental plan
 
-1. **State machine + goal/cap generalisation + IC1 composition**: the
-   `InfinityChallengeState`, unlock/start/exit/complete, `infinity_goal`,
-   `in_any_antimatter_challenge`, `challenge_running` IC1 composition, save/load.
-   NC modifiers now compose under IC1. Tests. Commit.
-2. **Per-IC modifiers + rewards** (batches): IC3/IC7 (simple), IC4/IC8 (production +
-   `postC4Tier`/`lastBuyTime`), IC2 (sacrifice + auto), IC5 (cost bumps), IC6
-   (matter). ID-targeting rewards (IC1, IC6) stubbed. Tests. Commit(s).
-3. **UI**: the Infinity Challenges subtab. Commit.
+1. ✅ **State machine + goal/cap generalisation + IC1 composition** (part 1).
+2. ✅ **Per-IC modifiers + rewards** (part 2): IC3 (tickspeed + static mult), IC4
+   (`^0.25`/`^1.05` powers + `post_c4_tier`), IC5 (cost bumps + galaxy/requirement
+   reward), IC6 (matter divide), IC7 (no galaxy + dim-boost power), IC8 (decay +
+   `last_buy_time_ms`), IC2 (auto-sacrifice + stronger-sacrifice formula).
+3. ✅ **UI** (part 3): the Challenges → Infinity Challenges subtab (8 tiles,
+   start/exit), snapshot `infinity_challenges[]` + `start_infinity_challenge`.
+
+**Feature 2.7 is complete**, save the deferred rewards: IC1 and IC6 reward
+Infinity Dimensions (wired in 3.1), and the IC8 reward (AD 2–7 from AD1×AD8) is a
+niche late-game multiplier left for a follow-up. All are purchasable/persisted and
+their restrictions fully active.
 
 ---
 

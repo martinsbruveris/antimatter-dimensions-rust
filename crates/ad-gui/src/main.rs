@@ -11,7 +11,7 @@ use ad_core::{
     offline_plan as core_offline_plan, AutobuyerMode, AutobuyerTarget,
     BreakInfinityRebuyable, BreakInfinityUpgrade, Decimal, GameState, InfinityUpgrade,
     ALL_BREAK_INFINITY_REBUYABLES, ALL_BREAK_INFINITY_UPGRADES, ALL_INFINITY_UPGRADES,
-    NORMAL_CHALLENGE_COUNT,
+    INFINITY_CHALLENGE_COUNT, NORMAL_CHALLENGE_COUNT,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
@@ -140,6 +140,19 @@ struct ChallengeView {
     is_completed: bool,
 }
 
+/// Serializable view of a single Infinity Challenge tile.
+#[derive(Serialize)]
+struct InfinityChallengeView {
+    /// Challenge id (1..=8).
+    id: u8,
+    /// Whether it is unlocked (peak antimatter this eternity ≥ its unlockAM).
+    is_unlocked: bool,
+    /// Whether it is the challenge currently running.
+    is_running: bool,
+    /// Whether it has been completed.
+    is_completed: bool,
+}
+
 /// Serializable view of the Break Infinity tab (12 upgrades).
 #[derive(Serialize)]
 struct BreakInfinityView {
@@ -209,6 +222,10 @@ struct GameView {
     challenges_unlocked: bool,
     /// The 12 Normal Challenges, for the Challenges tab.
     challenges: Vec<ChallengeView>,
+    /// Whether any Infinity Challenge is unlocked (the IC subtab gate).
+    infinity_challenges_unlocked: bool,
+    /// The 8 Infinity Challenges, for the Challenges tab.
+    infinity_challenges: Vec<InfinityChallengeView>,
     tickspeed_cost: Num,
     tickspeed_bought: u64,
     tickspeed_effect: Num,
@@ -432,6 +449,19 @@ fn build_challenges_view(game: &GameState) -> Vec<ChallengeView> {
         .collect()
 }
 
+/// Build the Infinity Challenges view (all 8, in id order). Descriptions/goals
+/// live frontend-side, keyed on the id.
+fn build_infinity_challenges_view(game: &GameState) -> Vec<InfinityChallengeView> {
+    (1..=INFINITY_CHALLENGE_COUNT)
+        .map(|id| InfinityChallengeView {
+            id,
+            is_unlocked: game.infinity_challenge_unlocked(id),
+            is_running: game.infinity_challenge_running(id),
+            is_completed: game.infinity_challenge_completed(id),
+        })
+        .collect()
+}
+
 /// Build the Break Infinity view (the 9 one-time + 3 rebuyable upgrades). Static
 /// per-upgrade display data (descriptions) lives frontend-side, keyed on the id.
 fn build_break_infinity_view(game: &GameState) -> BreakInfinityView {
@@ -542,6 +572,8 @@ fn build_game_view(game: &GameState) -> GameView {
         infinity_upgrades: build_infinity_upgrades_view(game),
         challenges_unlocked: game.challenges_unlocked(),
         challenges: build_challenges_view(game),
+        infinity_challenges_unlocked: game.infinity_challenges_unlocked(),
+        infinity_challenges: build_infinity_challenges_view(game),
         tickspeed_cost: num(tickspeed_cost),
         tickspeed_bought: game.tickspeed.bought,
         tickspeed_effect: num(&game.tickspeed_effect()),
@@ -785,11 +817,18 @@ fn start_challenge(id: u8, state: State<'_, Mutex<GameState>>) {
     game.start_challenge(id);
 }
 
-/// Exit the current Normal Challenge (a no-op if none is running).
+/// Exit the current challenge (Normal or Infinity; a no-op if none is running).
 #[tauri::command]
 fn exit_challenge(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.exit_challenge();
+}
+
+/// Start Infinity Challenge `id` (1..=8); a no-op if it can't be started.
+#[tauri::command]
+fn start_infinity_challenge(id: u8, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.start_infinity_challenge(id);
 }
 
 /// Resets the current save slot to a fresh state (the "HARD RESET" option) and
@@ -1295,6 +1334,7 @@ pub fn run() {
             buy_infinity_upgrade,
             start_challenge,
             exit_challenge,
+            start_infinity_challenge,
             hard_reset,
             unlock_ad_autobuyer,
             toggle_ad_autobuyer,

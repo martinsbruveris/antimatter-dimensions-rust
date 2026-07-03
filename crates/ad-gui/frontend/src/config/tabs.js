@@ -2,6 +2,7 @@ import AntimatterDimensionsTab from "../components/tabs/AntimatterDimensionsTab.
 import InfinityUpgradesTab from "../components/tabs/InfinityUpgradesTab.vue";
 import BreakInfinityTab from "../components/tabs/BreakInfinityTab.vue";
 import ChallengesTab from "../components/tabs/ChallengesTab.vue";
+import InfinityChallengesTab from "../components/tabs/InfinityChallengesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
@@ -61,6 +62,14 @@ export const TABS = [
     condition: (s) => Boolean(s?.challenges_unlocked),
     subtabs: [
       { key: "normal", name: "Challenges", symbol: "<i class='fas fa-fist-raised'></i>", component: ChallengesTab },
+      // Infinity Challenges: appear once any is unlocked (needs Break Infinity).
+      {
+        key: "infinity",
+        name: "Infinity Challenges",
+        symbol: "<i class='fas fa-infinity'></i>",
+        component: InfinityChallengesTab,
+        condition: (s) => Boolean(s?.infinity_challenges_unlocked),
+      },
     ],
   },
   {

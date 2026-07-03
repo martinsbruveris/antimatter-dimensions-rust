@@ -153,9 +153,15 @@ export const useGameStore = defineStore("game", {
       useUiStore().setSubtab("dimensions", "antimatter");
       return invoke("start_challenge", { id });
     },
-    // Exit the current Normal Challenge.
+    // Exit the current challenge (Normal or Infinity).
     exitChallenge() {
       return invoke("exit_challenge");
+    },
+    // Start Infinity Challenge `id` (a forced Big Crunch that also breaks Infinity,
+    // then enter). Navigates to the Antimatter Dimensions tab.
+    startInfinityChallenge(id) {
+      useUiStore().setSubtab("dimensions", "antimatter");
+      return invoke("start_infinity_challenge", { id });
     },
     // --- Confirmation-gated requests ---
     // Each click handler routes through one of these: if the matching
