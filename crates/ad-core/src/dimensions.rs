@@ -217,6 +217,10 @@ impl GameState {
         // matter divide).
         mult *= self.infinity_challenge_common_mult();
 
+        // Infinity Power (from the Infinity Dimensions) gives an `^7` all-tier
+        // multiplier (`infinityPower.pow(powerConversionRate).max(1)`).
+        mult *= self.infinity_power_ad_multiplier();
+
         // `applyNDMultipliers` clamps the multiplier to >= 1 (so e.g. IC6's divide
         // and a tiny `totalTimeMult` cannot push it below the base)...
         let mult = mult.max(&Decimal::ONE);

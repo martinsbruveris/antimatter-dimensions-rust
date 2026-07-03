@@ -29,6 +29,7 @@ use crate::autobuyers::{AutobuyerMode, AutobuyerState};
 use crate::break_infinity_upgrades::BreakInfinityUpgrade;
 use crate::challenges::NormalChallengeState;
 use crate::infinity_challenges::InfinityChallengeState;
+use crate::infinity_dimensions::{InfinityDimension, INFINITY_DIMENSION_COUNT};
 use crate::infinity_upgrades::InfinityUpgrade;
 use crate::options::{
     Confirmations, Options, MAX_AUTOSAVE_INTERVAL_MS, MAX_NOTATION_DIGITS,
@@ -70,6 +71,9 @@ pub struct PlayerDTO {
     pub infinities: Decimal,
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_points: Decimal,
+    /// `player.infinityPower` — produced by the Infinity Dimensions.
+    #[serde(with = "break_infinity::serde_string")]
+    pub infinity_power: Decimal,
     /// `player.infinityUpgrades` — owned Infinity Upgrades **and** the one-time
     /// Break Infinity Upgrades (they share this string set), by original id.
     /// Unmodelled ids are ignored on load.
@@ -133,10 +137,24 @@ pub struct NormalChallengeDTO {
     pub completed_bits: u16,
 }
 
-/// `player.dimensions` — only the `antimatter` array is modelled.
+/// `player.dimensions` — the `antimatter` and `infinity` arrays.
 #[derive(Debug, Clone, Deserialize)]
 pub struct DimensionsDTO {
     pub antimatter: Vec<DimensionDTO>,
+    pub infinity: Vec<InfinityDimensionDTO>,
+}
+
+/// One entry of `player.dimensions.infinity[]` (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InfinityDimensionDTO {
+    #[serde(with = "break_infinity::serde_string")]
+    pub amount: Decimal,
+    #[serde(with = "break_infinity::serde_string")]
+    pub cost: Decimal,
+    /// `10 × purchases`.
+    pub base_amount: u64,
+    pub is_unlocked: bool,
 }
 
 /// One entry of `player.dimensions.antimatter[]`.
@@ -330,6 +348,22 @@ impl GameState {
             amount: dims[tier].amount,
             bought: dims[tier].bought,
             cost_bumps: dims[tier].cost_bumps,
+        });
+
+        // The 8 infinity dimensions are likewise fixed-length.
+        let inf_dims = &dto.dimensions.infinity;
+        if inf_dims.len() != INFINITY_DIMENSION_COUNT {
+            return Err(SaveError::UnexpectedArrayLength {
+                field: "dimensions.infinity",
+                expected: INFINITY_DIMENSION_COUNT,
+                found: inf_dims.len(),
+            });
+        }
+        let infinity_dimensions = std::array::from_fn(|tier| InfinityDimension {
+            amount: inf_dims[tier].amount,
+            base_amount: inf_dims[tier].base_amount,
+            cost: inf_dims[tier].cost,
+            is_unlocked: inf_dims[tier].is_unlocked,
         });
 
         // `player.break` is the Break-Infinity flag. Infinity-*unlocked* (has
@@ -526,6 +560,8 @@ impl GameState {
             broke_infinity,
             break_infinity_upgrades,
             infinity_rebuyables,
+            infinity_dimensions,
+            infinity_power: dto.infinity_power,
             records,
             achievement_bits,
             tutorial_state: dto.tutorial_state,

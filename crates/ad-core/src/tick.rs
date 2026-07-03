@@ -76,6 +76,10 @@ impl GameState {
             self.antimatter = goal;
         }
 
+        // Infinity Dimensions produce Infinity Power (which feeds the AD multiplier
+        // on the next tick).
+        self.tick_infinity_dimensions(dt_ms);
+
         // Advance time records. Pre-Infinity the game-speed multiplier is 1, so
         // game time and real time both advance by `dt_ms` (mirrors the original's
         // `records.totalTimePlayed += diff` in the game loop). Runs during offline

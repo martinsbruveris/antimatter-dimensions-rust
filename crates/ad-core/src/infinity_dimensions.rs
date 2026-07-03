@@ -1,0 +1,328 @@
+//! Infinity Dimensions (Feature 3.1): 8 tiers bought with Infinity Points that
+//! produce Infinity Power — an `^7` multiplier to every Antimatter Dimension. IDs
+//! persist across a Big Crunch (only their `amount` and the Infinity Power reset);
+//! a full reset waits for Eternity. See `design-docs/2026-07-03-infinity-dimensions.md`.
+
+use break_infinity::Decimal;
+
+use crate::state::GameState;
+
+/// Number of infinity dimension tiers.
+pub const INFINITY_DIMENSION_COUNT: usize = 8;
+
+/// `thisEternity.maxAM` needed to unlock each tier (0-indexed).
+const ID_UNLOCK_AM: [Decimal; 8] = [
+    Decimal::new_unchecked(1.0, 1100),
+    Decimal::new_unchecked(1.0, 1900),
+    Decimal::new_unchecked(1.0, 2400),
+    Decimal::new_unchecked(1.0, 10500),
+    Decimal::new_unchecked(1.0, 30000),
+    Decimal::new_unchecked(1.0, 45000),
+    Decimal::new_unchecked(1.0, 54000),
+    Decimal::new_unchecked(1.0, 60000),
+];
+
+/// Base IP cost of each tier (0-indexed).
+const ID_BASE_COST: [Decimal; 8] = [
+    Decimal::new_unchecked(1.0, 8),
+    Decimal::new_unchecked(1.0, 9),
+    Decimal::new_unchecked(1.0, 10),
+    Decimal::new_unchecked(1.0, 20),
+    Decimal::new_unchecked(1.0, 140),
+    Decimal::new_unchecked(1.0, 200),
+    Decimal::new_unchecked(1.0, 250),
+    Decimal::new_unchecked(1.0, 280),
+];
+
+/// IP cost multiplier per purchase (0-indexed).
+const ID_COST_MULT: [f64; 8] = [1e3, 1e6, 1e8, 1e10, 1e15, 1e20, 1e25, 1e30];
+
+/// Production multiplier granted per 10 owned (per purchase), 0-indexed.
+const ID_POWER_MULT: [f64; 8] = [50.0, 30.0, 10.0, 5.0, 5.0, 5.0, 5.0, 5.0];
+
+/// IP required for the tier-1 unlock, in addition to the antimatter requirement
+/// (`hasIPUnlock`, pre-Eternity).
+const ID1_IP_REQUIREMENT: Decimal = Decimal::new_unchecked(1.0, 8);
+
+/// Purchase hardcap for tiers 1–7 (tier 8 is uncapped). Each purchase is 10 IDs.
+const ID_PURCHASE_CAP: u64 = 2_000_000;
+
+/// The Antimatter-Dimension multiplier exponent applied to Infinity Power
+/// (`InfinityDimensions.powerConversionRate`, pre-glyphs).
+const POWER_CONVERSION_RATE: f64 = 7.0;
+
+/// One infinity dimension tier's mutable state.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct InfinityDimension {
+    /// Current amount (grows from higher-tier production; reset to `base_amount` on
+    /// a Big Crunch).
+    pub amount: Decimal,
+    /// `10 × purchases` — the bought base. Persists across a Big Crunch. Drives the
+    /// per-tier multiplier (`powerMultiplier^(base_amount/10)`).
+    pub base_amount: u64,
+    /// Next-purchase IP cost. Persists across a Big Crunch.
+    pub cost: Decimal,
+    /// Whether the tier is unlocked. Persists across a Big Crunch.
+    pub is_unlocked: bool,
+}
+
+impl InfinityDimension {
+    /// A fresh tier (0-indexed): locked, unbought, at its base cost.
+    pub fn new(tier: usize) -> Self {
+        Self {
+            amount: Decimal::ZERO,
+            base_amount: 0,
+            cost: ID_BASE_COST[tier],
+            is_unlocked: false,
+        }
+    }
+
+    /// Number of purchases made (each gives 10 IDs).
+    pub fn purchases(&self) -> u64 {
+        self.base_amount / 10
+    }
+}
+
+impl GameState {
+    /// The purchase cap for tier `t` (uncapped for tier 8).
+    fn id_purchase_cap(tier: usize) -> u64 {
+        if tier == 7 {
+            u64::MAX
+        } else {
+            ID_PURCHASE_CAP
+        }
+    }
+
+    /// Whether tier `t` is at its purchase cap.
+    pub fn id_is_capped(&self, tier: usize) -> bool {
+        self.infinity_dimensions[tier].purchases() >= Self::id_purchase_cap(tier)
+    }
+
+    /// Whether tier `t` can be unlocked now: peak antimatter this eternity has
+    /// reached its requirement (and, for tier 1, enough Infinity Points).
+    pub fn can_unlock_infinity_dimension(&self, tier: usize) -> bool {
+        if self.infinity_dimensions[tier].is_unlocked {
+            return false;
+        }
+        let am_ok = self.records.max_am_this_eternity >= ID_UNLOCK_AM[tier];
+        let ip_ok = tier != 0 || self.infinity_points >= ID1_IP_REQUIREMENT;
+        am_ok && ip_ok
+    }
+
+    /// Unlock tier `t` if its requirements are met. Returns whether it is unlocked
+    /// afterwards.
+    pub fn unlock_infinity_dimension(&mut self, tier: usize) -> bool {
+        if self.infinity_dimensions[tier].is_unlocked {
+            return true;
+        }
+        if !self.can_unlock_infinity_dimension(tier) {
+            return false;
+        }
+        self.infinity_dimensions[tier].is_unlocked = true;
+        true
+    }
+
+    /// Whether tier `t` can be bought now (unlocked, affordable, not capped).
+    pub fn id_available_for_purchase(&self, tier: usize) -> bool {
+        let d = &self.infinity_dimensions[tier];
+        d.is_unlocked && self.infinity_points >= d.cost && !self.id_is_capped(tier)
+    }
+
+    /// Buy one purchase (10 IDs) of tier `t` — or unlock it first if it is locked.
+    /// Returns whether anything happened.
+    pub fn buy_infinity_dimension(&mut self, tier: usize) -> bool {
+        if !self.infinity_dimensions[tier].is_unlocked {
+            return self.unlock_infinity_dimension(tier);
+        }
+        if !self.id_available_for_purchase(tier) {
+            return false;
+        }
+        let cost = self.infinity_dimensions[tier].cost;
+        self.infinity_points -= cost;
+        let mult = Decimal::from_float(ID_COST_MULT[tier]);
+        let d = &mut self.infinity_dimensions[tier];
+        d.cost = (cost * mult).round();
+        d.amount += Decimal::from_float(10.0);
+        d.base_amount += 10;
+        true
+    }
+
+    /// Buy as many purchases of tier `t` as affordable, up to the cap.
+    pub fn buy_max_infinity_dimension(&mut self, tier: usize) -> u64 {
+        // Unlock first if needed.
+        if !self.infinity_dimensions[tier].is_unlocked {
+            self.unlock_infinity_dimension(tier);
+        }
+        let mut count = 0;
+        while self.buy_infinity_dimension(tier) {
+            count += 1;
+        }
+        count
+    }
+
+    /// Buy-max every Infinity Dimension (the "Max All" affordance).
+    pub fn buy_max_all_infinity_dimensions(&mut self) {
+        for tier in 0..INFINITY_DIMENSION_COUNT {
+            self.buy_max_infinity_dimension(tier);
+        }
+    }
+
+    /// The all-tier Infinity-Dimension multiplier: the completed IC1 reward
+    /// (`×1.3^(IC completed count)`) and IC6 reward (`tickspeed_per_second^0.0005`).
+    /// (The achievement/time-study/Replicanti terms are later features.)
+    pub fn id_common_multiplier(&self) -> Decimal {
+        let mut mult = Decimal::ONE;
+        if self.infinity_challenge_completed(1) {
+            let completed = (1..=8u8)
+                .filter(|&id| self.infinity_challenge_completed(id))
+                .count();
+            mult *= Decimal::from_float(1.3_f64.powi(completed as i32));
+        }
+        if self.infinity_challenge_completed(6) {
+            mult *= self.tickspeed_effect().pow(&Decimal::from_float(0.0005));
+        }
+        mult
+    }
+
+    /// Tier `t`'s production multiplier: `commonMult × powerMultiplier^purchases`.
+    pub fn id_multiplier(&self, tier: usize) -> Decimal {
+        let purchases = self.infinity_dimensions[tier].purchases();
+        self.id_common_multiplier()
+            * Decimal::from_float(ID_POWER_MULT[tier]).pow(&Decimal::from(purchases))
+    }
+
+    /// Tier `t`'s production per second (`amount × multiplier`).
+    pub fn id_production_per_second(&self, tier: usize) -> Decimal {
+        let d = &self.infinity_dimensions[tier];
+        if !d.is_unlocked {
+            return Decimal::ZERO;
+        }
+        d.amount * self.id_multiplier(tier)
+    }
+
+    /// The Antimatter-Dimension multiplier from Infinity Power:
+    /// `infinity_power ^ 7`, clamped to ≥ 1. Read in `dimension_multiplier`.
+    pub fn infinity_power_ad_multiplier(&self) -> Decimal {
+        self.infinity_power
+            .pow(&Decimal::from_float(POWER_CONVERSION_RATE))
+            .max(&Decimal::ONE)
+    }
+
+    /// Advance Infinity Dimension production: each tier feeds the tier below
+    /// (`diff/10`), and the 1st tier produces Infinity Power (`diff`). Mirrors
+    /// `InfinityDimensions.tick`.
+    pub fn tick_infinity_dimensions(&mut self, dt_ms: f64) {
+        let dt_s = dt_ms / 1000.0;
+        let prod: [Decimal; 8] =
+            std::array::from_fn(|t| self.id_production_per_second(t));
+
+        let dt10 = Decimal::from_float(dt_s / 10.0);
+        for tier in (1..INFINITY_DIMENSION_COUNT).rev() {
+            self.infinity_dimensions[tier - 1].amount += prod[tier] * dt10;
+        }
+        self.infinity_power += prod[0] * Decimal::from_float(dt_s);
+    }
+
+    /// Big-Crunch reset for Infinity Dimensions: Infinity Power → 0 and each tier's
+    /// `amount` → its `base_amount` (purchases/cost/unlock persist). Mirrors
+    /// `InfinityDimensions.resetAmount`.
+    pub(crate) fn reset_infinity_dimension_amounts(&mut self) {
+        self.infinity_power = Decimal::ZERO;
+        for d in self.infinity_dimensions.iter_mut() {
+            d.amount = Decimal::from(d.base_amount);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data::constants::BIG_CRUNCH_THRESHOLD;
+
+    fn game_with_id1_unlockable() -> GameState {
+        let mut game = GameState::new();
+        game.records.max_am_this_eternity = Decimal::new(1.0, 1100);
+        game.infinity_points = Decimal::new(1.0, 12);
+        game
+    }
+
+    #[test]
+    fn id1_requires_antimatter_and_ip_to_unlock() {
+        let mut game = GameState::new();
+        game.infinity_points = Decimal::new(1.0, 12);
+        // Antimatter requirement not yet met.
+        assert!(!game.can_unlock_infinity_dimension(0));
+        game.records.max_am_this_eternity = Decimal::new(1.0, 1100);
+        assert!(game.can_unlock_infinity_dimension(0));
+        // Without the 1e8 IP, tier 1 stays locked.
+        game.infinity_points = Decimal::new(1.0, 7);
+        assert!(!game.can_unlock_infinity_dimension(0));
+    }
+
+    #[test]
+    fn buying_unlocks_then_purchases_in_tens() {
+        let mut game = game_with_id1_unlockable();
+        // First buy unlocks.
+        assert!(game.buy_infinity_dimension(0));
+        assert!(game.infinity_dimensions[0].is_unlocked);
+        assert_eq!(game.infinity_dimensions[0].base_amount, 0);
+
+        // Next buy spends 1e8 IP and grants 10 IDs; cost ×1e3.
+        let ip_before = game.infinity_points;
+        assert!(game.buy_infinity_dimension(0));
+        assert_eq!(game.infinity_dimensions[0].base_amount, 10);
+        assert_eq!(
+            game.infinity_dimensions[0].amount,
+            Decimal::from_float(10.0)
+        );
+        assert_eq!(game.infinity_points, ip_before - Decimal::new(1.0, 8));
+        assert_eq!(game.infinity_dimensions[0].cost, Decimal::new(1.0, 11)); // 1e8×1e3
+    }
+
+    #[test]
+    fn id_multiplier_scales_with_purchases() {
+        let mut game = game_with_id1_unlockable();
+        game.buy_infinity_dimension(0); // unlock
+        game.infinity_points = Decimal::new(1.0, 40);
+        game.buy_infinity_dimension(0); // 1 purchase
+        game.buy_infinity_dimension(0); // 2 purchases
+                                        // powerMultiplier 50 ^ 2 purchases.
+        assert_eq!(game.id_multiplier(0), Decimal::from_float(50.0 * 50.0));
+    }
+
+    #[test]
+    fn id1_produces_infinity_power_which_boosts_ads() {
+        let mut game = game_with_id1_unlockable();
+        game.buy_infinity_dimension(0); // unlock
+        game.buy_infinity_dimension(0); // 10 IDs
+        assert_eq!(game.infinity_power, Decimal::ZERO);
+
+        game.tick_infinity_dimensions(1000.0);
+        assert!(game.infinity_power > Decimal::ZERO);
+        // Infinity Power gives an AD multiplier ≥ 1.
+        assert!(game.infinity_power_ad_multiplier() >= Decimal::ONE);
+    }
+
+    #[test]
+    fn crunch_resets_power_and_amount_but_keeps_purchases() {
+        let mut game = game_with_id1_unlockable();
+        game.buy_infinity_dimension(0); // unlock
+        game.buy_infinity_dimension(0); // 10 IDs, base_amount 10
+        game.tick_infinity_dimensions(1000.0); // grow power + (nothing feeds ID1)
+        game.infinity_power = Decimal::from_float(1e5);
+        game.infinity_dimensions[0].amount = Decimal::from_float(1e9);
+
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+
+        // Power reset; amount back to the bought base; purchases/unlock kept.
+        assert_eq!(game.infinity_power, Decimal::ZERO);
+        assert_eq!(
+            game.infinity_dimensions[0].amount,
+            Decimal::from_float(10.0)
+        );
+        assert_eq!(game.infinity_dimensions[0].base_amount, 10);
+        assert!(game.infinity_dimensions[0].is_unlocked);
+    }
+}

@@ -143,6 +143,16 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // NC9 tickspeed cost bumps.
     player["chall9TickspeedCostBumps"] = json!(state.tickspeed.cost_bumps);
 
+    // Infinity Dimensions + Infinity Power.
+    player["infinityPower"] = decimal(&state.infinity_power);
+    for (tier, d) in state.infinity_dimensions.iter().enumerate() {
+        let entry = &mut player["dimensions"]["infinity"][tier];
+        entry["amount"] = decimal(&d.amount);
+        entry["cost"] = decimal(&d.cost);
+        entry["baseAmount"] = json!(d.base_amount);
+        entry["isUnlocked"] = json!(d.is_unlocked);
+    }
+
     // Options.
     let options = &mut player["options"];
     options["hotkeys"] = json!(state.options.hotkeys);
@@ -313,6 +323,26 @@ mod tests {
         assert_eq!(reloaded.chall3_pow, Decimal::from_float(1234.5));
         assert_eq!(reloaded.matter, Decimal::new(1.0, 200));
         assert_eq!(reloaded.chall8_total_sacrifice, Decimal::new(2.5, 50));
+    }
+
+    #[test]
+    fn infinity_dimensions_round_trip() {
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.infinity_power = Decimal::new(1.0, 50);
+        state.infinity_dimensions[0].is_unlocked = true;
+        state.infinity_dimensions[0].base_amount = 40;
+        state.infinity_dimensions[0].amount = Decimal::from_float(1234.5);
+        state.infinity_dimensions[0].cost = Decimal::new(1.0, 20);
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.infinity_power, Decimal::new(1.0, 50));
+        assert!(reloaded.infinity_dimensions[0].is_unlocked);
+        assert_eq!(reloaded.infinity_dimensions[0].base_amount, 40);
+        assert_eq!(
+            reloaded.infinity_dimensions[0].amount,
+            Decimal::from_float(1234.5)
+        );
+        assert_eq!(reloaded.infinity_dimensions[0].cost, Decimal::new(1.0, 20));
     }
 
     #[test]

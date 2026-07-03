@@ -7,6 +7,7 @@ use crate::data::constants::{
     INITIAL_ANTIMATTER, TICKSPEED_BASE_COST, TICKSPEED_COST_MULTIPLIER,
 };
 use crate::infinity_challenges::InfinityChallengeState;
+use crate::infinity_dimensions::InfinityDimension;
 use crate::options::Options;
 use crate::records::Records;
 
@@ -42,6 +43,12 @@ fn default_chall3_pow() -> Decimal {
 #[cfg(feature = "serde")]
 fn default_post_c4_tier() -> u8 {
     1
+}
+
+/// serde default for `infinity_dimensions` (8 fresh, locked tiers).
+#[cfg(feature = "serde")]
+fn default_infinity_dimensions() -> [InfinityDimension; 8] {
+    std::array::from_fn(InfinityDimension::new)
 }
 
 /// A single antimatter dimension tier.
@@ -247,6 +254,16 @@ pub struct GameState {
     /// (`player.infinityRebuyables`): `[tickspeedCostMult, dimCostMult, ipGen]`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinity_rebuyables: [u32; 3],
+    /// The 8 Infinity Dimensions (bought with IP, produce Infinity Power). Their
+    /// purchases/cost/unlock persist across a Big Crunch; the `amount` resets. See
+    /// `infinity_dimensions.rs`.
+    #[cfg_attr(feature = "serde", serde(default = "default_infinity_dimensions"))]
+    pub infinity_dimensions: [InfinityDimension; 8],
+    /// Infinity Power (`Currency.infinityPower`): produced by the 1st Infinity
+    /// Dimension, gives an `^7` multiplier to all Antimatter Dimensions; reset on a
+    /// Big Crunch.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub infinity_power: Decimal,
     /// Time and prestige records (total time played, this/best infinity). Mirrors
     /// the modelled slice of `player.records`. Advanced in `tick`; the current
     /// infinity's records reset on a Big Crunch. See [`Records`].
@@ -306,6 +323,8 @@ impl GameState {
             broke_infinity: false,
             break_infinity_upgrades: 0,
             infinity_rebuyables: [0; 3],
+            infinity_dimensions: std::array::from_fn(InfinityDimension::new),
+            infinity_power: Decimal::ZERO,
             records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],
             tutorial_state: 0,

@@ -8,6 +8,7 @@ pub mod data;
 pub mod dimensions;
 pub mod galaxy;
 pub mod infinity_challenges;
+pub mod infinity_dimensions;
 pub mod infinity_upgrades;
 pub mod observed;
 pub mod options;
@@ -29,6 +30,7 @@ pub use break_infinity_upgrades::{
 };
 pub use challenges::{NormalChallengeState, NORMAL_CHALLENGE_COUNT};
 pub use infinity_challenges::{InfinityChallengeState, INFINITY_CHALLENGE_COUNT};
+pub use infinity_dimensions::{InfinityDimension, INFINITY_DIMENSION_COUNT};
 pub use infinity_upgrades::{
     InfinityUpgrade, ALL_INFINITY_UPGRADES, INFINITY_UPGRADE_COUNT,
 };

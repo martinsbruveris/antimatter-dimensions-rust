@@ -152,6 +152,9 @@ impl GameState {
         // Reset the per-run challenge accumulators (`secondSoftReset` → `softReset`
         // → `resetChallengeStuff`).
         self.reset_challenge_stuff();
+        // Reset Infinity Power and each Infinity Dimension's amount to its bought
+        // base (`InfinityDimensions.resetAmount`); purchases/cost/unlock persist.
+        self.reset_infinity_dimension_amounts();
         // Re-apply skip-reset Infinity Upgrades (original `secondSoftReset` →
         // `softReset` → `skipResetsIfPossible`): start the next infinity already at
         // the highest owned skip level (and with a Galaxy for skipResetGalaxy).
