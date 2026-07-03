@@ -122,6 +122,98 @@ impl GameState {
             self.infinity_challenge.completed |= 1u16 << id;
         }
     }
+
+    // --- Effect readers (per the original's `InfinityChallenge(N)` sites) ------
+
+    /// Whether Tickspeed is neutralised (its production effect → 1): IC3 while
+    /// running (`getTickSpeedMultiplier` returns 1). Read in `tickspeed_effect`.
+    pub(crate) fn ic3_neutralizes_tickspeed(&self) -> bool {
+        self.infinity_challenge_running(3)
+    }
+
+    /// The all-tier Antimatter Dimension multiplier from Infinity Challenges,
+    /// folded into `antimatterDimensionCommonMultiplier`:
+    /// - IC3 static `(1.05 + galaxies·0.005)^totalTickBought` (applied once while
+    ///   running and again as the IC3 completion reward — the original multiplies
+    ///   both effects);
+    /// - IC8 production decay `0.8446303389034288^(time − lastBuyTime)` while
+    ///   running;
+    /// - divided by IC6's rising `matter` (≥ 1) while running.
+    pub(crate) fn infinity_challenge_common_mult(&self) -> Decimal {
+        let mut mult = Decimal::ONE;
+
+        if self.infinity_challenge_running(3) || self.infinity_challenge_completed(3) {
+            let base = Decimal::from_float(1.05 + self.galaxies as f64 * 0.005)
+                .pow(&Decimal::from(self.tickspeed.bought));
+            if self.infinity_challenge_running(3) {
+                mult *= base;
+            }
+            if self.infinity_challenge_completed(3) {
+                mult *= base;
+            }
+        }
+
+        if self.infinity_challenge_running(8) {
+            let elapsed_ms = (self.records.this_infinity.time_ms
+                - self.records.this_infinity.last_buy_time_ms)
+                .max(0.0);
+            mult *= Decimal::from_float(0.844_630_338_903_428_8)
+                .pow(&Decimal::from_float(elapsed_ms));
+        }
+
+        if self.infinity_challenge_running(6) {
+            mult /= self.matter.max(&Decimal::ONE);
+        }
+
+        mult
+    }
+
+    /// The power applied to a dimension's *final* multiplier (0-indexed `tier`),
+    /// from `applyNDPowers`: IC4 weakens every dimension except the last-bought one
+    /// to `^0.25` while running, and (as its reward) raises all to `^1.05` once
+    /// completed.
+    pub(crate) fn infinity_challenge_mult_power(&self, tier: usize) -> f64 {
+        let mut power = 1.0;
+        if self.infinity_challenge_running(4) && self.post_c4_tier as usize != tier + 1 {
+            power *= 0.25;
+        }
+        if self.infinity_challenge_completed(4) {
+            power *= 1.05;
+        }
+        power
+    }
+
+    /// Extra reduction to the Dimension-Boost and Antimatter-Galaxy requirements
+    /// from a completed IC5 (`−1`, in addition to the `resetBoost` upgrade).
+    pub(crate) fn ic5_requirement_reduction(&self) -> u64 {
+        if self.infinity_challenge_completed(5) {
+            1
+        } else {
+            0
+        }
+    }
+
+    /// IC5 `multiplyIC5Costs`, triggered by completing a group of 10 of dimension
+    /// `src_tier` (0-indexed): buying AD1–4 raises the cost of every strictly
+    /// *cheaper* dimension, buying AD5–8 raises every strictly *pricier* one.
+    pub(crate) fn ic5_bump_costs_from_dimension(&mut self, src_tier: usize) {
+        let src_cost = self.dimension_cost(src_tier);
+        let src_is_low = src_tier <= 3; // 1-indexed tiers 1..4
+        for t in 0..8 {
+            if t == src_tier {
+                continue;
+            }
+            let cost = self.dimension_cost(t);
+            let bump = if src_is_low {
+                cost < src_cost
+            } else {
+                cost > src_cost
+            };
+            if bump {
+                self.dimensions[t].cost_bumps += 1;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -181,5 +273,46 @@ mod tests {
         assert!(game.challenge_running(8));
         assert!(!game.challenge_running(9));
         assert!(!game.challenge_running(12));
+    }
+
+    #[test]
+    fn ic3_neutralizes_tickspeed_and_grants_static_mult() {
+        let mut game = GameState::new();
+        game.records.max_am_this_eternity = Decimal::new(1.0, 12000);
+        game.start_infinity_challenge(3);
+        game.tickspeed.bought = 10;
+        game.galaxies = 2;
+        // Tickspeed's production effect is neutralised to ×1.
+        assert_eq!(game.tickspeed_effect(), Decimal::ONE);
+        // The static AD multiplier is (1.05 + 2×0.005)^10 = 1.06^10.
+        let expected = 1.06_f64.powi(10);
+        let mult = game.infinity_challenge_common_mult().to_f64();
+        assert!((mult / expected - 1.0).abs() < 1e-9, "{mult} vs {expected}");
+    }
+
+    #[test]
+    fn ic7_disables_galaxies_and_boosts_dim_boost_power() {
+        let mut game = GameState::new();
+        game.records.max_am_this_eternity = Decimal::new(1.0, 23000);
+        game.start_infinity_challenge(7);
+        game.dimensions[7].amount = Decimal::from_float(1e9);
+        assert!(!game.can_buy_galaxy());
+        // Base Dim-Boost power raised to ×10 while running.
+        assert_eq!(game.dim_boost_power(), Decimal::from_float(10.0));
+        // Completed (not running): floored at ×4.
+        game.exit_challenge();
+        game.complete_infinity_challenge(7);
+        assert_eq!(game.dim_boost_power(), Decimal::from_float(4.0));
+    }
+
+    #[test]
+    fn ic4_weakens_all_but_the_latest_dimension() {
+        let mut game = GameState::new();
+        game.records.max_am_this_eternity = Decimal::new(1.0, 14000);
+        game.start_infinity_challenge(4);
+        game.post_c4_tier = 3; // the 3rd AD (index 2) is the last bought
+        assert_eq!(game.infinity_challenge_mult_power(2), 1.0);
+        assert_eq!(game.infinity_challenge_mult_power(0), 0.25);
+        assert_eq!(game.infinity_challenge_mult_power(7), 0.25);
     }
 }

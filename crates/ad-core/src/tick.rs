@@ -145,6 +145,16 @@ impl GameState {
         if self.challenge_running(2) {
             self.chall2_pow = (self.chall2_pow + dt_ms / 100.0 / 1800.0).min(1.0);
         }
+
+        // IC2: a Dimensional Sacrifice fires automatically every 400 ms (once an
+        // 8th dimension exists; `sacrifice` no-ops otherwise).
+        if self.infinity_challenge_running(2) {
+            self.ic2_count += dt_ms;
+            if self.ic2_count >= 400.0 {
+                self.sacrifice();
+                self.ic2_count %= 400.0;
+            }
+        }
     }
 
     /// Advance the game by `repeats` discrete steps of `dt_ms` each.

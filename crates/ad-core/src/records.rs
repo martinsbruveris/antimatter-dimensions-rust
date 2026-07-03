@@ -30,6 +30,11 @@ pub struct ThisInfinity {
     /// Maximum antimatter reached during this infinity. Mirrors
     /// `player.records.thisInfinity.maxAM`; drives the post-break IP formula.
     pub max_am: Decimal,
+    /// Game time (ms) of the most recent AD/Tickspeed purchase this infinity
+    /// (`player.records.thisInfinity.lastBuyTime`). Under Infinity Challenge 8,
+    /// AD production decays with `time - lastBuyTime`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub last_buy_time_ms: f64,
 }
 
 impl ThisInfinity {
@@ -38,6 +43,7 @@ impl ThisInfinity {
             time_ms: 0.0,
             real_time_ms: 0.0,
             max_am: Decimal::ZERO,
+            last_buy_time_ms: 0.0,
         }
     }
 }

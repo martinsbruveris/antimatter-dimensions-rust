@@ -219,17 +219,25 @@ impl GameState {
         mult
     }
 
-    /// The Dimension-Boost power: `2`, or `2.5` once `dimboostMult` is owned
-    /// (original `DimBoost.power = Effects.max(2, dimboostMult=2.5, …)`). Normal
-    /// Challenge 8 overrides it to `1` — Dimension Boosts give no multiplier.
+    /// The Dimension-Boost power (`DimBoost.power = Effects.max(2, dimboostMult=2.5,
+    /// IC7.reward=4, IC7=10, …)`): `2` base, `2.5` with the `dimboostMult` Infinity
+    /// Upgrade, `4` once Infinity Challenge 7 is completed, and `10` while IC7 runs.
+    /// Normal Challenge 8 overrides it to `1` (Dimension Boosts give no multiplier).
     pub fn dim_boost_power(&self) -> Decimal {
         if self.challenge_running(8) {
-            Decimal::ONE
-        } else if self.infinity_upgrade_bought(InfinityUpgrade::DimboostMult) {
-            Decimal::from_float(2.5)
-        } else {
-            Decimal::from_float(DIM_BOOST_MULTIPLIER)
+            return Decimal::ONE;
         }
+        let mut power = DIM_BOOST_MULTIPLIER;
+        if self.infinity_upgrade_bought(InfinityUpgrade::DimboostMult) {
+            power = power.max(2.5);
+        }
+        if self.infinity_challenge_completed(7) {
+            power = power.max(4.0);
+        }
+        if self.infinity_challenge_running(7) {
+            power = power.max(10.0);
+        }
+        Decimal::from_float(power)
     }
 
     /// The galaxy-strength effect that scales the tickspeed formula's per-galaxy
@@ -242,7 +250,13 @@ impl GameState {
             } else {
                 1.0
             };
-        infinity_boost * self.break_infinity_galaxy_boost()
+        // Infinity Challenge 5's reward makes all Galaxies 10% stronger.
+        let ic5 = if self.infinity_challenge_completed(5) {
+            1.1
+        } else {
+            1.0
+        };
+        infinity_boost * self.break_infinity_galaxy_boost() * ic5
     }
 
     /// Amount subtracted from the Dimension-Boost and Antimatter-Galaxy

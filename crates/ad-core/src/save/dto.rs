@@ -374,6 +374,9 @@ impl GameState {
                 time_ms: dto.records.this_infinity.time,
                 real_time_ms: dto.records.this_infinity.real_time,
                 max_am: dto.records.this_infinity.max_am,
+                // Transient IC8 decay timer: start it at the current time on load so
+                // production isn't spuriously decayed before the next purchase.
+                last_buy_time_ms: dto.records.this_infinity.time,
             },
             best_infinity: BestInfinity {
                 time_ms: dto.records.best_infinity.time,
@@ -511,6 +514,10 @@ impl GameState {
                 current: dto.challenge.infinity.current,
                 completed: dto.challenge.infinity.completed_bits,
             },
+            // Transient per-run challenge counters (re-established on the next
+            // purchase / tick); defaulted rather than round-tripped.
+            post_c4_tier: 1,
+            ic2_count: 0.0,
             chall8_total_sacrifice: dto.chall8_total_sacrifice,
             chall2_pow: dto.chall2_pow,
             chall3_pow: dto.chall3_pow,

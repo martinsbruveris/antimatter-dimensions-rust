@@ -38,6 +38,12 @@ fn default_chall3_pow() -> Decimal {
     Decimal::from_float(0.01)
 }
 
+/// serde default for `post_c4_tier` (`1`, `player.postC4Tier` default).
+#[cfg(feature = "serde")]
+fn default_post_c4_tier() -> u8 {
+    1
+}
+
 /// A single antimatter dimension tier.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -180,6 +186,15 @@ pub struct GameState {
     /// `infinity_challenges.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinity_challenge: InfinityChallengeState,
+    /// The most recently bought Antimatter Dimension tier (1-indexed,
+    /// `player.postC4Tier`). Under Infinity Challenge 4 only this tier produces
+    /// normally. Default 1; set on each AD purchase, reset with challenge state.
+    #[cfg_attr(feature = "serde", serde(default = "default_post_c4_tier"))]
+    pub post_c4_tier: u8,
+    /// Infinity-Challenge-2 auto-sacrifice accumulator in ms (`player.ic2Count`):
+    /// while IC2 runs, a Dimensional Sacrifice fires every 400 ms.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub ic2_count: f64,
     /// Normal-Challenge-8 accumulated sacrifice boost (`player.chall8TotalSacrifice`).
     /// Under NC8 dimensional sacrifice uses a running product kept across
     /// sacrifice resets rather than the log-based total-boost formula; this holds
@@ -281,6 +296,8 @@ impl GameState {
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),
             infinity_challenge: InfinityChallengeState::default(),
+            post_c4_tier: 1,
+            ic2_count: 0.0,
             chall8_total_sacrifice: Decimal::ONE,
             chall2_pow: 1.0,
             chall3_pow: Decimal::from_float(0.01),

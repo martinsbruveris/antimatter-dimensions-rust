@@ -26,6 +26,9 @@ impl GameState {
             if self.challenge_running(2) {
                 self.chall2_pow = 0.0;
             }
+            // IC8: buying a Tickspeed upgrade resets the production-decay timer.
+            self.records.this_infinity.last_buy_time_ms =
+                self.records.this_infinity.time_ms;
             true
         } else {
             false
@@ -95,6 +98,11 @@ impl GameState {
     /// tickspeed interval:
     ///   effect = INITIAL_TICKSPEED_MS / current_tickspeed_ms
     pub fn tickspeed_effect(&self) -> Decimal {
+        // Infinity Challenge 3 neutralises Tickspeed (its production effect → ×1);
+        // in exchange it grants a static Antimatter Dimension multiplier.
+        if self.ic3_neutralizes_tickspeed() {
+            return Decimal::ONE;
+        }
         let current = self.current_tickspeed_ms();
         if current <= 0.0 {
             return Decimal::from_float(1.0);

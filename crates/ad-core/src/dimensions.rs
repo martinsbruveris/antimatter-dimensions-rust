@@ -54,11 +54,16 @@ impl GameState {
         let cost = self.dimension_cost(tier);
         if self.dim_currency_amount(tier) >= cost {
             self.spend_dim_currency(tier, cost);
-            // NC9: completing a group of 10 bumps the cost of equal-cost
-            // dimensions/tickspeed. Done before the `bought` increment so the
-            // source's cost still reflects the current (pre-rollover) group.
-            if self.challenge_running(9) && self.dimensions[tier].bought % 10 == 9 {
-                self.nc9_bump_same_cost_from_dimension(tier);
+            // Completing a group of 10 bumps other dimensions' costs under NC9
+            // (equal cost) or IC5 (cheaper/pricier by tier; IC5 takes precedence,
+            // mirroring `challengeCostBump`). Done before the `bought` increment so
+            // the source's cost still reflects the current (pre-rollover) group.
+            if self.dimensions[tier].bought % 10 == 9 {
+                if self.infinity_challenge_running(5) {
+                    self.ic5_bump_costs_from_dimension(tier);
+                } else if self.challenge_running(9) {
+                    self.nc9_bump_same_cost_from_dimension(tier);
+                }
             }
             self.dimensions[tier].amount += Decimal::from_float(1.0);
             self.dimensions[tier].bought += 1;
@@ -87,6 +92,10 @@ impl GameState {
                 self.dimensions[i].amount = Decimal::ZERO;
             }
         }
+
+        // Track the last-bought tier (Infinity Challenge 4) and buy time (IC8).
+        self.post_c4_tier = tier as u8 + 1;
+        self.records.this_infinity.last_buy_time_ms = self.records.this_infinity.time_ms;
 
         // 11–18: buy a 1st..8th Antimatter Dimension (tier is 0-indexed).
         self.unlock_achievement(11 + tier as u16);
@@ -204,11 +213,22 @@ impl GameState {
         // infinitied, and achievement multipliers.
         mult *= self.break_infinity_upgrade_common_mult();
 
-        // The original clamps the final per-tier multiplier to >= 1
-        // (applyNDMultipliers). Pre-Infinity every term was >= 1, but
-        // `totalTimeMult` can dip below 1 for a very short total play time, so
-        // clamp to stay faithful.
-        mult.max(&Decimal::ONE)
+        // Infinity Challenge all-tier multipliers (IC3 static / IC8 decay / IC6
+        // matter divide).
+        mult *= self.infinity_challenge_common_mult();
+
+        // `applyNDMultipliers` clamps the multiplier to >= 1 (so e.g. IC6's divide
+        // and a tiny `totalTimeMult` cannot push it below the base)...
+        let mult = mult.max(&Decimal::ONE);
+
+        // ...then `applyNDPowers` raises it to the IC4 power (`^0.25` for the
+        // non-latest dimensions while IC4 runs, `^1.05` all-tier once completed).
+        let power = self.infinity_challenge_mult_power(tier);
+        if power == 1.0 {
+            mult
+        } else {
+            mult.pow(&Decimal::from_float(power))
+        }
     }
 
     /// Get the per-second production rate for a dimension tier.

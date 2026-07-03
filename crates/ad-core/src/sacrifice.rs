@@ -28,9 +28,19 @@ impl GameState {
     fn sacrifice_exponent(&self) -> f64 {
         if self.challenge_running(8) {
             1.0
+        } else if self.infinity_challenge_completed(2) {
+            // IC2 completed drops a log10 (a much stronger sacrifice); the exponent
+            // shrinks to `1/120` to keep the pre-Reality balance.
+            1.0 / 120.0
         } else {
             SACRIFICE_EXPONENT
         }
+    }
+
+    /// Whether the IC2-completed sacrifice formula is active (the "pre-power" value
+    /// is the sacrificed amount / ratio directly rather than its `log10 / 10`).
+    fn ic2_sacrifice(&self) -> bool {
+        self.infinity_challenge_completed(2)
     }
 
     /// Get the current sacrifice multiplier applied to the 8th dimension.
@@ -45,17 +55,24 @@ impl GameState {
         if self.challenge_running(8) {
             return self.chall8_total_sacrifice;
         }
-        Self::total_boost(&self.sacrificed, self.sacrifice_exponent())
+        self.total_boost(&self.sacrificed)
     }
 
     /// Compute the standard (non-NC8) total sacrifice boost from a given
-    /// sacrificed amount and exponent.
-    fn total_boost(sacrificed: &Decimal, exponent: f64) -> Decimal {
+    /// sacrificed amount: `prePowerBoost.clampMin(1) ^ exponent`, where
+    /// `prePowerBoost` is `log10(sacrificed)/10` normally, or the sacrificed amount
+    /// itself once Infinity Challenge 2 is completed.
+    fn total_boost(&self, sacrificed: &Decimal) -> Decimal {
         if *sacrificed <= Decimal::ZERO {
             return Decimal::ONE;
         }
-        let pre_power = (sacrificed.log10() / 10.0).max(1.0);
-        Decimal::from_float(pre_power.powf(exponent))
+        let exponent = Decimal::from_float(self.sacrifice_exponent());
+        let pre_power = if self.ic2_sacrifice() {
+            *sacrificed
+        } else {
+            Decimal::from_float(sacrificed.log10() / 10.0)
+        };
+        pre_power.max(&Decimal::ONE).pow(&exponent)
     }
 
     /// Compute the individual boost that the next sacrifice would give (the gain
@@ -94,11 +111,16 @@ impl GameState {
             self.sacrificed
         };
 
-        let log_ad1 = ad1.log10() / 10.0;
-        let log_sacrificed = (sacrificed.log10() / 10.0).max(1.0);
-        let ratio = (log_ad1 / log_sacrificed).max(1.0);
-
-        Decimal::from_float(ratio.powf(self.sacrifice_exponent()))
+        let exponent = Decimal::from_float(self.sacrifice_exponent());
+        let pre_power = if self.ic2_sacrifice() {
+            // IC2 completed: `prePowerMult = AD1 / sacrificed` (no log10).
+            ad1 / sacrificed
+        } else {
+            let log_ad1 = ad1.log10() / 10.0;
+            let log_sacrificed = (sacrificed.log10() / 10.0).max(1.0);
+            Decimal::from_float((log_ad1 / log_sacrificed).max(1.0))
+        };
+        pre_power.max(&Decimal::ONE).pow(&exponent)
     }
 
     /// Compute what the total sacrifice multiplier would be after sacrificing.
@@ -107,7 +129,7 @@ impl GameState {
             return self.chall8_total_sacrifice * self.next_sacrifice_boost();
         }
         let new_sacrificed = self.sacrificed + self.dimensions[0].amount;
-        Self::total_boost(&new_sacrificed, self.sacrifice_exponent())
+        self.total_boost(&new_sacrificed)
     }
 
     /// Perform a dimensional sacrifice.

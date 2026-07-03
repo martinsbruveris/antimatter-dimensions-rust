@@ -30,14 +30,18 @@ impl GameState {
             (FIRST_GALAXY_REQUIREMENT, GALAXY_REQUIREMENT_INCREMENT)
         };
         let base = base_cost + self.galaxies as u64 * cost_mult;
-        // The `resetBoost` Infinity Upgrade reduces the requirement by 9.
-        base.saturating_sub(self.reset_boost_reduction())
+        // The `resetBoost` Infinity Upgrade reduces the requirement by 9, and a
+        // completed Infinity Challenge 5 by a further 1.
+        base.saturating_sub(
+            self.reset_boost_reduction() + self.ic5_requirement_reduction(),
+        )
     }
 
-    /// Check if the player can buy an antimatter galaxy. Normal Challenge 8
-    /// disables Antimatter Galaxies entirely (`Galaxy.canBeBought`).
+    /// Check if the player can buy an antimatter galaxy. Normal Challenge 8 and
+    /// Infinity Challenge 7 disable Antimatter Galaxies entirely
+    /// (`Galaxy.canBeBought`).
     pub fn can_buy_galaxy(&self) -> bool {
-        if self.challenge_running(8) {
+        if self.challenge_running(8) || self.infinity_challenge_running(7) {
             return false;
         }
         // Check total amount (floor) of the required-tier dimension.
@@ -117,8 +121,11 @@ impl GameState {
             amount +=
                 (target_resets.saturating_sub(5)) as u64 * DIM_BOOST_SCALING_REQUIREMENT;
         }
-        // The `resetBoost` Infinity Upgrade reduces the requirement by 9.
-        let amount = amount.saturating_sub(self.reset_boost_reduction());
+        // The `resetBoost` Infinity Upgrade reduces the requirement by 9, and a
+        // completed Infinity Challenge 5 by a further 1.
+        let amount = amount.saturating_sub(
+            self.reset_boost_reduction() + self.ic5_requirement_reduction(),
+        );
         (tier_1indexed as usize - 1, amount)
     }
 
