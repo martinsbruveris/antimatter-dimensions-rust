@@ -131,6 +131,11 @@ export const useGameStore = defineStore("game", {
         useUiStore().setSubtab("infinity", "upgrades");
       }
     },
+    // Break Infinity: lift the 1e308 cap so antimatter can grow further and the
+    // IP formula scales. Offered once the Big Crunch autobuyer's interval is maxed.
+    breakInfinity() {
+      return invoke("break_infinity");
+    },
     // Buy an Infinity Upgrade by its original save id (e.g. "timeMult").
     buyInfinityUpgrade(id) {
       return invoke("buy_infinity_upgrade", { id });

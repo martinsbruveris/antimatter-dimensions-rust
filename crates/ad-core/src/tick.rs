@@ -62,10 +62,14 @@ impl GameState {
             }
         }
 
-        // Cap antimatter at the Big Crunch threshold. Pre-Infinity, antimatter
-        // cannot exceed Number.MAX_VALUE; the player must Crunch to progress.
-        // This cap is lifted once breaking Infinity is implemented.
-        if self.antimatter > BIG_CRUNCH_THRESHOLD {
+        // Cap antimatter at the Big Crunch threshold while the crunch goal is in
+        // force: pre-break the player must Crunch at `1e308` to progress, and even
+        // post-break a normal challenge still targets `1e308`. Mirrors
+        // `hasBigCrunchGoal = !player.break || isInAntimatterChallenge`. Post-break
+        // and outside a challenge, antimatter grows without bound.
+        if (!self.broke_infinity || self.any_challenge_running())
+            && self.antimatter > BIG_CRUNCH_THRESHOLD
+        {
             self.antimatter = BIG_CRUNCH_THRESHOLD;
         }
 

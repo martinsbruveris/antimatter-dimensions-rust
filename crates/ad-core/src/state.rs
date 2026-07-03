@@ -208,6 +208,13 @@ pub struct GameState {
     /// the "Infinity" How To Play entry).
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinity_unlocked: bool,
+    /// Whether the player has bought Break Infinity (`player.break`): antimatter
+    /// may then exceed `1e308` and the Infinity-Point formula scales with how far
+    /// past the cap it goes. A permanent unlock (reset only on Eternity, later);
+    /// distinct from [`infinity_unlocked`](Self::infinity_unlocked). See
+    /// `crunch.rs` / `tick.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub broke_infinity: bool,
     /// Time and prestige records (total time played, this/best infinity). Mirrors
     /// the modelled slice of `player.records`. Advanced in `tick`; the current
     /// infinity's records reset on a Big Crunch. See [`Records`].
@@ -261,6 +268,7 @@ impl GameState {
             chall3_pow: Decimal::from_float(0.01),
             matter: Decimal::ONE,
             infinity_unlocked: false,
+            broke_infinity: false,
             records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],
             tutorial_state: 0,

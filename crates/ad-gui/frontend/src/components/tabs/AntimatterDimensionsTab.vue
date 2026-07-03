@@ -9,6 +9,7 @@ import DimensionRow from "../DimensionRow.vue";
 import DimBoostRow from "../DimBoostRow.vue";
 import GalaxyRow from "../GalaxyRow.vue";
 import ProgressBar from "../ProgressBar.vue";
+import BreakInfinityButton from "../BreakInfinityButton.vue";
 
 const game = useGameStore();
 const s = computed(() => game.snapshot);
@@ -76,6 +77,7 @@ const sacrificeTooltip = computed(
       <GalaxyRow />
     </div>
     <ProgressBar />
+    <BreakInfinityButton />
   </div>
 </template>
 

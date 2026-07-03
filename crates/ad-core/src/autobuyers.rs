@@ -430,12 +430,12 @@ impl GameState {
     }
 
     /// Whether Break Infinity (Feature 2.3) is unlockable: the Big Crunch
-    /// autobuyer is unlocked (NC12 completed) **and** its interval is upgraded to
-    /// the 100 ms floor (`Autobuyer.bigCrunch.hasMaxedInterval`). Feature 2.3
-    /// reads this to reveal the Break Infinity button; exposed here now.
+    /// autobuyer's interval is at its 100 ms floor
+    /// (`BreakInfinityButton.isUnlocked = Autobuyer.bigCrunch.hasMaxedInterval`).
+    /// Reaching the floor requires the interval to have been upgraded, which needs
+    /// NC12 completed, so no separate unlock check is necessary.
     pub fn break_infinity_unlockable(&self) -> bool {
-        self.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch)
-            && self.autobuyer_has_maxed_interval(AutobuyerTarget::BigCrunch)
+        self.autobuyer_has_maxed_interval(AutobuyerTarget::BigCrunch)
     }
 }
 

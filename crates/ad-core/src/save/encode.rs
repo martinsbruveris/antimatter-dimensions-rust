@@ -74,8 +74,9 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     player["dimensionBoosts"] = json!(state.dim_boosts);
     player["galaxies"] = json!(state.galaxies);
     player["totalTickBought"] = json!(state.tickspeed.bought);
-    // §4.3 inverse: carry the Infinity-unlocked flag via `break`.
-    player["break"] = json!(state.infinity_unlocked);
+    // `break` carries the Break-Infinity flag. `infinity_unlocked` is not stored
+    // separately — the load derives it from break / infinities / IP.
+    player["break"] = json!(state.broke_infinity);
     // Infinity currency (Decimal strings, matching the save schema).
     player["infinityPoints"] = decimal(&state.infinity_points);
     player["infinities"] = decimal(&state.infinities);
@@ -367,7 +368,7 @@ mod tests {
         let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
         state.galaxies = 7;
         state.dim_boosts = 3;
-        state.infinity_unlocked = true;
+        state.broke_infinity = true;
         state.infinity_points = Decimal::from_float(5.0);
         state.infinities = Decimal::from_float(3.0);
         // Own a couple of Infinity Upgrades (with their column prereqs) + a partial
@@ -397,6 +398,9 @@ mod tests {
         let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
         assert_eq!(reloaded.galaxies, 7);
         assert_eq!(reloaded.dim_boosts, 3);
+        // `break` round-trips as broke_infinity; infinity_unlocked derives from it
+        // (and from the infinities/IP we set).
+        assert!(reloaded.broke_infinity);
         assert!(reloaded.infinity_unlocked);
         assert_eq!(reloaded.infinity_points, Decimal::from_float(5.0));
         assert_eq!(reloaded.infinities, Decimal::from_float(3.0));

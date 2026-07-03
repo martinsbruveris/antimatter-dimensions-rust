@@ -29,11 +29,18 @@ impl GameState {
     }
 
     /// Infinity Points a Big Crunch would grant right now. Mirrors
-    /// `gainedInfinityPoints`: pre-Break-Infinity the base is `308 / div` (= 1
-    /// with `div = 308`), times `totalIPMult` (= 1), floored. The Break-Infinity
-    /// branch (`pow10(maxAM.log10() / div - 0.75)`) arrives with Feature 2.3.
+    /// `gainedInfinityPoints`: pre-break the base is `308 / div` (= 1 with
+    /// `div = 308`); once Infinity is broken it scales as
+    /// `10 ^ (log10(thisInfinity.maxAM) / div - 0.75)`. Times `totalIPMult` (= 1),
+    /// floored.
     pub fn gained_infinity_points(&self) -> Decimal {
-        let base = Decimal::from_float(308.0 / self.ip_gain_divisor());
+        let div = self.ip_gain_divisor();
+        let base = if self.broke_infinity {
+            let exponent = self.records.this_infinity.max_am.log10() / div - 0.75;
+            Decimal::pow10(exponent)
+        } else {
+            Decimal::from_float(308.0 / div)
+        };
         (base * self.total_ip_mult()).floor()
     }
 
@@ -58,6 +65,23 @@ impl GameState {
             return false;
         }
         self.big_crunch_reset(false, false);
+        true
+    }
+
+    /// Whether the player can Break Infinity now: the Big Crunch autobuyer's
+    /// interval is at its 100 ms floor (`BreakInfinityButton.isUnlocked`) and
+    /// Infinity is not already broken.
+    pub fn can_break_infinity(&self) -> bool {
+        !self.broke_infinity && self.break_infinity_unlockable()
+    }
+
+    /// Break Infinity: lift the `1e308` antimatter cap and switch to the scaling
+    /// IP formula. One-way pre-Eternity. Returns whether it happened.
+    pub fn break_infinity(&mut self) -> bool {
+        if !self.can_break_infinity() {
+            return false;
+        }
+        self.broke_infinity = true;
         true
     }
 
@@ -279,5 +303,68 @@ mod tests {
 
         game.dimensions[1].bought = 1;
         assert!(game.tickspeed_unlocked());
+    }
+
+    #[test]
+    fn break_infinity_requires_maxed_big_crunch_interval() {
+        use crate::AutobuyerTarget;
+        let mut game = GameState::new();
+        assert!(!game.can_break_infinity());
+        assert!(!game.break_infinity());
+
+        // Complete NC12 and upgrade the Big Crunch autobuyer to the 100 ms floor.
+        game.complete_challenge(12);
+        assert!(!game.can_break_infinity()); // interval still 150 s
+        game.infinity_points = Decimal::from_float(1e9);
+        for _ in 0..50 {
+            game.upgrade_autobuyer_interval(AutobuyerTarget::BigCrunch);
+        }
+        assert!(game.can_break_infinity());
+        assert!(game.break_infinity());
+        assert!(game.broke_infinity);
+        // One-way: cannot break again.
+        assert!(!game.can_break_infinity());
+    }
+
+    #[test]
+    fn post_break_ip_scales_with_max_am() {
+        let mut game = GameState::new();
+        game.records.this_infinity.max_am = Decimal::new(1.0, 616);
+        // Pre-break the crunch is always worth exactly 1 IP.
+        assert_eq!(game.gained_infinity_points(), Decimal::ONE);
+
+        // Post-break at 1e616: 10^(616/308 - 0.75) = 10^1.25 ≈ 17.78 → floor 17.
+        game.broke_infinity = true;
+        assert_eq!(game.gained_infinity_points(), Decimal::from_float(17.0));
+    }
+
+    #[test]
+    fn broke_infinity_persists_across_crunch() {
+        let mut game = GameState::new();
+        game.broke_infinity = true;
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+        assert!(game.broke_infinity);
+    }
+
+    #[test]
+    fn post_break_lifts_antimatter_cap_except_in_challenges() {
+        // Outside a challenge, post-break antimatter grows past 1e308.
+        let mut game = GameState::new();
+        game.broke_infinity = true;
+        game.dimensions[0].amount = Decimal::new(1.0, 400);
+        game.antimatter = BIG_CRUNCH_THRESHOLD * Decimal::from_float(0.9);
+        game.tick(1000.0);
+        assert!(game.antimatter > BIG_CRUNCH_THRESHOLD);
+
+        // Inside a normal challenge the 1e308 cap still holds, even post-break.
+        let mut game = GameState::new();
+        game.broke_infinity = true;
+        game.infinity_unlocked = true;
+        game.start_challenge(2);
+        game.dimensions[0].amount = Decimal::new(1.0, 400);
+        game.antimatter = BIG_CRUNCH_THRESHOLD * Decimal::from_float(0.9);
+        game.tick(1000.0);
+        assert_eq!(game.antimatter, BIG_CRUNCH_THRESHOLD);
     }
 }

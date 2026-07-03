@@ -211,6 +211,16 @@ struct GameView {
     /// Whether the player has performed at least one Big Crunch (JS
     /// `PlayerProgress.infinityUnlocked()`). Persists across crunches.
     infinity_unlocked: bool,
+    /// Whether Infinity has been broken (`player.break`): antimatter may exceed
+    /// `1e308` and the IP formula scales.
+    broke_infinity: bool,
+    /// Whether the Break Infinity button should be offered (the Big Crunch
+    /// autobuyer's interval is at the 100 ms floor).
+    break_infinity_unlockable: bool,
+    /// Whether the `1e308` Big-Crunch goal is still in force (pre-break, or inside
+    /// a challenge). When false the full-screen crunch view is suppressed so
+    /// post-break play continues in the normal tab view.
+    has_big_crunch_goal: bool,
     /// Autobuyer tab state (unlock progress, per-autobuyer status).
     autobuyers: AutobuyersView,
     /// Player options (UI/UX preferences), surfaced for the options tabs.
@@ -492,6 +502,9 @@ fn build_game_view(game: &GameState) -> GameView {
         infinity_progress,
         can_big_crunch: game.can_big_crunch(),
         infinity_unlocked: game.infinity_unlocked,
+        broke_infinity: game.broke_infinity,
+        break_infinity_unlockable: game.break_infinity_unlockable(),
+        has_big_crunch_goal: !game.broke_infinity || game.any_challenge_running(),
         autobuyers: build_autobuyers_view(game),
         unlocked_achievements: game.unlocked_achievement_ids(),
         achievement_power: num(&game.achievement_power()),
@@ -660,6 +673,12 @@ fn max_all(state: State<'_, Mutex<GameState>>) {
 fn big_crunch(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.big_crunch();
+}
+
+#[tauri::command]
+fn break_infinity(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.break_infinity();
 }
 
 /// Buy an Infinity Upgrade by its original save id (e.g. "timeMult"). An
@@ -1183,6 +1202,7 @@ pub fn run() {
             sacrifice,
             max_all,
             big_crunch,
+            break_infinity,
             buy_infinity_upgrade,
             start_challenge,
             exit_challenge,

@@ -197,8 +197,11 @@ onUnmounted(() => {
     </div>
     <!-- Once antimatter reaches the Big Crunch threshold the whole game view
          is replaced by the Big Crunch screen, matching ModernUi.vue's
-         `tab-container` being hidden while the crunch button shows. -->
-    <BigCrunchScreen v-if="game.snapshot && game.snapshot.can_big_crunch" />
+         `tab-container` being hidden while the crunch button shows. Post-break
+         (no crunch goal in force) the game view stays visible so play continues. -->
+    <BigCrunchScreen
+      v-if="game.snapshot && game.snapshot.can_big_crunch && game.snapshot.has_big_crunch_goal"
+    />
     <div
       v-else
       class="tab-container"

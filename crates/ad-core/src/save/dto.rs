@@ -304,12 +304,13 @@ impl GameState {
             cost_bumps: dims[tier].cost_bumps,
         });
 
-        // §4.3: Infinity is unlocked once `break` is set or any infinity / IP has
-        // ever been gained. We reset the pre-Infinity *mechanics* past the frontier,
-        // but Infinity Points, the infinities count, and the time/infinity records
-        // are within our frontier now, so they carry over verbatim (they are just
-        // numbers our `Decimal`/`f64` hold fine, even for a late-game save).
-        let infinity_unlocked = dto.break_unlocked
+        // `player.break` is the Break-Infinity flag. Infinity-*unlocked* (has
+        // reached Infinity) is derived: broke Infinity, or any infinity / IP was
+        // ever gained. We reset the pre-Infinity *mechanics* past the frontier, but
+        // Infinity Points, the infinities count, and the time/infinity records are
+        // within our frontier now, so they carry over verbatim.
+        let broke_infinity = dto.break_unlocked;
+        let infinity_unlocked = broke_infinity
             || dto.infinities > Decimal::ZERO
             || dto.infinity_points > Decimal::ZERO;
 
@@ -466,6 +467,7 @@ impl GameState {
             chall3_pow: dto.chall3_pow,
             matter: dto.matter,
             infinity_unlocked,
+            broke_infinity,
             records,
             achievement_bits,
             tutorial_state: dto.tutorial_state,
