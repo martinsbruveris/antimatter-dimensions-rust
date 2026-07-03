@@ -14,3 +14,6 @@ crates/ad-gui/frontend/dist/
 
 # Tauri-generated files — regenerated at build time
 crates/ad-gui/gen/
+
+# Savefiles
+saves/
