@@ -60,9 +60,16 @@ antimatter-dimensions-rust/
   `design-docs/2026-07-02-infinity-points-and-records.md`.
 - `src/challenges.rs` — Normal Challenges (Feature 2.5): `NormalChallengeState` on
   `GameState` (`current` + `completed` bitmask), unlock/start/exit/complete logic,
-  and the reward wiring (completing NC1–9 unlocks the AD/Tickspeed autobuyers). The
-  per-challenge rule modifiers are added incrementally at their engine sites; NC1
-  (the tutorial) is done. See `design-docs/2026-07-03-normal-challenges.md`.
+  the reward wiring (completing NC1–9 unlocks the AD/Tickspeed autobuyers), the
+  per-run accumulator reset (`reset_challenge_stuff`), and the NC-specific helpers
+  (`max_dimensions_unlockable`, `max_boosts`, the NC9 same-cost bumps). **All 12
+  modifiers are implemented**, each applied inline at its engine site via
+  `challenge_running(N)` (so normal play is untouched): NC2/NC3/NC11 tick-state in
+  `tick.rs::update_challenges` (`chall2_pow`/`chall3_pow`/`matter`); NC5/NC6/NC9 in
+  the cost/tickspeed paths; NC4/NC12 in the dimension buy/production paths; NC7/NC8
+  in `infinity_upgrades.rs` (buy-10 / dim-boost power) and `sacrifice.rs`; NC8/NC10
+  in `galaxy.rs` and `sacrifice.rs`. See
+  `design-docs/2026-07-03-normal-challenges.md`.
 - `src/records.rs` — `Records`: the modelled slice of `player.records` (total time
   played, this-infinity time/`maxAM`, best-infinity time). Advanced in `tick`; the
   current-infinity records reset on a Big Crunch.

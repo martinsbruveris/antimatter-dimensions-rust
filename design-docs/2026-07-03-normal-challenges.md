@@ -132,28 +132,71 @@ The confirmation modal (`startNormalChallenge`) mirrors the prestige-confirm she
 
 ## 6. Incremental plan
 
-1. **Infra + NC1 vertical slice**: `challenge` state, forced-reset path,
-   enter/complete/exit, the `ActiveModifiers` scaffold (empty), NC1 (no modifier)
-   end-to-end, save/load, the Challenges tab + tile grid, reward = mark autobuyer
-   unlocked. Commit.
-2. **Per-challenge modifiers**, a few at a time, each behind the fidelity harness:
-   the "simple multiplier/threshold" ones first (NC5 tickspeed base, NC7 buy-10,
-   NC8 no-boost/no-galaxy, NC10 six-dims), then the "tick-state" ones (NC2 halt,
-   NC3 pow, NC11 matter), then the "production-rewrite" ones (NC4 erase, NC6
-   cost-in-lower-dim, NC9 same-cost-bump, NC12 production-shift). Commit per batch.
+1. **Infra + NC1 vertical slice** ✅: `challenge` state, forced-reset path,
+   enter/complete/exit, NC1 (no modifier) end-to-end, save/load, the Challenges tab
+   + tile grid, reward = mark autobuyer unlocked. *(commits: parts 1–2, `d1c75f4` +
+   `631e3da`; also NC5 tickspeed base and NC7 buy-10 there.)*
+2. **Per-challenge modifiers**, in three batches at their engine sites (each behind
+   `challenge_running(N)`, so normal play is untouched):
+   - **Batch A ✅ — NC8, NC10** (thresholds): NC8 `dim_boost_power = 1`, galaxies
+     disabled, `max_boosts = 5`, and the running-product Sacrifice
+     (`chall8_total_sacrifice`); NC10 six dimensions, galaxy base 99/+90 on the 6th
+     dim, the 6th-dim boost scaling, Sacrifice disabled. *(commit part 3, plus the
+     `break_infinity` fractional-`pow` fix.)*
+   - **Batch B ✅ — NC2, NC3, NC11** (tick-state): `update_challenges` runs at the
+     top of `tick`. NC2 `chall2_pow` halt/recovery, NC3 `chall3_pow` AD1
+     multiplier, NC11 `matter` growth + annihilation (`dim_boost_reset`). *(commit
+     part 4; also guards `skip_resets_if_possible` against running mid-challenge.)*
+   - **Batch C ✅ — NC4, NC6, NC9, NC12** (production/cost rewrite): NC4 erase-lower
+     on buy, NC6 buy-with-lower-dim + C6 cost table, NC9 same-cost bump
+     (`cost_bumps` on dims + tickspeed), NC12 two-tier production shift + even-dim
+     strengthening + tier-6 Sacrifice. *(commit part 5.)*
 3. **Records** (best challenge times) and the reward autobuyers' *upgradeable*
    behaviour land with Feature 2.6.
 
+All 12 modifiers are implemented; the Challenges tab (built in part 1) renders and
+drives them unchanged.
+
 ---
 
-## 7. Open questions (proceeding with best-guess defaults)
+## 7. Open questions
 
-- Exact Challenges-tab unlock gate and C11/C12 `lockedAt` thresholds — read from the
-  data during implementation (best guess: tab = infinity-unlocked; C10=16, C11/C12
-  higher).
-- Whether to model `bestTimes` now — deferred until the Statistics/records consumer
+Resolved during implementation:
+
+- **Unlock gates** — the Challenges tab is `infinity_unlocked`; C1–9 unlock at 0
+  infinities, C10/C11/C12 at 16 (`DC.D16`), confirmed against the data.
+- **`ActiveModifiers` vs inline checks** — went with inline `challenge_running(N)`
+  at each engine site (matching the original's `NormalChallenge(N).isRunning`
+  checks), not a computed struct. The modifiers touch genuinely different sites
+  (cost formula, currency source, production chain, sacrifice, galaxy, dim boost),
+  so a struct would indirect rather than consolidate them, and inline checks keep
+  fidelity verification a 1:1 map to the JS.
+
+Still deferred (unchanged):
+
+- `bestTimes` (best challenge times) — until the Statistics/records consumer
   exists (consistent with the 2.1 best-IP/min deferral).
-- The reward autobuyers that don't exist yet (Dim Boost / Galaxy / Big Crunch) —
-  created as unlockable stubs in 2.5, fully wired in 2.6.
+- Reward autobuyers that don't exist yet (Dim Boost / Galaxy / Big Crunch, from
+  NC10–12) and the *upgradeable*-autobuyer behaviour — Feature 2.6. NC1–9 already
+  unlock the AD/Tickspeed autobuyers.
+- The start-confirmation modal (`startNormalChallenge`) — the tab starts a
+  challenge directly. Faithfully adding it needs a new `confirmations.challenges`
+  option (Options + save + toggle); low priority.
 
-*Document generated: 2026-07-03.*
+New notes for later (out of scope here, do not affect the challenge port's internal
+consistency):
+
+- **Production per-second cap** — the original caps each dimension's
+  `productionPerSecond` at `1e315` pre-break (`cappedProductionInNormalChallenges`).
+  Our engine has no such cap. It applies to *all* pre-break play, not just
+  challenges, and antimatter is capped at `1e308` anyway, so it rarely changes the
+  outcome; noted as a general fidelity item.
+- **Dimension→dimension `diff/10`** — the original's `AntimatterDimensions.tick`
+  feeds dimensions with `diff/10` but currency with `diff` (a 10× difference our
+  uniform-`dt` tick does not reproduce). This is a pre-existing, global convention,
+  not challenge-specific; NC12's re-routing uses the same `productions[]` our normal
+  tick does, so it stays consistent with the rest of the engine either way. Worth a
+  dedicated fidelity check against the JS before relying on absolute timings.
+
+*Document generated: 2026-07-03. Updated 2026-07-03 on completion of all 12
+modifiers.*
