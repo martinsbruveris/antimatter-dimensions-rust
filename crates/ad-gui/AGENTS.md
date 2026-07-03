@@ -355,6 +355,30 @@ frontend/
   buyable tile calls the `buy_infinity_upgrade(id)` command (store `buyInfinityUpgrade`).
   The bottom row (`ipMult`/`ipOffline`, Achievement 41) is not built yet.
 
+## Challenges tab (Normal Challenges — Feature 2.5)
+
+- Conditional top-level **Challenges** tab (`config/tabs.js`, shown once
+  `snapshot.challenges_unlocked` — i.e. after the first Infinity). `ChallengesTab.vue`
+  renders the vendored `l-challenge-grid` of 12 `c-challenge-box` tiles + an
+  Exit/Restart header (`ChallengeTabHeader`) while a challenge runs.
+- **Engine-owned** run state: `GameView.challenges[]` (`{ id, is_unlocked,
+  is_running, is_completed }`) + `challenges_unlocked` + `infinities` (for the
+  "Locked (X/Y)" text). Per-challenge display data (name/description/reward/lockedAt)
+  lives frontend-side in `data/normalChallenges.js`. Each tile's button state
+  (Start / Running / Completed / Locked) mirrors the original `ChallengeBox.vue`.
+- **Commands:** `start_challenge(id)` (a forced Big Crunch then enter; the store
+  action first navigates to the Antimatter Dimensions tab, like the original) and
+  `exit_challenge`. Store actions `startChallenge` / `exitChallenge`; Restart =
+  exit + start.
+- **Scope:** NC1 (the tutorial, no restriction) is wired end-to-end — reaching
+  Infinity completes it and unlocks the 1st AD autobuyer, and the first-ever
+  Infinity auto-completes NC1 (matching `handleChallengeCompletion`). The
+  per-challenge rule modifiers (NC2–12), the retry/show-all toggles, the
+  start-confirmation modal, and best-time records are follow-ups. Completing NC1–9
+  unlocks the AD/Tickspeed autobuyers; the Dim-Boost/Galaxy/Big-Crunch autobuyers
+  (NC10–12) don't exist yet (Feature 2.6). See
+  `design-docs/2026-07-03-normal-challenges.md`.
+
 ## Progressive reveal, tutorial highlights & confirmations
 
 Three early-game presentation features, all engine-driven; the frontend only

@@ -88,6 +88,9 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         .collect();
     player["infinityUpgrades"] = json!(owned_upgrades);
     player["partInfinityPoint"] = json!(state.part_infinity_point);
+    // Normal-challenge run state.
+    player["challenge"]["normal"]["current"] = json!(state.challenge.current);
+    player["challenge"]["normal"]["completedBits"] = json!(state.challenge.completed);
 
     // Time / infinity records. `records.totalAntimatter` is written above; here we
     // add the time and infinity-timing slice.
@@ -239,6 +242,7 @@ mod tests {
             assert_eq!(reloaded.infinities, state.infinities);
             assert_eq!(reloaded.infinity_upgrades, state.infinity_upgrades);
             assert_eq!(reloaded.part_infinity_point, state.part_infinity_point);
+            assert_eq!(reloaded.challenge, state.challenge);
             assert_eq!(reloaded.records, state.records);
             for tier in 0..8 {
                 assert_eq!(
@@ -271,6 +275,9 @@ mod tests {
             | InfinityUpgrade::Dim18Mult.bit()
             | InfinityUpgrade::Buy10Mult.bit();
         state.part_infinity_point = 0.42;
+        // In challenge 3, with challenges 1 and 2 completed.
+        state.challenge.current = 3;
+        state.challenge.completed = (1 << 1) | (1 << 2);
         state.records.total_time_played_ms = 123_456.0;
         state.records.this_infinity.time_ms = 7_890.0;
         state.records.this_infinity.max_am = Decimal::new(1.0, 250);
@@ -296,6 +303,10 @@ mod tests {
         assert!(reloaded.infinity_upgrade_bought(InfinityUpgrade::TotalTimeMult));
         assert!(reloaded.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult));
         assert_eq!(reloaded.part_infinity_point, 0.42);
+        assert_eq!(reloaded.challenge.current, 3);
+        assert!(reloaded.challenge_completed(1));
+        assert!(reloaded.challenge_completed(2));
+        assert!(!reloaded.challenge_completed(3));
         assert_eq!(reloaded.records.total_time_played_ms, 123_456.0);
         assert_eq!(reloaded.records.this_infinity.time_ms, 7_890.0);
         assert_eq!(

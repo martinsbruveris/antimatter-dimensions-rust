@@ -51,11 +51,18 @@ antimatter-dimensions-rust/
 - `src/tickspeed.rs` — Tickspeed upgrades and effects
 - `src/galaxy.rs` — Antimatter galaxy purchases
 - `src/sacrifice.rs` — Dimension sacrifice
-- `src/crunch.rs` — First Big Crunch (Infinity): `can_big_crunch` + `big_crunch`
-  reset. Awards Infinity Points (`gained_infinity_points`, pre-break = 1) and
-  Infinities (`gained_infinities`), and updates the fastest-infinity record; IP /
-  infinities / total-time-played persist across the reset. See
+- `src/crunch.rs` — Big Crunch (Infinity): `can_big_crunch`, `big_crunch`, and the
+  shared `big_crunch_reset(forced, entering_challenge)` that both the manual crunch
+  and the challenge enter/exit route through. Awards Infinity Points
+  (`gained_infinity_points`, pre-break = 1), Infinities (`gained_infinities`), and
+  challenge completion only when at the goal; updates the fastest-infinity record; IP
+  / infinities / total-time-played persist across the reset. See
   `design-docs/2026-07-02-infinity-points-and-records.md`.
+- `src/challenges.rs` — Normal Challenges (Feature 2.5): `NormalChallengeState` on
+  `GameState` (`current` + `completed` bitmask), unlock/start/exit/complete logic,
+  and the reward wiring (completing NC1–9 unlocks the AD/Tickspeed autobuyers). The
+  per-challenge rule modifiers are added incrementally at their engine sites; NC1
+  (the tutorial) is done. See `design-docs/2026-07-03-normal-challenges.md`.
 - `src/records.rs` — `Records`: the modelled slice of `player.records` (total time
   played, this-infinity time/`maxAM`, best-infinity time). Advanced in `tick`; the
   current-infinity records reset on a Big Crunch.
@@ -262,6 +269,7 @@ Located in `design-docs/`:
 | `2026-06-30-achievements.md` | Normal achievements: bitmask state on `GameState`, unlock hooks inline in the buy/galaxy/boost/crunch/tick methods (rows 1–2 minus News), per-achievement effects + the global achievement-power multiplier, `achievementBits` save round-trip, the sprite-driven tab, and the unlock toast; phased plan |
 | `2026-07-02-infinity-points-and-records.md` | Completing Feature 2.1: Infinity Points / Infinities currency, the `Records` struct (time played, this/best infinity), the IP gain formula (pre-break = 1), Big Crunch reward+reset semantics, save/load round-trip, and the Infinity tab + IP header |
 | `2026-07-03-infinity-upgrades.md` | Feature 2.2: the 16-upgrade Infinity grid — data table, bitmask state, purchase/column prereqs, every effect and its engine application site, passive `ipGen`, save/load, and the grid UI; bottom row (`ipMult`/`ipOffline`) deferred |
+| `2026-07-03-normal-challenges.md` | Feature 2.5: the 12 Normal Challenges — run state machine (start/complete/exit, forced Big-Crunch reset, unlock chain), all 12 modifiers mapped to their engine sites, reward→autobuyer wiring, save/load, the Challenges tab UI, and an incremental plan (NC1 slice first) |
 
 The table lists key documents; see the `design-docs/` folder for the full,
 date-prefixed set. Read these before making architectural decisions. The

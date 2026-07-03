@@ -57,29 +57,55 @@ impl GameState {
         if !self.can_big_crunch() {
             return false;
         }
+        self.big_crunch_reset(false, false);
+        true
+    }
 
-        // 21: "To infinity!" — unlocks on the crunch itself (the original's
-        // BIG_CRUNCH_BEFORE), so the post-reset starting antimatter already
-        // reflects its 100-antimatter reward.
-        self.unlock_achievement(21);
+    /// The Big-Crunch reset shared by the manual crunch and the challenge
+    /// enter/exit paths. Rewards — achievement 21, Infinity Points, Infinities,
+    /// challenge completion, and the fastest-infinity record — are granted only
+    /// when actually at the goal (`can_big_crunch`); `forced` lets a challenge
+    /// enter/exit reset below the goal without rewards. `entering_challenge`
+    /// suppresses `skip_resets_if_possible` so a challenge starts fresh (mirrors
+    /// `softReset(…, enteringAntimatterChallenge)`).
+    ///
+    /// Mirrors the original `bigCrunchReset(forced, enteringAntimatterChallenge)`.
+    pub(crate) fn big_crunch_reset(&mut self, forced: bool, entering_challenge: bool) {
+        let at_goal = self.can_big_crunch();
+        if !forced && !at_goal {
+            return;
+        }
 
-        // Award rewards from the pre-reset state (IP reads `thisInfinity.maxAM`
-        // once Break Infinity lands; both persist across the crunch).
-        self.infinity_points += self.gained_infinity_points();
-        self.infinities += self.gained_infinities();
+        if at_goal {
+            // 21: "To infinity!" — unlocks on the crunch itself (the original's
+            // BIG_CRUNCH_BEFORE), so the post-reset starting antimatter already
+            // reflects its 100-antimatter reward.
+            self.unlock_achievement(21);
 
-        // Lower the fastest-infinity record to this run before resetting it
-        // (mirrors `bigCrunchUpdateStatistics` + `secondSoftReset`).
-        self.records.best_infinity.time_ms = self
-            .records
-            .best_infinity
-            .time_ms
-            .min(self.records.this_infinity.time_ms);
-        self.records.best_infinity.real_time_ms = self
-            .records
-            .best_infinity
-            .real_time_ms
-            .min(self.records.this_infinity.real_time_ms);
+            // Award rewards from the pre-reset state (IP reads `thisInfinity.maxAM`
+            // once Break Infinity lands; both persist across the crunch).
+            self.infinity_points += self.gained_infinity_points();
+            self.infinities += self.gained_infinities();
+
+            // Complete the running challenge, or NC1 on the first Infinity performed
+            // outside a challenge (mirrors `handleChallengeCompletion`).
+            self.handle_challenge_completion();
+
+            // Lower the fastest-infinity record to this run before resetting it
+            // (mirrors `bigCrunchUpdateStatistics` + `secondSoftReset`).
+            self.records.best_infinity.time_ms = self
+                .records
+                .best_infinity
+                .time_ms
+                .min(self.records.this_infinity.time_ms);
+            self.records.best_infinity.real_time_ms = self
+                .records
+                .best_infinity
+                .real_time_ms
+                .min(self.records.this_infinity.real_time_ms);
+
+            self.infinity_unlocked = true;
+        }
 
         self.antimatter = self.starting_antimatter();
         self.dimensions = std::array::from_fn(|_| DimensionTier::new());
@@ -90,13 +116,13 @@ impl GameState {
         // Re-apply skip-reset Infinity Upgrades (original `secondSoftReset` →
         // `softReset` → `skipResetsIfPossible`): start the next infinity already at
         // the highest owned skip level (and with a Galaxy for skipResetGalaxy).
-        self.skip_resets_if_possible();
+        // Suppressed when entering a challenge (you start it fresh).
+        if !entering_challenge {
+            self.skip_resets_if_possible();
+        }
         // Reset the current infinity's records (time/maxAM back to 0); the
         // fastest-infinity record and total time played persist.
         self.records.this_infinity = ThisInfinity::new();
-        self.infinity_unlocked = true;
-
-        true
     }
 }
 

@@ -1,5 +1,6 @@
 import AntimatterDimensionsTab from "../components/tabs/AntimatterDimensionsTab.vue";
 import InfinityUpgradesTab from "../components/tabs/InfinityUpgradesTab.vue";
+import ChallengesTab from "../components/tabs/ChallengesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
@@ -41,6 +42,16 @@ export const TABS = [
     condition: (s) => Boolean(s?.autobuyers?.tab_unlocked),
     subtabs: [
       { key: "autobuyers", name: "Autobuyers", symbol: "<i class='fas fa-cog'></i>", component: AutobuyersTab },
+    ],
+  },
+  {
+    key: "challenges",
+    name: "Challenges",
+    // JS: `condition: () => PlayerProgress.infinityUnlocked()`. Only the Normal
+    // Challenges subtab is built; Infinity/Eternity challenges come later.
+    condition: (s) => Boolean(s?.challenges_unlocked),
+    subtabs: [
+      { key: "normal", name: "Challenges", symbol: "<i class='fas fa-fist-raised'></i>", component: ChallengesTab },
     ],
   },
   {

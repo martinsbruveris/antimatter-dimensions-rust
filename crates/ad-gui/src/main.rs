@@ -9,7 +9,7 @@ use ad_core::data::constants::{
 use ad_core::save::{decode_save_with_last_update, encode_save};
 use ad_core::{
     offline_plan as core_offline_plan, AutobuyerMode, Decimal, GameState,
-    InfinityUpgrade, ALL_INFINITY_UPGRADES,
+    InfinityUpgrade, ALL_INFINITY_UPGRADES, NORMAL_CHALLENGE_COUNT,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
@@ -106,6 +106,19 @@ struct InfinityUpgradeView {
     effect: Num,
 }
 
+/// Serializable view of a single Normal Challenge tile.
+#[derive(Serialize)]
+struct ChallengeView {
+    /// Challenge id (1..=12).
+    id: u8,
+    /// Whether it is unlocked (tab open + enough Infinities).
+    is_unlocked: bool,
+    /// Whether it is the challenge currently running.
+    is_running: bool,
+    /// Whether it has been completed.
+    is_completed: bool,
+}
+
 /// Serializable view of the whole autobuyers tab.
 #[derive(Serialize)]
 struct AutobuyersView {
@@ -129,8 +142,14 @@ struct GameView {
     /// (`ObservedState`) but aren't surfaced here yet — they gain consumers with
     /// the Statistics tab and the post-break crunch modal (Feature 2.3).
     infinity_points: Num,
+    /// Number of Infinities performed (shown on locked challenge tiles as X/Y).
+    infinities: Num,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
     infinity_upgrades: Vec<InfinityUpgradeView>,
+    /// Whether the Challenges tab is available (post first Infinity).
+    challenges_unlocked: bool,
+    /// The 12 Normal Challenges, for the Challenges tab.
+    challenges: Vec<ChallengeView>,
     tickspeed_cost: Num,
     tickspeed_bought: u64,
     tickspeed_effect: Num,
@@ -291,6 +310,19 @@ fn build_infinity_upgrades_view(game: &GameState) -> Vec<InfinityUpgradeView> {
         .collect()
 }
 
+/// Build the Normal Challenges view (all 12, in id order). Static per-challenge
+/// display data (name, reward, description, unlock threshold) lives frontend-side.
+fn build_challenges_view(game: &GameState) -> Vec<ChallengeView> {
+    (1..=NORMAL_CHALLENGE_COUNT)
+        .map(|id| ChallengeView {
+            id,
+            is_unlocked: game.challenge_unlocked(id),
+            is_running: game.challenge_running(id),
+            is_completed: game.challenge_completed(id),
+        })
+        .collect()
+}
+
 fn build_game_view(game: &GameState) -> GameView {
     let unlocked = game.unlocked_dimensions();
     let mut dimensions = Vec::with_capacity(8);
@@ -368,7 +400,10 @@ fn build_game_view(game: &GameState) -> GameView {
         antimatter: num(&game.antimatter),
         antimatter_per_sec: num(&game.antimatter_per_second()),
         infinity_points: num(&game.infinity_points),
+        infinities: num(&game.infinities),
         infinity_upgrades: build_infinity_upgrades_view(game),
+        challenges_unlocked: game.challenges_unlocked(),
+        challenges: build_challenges_view(game),
         tickspeed_cost: num(tickspeed_cost),
         tickspeed_bought: game.tickspeed.bought,
         tickspeed_effect: num(&game.tickspeed_effect()),
@@ -572,6 +607,20 @@ fn buy_infinity_upgrade(id: String, state: State<'_, Mutex<GameState>>) {
     if let Some(upgrade) = InfinityUpgrade::from_save_id(&id) {
         game.buy_infinity_upgrade(upgrade);
     }
+}
+
+/// Start Normal Challenge `id` (2..=12); a no-op if it can't be started.
+#[tauri::command]
+fn start_challenge(id: u8, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.start_challenge(id);
+}
+
+/// Exit the current Normal Challenge (a no-op if none is running).
+#[tauri::command]
+fn exit_challenge(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.exit_challenge();
 }
 
 /// Resets the current save slot to a fresh state (the "HARD RESET" option) and
@@ -1042,6 +1091,8 @@ pub fn run() {
             max_all,
             big_crunch,
             buy_infinity_upgrade,
+            start_challenge,
+            exit_challenge,
             hard_reset,
             unlock_ad_autobuyer,
             toggle_ad_autobuyer,

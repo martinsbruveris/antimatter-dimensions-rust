@@ -2,6 +2,7 @@ use break_infinity::Decimal;
 
 use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::AutobuyerState;
+use crate::challenges::NormalChallengeState;
 use crate::data::constants::{
     INITIAL_ANTIMATTER, TICKSPEED_BASE_COST, TICKSPEED_COST_MULTIPLIER,
 };
@@ -124,6 +125,10 @@ pub struct GameState {
     /// generation (mirrors `player.partInfinityPoint`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub part_infinity_point: f64,
+    /// Normal-challenge run state (active challenge + completed bitmask). Mirrors
+    /// `player.challenge.normal`; persists across a Big Crunch. See `challenges.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub challenge: NormalChallengeState,
     /// Whether the player has performed at least one Big Crunch. Mirrors JS
     /// `PlayerProgress.infinityUnlocked()`: set on the first crunch and
     /// **not** reset by subsequent crunches. Gates Infinity-related UI (e.g.
@@ -177,6 +182,7 @@ impl GameState {
             infinities: Decimal::ZERO,
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
+            challenge: NormalChallengeState::default(),
             infinity_unlocked: false,
             records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],

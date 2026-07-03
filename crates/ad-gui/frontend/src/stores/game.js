@@ -135,6 +135,16 @@ export const useGameStore = defineStore("game", {
     buyInfinityUpgrade(id) {
       return invoke("buy_infinity_upgrade", { id });
     },
+    // Start Normal Challenge `id` (a forced Big Crunch, then enter). Navigates to
+    // the Antimatter Dimensions tab like the original's `start()`.
+    startChallenge(id) {
+      useUiStore().setSubtab("dimensions", "antimatter");
+      return invoke("start_challenge", { id });
+    },
+    // Exit the current Normal Challenge.
+    exitChallenge() {
+      return invoke("exit_challenge");
+    },
     // --- Confirmation-gated requests ---
     // Each click handler routes through one of these: if the matching
     // confirmation option is on, open the explanatory modal (whose Confirm

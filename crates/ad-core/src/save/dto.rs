@@ -26,6 +26,7 @@ use serde::Deserialize;
 
 use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::{AutobuyerMode, AutobuyerState};
+use crate::challenges::NormalChallengeState;
 use crate::infinity_upgrades::InfinityUpgrade;
 use crate::options::{
     Confirmations, Options, MAX_AUTOSAVE_INTERVAL_MS, MAX_NOTATION_DIGITS,
@@ -79,6 +80,26 @@ pub struct PlayerDTO {
     pub records: RecordsDTO,
     pub auto: AutoDTO,
     pub options: OptionsDTO,
+    /// `player.challenge` — only the normal-challenge run state is modelled.
+    pub challenge: ChallengeDTO,
+}
+
+/// `player.challenge` — only the `normal` sub-object is modelled (infinity /
+/// eternity challenges are later features).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChallengeDTO {
+    pub normal: NormalChallengeDTO,
+}
+
+/// `player.challenge.normal` (modelled subset). `bestTimes` is ignored until a
+/// records consumer exists.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NormalChallengeDTO {
+    /// Active challenge id (`0` = none).
+    pub current: u8,
+    /// Completed-challenge bitmask (bit `1 << id`).
+    pub completed_bits: u16,
 }
 
 /// `player.dimensions` — only the `antimatter` array is modelled.
@@ -376,6 +397,10 @@ impl GameState {
             infinities: dto.infinities,
             infinity_upgrades,
             part_infinity_point: dto.part_infinity_point,
+            challenge: NormalChallengeState {
+                current: dto.challenge.normal.current,
+                completed: dto.challenge.normal.completed_bits,
+            },
             infinity_unlocked,
             records,
             achievement_bits,

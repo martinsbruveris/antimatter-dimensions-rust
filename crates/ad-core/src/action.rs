@@ -35,6 +35,10 @@ pub enum Action {
     Crunch,
     /// Buy an Infinity Upgrade from the grid.
     BuyInfinityUpgrade(InfinityUpgrade),
+    /// Start a normal challenge (2..=12).
+    StartChallenge(u8),
+    /// Exit the current normal challenge.
+    ExitChallenge,
     /// Unlock the antimatter-dimension autobuyer for the tier (0-indexed).
     UnlockAdAutobuyer(usize),
     /// Unlock the tickspeed autobuyer.
@@ -98,6 +102,10 @@ impl GameState {
             Action::BuyInfinityUpgrade(upgrade) => {
                 ActionOutcome::single(self.buy_infinity_upgrade(upgrade))
             }
+            Action::StartChallenge(id) => {
+                ActionOutcome::single(self.start_challenge(id))
+            }
+            Action::ExitChallenge => ActionOutcome::single(self.exit_challenge()),
             Action::UnlockAdAutobuyer(tier) => {
                 ActionOutcome::single(self.unlock_ad_autobuyer(tier))
             }

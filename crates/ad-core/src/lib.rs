@@ -1,6 +1,7 @@
 pub mod achievements;
 pub mod action;
 pub mod autobuyers;
+pub mod challenges;
 pub mod crunch;
 pub mod data;
 pub mod dimensions;
@@ -20,6 +21,7 @@ pub mod tutorial;
 pub use action::{Action, ActionOutcome};
 pub use autobuyers::{Autobuyer, AutobuyerMode, AutobuyerState};
 pub use break_infinity::Decimal;
+pub use challenges::{NormalChallengeState, NORMAL_CHALLENGE_COUNT};
 pub use infinity_upgrades::{
     InfinityUpgrade, ALL_INFINITY_UPGRADES, INFINITY_UPGRADE_COUNT,
 };
