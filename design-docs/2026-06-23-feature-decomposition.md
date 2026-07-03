@@ -438,6 +438,10 @@ Completion provides permanent rewards that significantly boost progression.
 | 7 | Tickspeed only works for 7th & 8th dims | 7th dim produces 8th dim |
 | 8 | Dim mult = bought^(0.4+IC8 × 0.1); sacrifice disabled | Galaxy threshold cost reduced |
 
+**Status:** ✅ Implemented (run state machine, all 8 restrictions + rewards, forced
+crunch on start/exit, save/load, UI subtab). See
+`design-docs/2026-07-03-infinity-challenges.md`.
+
 ---
 
 ## Phase 3: Infinity Dimensions & Replicanti
@@ -479,6 +483,10 @@ This multiplier applies to ALL antimatter dimensions.
 **Persistence:** IDs are NOT reset on infinity. They ARE reset on eternity (initially;
 eternity milestones eventually preserve them).
 
+**Status:** ✅ Implemented (8 tiers, production chain → Infinity Power → `^7` AD
+multiplier, unlock/buy/buy-max, per-crunch amount reset with purchases kept,
+save/load, UI subtab). See `design-docs/2026-07-03-infinity-dimensions.md`.
+
 ---
 
 ### Feature 3.2: Replicanti
@@ -492,10 +500,12 @@ and can be converted into "Replicanti Galaxies" (free galaxy equivalents).
 
 **Growth model:**
 - Replicanti have a "chance" (starts at 1%) and an "interval" (starts at 1000ms)
-- Each tick: amount doubles with probability `chance` per interval
-- Effective growth: `amount *= 2^(chance * diff / interval)` (continuous approximation)
+- Each tick a replicanti reproduces with probability `chance` per interval
+- Effective growth: `amount *= (1 + chance)^(diff / interval)` (the JS "fast gain"
+  continuous approximation; the binomial/Poisson randomness at tiny amounts is dropped)
 - Cap: 1e308 (then galaxies can be purchased)
-- Post-cap growth: slows down (scale factor per log10 orders of magnitude)
+- Post-cap growth: slows down (scale factor per log10) — **unreachable pre-Eternity**
+  (`isUncapped` is always false, so amount stays clamped at the cap; omitted)
 
 **Replicanti Galaxies:**
 - When replicanti reach cap, can buy a Replicanti Galaxy (resets replicanti to 1)
@@ -509,9 +519,14 @@ and can be converted into "Replicanti Galaxies" (free galaxy equivalents).
 
 **Replicanti multiplier to Infinity Dimensions:**
 ```
-replicanti_mult = max(replicanti_amount, 1)
-// (capped at replicanti_cap, increased by Glyph effects later)
+replicanti_mult = max(log2(max(replicanti_amount, 1))^2, 1)
+// (applied while unlocked and amount > 1; the TS/Glyph terms are later features)
 ```
+
+**Status:** ✅ Implemented (unlock at 1e140 IP, capped continuous growth,
+Replicanti Galaxies feeding tickspeed via `effective_galaxies`, the 3 IP upgrades,
+`replicanti_mult` into Infinity Dimensions, persistence across Big Crunch, save/load,
+UI subtab). See `design-docs/2026-07-03-replicanti.md`.
 
 ---
 
