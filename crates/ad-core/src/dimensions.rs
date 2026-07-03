@@ -1,17 +1,46 @@
 use break_infinity::Decimal;
 
-use crate::data::constants::{AD_BASE_COSTS, AD_COST_MULTIPLIERS};
+use crate::data::constants::{
+    AD_BASE_COSTS, AD_COST_MULTIPLIERS, C6_AD_BASE_COSTS, C6_AD_COST_MULTIPLIERS,
+};
 use crate::state::GameState;
 
 impl GameState {
     /// Compute the current cost for the next purchase of a
     /// dimension tier (0-indexed). Cost increases every 10
-    /// purchases: base_cost * cost_multiplier^(bought / 10).
+    /// purchases: `base × mult^(bought/10 + cost_bumps)`. Normal Challenge 6 uses
+    /// a different cost table; `cost_bumps` is the NC9 same-cost bump (0 otherwise).
     pub fn dimension_cost(&self, tier: usize) -> Decimal {
-        let purchase_group = self.dimensions[tier].bought / 10;
-        Decimal::from_float(AD_BASE_COSTS[tier])
-            * Decimal::from_float(AD_COST_MULTIPLIERS[tier])
-                .pow(&Decimal::from_float(purchase_group as f64))
+        let (base, mult) = if self.challenge_running(6) {
+            (C6_AD_BASE_COSTS[tier], C6_AD_COST_MULTIPLIERS[tier])
+        } else {
+            (AD_BASE_COSTS[tier], AD_COST_MULTIPLIERS[tier])
+        };
+        let purchase_group =
+            self.dimensions[tier].bought / 10 + self.dimensions[tier].cost_bumps;
+        Decimal::from_float(base)
+            * Decimal::from_float(mult).pow(&Decimal::from_float(purchase_group as f64))
+    }
+
+    /// The currency a dimension purchase spends. Normal Challenge 6 pays for the
+    /// 3rd and higher dimensions with the dimension 2 tiers below (`currencyAmount`);
+    /// otherwise it is antimatter.
+    fn dim_currency_amount(&self, tier: usize) -> Decimal {
+        if tier >= 2 && self.challenge_running(6) {
+            self.dimensions[tier - 2].amount
+        } else {
+            self.antimatter
+        }
+    }
+
+    /// Subtract `cost` from the currency a dimension purchase spends (see
+    /// [`dim_currency_amount`](Self::dim_currency_amount)).
+    fn spend_dim_currency(&mut self, tier: usize, cost: Decimal) {
+        if tier >= 2 && self.challenge_running(6) {
+            self.dimensions[tier - 2].amount -= cost;
+        } else {
+            self.antimatter -= cost;
+        }
     }
 
     /// Try to buy one of the specified dimension tier
@@ -23,8 +52,14 @@ impl GameState {
         }
 
         let cost = self.dimension_cost(tier);
-        if self.antimatter >= cost {
-            self.antimatter -= cost;
+        if self.dim_currency_amount(tier) >= cost {
+            self.spend_dim_currency(tier, cost);
+            // NC9: completing a group of 10 bumps the cost of equal-cost
+            // dimensions/tickspeed. Done before the `bought` increment so the
+            // source's cost still reflects the current (pre-rollover) group.
+            if self.challenge_running(9) && self.dimensions[tier].bought % 10 == 9 {
+                self.nc9_bump_same_cost_from_dimension(tier);
+            }
             self.dimensions[tier].amount += Decimal::from_float(1.0);
             self.dimensions[tier].bought += 1;
             self.on_buy_dimension(tier);
@@ -43,6 +78,14 @@ impl GameState {
         // (resets the recovering `chall2Pow` factor to 0).
         if self.challenge_running(2) {
             self.chall2_pow = 0.0;
+        }
+
+        // Normal Challenge 4: buying a dimension erases all lower-tier dimension
+        // amounts (keeping their bought counts) — like a Sacrifice with no boost.
+        if self.challenge_running(4) {
+            for i in 0..tier {
+                self.dimensions[i].amount = Decimal::ZERO;
+            }
         }
 
         // 11–18: buy a 1st..8th Antimatter Dimension (tier is 0-indexed).
@@ -173,7 +216,20 @@ impl GameState {
             return Decimal::ZERO;
         }
 
-        let amount = self.dimensions[tier].amount;
+        let mut amount = self.dimensions[tier].amount;
+        // Normal Challenge 12 strengthens the even dimensions (2nd/4th/6th) to
+        // compensate for producing 2 tiers below (tiers are 0-indexed here).
+        if self.challenge_running(12) {
+            let exponent = match tier {
+                1 => Some(1.6),
+                3 => Some(1.4),
+                5 => Some(1.2),
+                _ => None,
+            };
+            if let Some(exp) = exponent {
+                amount = amount.pow(&Decimal::from_float(exp));
+            }
+        }
         let multiplier = self.dimension_multiplier(tier);
         let tickspeed_effect = self.tickspeed_effect();
         let mut production = amount * multiplier * tickspeed_effect;

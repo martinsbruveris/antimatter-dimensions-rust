@@ -14,6 +14,11 @@ impl GameState {
             // Clear the TICKSPEED tutorial highlight on the purchase, like the
             // original's buyTickSpeed (no-op once past that step).
             self.tutorial_turn_off(crate::tutorial::state::TICKSPEED);
+            // NC9: buying a Tickspeed upgrade bumps every equal-cost dimension to
+            // its next cost step (before the purchase, using the current cost).
+            if self.challenge_running(9) {
+                self.nc9_bump_same_cost_from_tickspeed();
+            }
             self.antimatter -= self.tickspeed.cost;
             self.tickspeed.bought += 1;
             self.tickspeed.cost *= self.tickspeed.cost_multiplier;

@@ -46,6 +46,12 @@ pub struct DimensionTier {
     pub amount: Decimal,
     /// Number of individual purchases made.
     pub bought: u64,
+    /// Extra cost-scaling steps beyond `bought / 10` (`data.costBumps`). Normal
+    /// Challenge 9 bumps this on other dimensions of equal cost when you buy a
+    /// group of 10 or a Tickspeed upgrade; otherwise 0. Folds into the cost
+    /// exponent: `base × mult^(bought/10 + cost_bumps)`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub cost_bumps: u64,
 }
 
 impl DimensionTier {
@@ -53,6 +59,7 @@ impl DimensionTier {
         Self {
             amount: Decimal::ZERO,
             bought: 0,
+            cost_bumps: 0,
         }
     }
 }
@@ -69,6 +76,12 @@ impl Default for DimensionTier {
 pub struct TickspeedState {
     /// Number of tickspeed upgrades purchased.
     pub bought: u64,
+    /// Extra cost-scaling steps beyond `bought` (`player.chall9TickspeedCostBumps`).
+    /// Normal Challenge 9 bumps this when you buy a group of 10 Antimatter
+    /// Dimensions of equal cost; otherwise 0. The stored `cost` already reflects
+    /// it (invariant: `cost = base × mult^(bought + cost_bumps)`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub cost_bumps: u64,
     /// Current cost to buy the next tickspeed upgrade.
     pub cost: Decimal,
     /// Cost multiplier per purchase.
@@ -85,6 +98,7 @@ impl TickspeedState {
     pub fn new() -> Self {
         Self {
             bought: 0,
+            cost_bumps: 0,
             cost: Decimal::from_float(TICKSPEED_BASE_COST),
             cost_multiplier: Decimal::from_float(TICKSPEED_COST_MULTIPLIER),
         }
@@ -97,10 +111,20 @@ impl TickspeedState {
     /// value. Matches the geometric accumulation in [`GameState::buy_tickspeed`]
     /// (`cost = base * multiplier^bought`).
     pub fn with_bought(bought: u64) -> Self {
+        Self::with_bought_and_bumps(bought, 0)
+    }
+
+    /// Like [`with_bought`](Self::with_bought) but also applies Normal-Challenge-9
+    /// tickspeed cost bumps (`player.chall9TickspeedCostBumps`), which shift the
+    /// cost by extra multiplier steps: `cost = base × mult^(bought + cost_bumps)`.
+    pub fn with_bought_and_bumps(bought: u64, cost_bumps: u64) -> Self {
         let mut state = Self::new();
         state.bought = bought;
+        state.cost_bumps = cost_bumps;
         state.cost = Decimal::from_float(TICKSPEED_BASE_COST)
-            * state.cost_multiplier.pow(&Decimal::from(bought));
+            * state
+                .cost_multiplier
+                .pow(&Decimal::from(bought + cost_bumps));
         state
     }
 }

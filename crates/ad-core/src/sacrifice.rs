@@ -145,8 +145,11 @@ impl GameState {
         // Update total sacrificed
         self.sacrificed += self.dimensions[0].amount;
 
-        // Reset amounts for dimensions 1-7 (indices 0-6)
-        for i in 0..7 {
+        // Reset amounts for the lower dimensions (`resetAmountUpToTier`): up to
+        // tier 7 (indices 0–6) normally, or tier 6 (indices 0–5, keeping AD7)
+        // under Normal Challenge 12.
+        let max_tier = if self.challenge_running(12) { 6 } else { 7 };
+        for i in 0..max_tier {
             self.dimensions[i].amount = Decimal::ZERO;
         }
 

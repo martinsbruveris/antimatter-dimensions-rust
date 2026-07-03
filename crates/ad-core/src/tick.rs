@@ -41,17 +41,25 @@ impl GameState {
             }
         });
 
-        // Apply production: each tier produces into the tier below it
-        // Tier 0 (AD1) produces antimatter
-        self.antimatter += productions[0];
-
-        // Track all-time antimatter produced (monotonic, survives crunches).
-        // Counted before the Big Crunch cap so it reflects true production.
-        self.total_antimatter += productions[0];
-
-        // Tiers 1-7 produce into the tier below
-        for tier in 1..unlocked {
-            self.dimensions[tier - 1].amount += productions[tier];
+        // Apply production. Normally the 1st dimension makes antimatter and every
+        // higher dimension feeds the tier directly below it. Normal Challenge 12
+        // shifts this: the 1st *and* 2nd dimensions both make antimatter, and
+        // higher dimensions feed 2 tiers below (AD3→AD1, AD4→AD2, …).
+        // `total_antimatter` (monotonic, survives crunches) counts all antimatter
+        // produced, before the Big Crunch cap.
+        if self.challenge_running(12) {
+            let am_gain = productions[0] + productions[1];
+            self.antimatter += am_gain;
+            self.total_antimatter += am_gain;
+            for tier in 2..unlocked {
+                self.dimensions[tier - 2].amount += productions[tier];
+            }
+        } else {
+            self.antimatter += productions[0];
+            self.total_antimatter += productions[0];
+            for tier in 1..unlocked {
+                self.dimensions[tier - 1].amount += productions[tier];
+            }
         }
 
         // Cap antimatter at the Big Crunch threshold. Pre-Infinity, antimatter

@@ -83,6 +83,34 @@ impl GameState {
         self.chall8_total_sacrifice = Decimal::ONE;
     }
 
+    /// NC9 `multiplySameCosts`, triggered by completing a group of 10 of dimension
+    /// `src_tier`: every *other* dimension — and Tickspeed — whose current cost
+    /// shares the source's order of magnitude (its Decimal exponent) gets a cost
+    /// bump, jumping it to the next cost step.
+    pub(crate) fn nc9_bump_same_cost_from_dimension(&mut self, src_tier: usize) {
+        let src_e = self.dimension_cost(src_tier).exponent();
+        for t in 0..8 {
+            if t != src_tier && self.dimension_cost(t).exponent() == src_e {
+                self.dimensions[t].cost_bumps += 1;
+            }
+        }
+        if self.tickspeed.cost.exponent() == src_e {
+            self.tickspeed.cost_bumps += 1;
+            self.tickspeed.cost *= self.tickspeed.cost_multiplier;
+        }
+    }
+
+    /// NC9 `Tickspeed.multiplySameCosts`: buying a Tickspeed upgrade bumps every
+    /// dimension whose current cost shares Tickspeed's order of magnitude.
+    pub(crate) fn nc9_bump_same_cost_from_tickspeed(&mut self) {
+        let ts_e = self.tickspeed.cost.exponent();
+        for t in 0..8 {
+            if self.dimension_cost(t).exponent() == ts_e {
+                self.dimensions[t].cost_bumps += 1;
+            }
+        }
+    }
+
     /// Whether the Challenges tab is available — after the first Big Crunch
     /// (`PlayerProgress.infinityUnlocked()`).
     pub fn challenges_unlocked(&self) -> bool {
@@ -560,5 +588,135 @@ mod tests {
         assert_eq!(game.chall2_pow, 1.0);
         assert_eq!(game.chall3_pow, Decimal::from_float(0.01));
         assert_eq!(game.matter, Decimal::ZERO);
+    }
+
+    // --- NC4: buying a dimension erases all lower-tier amounts.
+
+    #[test]
+    fn nc4_erases_lower_dimensions_on_buy() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.start_challenge(4);
+        game.dimensions[0].amount = Decimal::from_float(100.0);
+        game.dimensions[1].amount = Decimal::from_float(50.0); // AD2 owned → AD3 available
+        game.dimensions[2].amount = Decimal::from_float(5.0);
+        game.antimatter = Decimal::from_float(1e12);
+
+        assert!(game.buy_dimension(2)); // buy a 3rd dimension
+                                        // Lower amounts erased; the just-bought tier keeps its amount.
+        assert_eq!(game.dimensions[0].amount, Decimal::ZERO);
+        assert_eq!(game.dimensions[1].amount, Decimal::ZERO);
+        assert!(game.dimensions[2].amount > Decimal::ZERO);
+    }
+
+    // --- NC6: dimensions bought with the dimension 2 tiers below, different costs.
+
+    #[test]
+    fn nc6_buys_higher_dimensions_with_lower_ones() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.start_challenge(6);
+        // The 3rd dimension uses the C6 base cost (100) and is paid for with the
+        // 1st dimension, not antimatter.
+        game.dimensions[1].amount = Decimal::from_float(1.0); // AD2 owned (availability)
+        game.dimensions[0].amount = Decimal::from_float(1000.0); // AD1 = currency
+        assert_eq!(game.dimension_cost(2), Decimal::from_float(100.0));
+
+        let am_before = game.antimatter;
+        assert!(game.buy_dimension(2));
+        assert_eq!(game.antimatter, am_before); // antimatter untouched
+        assert_eq!(game.dimensions[0].amount, Decimal::from_float(900.0)); // AD1 spent
+        assert_eq!(game.dimensions[2].bought, 1);
+    }
+
+    // --- NC9: buying 10 of a dimension (or tickspeed) bumps equal-cost costs.
+
+    #[test]
+    fn nc9_bumps_equal_cost_dimensions_on_group_of_ten() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.start_challenge(9);
+        // Arrange AD1 and AD2 to share a cost order of magnitude: AD1 at group 3
+        // (e = 1 + 3×3 = 10), AD2 at group 2 (e = 2 + 4×2 = 10).
+        game.dimensions[0].bought = 39;
+        game.dimensions[1].bought = 20;
+        game.dimensions[1].amount = Decimal::ONE;
+        assert_eq!(
+            game.dimension_cost(0).exponent(),
+            game.dimension_cost(1).exponent()
+        );
+        let ad2_cost_before = game.dimension_cost(1);
+        game.antimatter = game.dimension_cost(0) * Decimal::from_float(2.0);
+
+        // Buying the 40th 1st dimension completes a group of 10 → bumps AD2.
+        assert!(game.buy_dimension(0));
+        assert_eq!(game.dimensions[1].cost_bumps, 1);
+        assert_eq!(game.dimensions[0].cost_bumps, 0); // source not bumped
+        assert!(game.dimension_cost(1) > ad2_cost_before);
+    }
+
+    // --- NC12: production shifts 2 tiers, 1st/2nd make antimatter, evens stronger.
+
+    #[test]
+    fn nc12_first_two_dimensions_make_antimatter_and_shift_two_tiers() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinities = Decimal::from_float(16.0);
+        game.start_challenge(12);
+        game.autobuyers.enabled = false;
+        for t in 0..4 {
+            game.dimensions[t].amount = Decimal::from_float(10.0);
+            game.dimensions[t].bought = 10;
+        }
+        let am_before = game.antimatter;
+        let ad1_before = game.dimensions[0].amount;
+        let ad2_before = game.dimensions[1].amount;
+
+        game.tick(1000.0);
+
+        // Antimatter grows (1st + 2nd dims); AD3→AD1 and AD4→AD2.
+        assert!(game.antimatter > am_before);
+        assert!(game.dimensions[0].amount > ad1_before);
+        assert!(game.dimensions[1].amount > ad2_before);
+    }
+
+    #[test]
+    fn nc12_strengthens_the_second_dimension() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinities = Decimal::from_float(16.0);
+        game.start_challenge(12);
+        game.dimensions[1].amount = Decimal::from_float(100.0);
+        game.dimensions[1].bought = 10;
+
+        // AD2 production uses amount^1.6.
+        let produced = game.dimension_production_per_second(1);
+        let expected = Decimal::from_float(100.0).pow(&Decimal::from_float(1.6))
+            * game.dimension_multiplier(1)
+            * game.tickspeed_effect();
+        assert!((produced.to_f64() / expected.to_f64() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn nc12_sacrifice_keeps_the_seventh_dimension() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinities = Decimal::from_float(16.0);
+        game.start_challenge(12);
+        game.dim_boosts = 5;
+        for t in 0..8 {
+            game.dimensions[t].amount = Decimal::from_float(100.0);
+        }
+        game.dimensions[0].amount = Decimal::new(1.0, 20); // AD1 large → next boost > 1
+        game.dimensions[7].bought = 5;
+
+        assert!(game.can_sacrifice());
+        assert!(game.sacrifice());
+        // Dims 1–6 (indices 0–5) reset; AD7 (index 6) and AD8 (index 7) kept.
+        for i in 0..6 {
+            assert_eq!(game.dimensions[i].amount, Decimal::ZERO);
+        }
+        assert_eq!(game.dimensions[6].amount, Decimal::from_float(100.0));
+        assert_eq!(game.dimensions[7].amount, Decimal::from_float(100.0));
     }
 }

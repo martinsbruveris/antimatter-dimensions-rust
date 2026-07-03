@@ -12,6 +12,15 @@ pub const AD_BASE_COSTS: [f64; 8] = [1e1, 1e2, 1e4, 1e6, 1e9, 1e13, 1e18, 1e24];
 /// From the original game: 1e3, 1e4, 1e5, 1e6, 1e8, 1e10, 1e12, 1e15
 pub const AD_COST_MULTIPLIERS: [f64; 8] = [1e3, 1e4, 1e5, 1e6, 1e8, 1e10, 1e12, 1e15];
 
+/// Antimatter-dimension base costs under Normal Challenge 6 (`_c6BaseCost`), where
+/// each dimension is bought with the dimension 2 tiers below it. 0-indexed.
+pub const C6_AD_BASE_COSTS: [f64; 8] = [1e1, 1e2, 1e2, 5e2, 2.5e3, 2e4, 2e5, 4e6];
+
+/// Antimatter-dimension cost multipliers under Normal Challenge 6
+/// (`_c6BaseCostMultiplier`). 0-indexed.
+pub const C6_AD_COST_MULTIPLIERS: [f64; 8] =
+    [1e3, 5e3, 1e4, 1.2e4, 1.8e4, 2.6e4, 3.2e4, 4.2e4];
+
 /// Initial tickspeed in milliseconds (lower = faster production).
 pub const INITIAL_TICKSPEED_MS: f64 = 1000.0;
 

@@ -119,13 +119,15 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // Stamp the save time so the game computes ~0 offline progress on import.
     player["lastUpdate"] = json!(now_ms);
 
-    // Antimatter dimensions. `costBumps` stays 0 (template); we only model
-    // `amount` and `bought`.
+    // Antimatter dimensions: amount, purchase count, and NC9 cost bumps.
     for (tier, dim) in state.dimensions.iter().enumerate() {
         let entry = &mut player["dimensions"]["antimatter"][tier];
         entry["amount"] = decimal(&dim.amount);
         entry["bought"] = json!(dim.bought);
+        entry["costBumps"] = json!(dim.cost_bumps);
     }
+    // NC9 tickspeed cost bumps.
+    player["chall9TickspeedCostBumps"] = json!(state.tickspeed.cost_bumps);
 
     // Options.
     let options = &mut player["options"];
@@ -281,6 +283,27 @@ mod tests {
         assert_eq!(reloaded.chall3_pow, Decimal::from_float(1234.5));
         assert_eq!(reloaded.matter, Decimal::new(1.0, 200));
         assert_eq!(reloaded.chall8_total_sacrifice, Decimal::new(2.5, 50));
+    }
+
+    #[test]
+    fn cost_bumps_round_trip() {
+        // NC9 cost bumps survive encode → decode for dimensions and tickspeed,
+        // and the derived tickspeed cost reflects bought + bumps.
+        use crate::state::TickspeedState;
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.dimensions[2].cost_bumps = 3;
+        state.dimensions[5].cost_bumps = 1;
+        state.tickspeed = TickspeedState::with_bought_and_bumps(12, 4);
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.dimensions[2].cost_bumps, 3);
+        assert_eq!(reloaded.dimensions[5].cost_bumps, 1);
+        assert_eq!(reloaded.tickspeed.cost_bumps, 4);
+        assert_eq!(reloaded.tickspeed.bought, 12);
+        assert_eq!(
+            reloaded.tickspeed.cost,
+            TickspeedState::with_bought_and_bumps(12, 4).cost
+        );
     }
 
     #[test]

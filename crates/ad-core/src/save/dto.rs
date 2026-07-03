@@ -58,6 +58,8 @@ pub struct PlayerDTO {
     pub dimension_boosts: u32,
     pub galaxies: u32,
     pub total_tick_bought: u64,
+    /// `player.chall9TickspeedCostBumps` — NC9 tickspeed cost bumps (a number).
+    pub chall9_tickspeed_cost_bumps: u64,
     /// `player.break` — break-infinity flag. `break` is a Rust keyword, hence the
     /// rename. Part of the Infinity-unlocked test (§4.3).
     #[serde(rename = "break")]
@@ -122,11 +124,14 @@ pub struct DimensionsDTO {
 
 /// One entry of `player.dimensions.antimatter[]`.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DimensionDTO {
     #[serde(with = "break_infinity::serde_string")]
     pub amount: Decimal,
     pub bought: u64,
-    // `costBumps` exists in the save but is always 0 at our frontier; ignored.
+    /// `costBumps` — extra cost-scaling steps (nonzero only under NC9). See
+    /// [`DimensionTier::cost_bumps`].
+    pub cost_bumps: u64,
 }
 
 /// `player.records` — the modelled slice: all-time antimatter, total time
@@ -273,6 +278,7 @@ impl GameState {
         let dimensions = std::array::from_fn(|tier| DimensionTier {
             amount: dims[tier].amount,
             bought: dims[tier].bought,
+            cost_bumps: dims[tier].cost_bumps,
         });
 
         // §4.3: Infinity is unlocked once `break` is set or any infinity / IP has
@@ -401,7 +407,10 @@ impl GameState {
             antimatter: dto.antimatter,
             total_antimatter: dto.records.total_antimatter,
             dimensions,
-            tickspeed: TickspeedState::with_bought(dto.total_tick_bought),
+            tickspeed: TickspeedState::with_bought_and_bumps(
+                dto.total_tick_bought,
+                dto.chall9_tickspeed_cost_bumps,
+            ),
             dim_boosts: dto.dimension_boosts,
             galaxies: dto.galaxies,
             sacrificed: dto.sacrificed,
