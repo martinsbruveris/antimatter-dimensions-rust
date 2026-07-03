@@ -4,6 +4,8 @@
 // an explanatory body (slot), an optional "Don't show again" checkbox, and
 // Cancel / Confirm buttons. Built on our generic Modal.vue rather than the
 // original's EventHub-based wrapper.
+import { onMounted, onUnmounted } from "vue";
+
 import Modal from "./Modal.vue";
 import ModalConfirmationCheck from "./ModalConfirmationCheck.vue";
 
@@ -15,6 +17,20 @@ defineProps({
 });
 
 const emit = defineEmits(["confirm", "close"]);
+
+// Enter confirms the modal (the "Confirm Modal" hotkey). Bound here rather
+// than in util/shortcuts.js, mirroring the original where the modal wrapper —
+// not the global keyboard handler — reacts to GAME_EVENT.ENTER_PRESSED. Skips
+// typing targets like the global handler does.
+function onKeydown(e) {
+  if (e.key !== "Enter") return;
+  const tag = e.target?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  emit("confirm");
+}
+
+onMounted(() => window.addEventListener("keydown", onKeydown));
+onUnmounted(() => window.removeEventListener("keydown", onKeydown));
 </script>
 
 <template>

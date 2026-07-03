@@ -35,53 +35,65 @@ export function handleShortcut(e, game, ui) {
     return;
   }
 
-  // Ignore other Ctrl/Cmd/Alt combos: in the original these map to binds we
-  // don't implement yet (autobuyer toggles), and swallowing them would
-  // break browser/OS shortcuts.
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // Ignore other Ctrl/Cmd combos: in the original these map to binds we don't
+  // implement yet, and swallowing them would break browser/OS shortcuts.
+  if (e.ctrlKey || e.metaKey) return;
 
-  // Popups.
-  if (e.key === "?") {
-    ui.toggleModal("hotkeys");
-    return;
-  }
-  if (e.code === "KeyH") {
-    ui.toggleModal("help");
-    return;
-  }
-  if (e.key === "Escape") {
-    if (ui.openModal) ui.closeModal();
-    return;
-  }
+  if (!e.altKey) {
+    // Popups. Enter ("Confirm Modal") is not handled here: ConfirmModal.vue
+    // binds it itself while a confirmation modal is open.
+    if (e.key === "?") {
+      ui.toggleModal("hotkeys");
+      return;
+    }
+    if (e.code === "KeyH") {
+      ui.toggleModal("help");
+      return;
+    }
+    if (e.key === "Escape") {
+      // Close the open modal, or open the Options tab when none is (the
+      // original's keyboardPressEscape).
+      if (ui.openModal) ui.closeModal();
+      else ui.setTab("options");
+      return;
+    }
 
-  // Arrow keys cycle pages: Up/Down through tabs, Left/Right through the
-  // current tab's subtabs. Like the original these are bound with `bind` (not
-  // `bindHotkey`), so they stay active even when hotkeys are disabled.
-  switch (e.code) {
-    case "ArrowUp":
-      ui.moveTab(-1);
-      e.preventDefault();
-      return;
-    case "ArrowDown":
-      ui.moveTab(1);
-      e.preventDefault();
-      return;
-    case "ArrowLeft":
-      ui.moveSubtab(-1);
-      e.preventDefault();
-      return;
-    case "ArrowRight":
-      ui.moveSubtab(1);
-      e.preventDefault();
-      return;
-    default:
-      break;
+    // Arrow keys cycle pages: Up/Down through tabs, Left/Right through the
+    // current tab's subtabs. Like the original these are bound with `bind` (not
+    // `bindHotkey`), so they stay active even when hotkeys are disabled.
+    switch (e.code) {
+      case "ArrowUp":
+        ui.moveTab(-1);
+        e.preventDefault();
+        return;
+      case "ArrowDown":
+        ui.moveTab(1);
+        e.preventDefault();
+        return;
+      case "ArrowLeft":
+        ui.moveSubtab(-1);
+        e.preventDefault();
+        return;
+      case "ArrowRight":
+        ui.moveSubtab(1);
+        e.preventDefault();
+        return;
+      default:
+        break;
+    }
   }
 
   // Everything below relates to game functionality and obeys the "Hotkeys"
   // option, mirroring the original's `bindHotkey` (gated by
   // `player.options.hotkeys`) versus `bind` (always active) split.
   if (game.snapshot && game.snapshot.options && !game.snapshot.options.hotkeys) {
+    return;
+  }
+
+  // Alt is the autobuyer modifier: Alt+key toggles the key's corresponding
+  // autobuyer, Shift+Alt+key its singles/max mode.
+  if (e.altKey) {
+    handleAutobuyerShortcut(e, game, ui);
     return;
   }
 
@@ -134,4 +146,82 @@ export function handleShortcut(e, game, ui) {
     default:
       break;
   }
+}
+
+// Alt+key toggles the matching autobuyer on/off; Shift+Alt+key toggles its
+// buys-singles/buys-max mode instead. Mirrors the original's toggleAutobuyer /
+// toggleBuySingles (hotkeys.js), including their info toasts. The original's
+// Alt+S (Sacrifice) autobuyer doesn't exist in this reimplementation yet.
+function handleAutobuyerShortcut(e, game, ui) {
+  const autobuyers = game.snapshot?.autobuyers;
+  if (!autobuyers) return;
+
+  const dim = e.code.match(DIM_KEY);
+  if (dim) {
+    const tier = Number(dim[1]) - 1;
+    const entry = autobuyers.dimensions[tier];
+    if (e.shiftKey) {
+      toggleAutobuyerMode(entry, () => game.toggleAdAutobuyerMode(tier), ui);
+    } else {
+      toggleAutobuyer(entry, () => game.toggleAdAutobuyer(tier), ui);
+    }
+    return;
+  }
+
+  switch (e.code) {
+    case "KeyT":
+      // Shift+Alt+T (tickspeed singles/max mode) is a no-op for now: the mode
+      // is locked pre-Infinity (`can_change_mode` is always false) and the
+      // engine has no command to flip it yet.
+      if (!e.shiftKey) {
+        toggleAutobuyer(
+          autobuyers.tickspeed,
+          () => game.toggleTickspeedAutobuyer(),
+          ui,
+        );
+      }
+      break;
+    case "KeyD":
+      toggleAutobuyer(
+        autobuyers.dim_boost,
+        () => game.toggleAutobuyer("dimBoost"),
+        ui,
+      );
+      break;
+    case "KeyG":
+      toggleAutobuyer(
+        autobuyers.galaxy,
+        () => game.toggleAutobuyer("galaxy"),
+        ui,
+      );
+      break;
+    case "KeyC":
+      toggleAutobuyer(
+        autobuyers.big_crunch,
+        () => game.toggleAutobuyer("bigCrunch"),
+        ui,
+      );
+      break;
+    default:
+      break;
+  }
+}
+
+// Toggle one autobuyer on/off if it's unlocked. The toast reports the new
+// state, inferred from the pre-toggle snapshot (the command resolves before
+// the next snapshot arrives); entry names already end in "Autobuyer".
+function toggleAutobuyer(entry, doToggle, ui) {
+  if (!entry.is_unlocked) return;
+  doToggle();
+  ui.notify(`${entry.name} toggled ${entry.is_active ? "off" : "on"}`);
+}
+
+// Toggle an autobuyer between buying singles and buying max, where the mode
+// exists and is changeable (currently only the AD autobuyers).
+function toggleAutobuyerMode(entry, doToggle, ui) {
+  if (!entry.is_unlocked || !entry.can_change_mode) return;
+  doToggle();
+  ui.notify(
+    `${entry.name} set to buy ${entry.mode === "single" ? "max" : "singles"}`,
+  );
 }
