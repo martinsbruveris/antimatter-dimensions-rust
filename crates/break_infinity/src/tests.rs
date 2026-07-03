@@ -148,3 +148,31 @@ fn to_str_precision() {
     assert_eq!(Decimal::from_float(1e20).to_str_precision(3), "1.00e+20");
     assert_eq!(Decimal::from_float(5.0).to_str_precision(3), "5.00");
 }
+
+#[test]
+fn pow_fractional_exponent() {
+    // Regression: the fast path used to take `e * n` and truncate it via
+    // `as i64`, silently dropping the fractional exponent. `(1e10)^0.05` has
+    // `e * n = 0.5`, which must fold `10^0.5` into the mantissa rather than
+    // vanish. Expect 10^(10 * 0.05) = 10^0.5 ≈ 3.1623.
+    let base = Decimal::new(1.0, 10); // 1e10
+    let result = base.pow(&Decimal::from_float(0.05));
+    assert!(
+        (result.to_f64() - 10f64.powf(0.5)).abs() < 1e-9,
+        "expected ~3.1623, got {result:?}"
+    );
+
+    // A non-unit mantissa also needs the fractional exponent handled:
+    // (4e10)^0.5 = sqrt(4e10) = 2e5.
+    let result = Decimal::new(4.0, 10).pow(&Decimal::from_float(0.5));
+    assert!(
+        (result.to_f64() - 2e5).abs() / 2e5 < 1e-12,
+        "expected 2e5, got {result:?}"
+    );
+
+    // Integer `e * n` still takes the (exact) fast path.
+    assert_eq!(
+        Decimal::new(1.0, 10).pow(&Decimal::from_float(2.0)),
+        Decimal::new(1.0, 20)
+    );
+}

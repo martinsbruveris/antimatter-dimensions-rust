@@ -35,6 +35,16 @@ pub const DIM_BOOST_INITIAL_REQUIREMENT: u64 = 20;
 /// 15 more 8th dims.
 pub const DIM_BOOST_SCALING_REQUIREMENT: u64 = 15;
 
+/// Under Normal Challenge 10 (only 6 dimensions), each Dimension Boost past the
+/// 3rd requires this many more 6th dimensions (`(targetResets - 3) × 20` in
+/// `DimBoost.bulkRequirement`).
+pub const NC10_DIM_BOOST_SCALING_REQUIREMENT: u64 = 20;
+
+/// Antimatter-Galaxy cost under Normal Challenge 10: base `99` plus `90` per
+/// existing galaxy (vs the standard `80` / `60`).
+pub const NC10_FIRST_GALAXY_REQUIREMENT: u64 = 99;
+pub const NC10_GALAXY_REQUIREMENT_INCREMENT: u64 = 90;
+
 /// The base multiplier each dimension boost gives.
 /// Applied tier-dependently: power^max(0, boosts - tier).
 pub const DIM_BOOST_MULTIPLIER: f64 = 2.0;

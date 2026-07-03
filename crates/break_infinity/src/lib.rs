@@ -826,8 +826,14 @@ impl Decimal {
         let n = power.to_f64();
         let new_e = self.e as f64 * n;
 
-        // Fast track: mantissa^n is finite and e*n fits in safe integer range
-        if new_e.abs() < F64_MAX_SAFE_INT {
+        // Fast track: only when `e * n` is a safe *integer*, so the exponent needs
+        // no adjustment and the whole result lives in the mantissa's `^n`. This
+        // mirrors break_infinity.js's `Number.isSafeInteger(temp)` guard — a
+        // fractional `new_e` (e.g. `1e10 ^ 0.05` → `e * n = 0.5`) must NOT take
+        // this path, since `new_e as i64` would truncate the fractional exponent
+        // and silently drop a factor of `10^frac`. Such cases fall through to the
+        // logarithmic path below, which handles them correctly.
+        if new_e.abs() < F64_MAX_SAFE_INT && new_e.fract() == 0.0 {
             let new_m = self.m.powf(n);
             if new_m.is_finite() && new_m != 0.0 {
                 return Decimal::new(new_m, new_e as i64);

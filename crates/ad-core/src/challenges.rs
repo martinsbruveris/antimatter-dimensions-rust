@@ -48,6 +48,37 @@ impl GameState {
             && self.challenge.completed & (1u16 << id) != 0
     }
 
+    /// The number of Antimatter Dimensions unlockable in the current run.
+    /// Mirrors `DimBoost.maxDimensionsUnlockable`: Normal Challenge 10 restricts
+    /// play to 6 dimensions, otherwise all 8.
+    pub fn max_dimensions_unlockable(&self) -> usize {
+        if self.challenge_running(10) {
+            6
+        } else {
+            8
+        }
+    }
+
+    /// The maximum number of Dimension Boosts purchasable in the current run;
+    /// `None` = unbounded. Mirrors `DimBoost.maxBoosts`: Normal Challenge 8 caps
+    /// it at 5 (the 5th unlocks Sacrifice, and further boosts are pointless since
+    /// NC8 zeroes the boost multiplier).
+    pub fn max_boosts(&self) -> Option<u32> {
+        if self.challenge_running(8) {
+            Some(5)
+        } else {
+            None
+        }
+    }
+
+    /// Reset the per-run challenge accumulators (`resetChallengeStuff`), run on
+    /// every soft reset (Dimension Boost, Antimatter Galaxy) and Big Crunch. For
+    /// now just NC8's running sacrifice product; NC2/NC3 powers and NC11 matter
+    /// join it in later batches.
+    pub(crate) fn reset_challenge_stuff(&mut self) {
+        self.chall8_total_sacrifice = Decimal::ONE;
+    }
+
     /// Whether the Challenges tab is available — after the first Big Crunch
     /// (`PlayerProgress.infinityUnlocked()`).
     pub fn challenges_unlocked(&self) -> bool {
@@ -242,5 +273,145 @@ mod tests {
         assert!(game.start_challenge(2));
         assert_eq!(game.infinities, infinities_before);
         assert!(!game.challenge_completed(2));
+    }
+
+    // --- NC8: no boost multiplier, no galaxies, capped boosts, stronger sacrifice.
+
+    #[test]
+    fn nc8_zeroes_boost_multiplier_and_caps_boosts() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.start_challenge(8);
+
+        // Dimension Boosts give no multiplier (power = 1).
+        assert_eq!(game.dim_boost_power(), Decimal::ONE);
+        assert_eq!(game.max_boosts(), Some(5));
+
+        // At the 5-boost cap, no further boost is possible even with plenty of AD8.
+        game.dim_boosts = 5;
+        game.dimensions[7].amount = Decimal::from_float(1e6);
+        assert!(!game.can_dim_boost());
+    }
+
+    #[test]
+    fn nc8_disables_galaxies() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        // Outside a challenge, enough 8th dimensions allow a galaxy.
+        game.dimensions[7].amount = Decimal::from_float(1e6);
+        assert!(game.can_buy_galaxy());
+
+        game.start_challenge(8);
+        game.dimensions[7].amount = Decimal::from_float(1e6);
+        assert!(!game.can_buy_galaxy());
+    }
+
+    #[test]
+    fn nc8_sacrifice_accumulates_running_product_and_full_resets() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.start_challenge(8);
+        // Sacrifice needs >= 5 boosts and an 8th dimension.
+        game.dim_boosts = 5;
+        game.dimensions[0].amount = Decimal::from_float(1e10);
+        game.dimensions[0].bought = 40;
+        game.dimensions[7].amount = Decimal::from_float(10.0);
+        game.dimensions[7].bought = 5;
+        game.antimatter = Decimal::from_float(1e50);
+
+        assert_eq!(game.chall8_total_sacrifice, Decimal::ONE);
+        let next = game.next_sacrifice_boost();
+        assert!(next > Decimal::ONE, "next boost should exceed 1: {next:?}");
+        assert!(game.can_sacrifice());
+        assert!(game.sacrifice());
+
+        // The running product advances by the boost and drives the 8th-dim mult.
+        assert_eq!(game.chall8_total_sacrifice, next);
+        assert_eq!(game.sacrifice_multiplier(), next);
+        // Everything resets: all dimensions cleared, antimatter back to start.
+        for tier in 0..8 {
+            assert_eq!(game.dimensions[tier].amount, Decimal::ZERO);
+            assert_eq!(game.dimensions[tier].bought, 0);
+        }
+        assert_eq!(game.antimatter, game.starting_antimatter());
+    }
+
+    #[test]
+    fn crunch_and_boost_reset_chall8_total_sacrifice() {
+        // A Big Crunch resets the running product (resetChallengeStuff).
+        let mut game = GameState::new();
+        game.chall8_total_sacrifice = Decimal::from_float(1e20);
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+        assert_eq!(game.chall8_total_sacrifice, Decimal::ONE);
+
+        // So does a Dimension Boost.
+        game.chall8_total_sacrifice = Decimal::from_float(1e20);
+        game.dimensions[3].amount = Decimal::from_float(100.0); // 20 of the 4th
+        assert!(game.buy_dim_boost());
+        assert_eq!(game.chall8_total_sacrifice, Decimal::ONE);
+    }
+
+    // --- NC10: only 6 dimensions, modified boost/galaxy costs, no sacrifice.
+
+    #[test]
+    fn nc10_limits_dimensions_to_six() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinities = Decimal::from_float(16.0);
+        game.start_challenge(10);
+        game.dim_boosts = 4; // would normally unlock all 8
+
+        assert_eq!(game.max_dimensions_unlockable(), 6);
+        assert_eq!(game.unlocked_dimensions(), 6);
+        // The 7th dimension (index 6) is never unlocked or purchasable.
+        game.dimensions[5].amount = Decimal::ONE; // own a 6th
+        assert!(!game.is_dimension_unlocked(6));
+        assert!(!game.dim_available_for_purchase(6));
+    }
+
+    #[test]
+    fn nc10_modifies_galaxy_cost_and_tier() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinities = Decimal::from_float(16.0);
+        game.start_challenge(10);
+
+        // Gated on the 6th dimension (index 5), base cost 99, +90 per galaxy.
+        assert_eq!(game.galaxy_required_tier(), 5);
+        assert_eq!(game.galaxy_requirement(), 99);
+        game.galaxies = 2;
+        assert_eq!(game.galaxy_requirement(), 99 + 2 * 90);
+        game.dimensions[5].amount = Decimal::from_float(1000.0);
+        assert!(game.can_buy_galaxy());
+    }
+
+    #[test]
+    fn nc10_dim_boost_requires_more_sixth_dimensions() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinities = Decimal::from_float(16.0);
+        game.start_challenge(10);
+
+        // Early boosts unlock the 5th/6th dims at 20; then the 6th-dim cost scales
+        // by +20 per boost.
+        assert_eq!(game.dim_boost_requirement(), (3, 20)); // 4th dim
+        game.dim_boosts = 2;
+        assert_eq!(game.dim_boost_requirement(), (5, 20)); // 6th dim
+        game.dim_boosts = 3;
+        assert_eq!(game.dim_boost_requirement(), (5, 40));
+        game.dim_boosts = 4;
+        assert_eq!(game.dim_boost_requirement(), (5, 60));
+    }
+
+    #[test]
+    fn nc10_disables_sacrifice() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinities = Decimal::from_float(16.0);
+        game.start_challenge(10);
+        game.dim_boosts = 6;
+        game.dimensions[7].amount = Decimal::from_float(100.0);
+        assert!(!game.can_sacrifice());
     }
 }

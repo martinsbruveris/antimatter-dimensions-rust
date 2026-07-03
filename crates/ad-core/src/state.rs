@@ -16,6 +16,13 @@ fn default_true() -> bool {
     true
 }
 
+/// serde default for `Decimal` fields whose neutral value is `1` (e.g.
+/// `chall8_total_sacrifice`), since `Decimal`'s own `Default` is `0`.
+#[cfg(feature = "serde")]
+fn default_decimal_one() -> Decimal {
+    Decimal::ONE
+}
+
 /// A single antimatter dimension tier.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -129,6 +136,13 @@ pub struct GameState {
     /// `player.challenge.normal`; persists across a Big Crunch. See `challenges.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub challenge: NormalChallengeState,
+    /// Normal-Challenge-8 accumulated sacrifice boost (`player.chall8TotalSacrifice`).
+    /// Under NC8 dimensional sacrifice uses a running product kept across
+    /// sacrifice resets rather than the log-based total-boost formula; this holds
+    /// it. Starts at 1, advanced on each NC8 sacrifice, and reset by
+    /// [`reset_challenge_stuff`](GameState::reset_challenge_stuff). See `sacrifice.rs`.
+    #[cfg_attr(feature = "serde", serde(default = "default_decimal_one"))]
+    pub chall8_total_sacrifice: Decimal,
     /// Whether the player has performed at least one Big Crunch. Mirrors JS
     /// `PlayerProgress.infinityUnlocked()`: set on the first crunch and
     /// **not** reset by subsequent crunches. Gates Infinity-related UI (e.g.
@@ -183,6 +197,7 @@ impl GameState {
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),
+            chall8_total_sacrifice: Decimal::ONE,
             infinity_unlocked: false,
             records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],
@@ -195,11 +210,13 @@ impl GameState {
 
     /// Returns how many dimension tiers are currently unlocked.
     /// Starts with 4, each dim boost beyond the first 4 doesn't unlock more.
-    /// Dim boost 1 unlocks tier 5, boost 2 unlocks tier 6, etc.
+    /// Dim boost 1 unlocks tier 5, boost 2 unlocks tier 6, etc. Capped at
+    /// [`max_dimensions_unlockable`](Self::max_dimensions_unlockable) (6 under
+    /// Normal Challenge 10, otherwise 8).
     pub fn unlocked_dimensions(&self) -> usize {
         let base = 4;
         let from_boosts = (self.dim_boosts as usize).min(4);
-        base + from_boosts
+        (base + from_boosts).min(self.max_dimensions_unlockable())
     }
 
     /// Returns whether a given dimension tier (0-indexed) is unlocked.
@@ -214,7 +231,11 @@ impl GameState {
     /// original is 1-indexed (`tier > totalBoosts + 4`); for our 0-indexed
     /// `tier` that band is `tier > dim_boosts + 3`.
     pub fn dim_available_for_purchase(&self, tier: usize) -> bool {
-        if tier >= 8 || tier > self.dim_boosts as usize + 3 {
+        // Under Normal Challenge 10 only 6 dimensions exist (`tier < 7 ||
+        // !NC10` in `isAvailableForPurchase`); otherwise all 8.
+        if tier >= self.max_dimensions_unlockable()
+            || tier > self.dim_boosts as usize + 3
+        {
             return false;
         }
         tier == 0 || self.dimensions[tier - 1].amount > Decimal::ZERO

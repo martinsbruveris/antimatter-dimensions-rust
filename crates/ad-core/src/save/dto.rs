@@ -82,6 +82,10 @@ pub struct PlayerDTO {
     pub options: OptionsDTO,
     /// `player.challenge` — only the normal-challenge run state is modelled.
     pub challenge: ChallengeDTO,
+    /// `player.chall8TotalSacrifice` — NC8's running sacrifice product (a Decimal
+    /// string in the save). See `sacrifice.rs`.
+    #[serde(with = "break_infinity::serde_string")]
+    pub chall8_total_sacrifice: Decimal,
 }
 
 /// `player.challenge` — only the `normal` sub-object is modelled (infinity /
@@ -401,6 +405,7 @@ impl GameState {
                 current: dto.challenge.normal.current,
                 completed: dto.challenge.normal.completed_bits,
             },
+            chall8_total_sacrifice: dto.chall8_total_sacrifice,
             infinity_unlocked,
             records,
             achievement_bits,

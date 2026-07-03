@@ -91,6 +91,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // Normal-challenge run state.
     player["challenge"]["normal"]["current"] = json!(state.challenge.current);
     player["challenge"]["normal"]["completedBits"] = json!(state.challenge.completed);
+    // NC8's running sacrifice product (a Decimal string in the save schema).
+    player["chall8TotalSacrifice"] = decimal(&state.chall8_total_sacrifice);
 
     // Time / infinity records. `records.totalAntimatter` is written above; here we
     // add the time and infinity-timing slice.

@@ -220,9 +220,12 @@ impl GameState {
     }
 
     /// The Dimension-Boost power: `2`, or `2.5` once `dimboostMult` is owned
-    /// (original `DimBoost.power = Effects.max(2, dimboostMult=2.5, …)`).
+    /// (original `DimBoost.power = Effects.max(2, dimboostMult=2.5, …)`). Normal
+    /// Challenge 8 overrides it to `1` — Dimension Boosts give no multiplier.
     pub fn dim_boost_power(&self) -> Decimal {
-        if self.infinity_upgrade_bought(InfinityUpgrade::DimboostMult) {
+        if self.challenge_running(8) {
+            Decimal::ONE
+        } else if self.infinity_upgrade_bought(InfinityUpgrade::DimboostMult) {
             Decimal::from_float(2.5)
         } else {
             Decimal::from_float(DIM_BOOST_MULTIPLIER)

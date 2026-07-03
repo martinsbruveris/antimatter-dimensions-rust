@@ -113,6 +113,9 @@ impl GameState {
         self.dim_boosts = 0;
         self.galaxies = 0;
         self.sacrificed = Decimal::ZERO;
+        // Reset the per-run challenge accumulators (`secondSoftReset` → `softReset`
+        // → `resetChallengeStuff`).
+        self.reset_challenge_stuff();
         // Re-apply skip-reset Infinity Upgrades (original `secondSoftReset` →
         // `softReset` → `skipResetsIfPossible`): start the next infinity already at
         // the highest owned skip level (and with a Galaxy for skipResetGalaxy).
