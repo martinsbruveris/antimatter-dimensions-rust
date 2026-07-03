@@ -11,7 +11,7 @@ use ad_core::{
     offline_plan as core_offline_plan, AutobuyerMode, AutobuyerTarget,
     BreakInfinityRebuyable, BreakInfinityUpgrade, Decimal, GameState, InfinityUpgrade,
     ALL_BREAK_INFINITY_REBUYABLES, ALL_BREAK_INFINITY_UPGRADES, ALL_INFINITY_UPGRADES,
-    INFINITY_CHALLENGE_COUNT, NORMAL_CHALLENGE_COUNT,
+    INFINITY_CHALLENGE_COUNT, INFINITY_DIMENSION_COUNT, NORMAL_CHALLENGE_COUNT,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
@@ -153,6 +153,36 @@ struct InfinityChallengeView {
     is_completed: bool,
 }
 
+/// Serializable view of the Infinity Dimensions tab.
+#[derive(Serialize)]
+struct InfinityDimensionsView {
+    /// Whether the tab is available (Infinity broken, or ID1 already unlocked).
+    unlocked: bool,
+    /// Current Infinity Power.
+    power: Num,
+    /// The `^7` multiplier Infinity Power gives to all Antimatter Dimensions.
+    power_mult: Num,
+    /// The 8 tiers (index 0 = 1st Infinity Dimension).
+    dimensions: Vec<InfinityDimensionView>,
+}
+
+/// Serializable view of one Infinity Dimension row.
+#[derive(Serialize)]
+struct InfinityDimensionView {
+    /// 0-indexed tier.
+    tier: usize,
+    amount: Num,
+    multiplier: Num,
+    cost: Num,
+    is_unlocked: bool,
+    /// Whether a purchase is possible now (unlocked, affordable, not capped).
+    can_be_bought: bool,
+    /// Whether it can be unlocked now (still locked, requirements met).
+    can_unlock: bool,
+    /// Whether it is at its purchase cap.
+    is_capped: bool,
+}
+
 /// Serializable view of the Break Infinity tab (12 upgrades).
 #[derive(Serialize)]
 struct BreakInfinityView {
@@ -276,6 +306,8 @@ struct GameView {
     autobuyers: AutobuyersView,
     /// Break Infinity tab state (the 12 upgrades).
     break_infinity: BreakInfinityView,
+    /// Infinity Dimensions tab state (8 tiers + Infinity Power).
+    infinity_dimensions: InfinityDimensionsView,
     /// Player options (UI/UX preferences), surfaced for the options tabs.
     options: OptionsView,
     /// Sorted ids of unlocked normal achievements; drives the Achievements tab
@@ -462,6 +494,31 @@ fn build_infinity_challenges_view(game: &GameState) -> Vec<InfinityChallengeView
         .collect()
 }
 
+/// Build the Infinity Dimensions view (8 tiers + Infinity Power).
+fn build_infinity_dimensions_view(game: &GameState) -> InfinityDimensionsView {
+    let dimensions = (0..INFINITY_DIMENSION_COUNT)
+        .map(|tier| {
+            let d = &game.infinity_dimensions[tier];
+            InfinityDimensionView {
+                tier,
+                amount: num(&d.amount),
+                multiplier: num(&game.id_multiplier(tier)),
+                cost: num(&d.cost),
+                is_unlocked: d.is_unlocked,
+                can_be_bought: game.id_available_for_purchase(tier),
+                can_unlock: game.can_unlock_infinity_dimension(tier),
+                is_capped: game.id_is_capped(tier),
+            }
+        })
+        .collect();
+    InfinityDimensionsView {
+        unlocked: game.broke_infinity || game.infinity_dimensions[0].is_unlocked,
+        power: num(&game.infinity_power),
+        power_mult: num(&game.infinity_power_ad_multiplier()),
+        dimensions,
+    }
+}
+
 /// Build the Break Infinity view (the 9 one-time + 3 rebuyable upgrades). Static
 /// per-upgrade display data (descriptions) lives frontend-side, keyed on the id.
 fn build_break_infinity_view(game: &GameState) -> BreakInfinityView {
@@ -604,6 +661,7 @@ fn build_game_view(game: &GameState) -> GameView {
         has_big_crunch_goal: !game.broke_infinity || game.any_challenge_running(),
         autobuyers: build_autobuyers_view(game),
         break_infinity: build_break_infinity_view(game),
+        infinity_dimensions: build_infinity_dimensions_view(game),
         unlocked_achievements: game.unlocked_achievement_ids(),
         achievement_power: num(&game.achievement_power()),
         tutorial_state: game.tutorial_state,
@@ -798,6 +856,29 @@ fn buy_break_infinity_rebuyable(id: usize, state: State<'_, Mutex<GameState>>) {
         _ => return,
     };
     state.lock().unwrap().buy_break_infinity_rebuyable(upgrade);
+}
+
+/// Buy one purchase (10 IDs) of the given Infinity Dimension tier (0-indexed), or
+/// unlock it if locked.
+#[tauri::command]
+fn buy_infinity_dimension(tier: usize, state: State<'_, Mutex<GameState>>) {
+    if tier < INFINITY_DIMENSION_COUNT {
+        state.lock().unwrap().buy_infinity_dimension(tier);
+    }
+}
+
+/// Buy-max a single Infinity Dimension tier (0-indexed).
+#[tauri::command]
+fn buy_max_infinity_dimension(tier: usize, state: State<'_, Mutex<GameState>>) {
+    if tier < INFINITY_DIMENSION_COUNT {
+        state.lock().unwrap().buy_max_infinity_dimension(tier);
+    }
+}
+
+/// Buy-max all Infinity Dimensions.
+#[tauri::command]
+fn buy_max_all_infinity_dimensions(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_max_all_infinity_dimensions();
 }
 
 /// Buy an Infinity Upgrade by its original save id (e.g. "timeMult"). An
@@ -1331,6 +1412,9 @@ pub fn run() {
             break_infinity,
             buy_break_infinity_upgrade,
             buy_break_infinity_rebuyable,
+            buy_infinity_dimension,
+            buy_max_infinity_dimension,
+            buy_max_all_infinity_dimensions,
             buy_infinity_upgrade,
             start_challenge,
             exit_challenge,

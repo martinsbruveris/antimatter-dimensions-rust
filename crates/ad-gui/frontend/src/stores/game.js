@@ -143,6 +143,17 @@ export const useGameStore = defineStore("game", {
     buyBreakInfinityRebuyable(id) {
       return invoke("buy_break_infinity_rebuyable", { id });
     },
+    // Buy one purchase (10 IDs) of an Infinity Dimension tier (or unlock it), the
+    // whole tier at once, or all tiers.
+    buyInfinityDimension(tier) {
+      return invoke("buy_infinity_dimension", { tier });
+    },
+    buyMaxInfinityDimension(tier) {
+      return invoke("buy_max_infinity_dimension", { tier });
+    },
+    buyMaxAllInfinityDimensions() {
+      return invoke("buy_max_all_infinity_dimensions");
+    },
     // Buy an Infinity Upgrade by its original save id (e.g. "timeMult").
     buyInfinityUpgrade(id) {
       return invoke("buy_infinity_upgrade", { id });
