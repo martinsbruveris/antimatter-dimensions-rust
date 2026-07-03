@@ -202,6 +202,36 @@ mod tests {
     }
 
     #[test]
+    fn nc7_reduces_buy_ten_multiplier() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        // Outside a challenge the buy-10 base is ×2.
+        assert_eq!(game.buy_ten_multiplier(), Decimal::from_float(2.0));
+
+        game.start_challenge(7);
+        // NC7 with 0 boosts: min(2, 1 + 0/5) = ×1.
+        assert_eq!(game.buy_ten_multiplier(), Decimal::from_float(1.0));
+        game.dim_boosts = 3;
+        // 1 + 3/5 = ×1.6.
+        assert_eq!(game.buy_ten_multiplier(), Decimal::from_float(1.6));
+        game.dim_boosts = 12;
+        // Capped at ×2.
+        assert_eq!(game.buy_ten_multiplier(), Decimal::from_float(2.0));
+    }
+
+    #[test]
+    fn nc5_weakens_tickspeed_multiplier() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        let normal = game.tickspeed_purchase_multiplier();
+
+        game.start_challenge(5);
+        // NC5 base 1/1.08 > normal 1/1.1245 → a *larger* retained multiplier at 0
+        // galaxies, i.e. weaker tickspeed (the challenge).
+        assert!(game.tickspeed_purchase_multiplier() > normal);
+    }
+
+    #[test]
     fn starting_a_challenge_below_goal_does_not_reward() {
         let mut game = GameState::new();
         game.infinity_unlocked = true;

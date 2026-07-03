@@ -204,7 +204,14 @@ impl GameState {
 
     /// The buy-10 base multiplier: `2`, raised to `2 × 1.1 = 2.2` once
     /// `buy10Mult` is owned (original `AntimatterDimensions.buyTenMultiplier`).
+    ///
+    /// Normal Challenge 7 overrides it to `min(2, 1 + dim_boosts / 5)` and, per the
+    /// original, ignores the `buy10Mult` upgrade ("unaffected by any upgrades").
     pub fn buy_ten_multiplier(&self) -> Decimal {
+        if self.challenge_running(7) {
+            let value = (1.0 + self.dim_boosts as f64 / 5.0).min(2.0);
+            return Decimal::from_float(value);
+        }
         let mut mult = Decimal::from_float(BUY_TEN_MULTIPLIER);
         if self.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult) {
             mult *= Decimal::from_float(1.1);

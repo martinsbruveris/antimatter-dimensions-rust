@@ -63,6 +63,16 @@ pub const TICKSPEED_GALAXY_DECAY: f64 = 0.965;
 /// galaxies).
 pub const TICKSPEED_GALAXY_BASE: f64 = 0.8;
 
+/// Tickspeed base multipliers under Normal Challenge 5 (the purchase multiplier
+/// starts at ×1.080 instead of ×1.1245), indexed by galaxy count 0/1/2. From the
+/// original `getTickSpeedMultiplier` NC5 branch: `1/1.08`, `1/1.07632`, `1/1.072`.
+pub const TICKSPEED_BASE_MULTIPLIERS_C5: [f64; 3] =
+    [1.0 / 1.08, 1.0 / 1.07632, 1.0 / 1.072];
+
+/// Base multiplier for the 3+-galaxy exponential formula under Normal Challenge 5
+/// (`0.83` instead of `0.8`).
+pub const TICKSPEED_GALAXY_BASE_C5: f64 = 0.83;
+
 /// Minimum tickspeed purchase multiplier (floor).
 pub const TICKSPEED_MULTIPLIER_MIN: f64 = 0.01;
 

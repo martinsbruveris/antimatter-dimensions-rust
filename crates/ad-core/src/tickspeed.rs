@@ -2,7 +2,8 @@ use break_infinity::Decimal;
 
 use crate::data::constants::{
     GALAXY_TICKSPEED_REDUCTION, INITIAL_TICKSPEED_MS, TICKSPEED_BASE_MULTIPLIERS,
-    TICKSPEED_GALAXY_BASE, TICKSPEED_GALAXY_DECAY, TICKSPEED_MULTIPLIER_MIN,
+    TICKSPEED_BASE_MULTIPLIERS_C5, TICKSPEED_GALAXY_BASE, TICKSPEED_GALAXY_BASE_C5,
+    TICKSPEED_GALAXY_DECAY, TICKSPEED_MULTIPLIER_MIN,
 };
 use crate::state::GameState;
 
@@ -54,15 +55,28 @@ impl GameState {
         // pre-Infinity contributor is the `galaxyBoost` Infinity Upgrade (×2).
         let effects = self.galaxy_strength_effect();
 
+        // Normal Challenge 5 lowers the base multiplier (the tickspeed purchase
+        // multiplier starts at ×1.080 instead of ×1.1245).
+        let in_c5 = self.challenge_running(5);
+
         if self.galaxies < 3 {
-            let base = TICKSPEED_BASE_MULTIPLIERS[self.galaxies as usize];
+            let base = if in_c5 {
+                TICKSPEED_BASE_MULTIPLIERS_C5[self.galaxies as usize]
+            } else {
+                TICKSPEED_BASE_MULTIPLIERS[self.galaxies as usize]
+            };
             // perGalaxy = 0.02 * effects; reduction = galaxies * perGalaxy.
             let reduction = galaxies * GALAXY_TICKSPEED_REDUCTION * effects;
             (base - reduction).max(TICKSPEED_MULTIPLIER_MIN)
         } else {
             // JS: galaxies -= 2; galaxies *= effects; decay^(galaxies - 2) * base.
+            let galaxy_base = if in_c5 {
+                TICKSPEED_GALAXY_BASE_C5
+            } else {
+                TICKSPEED_GALAXY_BASE
+            };
             let adjusted = (galaxies - 2.0) * effects;
-            (TICKSPEED_GALAXY_BASE * TICKSPEED_GALAXY_DECAY.powf(adjusted - 2.0))
+            (galaxy_base * TICKSPEED_GALAXY_DECAY.powf(adjusted - 2.0))
                 .max(TICKSPEED_MULTIPLIER_MIN)
         }
     }
