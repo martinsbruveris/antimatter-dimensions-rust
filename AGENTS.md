@@ -91,6 +91,14 @@ antimatter-dimensions-rust/
   purchase logic, and the effect readers (`break_infinity_upgrade_common_mult`,
   `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`); six effects are
   deferred (neutral). See `design-docs/2026-07-03-break-infinity.md`.
+- `src/replicanti.rs` — Replicanti (Feature 3.2): `ReplicantiState` on `GameState`,
+  unlocked with IP (`unlock_replicanti`), grown each tick (`tick_replicanti`, the
+  capped continuous approximation), and spent on Replicanti Galaxies
+  (`buy_replicanti_galaxy` → an antimatter-galaxy-like reset). RGs feed the tickspeed
+  formula via `effective_galaxies()` (used in `tickspeed.rs`); `replicanti_mult` is
+  folded into `id_common_multiplier` (`infinity_dimensions.rs`). Three IP upgrades
+  (chance / interval / galaxy cap). Persists across a Big Crunch. See
+  `design-docs/2026-07-03-replicanti.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant

@@ -13,6 +13,7 @@ pub mod infinity_upgrades;
 pub mod observed;
 pub mod options;
 pub mod records;
+pub mod replicanti;
 pub mod sacrifice;
 #[cfg(feature = "serde")]
 pub mod save;
@@ -37,5 +38,6 @@ pub use infinity_upgrades::{
 pub use observed::{ObservedDimensionTier, ObservedState, ObservedTickspeedState};
 pub use options::Options;
 pub use records::{BestInfinity, Records, ThisInfinity};
+pub use replicanti::{ReplicantiState, REPLICANTI_CAP, REPLICANTI_UNLOCK_COST};
 pub use state::{DimensionTier, GameState, TickspeedState};
 pub use tick::offline_plan;

@@ -10,6 +10,7 @@ use crate::infinity_challenges::InfinityChallengeState;
 use crate::infinity_dimensions::InfinityDimension;
 use crate::options::Options;
 use crate::records::Records;
+use crate::replicanti::ReplicantiState;
 
 /// serde default for boolean fields that default to `true` (e.g.
 /// `tutorial_active`), since `bool`'s own `Default` is `false`.
@@ -264,6 +265,12 @@ pub struct GameState {
     /// Big Crunch.
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinity_power: Decimal,
+    /// Replicanti (`player.replicanti`): self-replicating entities unlocked with
+    /// Infinity Points that multiply Infinity Dimensions and can be spent on
+    /// Replicanti Galaxies. Persists across a Big Crunch (reset only on Eternity,
+    /// later). See `replicanti.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub replicanti: ReplicantiState,
     /// Time and prestige records (total time played, this/best infinity). Mirrors
     /// the modelled slice of `player.records`. Advanced in `tick`; the current
     /// infinity's records reset on a Big Crunch. See [`Records`].
@@ -325,6 +332,7 @@ impl GameState {
             infinity_rebuyables: [0; 3],
             infinity_dimensions: std::array::from_fn(InfinityDimension::new),
             infinity_power: Decimal::ZERO,
+            replicanti: ReplicantiState::new(),
             records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],
             tutorial_state: 0,

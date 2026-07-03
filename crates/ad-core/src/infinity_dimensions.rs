@@ -169,8 +169,9 @@ impl GameState {
     }
 
     /// The all-tier Infinity-Dimension multiplier: the completed IC1 reward
-    /// (`×1.3^(IC completed count)`) and IC6 reward (`tickspeed_per_second^0.0005`).
-    /// (The achievement/time-study/Replicanti terms are later features.)
+    /// (`×1.3^(IC completed count)`), the IC6 reward (`tickspeed_per_second^0.0005`),
+    /// and the Replicanti multiplier while Replicanti are unlocked and above 1.
+    /// (The achievement/time-study terms are later features.)
     pub fn id_common_multiplier(&self) -> Decimal {
         let mut mult = Decimal::ONE;
         if self.infinity_challenge_completed(1) {
@@ -181,6 +182,9 @@ impl GameState {
         }
         if self.infinity_challenge_completed(6) {
             mult *= self.tickspeed_effect().pow(&Decimal::from_float(0.0005));
+        }
+        if self.replicanti.unlocked && self.replicanti.amount > Decimal::ONE {
+            mult *= self.replicanti_mult();
         }
         mult
     }

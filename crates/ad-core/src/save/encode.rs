@@ -153,6 +153,20 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         entry["isUnlocked"] = json!(d.is_unlocked);
     }
 
+    // Replicanti. The sub-interval `timer` is transient (not modelled here) and
+    // `galCost` is derived from the bought-galaxy cap.
+    let gal_cost = state.replicanti_galaxy_cost();
+    let rep = &mut player["replicanti"];
+    rep["unl"] = json!(state.replicanti.unlocked);
+    rep["amount"] = decimal(&state.replicanti.amount);
+    rep["chance"] = json!(state.replicanti.chance);
+    rep["chanceCost"] = decimal(&state.replicanti.chance_cost);
+    rep["interval"] = json!(state.replicanti.interval_ms);
+    rep["intervalCost"] = decimal(&state.replicanti.interval_cost);
+    rep["boughtGalaxyCap"] = json!(state.replicanti.galaxy_cap);
+    rep["galaxies"] = json!(state.replicanti.galaxies);
+    rep["galCost"] = decimal(&gal_cost);
+
     // Options.
     let options = &mut player["options"];
     options["hotkeys"] = json!(state.options.hotkeys);
@@ -343,6 +357,29 @@ mod tests {
             Decimal::from_float(1234.5)
         );
         assert_eq!(reloaded.infinity_dimensions[0].cost, Decimal::new(1.0, 20));
+    }
+
+    #[test]
+    fn replicanti_round_trip() {
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.replicanti.unlocked = true;
+        state.replicanti.amount = Decimal::new(1.0, 250);
+        state.replicanti.chance = 0.23;
+        state.replicanti.chance_cost = Decimal::new(1.0, 180);
+        state.replicanti.interval_ms = 729.0;
+        state.replicanti.interval_cost = Decimal::new(1.0, 160);
+        state.replicanti.galaxies = 7;
+        state.replicanti.galaxy_cap = 12;
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert!(reloaded.replicanti.unlocked);
+        assert_eq!(reloaded.replicanti.amount, Decimal::new(1.0, 250));
+        assert_eq!(reloaded.replicanti.chance, 0.23);
+        assert_eq!(reloaded.replicanti.chance_cost, Decimal::new(1.0, 180));
+        assert_eq!(reloaded.replicanti.interval_ms, 729.0);
+        assert_eq!(reloaded.replicanti.interval_cost, Decimal::new(1.0, 160));
+        assert_eq!(reloaded.replicanti.galaxies, 7);
+        assert_eq!(reloaded.replicanti.galaxy_cap, 12);
     }
 
     #[test]

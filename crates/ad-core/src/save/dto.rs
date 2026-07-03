@@ -37,6 +37,7 @@ use crate::options::{
     MIN_UPDATE_RATE_MS,
 };
 use crate::records::{BestInfinity, Records, ThisInfinity};
+use crate::replicanti::ReplicantiState;
 use crate::state::{DimensionTier, GameState, TickspeedState};
 
 use super::SaveError;
@@ -106,6 +107,33 @@ pub struct PlayerDTO {
     /// `player.matter` — normal matter for NC11 (a Decimal string).
     #[serde(with = "break_infinity::serde_string")]
     pub matter: Decimal,
+    /// `player.replicanti` — the Replicanti state (Feature 3.2).
+    pub replicanti: ReplicantiDTO,
+}
+
+/// `player.replicanti` (modelled subset). The sub-interval `timer` is transient and
+/// absent from real saves, so it is not read (defaults to 0). `galCost` is present
+/// in the save but derived on our side (`replicanti_galaxy_cost`), so it is omitted
+/// here and ignored on load.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplicantiDTO {
+    /// Whether Replicanti are unlocked (`unl`).
+    pub unl: bool,
+    #[serde(with = "break_infinity::serde_string")]
+    pub amount: Decimal,
+    /// Reproduction chance per interval (a plain number).
+    pub chance: f64,
+    #[serde(with = "break_infinity::serde_string")]
+    pub chance_cost: Decimal,
+    /// Reproduction interval in ms (a plain number).
+    pub interval: f64,
+    #[serde(with = "break_infinity::serde_string")]
+    pub interval_cost: Decimal,
+    /// Max Replicanti Galaxies (`boughtGalaxyCap`).
+    pub bought_galaxy_cap: u32,
+    /// Replicanti Galaxies made.
+    pub galaxies: u32,
 }
 
 /// `player.challenge` — the `normal` and `infinity` run states (eternity
@@ -366,6 +394,21 @@ impl GameState {
             is_unlocked: inf_dims[tier].is_unlocked,
         });
 
+        // Replicanti (Feature 3.2). The bought-galaxy-cap cost (`galCost`) is
+        // derived from `boughtGalaxyCap`, and the sub-interval `timer` is transient
+        // (starts at 0), so neither is round-tripped.
+        let replicanti = ReplicantiState {
+            unlocked: dto.replicanti.unl,
+            amount: dto.replicanti.amount,
+            timer_ms: 0.0,
+            chance: dto.replicanti.chance,
+            chance_cost: dto.replicanti.chance_cost,
+            interval_ms: dto.replicanti.interval,
+            interval_cost: dto.replicanti.interval_cost,
+            galaxies: dto.replicanti.galaxies,
+            galaxy_cap: dto.replicanti.bought_galaxy_cap,
+        };
+
         // `player.break` is the Break-Infinity flag. Infinity-*unlocked* (has
         // reached Infinity) is derived: broke Infinity, or any infinity / IP was
         // ever gained. We reset the pre-Infinity *mechanics* past the frontier, but
@@ -562,6 +605,7 @@ impl GameState {
             infinity_rebuyables,
             infinity_dimensions,
             infinity_power: dto.infinity_power,
+            replicanti,
             records,
             achievement_bits,
             tutorial_state: dto.tutorial_state,
@@ -769,7 +813,6 @@ mod tests {
     fn unknown_fields_are_ignored() {
         // Unmodelled mechanics in the save must not prevent a load.
         let mut player = base_player();
-        player["replicanti"] = json!("1e50");
         player["celestials"] = json!({ "teresa": { "pouredAmount": 1 } });
         player["someBrandNewField"] = json!(42);
 

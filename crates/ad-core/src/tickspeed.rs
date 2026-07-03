@@ -62,7 +62,13 @@ impl GameState {
     /// 3+ galaxies (exponential):
     ///   0.8 * 0.965^(galaxies - 4)
     pub fn tickspeed_purchase_multiplier(&self) -> f64 {
-        let galaxies = self.galaxies as f64;
+        // `effectiveBaseGalaxies`: antimatter galaxies plus Replicanti Galaxies feed
+        // the tickspeed formula (the branch cutoff, per-galaxy reduction, and the
+        // exponent). The base-multiplier lookup, however, keys off the *antimatter*
+        // galaxy count (JS: `player.galaxies === 1/2`), since only 0–2 antimatter
+        // galaxies are possible while the effective count is < 3.
+        let eff = self.effective_galaxies();
+        let galaxies = eff as f64;
         // The original's `effects` product scales the per-galaxy term; the only
         // pre-Infinity contributor is the `galaxyBoost` Infinity Upgrade (×2).
         let effects = self.galaxy_strength_effect();
@@ -71,7 +77,7 @@ impl GameState {
         // multiplier starts at ×1.080 instead of ×1.1245).
         let in_c5 = self.challenge_running(5);
 
-        if self.galaxies < 3 {
+        if eff < 3 {
             let base = if in_c5 {
                 TICKSPEED_BASE_MULTIPLIERS_C5[self.galaxies as usize]
             } else {
