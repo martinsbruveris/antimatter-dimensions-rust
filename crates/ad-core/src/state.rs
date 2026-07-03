@@ -283,6 +283,18 @@ pub struct GameState {
     /// Crunch. See `achievements.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub achievement_bits: [u32; ACHIEVEMENT_ROW_COUNT],
+    /// Tabs/subtabs currently showing the yellow `!` notification badge, as the
+    /// original's concatenated `parentKey + subtabKey` strings (mirrors
+    /// `player.tabNotifications`, a `Set` serialized as an array). A `BTreeSet`
+    /// so serialization order is deterministic. See `tab_notifications.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub tab_notifications: std::collections::BTreeSet<String>,
+    /// Which tab notifications have ever fired, one bit per
+    /// [`TabNotificationId`](crate::TabNotificationId) (mirrors
+    /// `player.triggeredTabNotificationBits`), so each fires once. Bits of
+    /// notifications past our frontier round-trip untouched.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub triggered_tab_notification_bits: u32,
     /// Current tutorial-highlight step. Mirrors `player.tutorialState` (an
     /// index into [`tutorial`](crate::tutorial)'s state machine): which early
     /// element gets the gold glow + `!` icon next. Persisted at the `player`
@@ -335,6 +347,8 @@ impl GameState {
             replicanti: ReplicantiState::new(),
             records: Records::new(),
             achievement_bits: [0; ACHIEVEMENT_ROW_COUNT],
+            tab_notifications: std::collections::BTreeSet::new(),
+            triggered_tab_notification_bits: 0,
             tutorial_state: 0,
             tutorial_active: true,
             autobuyers: AutobuyerState::new(),

@@ -176,6 +176,13 @@ impl GameState {
         }
         let already = self.challenge_completed(id);
         self.challenge.completed |= 1u16 << id;
+        // Completing an NC unlocks an autobuyer, changing the cheapest-locked
+        // set; re-arm the badge so the per-tick check re-evaluates (mirrors
+        // NormalChallengeState.complete's clearTrigger + cache invalidation,
+        // which the original runs unconditionally).
+        self.clear_tab_notification_trigger(
+            crate::tab_notifications::TabNotificationId::NewAutobuyer,
+        );
         if !already {
             self.on_challenge_reward(id);
         }
@@ -188,6 +195,14 @@ impl GameState {
         // An Infinity Challenge takes precedence (the two never run at once).
         if self.infinity_challenge.current != 0 {
             let ic = self.infinity_challenge.current;
+            // An IC's first completion re-arms the IC-unlock badge so the next
+            // unlock badges again (mirrors handleChallengeCompletion's
+            // "clear after the first completion (only)").
+            if !self.infinity_challenge_completed(ic) {
+                self.clear_tab_notification_trigger(
+                    crate::tab_notifications::TabNotificationId::IcUnlock,
+                );
+            }
             self.complete_infinity_challenge(ic);
             self.infinity_challenge.current = 0;
             return;

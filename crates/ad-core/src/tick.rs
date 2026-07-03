@@ -98,8 +98,14 @@ impl GameState {
             self.records.this_infinity.max_am.max(&self.antimatter);
         // Peak antimatter this eternity (persists across crunches; gates Infinity
         // Challenge unlocks).
+        let prev_peak = self.records.max_am_this_eternity;
         self.records.max_am_this_eternity =
             self.records.max_am_this_eternity.max(&self.antimatter);
+
+        // Tab-notification checks the original runs from the antimatter setter:
+        // a newly crossed IC unlock threshold and an affordable autobuyer unlock.
+        self.notify_ic_unlock(prev_peak);
+        self.notify_new_autobuyer();
 
         // 24: "Antimatter Apocalypse" — reach 1e80 antimatter (original's
         // GAME_TICK_AFTER check).

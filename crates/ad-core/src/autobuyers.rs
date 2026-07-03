@@ -7,6 +7,7 @@ use crate::data::constants::{
     TICKSPEED_AUTOBUYER_REQUIREMENT,
 };
 use crate::state::GameState;
+use crate::tab_notifications::TabNotificationId;
 
 /// Autobuyer purchase mode.
 ///
@@ -224,6 +225,10 @@ impl GameState {
             return false;
         }
         self.autobuyers.dimensions[tier].is_bought = true;
+        // Buying the unlock acknowledges the "new autobuyer" badge (mirrors
+        // AntimatterDimensionAutobuyerState.purchase); the per-tick check
+        // re-badges if another unlock is already affordable.
+        self.clear_tab_notification_trigger(TabNotificationId::NewAutobuyer);
         true
     }
 
@@ -263,6 +268,8 @@ impl GameState {
             return false;
         }
         self.autobuyers.tickspeed.is_bought = true;
+        // See unlock_ad_autobuyer (mirrors TickspeedAutobuyerState.purchase).
+        self.clear_tab_notification_trigger(TabNotificationId::NewAutobuyer);
         true
     }
 
@@ -369,6 +376,12 @@ impl GameState {
         ab.cost *= 2.0;
         ab.interval_ms =
             (ab.interval_ms * INTERVAL_UPGRADE_FACTOR).max(AUTOBUYER_MIN_INTERVAL_MS);
+        // Maxing the Big Crunch interval unlocks Break Infinity: badge its tab
+        // (mirrors BigCrunchAutobuyerState.upgradeInterval; the trigger's own
+        // condition checks the interval actually reached the floor).
+        if target == AutobuyerTarget::BigCrunch {
+            self.try_trigger_tab_notification(TabNotificationId::BreakInfinity);
+        }
         true
     }
 

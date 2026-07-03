@@ -55,6 +55,9 @@ export const useGameStore = defineStore("game", {
     async tick(dtMs, repeats = 1) {
       this.snapshot = await invoke("tick_and_get_state", { dtMs, repeats });
       this.notifyNewAchievements();
+      // A badge that landed on the subtab the player is looking at is
+      // acknowledged immediately (never displayed).
+      useUiStore().ackTabNotification();
     },
     // Replay `gameMs` of offline game-time (already speed-scaled) at the
     // resolution set by `offlineTicks`, all at once. Used for sub-threshold
@@ -161,6 +164,11 @@ export const useGameStore = defineStore("game", {
     },
     buyMaxAllInfinityDimensions() {
       return invoke("buy_max_all_infinity_dimensions");
+    },
+    // Acknowledge a tab-notification badge (`tabKey + subtabKey`); called when
+    // the player opens that tab. The next snapshot drops the key.
+    tabNotificationSeen(key) {
+      return invoke("tab_notification_seen", { key });
     },
     // Replicanti: unlock (1e140 IP), the 3 IP upgrades, and a Replicanti Galaxy.
     unlockReplicanti() {

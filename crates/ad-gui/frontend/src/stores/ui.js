@@ -97,14 +97,44 @@ export const useUiStore = defineStore("ui", {
     currentComponent() {
       return this.currentSubtab.component;
     },
+    // Whether `subtab` of `tab` shows the yellow `!` notification badge:
+    // present in the snapshot's badge keys and not the currently open subtab
+    // (the open subtab's badge is acknowledged, never displayed — the original
+    // never adds a key for the tab being viewed).
+    subtabHasNotification() {
+      const game = useGameStore();
+      return (tab, subtab) =>
+        (game.snapshot?.tab_notifications ?? []).includes(tab.key + subtab.key) &&
+        !(tab.key === this.currentTabKey && subtab.key === this.currentSubtab.key);
+    },
+    // A tab is badged when any of its visible subtabs is.
+    tabHasNotification() {
+      return (tab) =>
+        this.visibleSubtabs(tab).some((st) => this.subtabHasNotification(tab, st));
+    },
   },
   actions: {
     setTab(tabKey) {
       this.currentTabKey = tabKey;
+      this.ackTabNotification();
     },
     setSubtab(tabKey, subtabKey) {
       this.currentTabKey = tabKey;
       this.currentSubtabKey[tabKey] = subtabKey;
+      this.ackTabNotification();
+    },
+    // Acknowledge the open subtab's notification badge, if it carries one:
+    // called on navigation (mirroring the original TabState.show's
+    // `tabNotifications.delete`) and after every tick, which covers a
+    // notification firing while its tab is already open — the original avoids
+    // that case by excluding the current tab at trigger time; our engine
+    // doesn't know the open tab, so the frontend acknowledges instead.
+    ackTabNotification() {
+      const game = useGameStore();
+      const key = this.currentTabKey + this.currentSubtab.key;
+      if (game.snapshot?.tab_notifications?.includes(key)) {
+        game.tabNotificationSeen(key);
+      }
     },
     // Cycle through tabs (delta -1/+1) with wraparound, mirroring the
     // original's Up/Down arrow tab movement.

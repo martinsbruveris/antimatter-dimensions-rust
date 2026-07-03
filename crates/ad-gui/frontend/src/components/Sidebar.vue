@@ -19,6 +19,10 @@ const ui = useUiStore();
         @click="ui.setTab(tab.key)"
       >
         {{ tab.name }}
+        <div
+          v-if="ui.tabHasNotification(tab)"
+          class="fas fa-circle-exclamation l-notification-icon"
+        />
       </div>
       <div class="subtabs">
         <div
@@ -33,6 +37,10 @@ const ui = useUiStore();
         >
           <!-- eslint-disable-next-line vue/no-v-html -->
           <span v-html="subtab.symbol" />
+          <div
+            v-if="ui.subtabHasNotification(tab, subtab)"
+            class="fas fa-circle-exclamation l-notification-icon"
+          />
           <div class="o-subtab__tooltip">{{ subtab.name }}</div>
         </div>
       </div>

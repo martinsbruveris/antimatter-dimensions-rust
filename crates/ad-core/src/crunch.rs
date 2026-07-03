@@ -3,6 +3,7 @@ use break_infinity::Decimal;
 use crate::data::constants::BIG_CRUNCH_THRESHOLD;
 use crate::records::ThisInfinity;
 use crate::state::{DimensionTier, GameState, TickspeedState};
+use crate::tab_notifications::TabNotificationId;
 
 impl GameState {
     /// The antimatter goal for the current run — an Infinity Challenge's own goal
@@ -94,6 +95,9 @@ impl GameState {
             return false;
         }
         self.broke_infinity = true;
+        // Breaking Infinity points the player at the Infinity Challenges tab
+        // (mirrors game.js `breakInfinity`).
+        self.try_trigger_tab_notification(TabNotificationId::IcUnlock);
         true
     }
 
@@ -113,6 +117,11 @@ impl GameState {
         }
 
         if at_goal {
+            // The first-ever Infinity badges the tabs it opens up (the original's
+            // BIG_CRUNCH_BEFORE event, dispatched only when at the goal; the
+            // trigger's condition is "Infinity not yet unlocked").
+            self.try_trigger_tab_notification(TabNotificationId::FirstInfinity);
+
             // 21: "To infinity!" — unlocks on the crunch itself (the original's
             // BIG_CRUNCH_BEFORE), so the post-reset starting antimatter already
             // reflects its 100-antimatter reward.
@@ -165,6 +174,11 @@ impl GameState {
         // Reset the current infinity's records (time/maxAM back to 0); the
         // fastest-infinity record and total time played persist.
         self.records.this_infinity = ThisInfinity::new();
+
+        // Replicanti-affordable badge (the original's BIG_CRUNCH_AFTER event,
+        // dispatched at the end of every reset, forced ones included; the
+        // trigger's condition is IP >= 1e140).
+        self.try_trigger_tab_notification(TabNotificationId::Replicanti);
     }
 }
 

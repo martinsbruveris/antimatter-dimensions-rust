@@ -381,8 +381,9 @@ frontend/
 
 ## Progressive reveal, tutorial highlights & confirmations
 
-Three early-game presentation features, all engine-driven; the frontend only
-renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md`.
+Four attention/presentation features, all engine-driven; the frontend only
+renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md` and
+`design-docs/2026-07-04-tab-notifications.md`.
 
 - **Progressive reveal.** The engine derives per-dimension `available_for_purchase`
   (band + "own the tier below") and `shown` (reveal/lookahead) flags, shipped in
@@ -413,6 +414,18 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md`.
   directly — mirroring the original's `manualRequest*` / `sacrificeBtnClick`.
   The toggles live in the engine's `Options.confirmations`, surfaced as
   `GameView.options.confirmations` and round-tripped through the save.
+- **Tab notification badges.** The pulsing yellow `!` on sidebar tabs/subtabs
+  (first Infinity → Challenges, affordable autobuyer → Automation, IC unlock,
+  1e140-IP Replicanti, maxed-crunch-interval Break Infinity). Engine-owned
+  (`ad-core` `tab_notifications.rs`): the snapshot ships the badged keys in
+  `GameView.tab_notifications` (concatenated `tabKey + subtabKey`, matching our
+  `config/tabs.js` keys and the original save format). `Sidebar.vue` renders the
+  `fa-circle-exclamation l-notification-icon` badge via the `ui` store's
+  `subtabHasNotification` / `tabHasNotification` getters, which never badge the
+  currently open subtab. Navigation (`setTab`/`setSubtab`) and every tick call
+  `ui.ackTabNotification()`, which sends the `tab_notification_seen` command
+  (store `tabNotificationSeen`) for the open subtab's key — together replacing
+  the original's exclude-current-tab-at-trigger-time rule.
 
 ## Conventions
 

@@ -109,6 +109,13 @@ pub struct PlayerDTO {
     pub matter: Decimal,
     /// `player.replicanti` — the Replicanti state (Feature 3.2).
     pub replicanti: ReplicantiDTO,
+    /// `player.tabNotifications` — tabs currently showing the `!` badge, as
+    /// concatenated `parentKey + subtabKey` strings (a JS `Set` serialized as an
+    /// array). Keys we don't render are carried through untouched.
+    pub tab_notifications: Vec<String>,
+    /// `player.triggeredTabNotificationBits` — which tab notifications have ever
+    /// fired. Bits beyond our modelled ids round-trip verbatim.
+    pub triggered_tab_notification_bits: u32,
 }
 
 /// `player.replicanti` (modelled subset). The sub-interval `timer` is transient and
@@ -608,6 +615,8 @@ impl GameState {
             replicanti,
             records,
             achievement_bits,
+            tab_notifications: dto.tab_notifications.iter().cloned().collect(),
+            triggered_tab_notification_bits: dto.triggered_tab_notification_bits,
             tutorial_state: dto.tutorial_state,
             tutorial_active: dto.tutorial_active,
             autobuyers,

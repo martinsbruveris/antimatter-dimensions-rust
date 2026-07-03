@@ -127,6 +127,11 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     records["thisEternity"]["maxAM"] = decimal(&state.records.max_am_this_eternity);
     // Achievement bitmask, written back verbatim (one int per row).
     player["achievementBits"] = json!(state.achievement_bits);
+    // Tab notification badges: the badged keys (a Set serialized as an array,
+    // ours in BTreeSet order) + the triggered-notification bits.
+    player["tabNotifications"] = json!(state.tab_notifications);
+    player["triggeredTabNotificationBits"] =
+        json!(state.triggered_tab_notification_bits);
     // Tutorial-highlight progress (at the player root, not under options).
     player["tutorialState"] = json!(state.tutorial_state);
     player["tutorialActive"] = json!(state.tutorial_active);
@@ -380,6 +385,27 @@ mod tests {
         assert_eq!(reloaded.replicanti.interval_cost, Decimal::new(1.0, 160));
         assert_eq!(reloaded.replicanti.galaxies, 7);
         assert_eq!(reloaded.replicanti.galaxy_cap, 12);
+    }
+
+    #[test]
+    fn tab_notifications_round_trip() {
+        // Badged keys and triggered bits survive encode → decode — including a
+        // key we never render and a bit past our modelled ids.
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state
+            .tab_notifications
+            .insert("challengesnormal".to_string());
+        state
+            .tab_notifications
+            .insert("eternitystudies".to_string());
+        state.triggered_tab_notification_bits = (1 << 0) | (1 << 12) | (1 << 7);
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.tab_notifications, state.tab_notifications);
+        assert_eq!(
+            reloaded.triggered_tab_notification_bits,
+            (1 << 0) | (1 << 12) | (1 << 7)
+        );
     }
 
     #[test]

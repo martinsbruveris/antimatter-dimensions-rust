@@ -18,6 +18,7 @@ pub mod sacrifice;
 #[cfg(feature = "serde")]
 pub mod save;
 pub mod state;
+pub mod tab_notifications;
 pub mod tick;
 pub mod tickspeed;
 pub mod tutorial;
@@ -40,4 +41,5 @@ pub use options::Options;
 pub use records::{BestInfinity, Records, ThisInfinity};
 pub use replicanti::{ReplicantiState, REPLICANTI_CAP, REPLICANTI_UNLOCK_COST};
 pub use state::{DimensionTier, GameState, TickspeedState};
+pub use tab_notifications::TabNotificationId;
 pub use tick::offline_plan;

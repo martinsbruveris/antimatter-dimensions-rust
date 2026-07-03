@@ -103,6 +103,15 @@ antimatter-dimensions-rust/
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
   action methods; see `design-docs/2026-06-30-achievements.md`.
+- `src/tab_notifications.rs` — Tab notification badges: the pulsing yellow `!`
+  on tab/subtab buttons pointing at newly relevant content. `tab_notifications`
+  (the badged `tabKey + subtabKey` strings, ↔ `player.tabNotifications`) +
+  `triggered_tab_notification_bits` on `GameState`; the modelled
+  `TabNotificationId`s (firstInfinity / breakInfinity / ICUnlock / replicanti /
+  newAutobuyer) fire inline from `big_crunch_reset`, `break_infinity`,
+  `upgrade_autobuyer_interval`, and the per-tick IC-unlock/affordable-autobuyer
+  checks; the frontend acknowledges a viewed tab via `tab_notification_seen`.
+  See `design-docs/2026-07-04-tab-notifications.md`.
 - `src/tutorial.rs` — Tutorial-highlight state machine (`tutorial_state` /
   `tutorial_active`): the gold glow + `!` that points a new player at the next
   action. Advances passively in `tick()` and on the boost/galaxy/tickspeed
@@ -301,6 +310,7 @@ Located in `design-docs/`:
 | `2026-07-02-infinity-points-and-records.md` | Completing Feature 2.1: Infinity Points / Infinities currency, the `Records` struct (time played, this/best infinity), the IP gain formula (pre-break = 1), Big Crunch reward+reset semantics, save/load round-trip, and the Infinity tab + IP header |
 | `2026-07-03-infinity-upgrades.md` | Feature 2.2: the 16-upgrade Infinity grid — data table, bitmask state, purchase/column prereqs, every effect and its engine application site, passive `ipGen`, save/load, and the grid UI; bottom row (`ipMult`/`ipOffline`) deferred |
 | `2026-07-03-normal-challenges.md` | Feature 2.5: the 12 Normal Challenges — run state machine (start/complete/exit, forced Big-Crunch reset, unlock chain), all 12 modifiers mapped to their engine sites, reward→autobuyer wiring, save/load, the Challenges tab UI, and an incremental plan (NC1 slice first) |
+| `2026-07-04-tab-notifications.md` | Tab notification badges (the yellow `!` on tabs): the original's two-field state + trigger/clear semantics, the 5 in-frontier notifications, and the engine-owned port (trigger hooks, save round-trip, sidebar rendering + seen-acknowledgement) |
 
 The table lists key documents; see the `design-docs/` folder for the full,
 date-prefixed set. Read these before making architectural decisions. The

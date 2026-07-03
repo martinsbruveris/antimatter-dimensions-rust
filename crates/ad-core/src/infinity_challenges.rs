@@ -59,6 +59,16 @@ impl GameState {
         }
     }
 
+    /// The `thisEternity.maxAM` needed to unlock infinity challenge `id`
+    /// (`unlockAM`; 0 for an invalid id).
+    pub fn infinity_challenge_unlock_am(id: u8) -> Decimal {
+        if (1..=INFINITY_CHALLENGE_COUNT).contains(&id) {
+            IC_UNLOCK_AM[(id - 1) as usize]
+        } else {
+            Decimal::ZERO
+        }
+    }
+
     /// Whether infinity challenge `id` is the one currently running.
     pub fn infinity_challenge_running(&self, id: u8) -> bool {
         self.infinity_challenge.current == id

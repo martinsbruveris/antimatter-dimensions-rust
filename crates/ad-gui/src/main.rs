@@ -354,6 +354,10 @@ struct GameView {
     unlocked_achievements: Vec<u16>,
     /// Global achievement-power multiplier (shown as the tab's boost).
     achievement_power: Num,
+    /// Tabs/subtabs currently showing the yellow `!` badge, as concatenated
+    /// `tabKey + subtabKey` strings; the sidebar matches them against its
+    /// entries. Cleared per key via the `tab_notification_seen` command.
+    tab_notifications: Vec<String>,
     /// Current tutorial-highlight step (`player.tutorialState`); components
     /// compare against their own step id to decide whether to glow.
     tutorial_state: u8,
@@ -732,6 +736,7 @@ fn build_game_view(game: &GameState) -> GameView {
         replicanti: build_replicanti_view(game),
         unlocked_achievements: game.unlocked_achievement_ids(),
         achievement_power: num(&game.achievement_power()),
+        tab_notifications: game.tab_notifications.iter().cloned().collect(),
         tutorial_state: game.tutorial_state,
         tutorial_active: game.tutorial_active,
         options: OptionsView {
@@ -953,6 +958,13 @@ fn buy_max_all_infinity_dimensions(state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn unlock_replicanti(state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().unlock_replicanti();
+}
+
+/// Acknowledge the tab-notification badge for `key` (`tabKey + subtabKey`);
+/// called by the frontend when the player opens that tab.
+#[tauri::command]
+fn tab_notification_seen(key: String, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().tab_notification_seen(&key);
 }
 
 /// Buy one Replicanti chance upgrade (`+1%`).
@@ -1515,6 +1527,7 @@ pub fn run() {
             buy_max_infinity_dimension,
             buy_max_all_infinity_dimensions,
             unlock_replicanti,
+            tab_notification_seen,
             buy_replicanti_chance,
             buy_replicanti_interval,
             buy_replicanti_galaxy_cap,
