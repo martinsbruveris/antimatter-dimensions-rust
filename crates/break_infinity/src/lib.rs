@@ -403,6 +403,14 @@ impl Decimal {
         m: 1.0,
         e: EXP_INF_THRESHOLD,
     };
+    /// JS `Number.MAX_VALUE` (1.7976931348623157e308), mirroring the original
+    /// library's `Decimal.NUMBER_MAX_VALUE`. In the game this is the pre-break
+    /// Infinity threshold (Big Crunch goal, Replicanti cap, "Infinite" display
+    /// threshold).
+    pub const NUMBER_MAX_VALUE: Decimal = Decimal {
+        m: 1.797_693_134_862_315_7,
+        e: 308,
+    };
     pub const MIN_VALUE: Decimal = Decimal {
         m: -1.0,
         e: EXP_INF_THRESHOLD,

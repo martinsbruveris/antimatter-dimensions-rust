@@ -19,7 +19,7 @@ pub const REPLICANTI_UNLOCK_COST: Decimal = Decimal::new_unchecked(1.0, 140);
 /// Hard cap on the replicanti amount pre-Eternity: `Decimal.NUMBER_MAX_VALUE` =
 /// `Number.MAX_VALUE` ≈ 1.8e308. (Distinct from [`Decimal::MAX_VALUE`], which is the
 /// Decimal-infinity sentinel far beyond this.)
-pub const REPLICANTI_CAP: Decimal = Decimal::new_unchecked(1.797_693_134_862_315_7, 308);
+pub const REPLICANTI_CAP: Decimal = Decimal::NUMBER_MAX_VALUE;
 
 /// Base cost and per-buy multiplier of the chance upgrade (`chanceCost`).
 const CHANCE_BASE_COST: Decimal = Decimal::new_unchecked(1.0, 150);
@@ -130,8 +130,8 @@ impl GameState {
         }
         // amount ·= (1 + chance)^whole, then clamp to the cap. Decimal::pow handles
         // the f64 overflow that a fast interval would otherwise cause.
-        let growth =
-            Decimal::from_float(1.0 + self.replicanti.chance).pow(&Decimal::from_float(whole));
+        let growth = Decimal::from_float(1.0 + self.replicanti.chance)
+            .pow(&Decimal::from_float(whole));
         self.replicanti.amount = (self.replicanti.amount * growth).min(&REPLICANTI_CAP);
     }
 
@@ -145,7 +145,8 @@ impl GameState {
     /// clamped to ≥ 1 (`replicantiMult`, dropping the later TS/glyph terms). Folded
     /// into `id_common_multiplier` while `unlocked && amount > 1`.
     pub fn replicanti_mult(&self) -> Decimal {
-        let log2 = self.replicanti.amount.max(&Decimal::ONE).log10() / std::f64::consts::LOG10_2;
+        let log2 = self.replicanti.amount.max(&Decimal::ONE).log10()
+            / std::f64::consts::LOG10_2;
         Decimal::from_float(log2 * log2).max(&Decimal::ONE)
     }
 
@@ -183,7 +184,8 @@ impl GameState {
 
     /// Whether the chance upgrade can be bought (not capped, affordable).
     pub fn can_buy_replicanti_chance(&self) -> bool {
-        !self.replicanti_chance_capped() && self.infinity_points >= self.replicanti.chance_cost
+        !self.replicanti_chance_capped()
+            && self.infinity_points >= self.replicanti.chance_cost
     }
 
     /// Buy one chance upgrade: `+0.01` chance (rounded to the nearest %), cost ×1e15.
@@ -194,7 +196,8 @@ impl GameState {
         self.infinity_points -= self.replicanti.chance_cost;
         self.replicanti.chance_cost *= Decimal::from_float(CHANCE_COST_MULT);
         // nearestPercent(value + 0.01).
-        self.replicanti.chance = ((self.replicanti.chance + 0.01) * 100.0).round() / 100.0;
+        self.replicanti.chance =
+            ((self.replicanti.chance + 0.01) * 100.0).round() / 100.0;
         true
     }
 
@@ -216,7 +219,8 @@ impl GameState {
         }
         self.infinity_points -= self.replicanti.interval_cost;
         self.replicanti.interval_cost *= Decimal::from_float(INTERVAL_COST_MULT);
-        self.replicanti.interval_ms = (self.replicanti.interval_ms * 0.9).max(INTERVAL_CAP_MS);
+        self.replicanti.interval_ms =
+            (self.replicanti.interval_ms * 0.9).max(INTERVAL_CAP_MS);
         true
     }
 
@@ -272,7 +276,10 @@ mod tests {
         assert!(game.replicanti.unlocked);
         assert_eq!(game.replicanti.amount, Decimal::ONE);
         // Spent exactly 1e140.
-        assert_eq!(game.infinity_points, Decimal::new(1.0, 141) - Decimal::new(1.0, 140));
+        assert_eq!(
+            game.infinity_points,
+            Decimal::new(1.0, 141) - Decimal::new(1.0, 140)
+        );
     }
 
     #[test]

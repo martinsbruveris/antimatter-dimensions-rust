@@ -21,13 +21,22 @@ function exponentDigits() {
   return [o?.notation_digits_comma ?? 5, o?.notation_digits_notation ?? 9];
 }
 
+// Pre-break, values at or above Number.MAX_VALUE render as "Infinite" — the
+// original's notation threshold (`player.break` lifts it).
+function showInfinite() {
+  return !(useGameStore().snapshot?.broke_infinity ?? false);
+}
+
 // Format a raw snapshot number ({ m, e }). `places` = mantissa digits for
 // numbers ≥ 1000; `placesUnder1000` = digits for smaller numbers. Defaults
 // mirror the original game's common `format(value, 2)` call.
 export function formatDecimal(num, places = 2, placesUnder1000 = 0) {
   if (!num) return "0";
   const [comma, notation] = exponentDigits();
-  return wasmFormat(num.m, num.e, currentNotation(), places, placesUnder1000, comma, notation);
+  return wasmFormat(
+    num.m, num.e, currentNotation(), places, placesUnder1000, comma, notation,
+    showInfinite(),
+  );
 }
 
 // A multiplier (`×N`). Two decimal places below 1000, matching the original's
@@ -103,5 +112,6 @@ export function timeDisplayShort(ms) {
 // reads as e.g. "1e1234".
 export function formatExponentSample(num, commaDigits, notationDigits) {
   if (!num) return "0";
-  return wasmFormat(num.m, num.e, currentNotation(), 0, 0, commaDigits, notationDigits);
+  // Never "Infinite": the preview's sample numbers exceed 1e308 by design.
+  return wasmFormat(num.m, num.e, currentNotation(), 0, 0, commaDigits, notationDigits, false);
 }

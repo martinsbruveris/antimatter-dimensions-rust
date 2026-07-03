@@ -121,14 +121,22 @@ export const useGameStore = defineStore("game", {
       return invoke("max_all");
     },
     // Big Crunch (Infinity): resets all pre-Infinity progress in the engine and
-    // awards Infinity Points. On the *first* crunch, navigate to the new Infinity
-    // tab (mirrors the original's `Tab.infinity.upgrades.show()` in
-    // `bigCrunchTabChange`); the tab becomes visible on the next snapshot.
+    // awards Infinity Points. Tab change mirrors the original's
+    // `bigCrunchTabChange`: it runs *after* Infinities are awarded, so its
+    // first-infinity branch (Infinity tab) never fires — the effective behavior
+    // is that an "early game" crunch (best infinity > 60 s, pre-break) or a
+    // crunch that finishes a challenge lands on the Antimatter Dimensions tab.
     async bigCrunch() {
-      const wasFirstInfinity = !this.snapshot?.infinity_unlocked;
+      const wasInChallenge =
+        (this.snapshot?.challenges ?? []).some((c) => c.is_running) ||
+        (this.snapshot?.infinity_challenges ?? []).some((c) => c.is_running);
       await invoke("big_crunch");
-      if (wasFirstInfinity) {
-        useUiStore().setSubtab("infinity", "upgrades");
+      this.snapshot = await this.getState();
+      const earlyGame =
+        this.snapshot.best_infinity_time_ms > 60000 &&
+        !this.snapshot.broke_infinity;
+      if (earlyGame || wasInChallenge) {
+        useUiStore().setSubtab("dimensions", "antimatter");
       }
     },
     // Break Infinity: lift the 1e308 cap so antimatter can grow further and the

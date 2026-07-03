@@ -41,6 +41,8 @@ fn threshold(digits: u32) -> i64 {
 /// per-call-site digit counts. `comma_digits`/`notation_digits` are the player's
 /// Exponent Notation thresholds: the exponent gets commas at 10^`comma_digits`
 /// and switches to in-notation at 10^`notation_digits` (see [`FormatOptions`]).
+/// `infinite` renders values at or above `Number.MAX_VALUE` as "Infinite"
+/// (the caller passes the pre-break state, i.e. `!player.break`).
 #[wasm_bindgen]
 pub fn format(
     mantissa: f64,
@@ -50,6 +52,7 @@ pub fn format(
     places_under_1000: u32,
     comma_digits: u32,
     notation_digits: u32,
+    infinite: bool,
 ) -> String {
     let value = Decimal::new(mantissa, exponent as i64);
     let opts = FormatOptions {
@@ -61,6 +64,8 @@ pub fn format(
             min: threshold(comma_digits),
             max: threshold(notation_digits),
         },
+        // `Number.MAX_VALUE`, the original's pre-break Infinite threshold.
+        inf_threshold: infinite.then_some(Decimal::NUMBER_MAX_VALUE),
         ..FormatOptions::default()
     };
     router::format(&value, &opts)

@@ -329,6 +329,9 @@ struct GameView {
     /// Whether Infinity has been broken (`player.break`): antimatter may exceed
     /// `1e308` and the IP formula scales.
     broke_infinity: bool,
+    /// Fastest infinity by game time (ms); `f64::MAX` before the first crunch.
+    /// Drives the original's post-crunch "early game" tab change (> 60 s).
+    best_infinity_time_ms: f64,
     /// Whether the Break Infinity button should be offered (the Big Crunch
     /// autobuyer's interval is at the 100 ms floor).
     break_infinity_unlockable: bool,
@@ -720,6 +723,7 @@ fn build_game_view(game: &GameState) -> GameView {
         can_big_crunch: game.can_big_crunch(),
         infinity_unlocked: game.infinity_unlocked,
         broke_infinity: game.broke_infinity,
+        best_infinity_time_ms: game.records.best_infinity.time_ms,
         break_infinity_unlockable: game.break_infinity_unlockable(),
         has_big_crunch_goal: !game.broke_infinity || game.any_challenge_running(),
         autobuyers: build_autobuyers_view(game),
@@ -1460,7 +1464,7 @@ fn fresh_game() -> GameState {
         game.options.confirmations.dimension_boost = false;
         game.options.confirmations.antimatter_galaxy = false;
         game.options.confirmations.sacrifice = false;
-        game.options.confirmations.big_crunch = false;
+        game.options.confirmations.big_crunch = true;
     }
     game
 }

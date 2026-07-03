@@ -19,13 +19,24 @@ export function handleShortcut(e, game, ui) {
   // Ctrl/Cmd+S saves the game (original "Save game" bind = mod+s). Handle it
   // before the general Ctrl/Cmd guard below, and stop the browser's own Save.
   if (e.code === "KeyS" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
-    game.saveGame();
+    game.saveGame().then(() => ui.notify("Game saved"));
+    e.preventDefault();
+    return;
+  }
+
+  // Ctrl/Cmd+E exports the save to the clipboard (original "Export save"
+  // bind = mod+e).
+  if (e.code === "KeyE" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+    game
+      .exportSave()
+      .then((saveStr) => navigator.clipboard.writeText(saveStr))
+      .then(() => ui.notify("Save exported to clipboard"));
     e.preventDefault();
     return;
   }
 
   // Ignore other Ctrl/Cmd/Alt combos: in the original these map to binds we
-  // don't implement yet (export, autobuyer toggles), and swallowing them would
+  // don't implement yet (autobuyer toggles), and swallowing them would
   // break browser/OS shortcuts.
   if (e.ctrlKey || e.metaKey || e.altKey) return;
 

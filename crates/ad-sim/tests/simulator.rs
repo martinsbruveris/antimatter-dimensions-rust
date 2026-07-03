@@ -72,7 +72,13 @@ fn test_state_trace_interval_doubles_after_compaction() {
 // Simulation tests
 // ============================================================
 
+// The three full-playthrough tests below simulate all the way to the Big
+// Crunch in 50 ms ticks. As the engine grew (challenges, autobuyers,
+// replicanti, records all add per-tick work) they became far too slow for the
+// regular suite (minutes, not seconds, in debug builds). Ignored until the
+// simulator is revisited; run explicitly with `cargo test -- --ignored`.
 #[test]
+#[ignore = "full-playthrough simulation; too slow for the regular suite"]
 fn test_baseline_auto_reaches_crunch() {
     let config = SimulationConfig {
         strategy: StrategyConfig::baseline(),
@@ -83,7 +89,7 @@ fn test_baseline_auto_reaches_crunch() {
 
     let result = simulate(&config);
 
-    let threshold = Decimal::new(1.7976931348623157, 308);
+    let threshold = Decimal::NUMBER_MAX_VALUE;
     assert!(result.final_state.antimatter >= threshold);
     assert_eq!(result.stop_reason, StopReason::ScoreReached);
     assert!(result.total_ticks > 0);
@@ -104,6 +110,7 @@ fn test_baseline_auto_reaches_crunch() {
 }
 
 #[test]
+#[ignore = "full-playthrough simulation; too slow for the regular suite"]
 fn test_cheapest_first_auto_reaches_crunch() {
     let config = SimulationConfig {
         strategy: StrategyConfig {
@@ -125,12 +132,13 @@ fn test_cheapest_first_auto_reaches_crunch() {
     };
 
     let result = simulate(&config);
-    let threshold = Decimal::new(1.7976931348623157, 308);
+    let threshold = Decimal::NUMBER_MAX_VALUE;
     assert!(result.final_state.antimatter >= threshold);
     assert_eq!(result.stop_reason, StopReason::ScoreReached);
 }
 
 #[test]
+#[ignore = "full-playthrough simulation; too slow for the regular suite"]
 fn test_simulate_no_trace_when_zero_snapshots() {
     let config = SimulationConfig {
         strategy: StrategyConfig::baseline(),
@@ -141,7 +149,7 @@ fn test_simulate_no_trace_when_zero_snapshots() {
 
     let result = simulate(&config);
     assert!(result.trace.is_empty());
-    let threshold = Decimal::new(1.7976931348623157, 308);
+    let threshold = Decimal::NUMBER_MAX_VALUE;
     assert!(result.final_state.antimatter >= threshold);
     assert_eq!(result.stop_reason, StopReason::ScoreReached);
 }

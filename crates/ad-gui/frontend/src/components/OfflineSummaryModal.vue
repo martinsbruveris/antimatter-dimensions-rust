@@ -3,7 +3,7 @@
 // game-time. Mirrors the original AwayProgressModal.vue
 // (../antimatter-dimensions/src/components/modals): a "While you were away
 // for {time}:" header followed by one resource line per gain (pre-Infinity,
-// just Antimatter) in the same `{before} to {after}` formatting.
+// just Antimatter) in the same "increased from {before} to {after}" wording.
 import { computed } from "vue";
 
 import { useUiStore } from "../stores/ui";
@@ -58,8 +58,9 @@ const headerText = computed(() => {
         v-if="antimatterChanged"
         class="c-modal-away-progress__resources"
       >
-        <div>
+        <div class="c-modal-away-progress__antimatter">
           <b>Antimatter</b>
+          increased from
           {{ fmt(summary.before.antimatter) }} to {{ fmt(summary.after.antimatter) }}
         </div>
       </div>
@@ -69,7 +70,13 @@ const headerText = computed(() => {
 
 <style scoped>
 /* The original keeps the resource rows in a component-scoped block (not the
-   vendored stylesheet); reproduce its underlined-row look. */
+   vendored stylesheet); reproduce its underlined-row look. The vendored
+   `.c-modal` centers text, but our Modal shell's `.c-modal-text` resets it to
+   left — restore the original's centering here. */
+.c-modal-away-progress {
+  text-align: center;
+}
+
 .c-modal-away-progress__resources div {
   min-width: 35rem;
   border-bottom: 0.1rem solid var(--color-text, #cccccc);
@@ -79,5 +86,15 @@ const headerText = computed(() => {
 
 .c-modal-away-progress__resources div:last-child {
   border: none;
+}
+
+/* Per-resource coloring from the original AwayProgressEntry's scoped styles
+   (antimatter red + the dark-theme glow). */
+.c-modal-away-progress__antimatter {
+  color: var(--color-antimatter);
+}
+
+.t-dark .c-modal-away-progress__antimatter {
+  animation: a-game-header__antimatter--glow 25s infinite;
 }
 </style>

@@ -25,6 +25,35 @@ export const TABS = [
     ],
   },
   {
+    key: "automation",
+    name: "Automation",
+    // JS: tab unlocks at total antimatter >= 1e40 (around buying the 7th
+    // Antimatter Dimension). The Automator subtab is post-Reality, so it is
+    // omitted here.
+    condition: (s) => Boolean(s?.autobuyers?.tab_unlocked),
+    subtabs: [
+      { key: "autobuyers", name: "Autobuyers", symbol: "<i class='fas fa-cog'></i>", component: AutobuyersTab },
+    ],
+  },
+  {
+    key: "challenges",
+    name: "Challenges",
+    // JS: `condition: () => PlayerProgress.infinityUnlocked()`. Only the Normal
+    // Challenges subtab is built; Infinity/Eternity challenges come later.
+    condition: (s) => Boolean(s?.challenges_unlocked),
+    subtabs: [
+      { key: "normal", name: "Challenges", symbol: "Ω", component: ChallengesTab },
+      // Infinity Challenges: appear once any is unlocked (needs Break Infinity).
+      {
+        key: "infinity",
+        name: "Infinity Challenges",
+        symbol: "<i class='fas fa-infinity'></i>",
+        component: InfinityChallengesTab,
+        condition: (s) => Boolean(s?.infinity_challenges_unlocked),
+      },
+    ],
+  },
+  {
     key: "infinity",
     name: "Infinity",
     // JS: `condition: () => PlayerProgress.infinityUnlocked()` — appears after the
@@ -59,35 +88,6 @@ export const TABS = [
         name: "Replicanti",
         symbol: "Ξ",
         component: ReplicantiTab,
-      },
-    ],
-  },
-  {
-    key: "automation",
-    name: "Automation",
-    // JS: tab unlocks at total antimatter >= 1e40 (around buying the 7th
-    // Antimatter Dimension). The Automator subtab is post-Reality, so it is
-    // omitted here.
-    condition: (s) => Boolean(s?.autobuyers?.tab_unlocked),
-    subtabs: [
-      { key: "autobuyers", name: "Autobuyers", symbol: "<i class='fas fa-cog'></i>", component: AutobuyersTab },
-    ],
-  },
-  {
-    key: "challenges",
-    name: "Challenges",
-    // JS: `condition: () => PlayerProgress.infinityUnlocked()`. Only the Normal
-    // Challenges subtab is built; Infinity/Eternity challenges come later.
-    condition: (s) => Boolean(s?.challenges_unlocked),
-    subtabs: [
-      { key: "normal", name: "Challenges", symbol: "<i class='fas fa-fist-raised'></i>", component: ChallengesTab },
-      // Infinity Challenges: appear once any is unlocked (needs Break Infinity).
-      {
-        key: "infinity",
-        name: "Infinity Challenges",
-        symbol: "<i class='fas fa-infinity'></i>",
-        component: InfinityChallengesTab,
-        condition: (s) => Boolean(s?.infinity_challenges_unlocked),
       },
     ],
   },

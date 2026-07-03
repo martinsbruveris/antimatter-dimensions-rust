@@ -7,6 +7,7 @@ import { handleShortcut } from "./util/shortcuts";
 import { formatTime } from "./util/format";
 import Sidebar from "./components/Sidebar.vue";
 import GameHeader from "./components/GameHeader.vue";
+import HeaderChallengeDisplay from "./components/HeaderChallengeDisplay.vue";
 import InfoButtons from "./components/InfoButtons.vue";
 import HotkeysModal from "./components/HotkeysModal.vue";
 import NotationModal from "./components/NotationModal.vue";
@@ -207,9 +208,12 @@ onUnmounted(() => {
       class="tab-container"
     >
       <GameHeader />
-      <!-- Matches ModernUi.vue: an (empty pre-infinity) information-header
-           whose green border-bottom is the separator under the header. -->
-      <div class="information-header" />
+      <!-- Matches ModernUi.vue: the information-header (green border-bottom
+           separator) holding the challenge display once Infinity is unlocked;
+           empty before that. -->
+      <div class="information-header">
+        <HeaderChallengeDisplay />
+      </div>
       <!-- The active page; swaps based on the selected tab/subtab. -->
       <component
         :is="ui.currentComponent"
