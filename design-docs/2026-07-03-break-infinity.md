@@ -141,13 +141,18 @@ bits is the faithful pre-Reality value).
 
 ## 6. Incremental plan
 
-1. **Core (slice 1)**: `broke_infinity` field + save separation; simplify
-   `break_infinity_unlockable`; `break_infinity()` action; guard the tick cap;
-   post-break IP branch; the Break Infinity button + snapshot flag. Tests. Commit.
-2. **Upgrades (slice 2)**: `BreakInfinityUpgrade` enum + bitmask + rebuyable counts;
-   IP-gated purchase; save/load (shared `infinityUpgrades` + `infinityRebuyables`);
-   wire the six wireable effects; stub the deferred ones; the Break Infinity tab.
-   Tests. Commit.
+1. ✅ **Core (slice 1)**: `broke_infinity` field + save separation; simplified
+   `break_infinity_unlockable`; `break_infinity()` action; guarded tick cap;
+   post-break IP branch; the Break Infinity button + snapshot flags.
+2. ✅ **Upgrades (slice 2)**: `BreakInfinityUpgrade` enum + bitmask + rebuyable
+   counts; IP-gated purchase; save/load (shared `infinityUpgrades` +
+   `infinityRebuyables`); the six wireable effects wired, the other six stubbed;
+   the Break Infinity subtab (under Infinity, shown once broken) + subtab-level
+   condition support in the tab store.
+
+**Feature 2.3 is complete.** Deferred effects (slowestChallenge / infinitiedGen /
+ipGen / the two cost-scaling rebuyables / the buy-max Dim Boost behaviour) light up
+with their prerequisite features; they are purchasable and persist now.
 
 ---
 

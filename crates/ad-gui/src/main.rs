@@ -8,8 +8,10 @@ use ad_core::data::constants::{
 };
 use ad_core::save::{decode_save_with_last_update, encode_save};
 use ad_core::{
-    offline_plan as core_offline_plan, AutobuyerMode, AutobuyerTarget, Decimal,
-    GameState, InfinityUpgrade, ALL_INFINITY_UPGRADES, NORMAL_CHALLENGE_COUNT,
+    offline_plan as core_offline_plan, AutobuyerMode, AutobuyerTarget,
+    BreakInfinityRebuyable, BreakInfinityUpgrade, Decimal, GameState, InfinityUpgrade,
+    ALL_BREAK_INFINITY_REBUYABLES, ALL_BREAK_INFINITY_UPGRADES, ALL_INFINITY_UPGRADES,
+    NORMAL_CHALLENGE_COUNT,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
@@ -138,6 +140,38 @@ struct ChallengeView {
     is_completed: bool,
 }
 
+/// Serializable view of the Break Infinity tab (12 upgrades).
+#[derive(Serialize)]
+struct BreakInfinityView {
+    /// Whether Infinity is broken (the tab/upgrades are active).
+    unlocked: bool,
+    /// The 9 one-time upgrades, in enum order.
+    upgrades: Vec<BreakUpgradeView>,
+    /// The 3 rebuyable upgrades, in index order.
+    rebuyables: Vec<BreakRebuyableView>,
+}
+
+/// A single one-time Break Infinity Upgrade.
+#[derive(Serialize)]
+struct BreakUpgradeView {
+    /// Original save id (the frontend keys its description on this).
+    id: String,
+    cost: Num,
+    is_bought: bool,
+    can_be_bought: bool,
+}
+
+/// A single rebuyable Break Infinity Upgrade.
+#[derive(Serialize)]
+struct BreakRebuyableView {
+    /// Index 0/1/2 (tickspeedCostMult / dimCostMult / ipGen).
+    id: usize,
+    cost: Num,
+    count: u32,
+    max: u32,
+    can_be_bought: bool,
+}
+
 /// Serializable view of the whole autobuyers tab.
 #[derive(Serialize)]
 struct AutobuyersView {
@@ -223,6 +257,8 @@ struct GameView {
     has_big_crunch_goal: bool,
     /// Autobuyer tab state (unlock progress, per-autobuyer status).
     autobuyers: AutobuyersView,
+    /// Break Infinity tab state (the 12 upgrades).
+    break_infinity: BreakInfinityView,
     /// Player options (UI/UX preferences), surfaced for the options tabs.
     options: OptionsView,
     /// Sorted ids of unlocked normal achievements; drives the Achievements tab
@@ -396,6 +432,35 @@ fn build_challenges_view(game: &GameState) -> Vec<ChallengeView> {
         .collect()
 }
 
+/// Build the Break Infinity view (the 9 one-time + 3 rebuyable upgrades). Static
+/// per-upgrade display data (descriptions) lives frontend-side, keyed on the id.
+fn build_break_infinity_view(game: &GameState) -> BreakInfinityView {
+    let upgrades = ALL_BREAK_INFINITY_UPGRADES
+        .iter()
+        .map(|&u| BreakUpgradeView {
+            id: u.save_id().to_string(),
+            cost: num(&u.cost()),
+            is_bought: game.break_infinity_upgrade_bought(u),
+            can_be_bought: game.can_buy_break_infinity_upgrade(u),
+        })
+        .collect();
+    let rebuyables = ALL_BREAK_INFINITY_REBUYABLES
+        .iter()
+        .map(|&r| BreakRebuyableView {
+            id: r.index(),
+            cost: num(&game.break_infinity_rebuyable_cost(r)),
+            count: game.break_infinity_rebuyable_count(r),
+            max: r.max_upgrades(),
+            can_be_bought: game.can_buy_break_infinity_rebuyable(r),
+        })
+        .collect();
+    BreakInfinityView {
+        unlocked: game.broke_infinity,
+        upgrades,
+        rebuyables,
+    }
+}
+
 fn build_game_view(game: &GameState) -> GameView {
     let unlocked = game.unlocked_dimensions();
     let mut dimensions = Vec::with_capacity(8);
@@ -506,6 +571,7 @@ fn build_game_view(game: &GameState) -> GameView {
         break_infinity_unlockable: game.break_infinity_unlockable(),
         has_big_crunch_goal: !game.broke_infinity || game.any_challenge_running(),
         autobuyers: build_autobuyers_view(game),
+        break_infinity: build_break_infinity_view(game),
         unlocked_achievements: game.unlocked_achievement_ids(),
         achievement_power: num(&game.achievement_power()),
         tutorial_state: game.tutorial_state,
@@ -679,6 +745,27 @@ fn big_crunch(state: State<'_, Mutex<GameState>>) {
 fn break_infinity(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.break_infinity();
+}
+
+/// Buy a one-time Break Infinity Upgrade by its original save id (e.g.
+/// "totalMult"). An unrecognized id is a no-op.
+#[tauri::command]
+fn buy_break_infinity_upgrade(id: String, state: State<'_, Mutex<GameState>>) {
+    if let Some(upgrade) = BreakInfinityUpgrade::from_save_id(&id) {
+        state.lock().unwrap().buy_break_infinity_upgrade(upgrade);
+    }
+}
+
+/// Buy one level of a rebuyable Break Infinity Upgrade by index (0/1/2).
+#[tauri::command]
+fn buy_break_infinity_rebuyable(id: usize, state: State<'_, Mutex<GameState>>) {
+    let upgrade = match id {
+        0 => BreakInfinityRebuyable::TickspeedCostMult,
+        1 => BreakInfinityRebuyable::DimCostMult,
+        2 => BreakInfinityRebuyable::IpGen,
+        _ => return,
+    };
+    state.lock().unwrap().buy_break_infinity_rebuyable(upgrade);
 }
 
 /// Buy an Infinity Upgrade by its original save id (e.g. "timeMult"). An
@@ -1203,6 +1290,8 @@ pub fn run() {
             max_all,
             big_crunch,
             break_infinity,
+            buy_break_infinity_upgrade,
+            buy_break_infinity_rebuyable,
             buy_infinity_upgrade,
             start_challenge,
             exit_challenge,

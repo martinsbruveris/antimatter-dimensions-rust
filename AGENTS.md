@@ -82,6 +82,15 @@ antimatter-dimensions-rust/
   are *applied* at the original's sites (dimension multiplier, tickspeed, boost/
   galaxy requirement, reset paths). See
   `design-docs/2026-07-03-infinity-upgrades.md`.
+- `src/break_infinity_upgrades.rs` — Break Infinity + its 12 upgrades (Feature 2.3).
+  `GameState::broke_infinity` (↔ `player.break`) lifts the `1e308` cap and switches
+  `gained_infinity_points` to the scaling formula (both in `crunch.rs` / `tick.rs`);
+  `break_infinity()` is gated on `break_infinity_unlockable()` (Big Crunch autobuyer
+  maxed). This module owns the `BreakInfinityUpgrade` (9 one-time, sharing the save's
+  `infinityUpgrades`) + `BreakInfinityRebuyable` (3, in `infinityRebuyables`) types,
+  purchase logic, and the effect readers (`break_infinity_upgrade_common_mult`,
+  `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`); six effects are
+  deferred (neutral). See `design-docs/2026-07-03-break-infinity.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant

@@ -1,5 +1,6 @@
 import AntimatterDimensionsTab from "../components/tabs/AntimatterDimensionsTab.vue";
 import InfinityUpgradesTab from "../components/tabs/InfinityUpgradesTab.vue";
+import BreakInfinityTab from "../components/tabs/BreakInfinityTab.vue";
 import ChallengesTab from "../components/tabs/ChallengesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
@@ -31,6 +32,14 @@ export const TABS = [
     uiClass: "o-tab-btn--infinity",
     subtabs: [
       { key: "upgrades", name: "Infinity Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: InfinityUpgradesTab },
+      // Break Infinity: appears once Infinity is broken (`player.break`).
+      {
+        key: "break",
+        name: "Break Infinity",
+        symbol: "<i class='fas fa-arrows-alt-h'></i>",
+        component: BreakInfinityTab,
+        condition: (s) => Boolean(s?.break_infinity?.unlocked),
+      },
     ],
   },
   {

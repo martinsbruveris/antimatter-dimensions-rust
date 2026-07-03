@@ -136,6 +136,13 @@ export const useGameStore = defineStore("game", {
     breakInfinity() {
       return invoke("break_infinity");
     },
+    // Buy a one-time Break Infinity Upgrade by save id, or a rebuyable by index.
+    buyBreakInfinityUpgrade(id) {
+      return invoke("buy_break_infinity_upgrade", { id });
+    },
+    buyBreakInfinityRebuyable(id) {
+      return invoke("buy_break_infinity_rebuyable", { id });
+    },
     // Buy an Infinity Upgrade by its original save id (e.g. "timeMult").
     buyInfinityUpgrade(id) {
       return invoke("buy_infinity_upgrade", { id });

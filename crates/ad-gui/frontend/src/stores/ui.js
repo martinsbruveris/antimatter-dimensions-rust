@@ -72,6 +72,15 @@ export const useUiStore = defineStore("ui", {
       const game = useGameStore();
       return TABS.filter((t) => !t.condition || t.condition(game.snapshot));
     },
+    // A subtab may carry its own `condition(snapshot)` (e.g. Break Infinity, shown
+    // only after breaking) — filter those the same way as tabs.
+    visibleSubtabs() {
+      const game = useGameStore();
+      return (tab) =>
+        tab.subtabs.filter(
+          (st) => !st.condition || st.condition(game.snapshot),
+        );
+    },
     currentTab(state) {
       return (
         this.visibleTabs.find((t) => t.key === state.currentTabKey) ?? TABS[0]
@@ -79,8 +88,11 @@ export const useUiStore = defineStore("ui", {
     },
     currentSubtab(state) {
       const tab = this.currentTab;
-      const key = state.currentSubtabKey[tab.key] ?? tab.subtabs[0].key;
-      return tab.subtabs.find((st) => st.key === key) ?? tab.subtabs[0];
+      const subtabs = this.visibleSubtabs(tab);
+      // Fall back to the tab's own first subtab if every visible one is hidden.
+      const fallback = subtabs[0] ?? tab.subtabs[0];
+      const key = state.currentSubtabKey[tab.key] ?? fallback.key;
+      return subtabs.find((st) => st.key === key) ?? fallback;
     },
     currentComponent() {
       return this.currentSubtab.component;
@@ -106,7 +118,7 @@ export const useUiStore = defineStore("ui", {
     // mirroring the original's Left/Right arrow subtab movement.
     moveSubtab(delta) {
       const tab = this.currentTab;
-      const subtabs = tab.subtabs;
+      const subtabs = this.visibleSubtabs(tab);
       const idx = subtabs.findIndex((st) => st.key === this.currentSubtab.key);
       const next = (idx + delta + subtabs.length) % subtabs.length;
       this.setSubtab(tab.key, subtabs[next].key);

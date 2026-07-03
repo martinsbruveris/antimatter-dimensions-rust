@@ -22,7 +22,7 @@ const ui = useUiStore();
       </div>
       <div class="subtabs">
         <div
-          v-for="subtab in tab.subtabs"
+          v-for="subtab in ui.visibleSubtabs(tab)"
           :key="subtab.key"
           class="o-tab-btn o-tab-btn--subtab"
           :class="{
