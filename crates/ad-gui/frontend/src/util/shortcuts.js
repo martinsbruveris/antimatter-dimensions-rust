@@ -57,6 +57,16 @@ export function handleShortcut(e, game, ui) {
       else ui.setTab("options");
       return;
     }
+    if (e.code === "Tab" && !e.shiftKey) {
+      // Modify Visible Tabs (the original's "tab" bind /
+      // keyboardVisibleTabsToggle): close the hidden-tabs modal if it is the
+      // one open, otherwise replace whatever modal is open with it. Like the
+      // modal keys above this is a `bind`, active even with hotkeys disabled;
+      // preventDefault stops the browser's focus cycling.
+      ui.toggleModal("hiddenTabs");
+      e.preventDefault();
+      return;
+    }
 
     // Arrow keys cycle pages: Up/Down through tabs, Left/Right through the
     // current tab's subtabs. Like the original these are bound with `bind` (not

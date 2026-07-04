@@ -423,12 +423,22 @@ system.
 - ☐ V4 Theme dropdown (Normal-only first; body-class swap) — Milestone
 - ☑ V5 Notation dropdown (limited list; → ad-format WASM) — Milestone
 - ☑ V6 Exponent Notation modal (comma/notation sliders, comma ≤ notation) — Milestone
-- ☐ V11 Relative prestige gain text coloring toggle — Milestone
+- ☑ V11 Relative prestige gain text coloring toggle (stored + toggle; its
+  consumer, the post-break header crunch button, isn't built yet)
 - ☑ V13 Hotkey List button (already implemented)
-- ◐ V10 Modify Visible Tabs modal (tracked on todo.md) — Milestone
-- ☐ V7 Animation Options modal (bigCrunch toggle; ties to crunch animation) — Milestone/Later
-- ☐ V8 Info Display Options modal (showPercentage, achievement IDs/states) — Later
-- ☐ V12 Sidebar resource picker (Modern UI) — Later
+- ☑ V10 Modify Visible Tabs modal (+ Tab hotkey; engine-owned
+  `hiddenTabBits`/`hiddenSubtabBits` with the original bit ids, so the state
+  round-trips through real saves; our Infinity → Infinity Dimensions subtab
+  maps to the original's Dimensions-tab (0,1) bit)
+- ☑ V7 Animation Options modal (bigCrunch toggle stored; the crunch animation
+  itself is still a separate todo item)
+- ☑ V8 Info Display Options modal (showPercentage → dimension-row %/s;
+  achievement IDs/unlock states → Achievements tab; challenge IDs → the two
+  challenge tabs; Shift shows all hint text while held)
+- ☑ V9 Away Progress Options modal (7 in-frontier resources; the offline
+  catch-up summary lists them all, honours the toggles, click-to-hide)
+- ☑ V12 Sidebar resource picker (Antimatter / IP / Replicanti + "Latest",
+  original ids; the sidebar box itself also click-cycles)
 - ☐ V3 News Options modal — Later (News unported)
 - ✗ V1 UI Modern/Classic toggle — **not porting** (Modern-only); document deviation
 
@@ -442,7 +452,8 @@ system.
 - ☐ G7 Automator Log Max slider — Later (post-Reality)
 
 ### Modals backing later systems
-- ☐ V9 Away Progress Options modal — Later (offline progress)
+- ☑ V9 Away Progress Options modal (offline progress landed 2026-06-30, so
+  this moved into scope; see the Visual-tab checklist above)
 - ☐ News Options modal — Later (News ticker)
 
 

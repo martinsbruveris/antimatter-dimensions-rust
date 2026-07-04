@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../stores/game";
+import { useUiStore } from "../stores/ui";
 import { DIM_NAMES } from "../util/dimensionText";
 import { formatDecimal, formatMultiplier } from "../util/format";
 import { isSmall } from "../util/responsive";
@@ -10,6 +11,7 @@ import { TUTORIAL_STATE, hasTutorial } from "../util/tutorial";
 const props = defineProps({ tier: { type: Number, required: true } });
 
 const game = useGameStore();
+const ui = useUiStore();
 const s = computed(() => game.snapshot);
 const dim = computed(() => s.value.dimensions[props.tier]);
 // "Unlocked" here is the original's `isUnlocked = isAvailableForPurchase`:
@@ -35,7 +37,14 @@ const costText = computed(() => {
   return `Cost: ${formatDecimal(cost, 0)} AM`;
 });
 const hasLongText = computed(() => costText.value.length > 20);
-const showRate = computed(() => props.tier < 7 && dim.value.rate_percent > 0.01);
+// The %/s growth readout obeys the "Show % gain" Info-Display option; holding
+// Shift always shows it (original GenericDimensionRowText.showPercentage).
+const showRate = computed(
+  () =>
+    props.tier < 7 &&
+    dim.value.rate_percent > 0.01 &&
+    (s.value.options.show_hint_text.show_percentage || ui.shiftDown)
+);
 
 // Tutorial highlight: the 1st and 2nd dimension buy buttons are the DIM1 / DIM2
 // steps. The glow only shows when the buy is affordable; the `!` icon shows

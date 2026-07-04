@@ -6,13 +6,19 @@
     <title>Antimatter Dimensions</title>
     <!-- Vendored verbatim from the original game (public/stylesheets).
          Modern UI = styles.css + new-ui-styles.css; body class below
-         selects the Modern default theme (t-normal s-base--dark). -->
+         selects the Modern default theme (t-normal s-base--dark).
+         ORDER MATTERS: equal-specificity rules overlap across these files
+         (e.g. vue-sfc-classes' base .l-hint-text top offset vs styles.css'
+         achievement/challenge hint-text variants), so keep the original's
+         cascade: head links in the original index.html order, then
+         new-ui-styles.css last (the original injects that one at
+         Modern-UI mount, after every head stylesheet). -->
     <link rel="stylesheet" href="/stylesheets/fontawesome/css/all.css">
-    <link rel="stylesheet" href="/stylesheets/styles.css">
-    <link rel="stylesheet" href="/stylesheets/new-ui-styles.css">
-    <link rel="stylesheet" href="/stylesheets/tooltips.css">
     <link rel="stylesheet" href="/stylesheets/vue-sfc-classes.css">
     <link rel="stylesheet" href="/stylesheets/ad-slider-component.css">
+    <link rel="stylesheet" href="/stylesheets/styles.css">
+    <link rel="stylesheet" href="/stylesheets/tooltips.css">
+    <link rel="stylesheet" href="/stylesheets/new-ui-styles.css">
     <!-- Startup splash: static markup + inline CSS so it paints immediately,
          before the JS bundle loads (mirrors the original game's #loading).
          main.js hides it once the app has mounted. -->

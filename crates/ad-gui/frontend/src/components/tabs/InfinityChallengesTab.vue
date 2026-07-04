@@ -6,10 +6,18 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
+import { useUiStore } from "../../stores/ui";
 import { INFINITY_CHALLENGES } from "../../data/infinityChallenges";
 
 const game = useGameStore();
+const ui = useUiStore();
 const s = computed(() => game.snapshot);
+
+// The corner "IC1"-style IDs obey the "Challenge IDs" Info-Display option;
+// holding Shift always shows them (original HintText type="challenges").
+const showIds = computed(
+  () => Boolean(s.value?.options?.show_hint_text?.challenges) || ui.shiftDown,
+);
 
 const viewById = computed(
   () => new Map((s.value?.infinity_challenges ?? []).map((c) => [c.id, c])),
@@ -83,7 +91,10 @@ function exitChallenge() {
         class="l-challenge-grid__cell"
       >
         <div class="c-challenge-box l-challenge-box c-challenge-box--normal">
-          <div class="o-hint-text l-hint-text l-hint-text--challenge">
+          <div
+            v-show="showIds"
+            class="o-hint-text l-hint-text l-hint-text--challenge"
+          >
             IC{{ b.meta.id }}
           </div>
           <span>{{ b.meta.description }}</span>

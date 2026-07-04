@@ -16,33 +16,44 @@ import OptionsGameplayTab from "../components/tabs/OptionsGameplayTab.vue";
 // null` means "not implemented yet" (renders a placeholder). An optional
 // `condition(snapshot)` hides a tab until the game unlocks it. Only the
 // early-game tabs are listed for now; more get added as systems land.
+//
+// Hidden-tab bookkeeping (the Modify Visible Tabs modal): each tab carries the
+// **original game's tab id** as `hideId` and each subtab a `[tabId, subtabId]`
+// pair — the bit positions in the save's `hiddenTabBits`/`hiddenSubtabBits`, so
+// hidden-tab state round-trips through real saves. Note the Infinity →
+// Infinity Dimensions subtab maps to the original's Dimensions-tab "Infinity
+// Dimensions" subtab (0,1) — we host that page under the Infinity tab instead.
+// `hidable: false` marks the Options tab/subtabs, which can never be hidden.
 export const TABS = [
   {
     key: "dimensions",
     name: "Dimensions",
+    hideId: 0,
     subtabs: [
-      { key: "antimatter", name: "Antimatter Dimensions", symbol: "Ω", component: AntimatterDimensionsTab },
+      { key: "antimatter", name: "Antimatter Dimensions", symbol: "Ω", component: AntimatterDimensionsTab, hideId: [0, 0] },
     ],
   },
   {
     key: "automation",
     name: "Automation",
+    hideId: 4,
     // JS: tab unlocks at total antimatter >= 1e40 (around buying the 7th
     // Antimatter Dimension). The Automator subtab is post-Reality, so it is
     // omitted here.
     condition: (s) => Boolean(s?.autobuyers?.tab_unlocked),
     subtabs: [
-      { key: "autobuyers", name: "Autobuyers", symbol: "<i class='fas fa-cog'></i>", component: AutobuyersTab },
+      { key: "autobuyers", name: "Autobuyers", symbol: "<i class='fas fa-cog'></i>", component: AutobuyersTab, hideId: [4, 0] },
     ],
   },
   {
     key: "challenges",
     name: "Challenges",
+    hideId: 5,
     // JS: `condition: () => PlayerProgress.infinityUnlocked()`. Only the Normal
     // Challenges subtab is built; Infinity/Eternity challenges come later.
     condition: (s) => Boolean(s?.challenges_unlocked),
     subtabs: [
-      { key: "normal", name: "Challenges", symbol: "Ω", component: ChallengesTab },
+      { key: "normal", name: "Challenges", symbol: "Ω", component: ChallengesTab, hideId: [5, 0] },
       // Infinity Challenges: appear once any is unlocked (needs Break Infinity).
       {
         key: "infinity",
@@ -50,28 +61,31 @@ export const TABS = [
         symbol: "<i class='fas fa-infinity'></i>",
         component: InfinityChallengesTab,
         condition: (s) => Boolean(s?.infinity_challenges_unlocked),
+        hideId: [5, 1],
       },
     ],
   },
   {
     key: "infinity",
     name: "Infinity",
+    hideId: 6,
     // JS: `condition: () => PlayerProgress.infinityUnlocked()` — appears after the
     // first Big Crunch and stays. `uiClass` gives the tab its infinity coloring
-    // (original `UIClass: "o-tab-btn--infinity"`). Only the Infinity Upgrades
-    // subtab is built; Break Infinity and Replicanti come later.
+    // (original `UIClass: "o-tab-btn--infinity"`).
     condition: (s) => Boolean(s?.infinity_unlocked),
     uiClass: "o-tab-btn--infinity",
     subtabs: [
-      { key: "upgrades", name: "Infinity Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: InfinityUpgradesTab },
+      { key: "upgrades", name: "Infinity Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: InfinityUpgradesTab, hideId: [6, 0] },
       // Infinity Dimensions: appear once Infinity is broken (their unlock AM
-      // exceeds 1e308) or the 1st is already unlocked.
+      // exceeds 1e308) or the 1st is already unlocked. Hide-bit-wise this is
+      // the original's Dimensions-tab "Infinity Dimensions" subtab.
       {
         key: "dimensions",
         name: "Infinity Dimensions",
         symbol: "<i class='fas fa-times'></i>",
         component: InfinityDimensionsTab,
         condition: (s) => Boolean(s?.infinity_dimensions?.unlocked),
+        hideId: [0, 1],
       },
       // Break Infinity: appears once Infinity is broken (`player.break`).
       {
@@ -80,6 +94,7 @@ export const TABS = [
         symbol: "<i class='fas fa-arrows-alt-h'></i>",
         component: BreakInfinityTab,
         condition: (s) => Boolean(s?.break_infinity?.unlocked),
+        hideId: [6, 1],
       },
       // Replicanti: visible from the first Infinity (JS `infinityUnlocked()`); the
       // in-tab button unlocks the mechanic once 1e140 IP is affordable.
@@ -88,30 +103,35 @@ export const TABS = [
         name: "Replicanti",
         symbol: "Ξ",
         component: ReplicantiTab,
+        hideId: [6, 2],
       },
     ],
   },
   {
     key: "achievements",
     name: "Achievements",
+    hideId: 3,
     subtabs: [
-      { key: "normal", name: "Achievements", symbol: "<i class='fas fa-trophy'></i>", component: NormalAchievementsTab },
+      { key: "normal", name: "Achievements", symbol: "<i class='fas fa-trophy'></i>", component: NormalAchievementsTab, hideId: [3, 0] },
     ],
   },
   {
     key: "statistics",
     name: "Statistics",
+    hideId: 2,
     subtabs: [
-      { key: "statistics", name: "Statistics", symbol: "<i class='fas fa-clipboard-list'></i>", component: null },
+      { key: "statistics", name: "Statistics", symbol: "<i class='fas fa-clipboard-list'></i>", component: null, hideId: [2, 0] },
     ],
   },
   {
     key: "options",
     name: "Options",
+    hideId: 1,
+    hidable: false,
     subtabs: [
-      { key: "saving", name: "Saving", symbol: "<i class='fas fa-save'></i>", component: OptionsSavingTab },
-      { key: "visual", name: "Visual", symbol: "<i class='fas fa-palette'></i>", component: OptionsVisualTab },
-      { key: "gameplay", name: "Gameplay", symbol: "<i class='fas fa-wrench'></i>", component: OptionsGameplayTab },
+      { key: "saving", name: "Saving", symbol: "<i class='fas fa-save'></i>", component: OptionsSavingTab, hideId: [1, 0], hidable: false },
+      { key: "visual", name: "Visual", symbol: "<i class='fas fa-palette'></i>", component: OptionsVisualTab, hideId: [1, 1], hidable: false },
+      { key: "gameplay", name: "Gameplay", symbol: "<i class='fas fa-wrench'></i>", component: OptionsGameplayTab, hideId: [1, 2], hidable: false },
     ],
   },
 ];

@@ -392,6 +392,21 @@ struct OptionsView {
     /// Per-action confirmation toggles; the action handlers branch on these to
     /// decide whether to show the explanatory modal.
     confirmations: ConfirmationsView,
+    /// Animation toggles (Animation Options modal; only Big Crunch so far).
+    animations: AnimationsView,
+    /// Info-display hint toggles (Info Display Options modal).
+    show_hint_text: ShowHintTextView,
+    /// Away-progress display toggles (Away Progress Options modal + the
+    /// "While you were away" summary).
+    away_progress: AwayProgressView,
+    /// Relative prestige-gain text coloring (original `headerTextColored`).
+    header_text_colored: bool,
+    /// Sidebar resource id (original `sidebarResourceID`; 0 = latest resource).
+    sidebar_resource_id: u32,
+    /// Hidden top-level tabs bitmask (original `hiddenTabBits`, original ids).
+    hidden_tab_bits: u32,
+    /// Per-tab hidden-subtab bitmasks (original `hiddenSubtabBits`, 11 entries).
+    hidden_subtab_bits: Vec<u32>,
 }
 
 /// Serializable view of the per-action confirmation toggles.
@@ -401,6 +416,33 @@ struct ConfirmationsView {
     antimatter_galaxy: bool,
     sacrifice: bool,
     big_crunch: bool,
+}
+
+/// Serializable view of the animation toggles (modelled subset).
+#[derive(Serialize)]
+struct AnimationsView {
+    big_crunch: bool,
+}
+
+/// Serializable view of the info-display hint toggles.
+#[derive(Serialize)]
+struct ShowHintTextView {
+    show_percentage: bool,
+    achievements: bool,
+    achievement_unlock_states: bool,
+    challenges: bool,
+}
+
+/// Serializable view of the away-progress display toggles.
+#[derive(Serialize)]
+struct AwayProgressView {
+    antimatter: bool,
+    dimension_boosts: bool,
+    antimatter_galaxies: bool,
+    infinities: bool,
+    infinity_points: bool,
+    replicanti: bool,
+    replicanti_galaxies: bool,
 }
 
 /// Build the serializable view for one autobuyer, including its interval-upgrade
@@ -755,6 +797,31 @@ fn build_game_view(game: &GameState) -> GameView {
                 sacrifice: game.options.confirmations.sacrifice,
                 big_crunch: game.options.confirmations.big_crunch,
             },
+            animations: AnimationsView {
+                big_crunch: game.options.animations.big_crunch,
+            },
+            show_hint_text: ShowHintTextView {
+                show_percentage: game.options.show_hint_text.show_percentage,
+                achievements: game.options.show_hint_text.achievements,
+                achievement_unlock_states: game
+                    .options
+                    .show_hint_text
+                    .achievement_unlock_states,
+                challenges: game.options.show_hint_text.challenges,
+            },
+            away_progress: AwayProgressView {
+                antimatter: game.options.away_progress.antimatter,
+                dimension_boosts: game.options.away_progress.dimension_boosts,
+                antimatter_galaxies: game.options.away_progress.antimatter_galaxies,
+                infinities: game.options.away_progress.infinities,
+                infinity_points: game.options.away_progress.infinity_points,
+                replicanti: game.options.away_progress.replicanti,
+                replicanti_galaxies: game.options.away_progress.replicanti_galaxies,
+            },
+            header_text_colored: game.options.header_text_colored,
+            sidebar_resource_id: game.options.sidebar_resource_id,
+            hidden_tab_bits: game.options.hidden_tab_bits,
+            hidden_subtab_bits: game.options.hidden_subtab_bits.to_vec(),
         },
     }
 }
@@ -1147,6 +1214,81 @@ fn set_notation_digits(comma: u32, notation: u32, state: State<'_, Mutex<GameSta
 fn set_confirmation(kind: String, enabled: bool, state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.options.set_confirmation(&kind, enabled);
+}
+
+/// Flip a single animation toggle (original `player.options.animations.*`).
+/// `kind` is the camelCase name (`bigCrunch`); an unknown name is ignored.
+#[tauri::command]
+fn set_animation(kind: String, enabled: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_animation(&kind, enabled);
+}
+
+/// Flip a single info-display hint toggle (original
+/// `player.options.showHintText.*`). `kind` is the camelCase name
+/// (`showPercentage`, `achievements`, `achievementUnlockStates`, `challenges`).
+#[tauri::command]
+fn set_hint_text(kind: String, enabled: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_hint_text(&kind, enabled);
+}
+
+/// Flip a single away-progress display toggle (original
+/// `player.options.awayProgress.*`). `kind` is the camelCase resource name.
+#[tauri::command]
+fn set_away_progress(kind: String, enabled: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_away_progress(&kind, enabled);
+}
+
+/// Toggles the relative prestige-gain text coloring (original
+/// `headerTextColored`).
+#[tauri::command]
+fn set_header_text_colored(enabled: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.header_text_colored = enabled;
+}
+
+/// Sets the sidebar resource (original `sidebarResourceID`; 0 = latest).
+#[tauri::command]
+fn set_sidebar_resource(id: u32, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.set_sidebar_resource(id);
+}
+
+/// Toggles a top-level tab's hidden bit (original tab ids; the current-tab and
+/// non-hidable guards live in the frontend, which knows the open tab).
+#[tauri::command]
+fn toggle_tab_visibility(tab_id: u32, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.toggle_tab_visibility(tab_id);
+}
+
+/// Clears a top-level tab's hidden bit (used when unhiding a tab whose subtabs
+/// were all hidden).
+#[tauri::command]
+fn unhide_tab(tab_id: u32, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.unhide_tab(tab_id);
+}
+
+/// Toggles a subtab's hidden bit (original tab/subtab ids).
+#[tauri::command]
+fn toggle_subtab_visibility(
+    tab_id: u32,
+    subtab_id: u32,
+    state: State<'_, Mutex<GameState>>,
+) {
+    let mut game = state.lock().unwrap();
+    game.options.toggle_subtab_visibility(tab_id, subtab_id);
+}
+
+/// Unhides every tab and subtab (the Modify Visible Tabs modal's "Show all
+/// tabs" button).
+#[tauri::command]
+fn show_all_tabs(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.show_all_tabs();
 }
 
 /// Sets the autosave cadence in milliseconds (original `autosaveInterval`); the
@@ -1551,6 +1693,15 @@ pub fn run() {
             set_notation,
             set_notation_digits,
             set_offline_ticks,
+            set_animation,
+            set_hint_text,
+            set_away_progress,
+            set_header_text_colored,
+            set_sidebar_resource,
+            toggle_tab_visibility,
+            unhide_tab,
+            toggle_subtab_visibility,
+            show_all_tabs,
             set_confirmation,
             set_autosave_interval,
             set_show_time_since_save,

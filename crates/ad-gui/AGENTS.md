@@ -160,10 +160,61 @@ frontend/
   position with the rest of the grid as invisible placeholders
   (`l-options-grid__button--hidden`): **Visual → Update rate** (slider),
   **Visual → Notation** (dropdown), **Visual → Exponent Notation Options**
-  (button → modal), **Gameplay → Hotkeys** (enable/disable toggle) and
-  **Gameplay → Offline ticks** (slider). The Classic-UI toggle is intentionally
-  dropped (Modern UI only); themes will be a reduced set. Full plan + per-option
-  checklist: `design-docs/2026-06-27-options-tabs.md`.
+  (button → modal), **Visual rows 3–4** — the Animation / Info Display / Away
+  Progress options modals, Modify Visible Tabs, the prestige-gain coloring
+  toggle, and the Sidebar resource picker (V7–V12, see below) — plus
+  **Gameplay → Hotkeys** (enable/disable toggle) and **Gameplay → Offline
+  ticks** (slider). The Classic-UI toggle is intentionally dropped (Modern UI
+  only); themes will be a reduced set. Full plan + per-option checklist:
+  `design-docs/2026-06-27-options-tabs.md`.
+- **Options modals (V7–V9).** `AnimationOptionsModal` (only the Big Crunch
+  toggle so far, shown once Infinity is unlocked; the crunch animation itself
+  is a separate todo item — the flag is stored for it), `InfoDisplayOptionsModal`
+  (hint-text toggles, below), and `AwayProgressOptionsModal` (which resources
+  the offline catch-up summary may list) — `ui.openModal` ids
+  `animationOptions` / `infoDisplayOptions` / `awayProgressOptions`. All are
+  built from `options/ModalOptionsToggleButton.vue` (the green/purple
+  `o-primary-btn--modal-option` toggle) inside the vendored
+  `c-modal-options__large` / `l-modal-options` chrome. Engine storage:
+  `Options.animations` / `.show_hint_text` / `.away_progress`, written via the
+  `set_animation` / `set_hint_text` / `set_away_progress` commands (camelCase
+  kind names, mirroring the original save keys).
+- **Info-display hints (V8).** Consumers read
+  `snapshot.options.show_hint_text` OR `ui.shiftDown` (Shift always reveals
+  hint text, tracked by App.vue's keydown/keyup/blur listeners):
+  `showPercentage` gates the dimension rows' `(+x.xx%/s)` readout,
+  `achievements` the ID overlay on achievement tiles, `challenges` the
+  C*/IC* overlay on both challenge tabs. `achievementUnlockStates` gates the
+  ✓/✗ tile corners (no Shift override, as in the original).
+- **Away-progress summary (V9).** `OfflineSummaryModal.vue` lists every
+  modelled resource that visibly increased (antimatter, boosts, galaxies,
+  infinities, IP, replicanti, RGs — the original AwayProgressEntry wording and
+  colors), honouring the `away_progress` toggles *as of the replay's `before`
+  snapshot*; clicking a line strikes it through and flips its toggle off for
+  future summaries.
+- **Modify Visible Tabs (V10).** `HiddenTabsModal.vue` (`ui.openModal ===
+  'hiddenTabs'`, also the **Tab** key — a `bind`, active with hotkeys
+  disabled). Hidden state is engine-owned (`Options.hidden_tab_bits` /
+  `.hidden_subtab_bits`) using the **original game's tab/subtab ids** so it
+  round-trips through real saves; `config/tabs.js` carries the id mapping as
+  `hideId` (tab: number; subtab: `[tabId, subtabId]` — note our Infinity →
+  Infinity Dimensions subtab maps to the original's Dimensions-tab `(0, 1)`),
+  plus `hidable: false` on the never-hidable Options tab. The `ui` store's
+  `tabIsHidden` / `subtabIsHidden` getters feed `visibleTabs` /
+  `visibleSubtabs`, which keep the currently open tab/subtab visible even when
+  hidden (original `isAvailable` semantics). Commands:
+  `toggle_tab_visibility`, `toggle_subtab_visibility`, `unhide_tab`,
+  `show_all_tabs`.
+- **Prestige-gain coloring (V11).** The `headerTextColored` toggle is stored
+  (`set_header_text_colored`); its consumer — the post-break header crunch
+  button's relative-gain coloring — isn't built yet.
+- **Sidebar resource (V12).** `config/sidebarResources.js` lists the renderable
+  resources with the **original ids** (2 Antimatter, 3 Infinity Points,
+  4 Replicanti; 0 = latest unlocked). `SidebarCurrency.vue` renders the pick
+  and click-cycles it (shift-click backwards); the Visual tab's
+  `SelectSidebarDropdown.vue` sets it directly (`set_sidebar_resource`).
+  Unknown/locked ids from imported saves fall back to the latest resource but
+  are preserved in the save.
 - **Notation** (`SelectNotationDropdown.vue`, Visual row 2 middle): a simplified
   port of the original's ExpandingControlBox — a header button expanding an
   inline list of the four `ad-format` notations (Scientific, Engineering,
@@ -292,7 +343,7 @@ frontend/
   implemented mechanics: `1`-`8` buy-until-10 / `Shift`+`1`-`8` buy-1, `T` /
   `Shift`+`T` tickspeed, `S`/`D`/`G` sacrifice/boost/galaxy, `C` Big Crunch, `M`
   max-all, arrows move tab (Up/Down) / subtab (Left/Right), `H` how-to-play, `?`
-  Hotkey List. `S`/`D`/`G`/`C` route through the confirmation gate (the
+  Hotkey List, `Tab` Modify Visible Tabs (toggles the `hiddenTabs` modal). `S`/`D`/`G`/`C` route through the confirmation gate (the
   `request*` store actions), so they pop the explanatory modal just like the
   on-screen buttons. Letters/digits are matched via `e.code` (robust to Shift),
   `?` by character; Ctrl/Cmd/Alt combos and typing in inputs are ignored.
@@ -433,6 +484,13 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md` and
   original stylesheets copied unchanged into `public/stylesheets/`. Do not
   hand-transcribe CSS (that caused colour/size bugs in an earlier prototype).
   Select the Modern default theme via the `t-normal s-base--dark` body classes.
+  **Load order matters:** equal-specificity rules overlap across the vendored
+  files (e.g. vue-sfc-classes' base `.l-hint-text` top offset vs styles.css'
+  achievement/challenge variants — getting this wrong sank the hint IDs onto
+  the tile borders), so `index.html` must keep the original's cascade:
+  vue-sfc-classes → ad-slider-component → styles.css → tooltips, with
+  new-ui-styles.css last (the original injects it at Modern-UI mount, after
+  every head stylesheet).
 - **Scoped styles.** Some Modern classes live only in the original components'
   `<style scoped>` (e.g. `.l-tickspeed-container`, `.c-dim-row__large`,
   `.l-modern-buy-ad-text`, sidebar active states). Replicate those in the

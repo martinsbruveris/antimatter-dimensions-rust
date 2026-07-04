@@ -127,7 +127,10 @@ antimatter-dimensions-rust/
   (Break Infinity) consumes. See `design-docs/2026-07-03-autobuyers.md`.
 - `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
   `player.options`), held in `GameState`, preserved across a Big Crunch.
-  Includes the per-action `Confirmations` toggles (boost/galaxy/sacrifice/crunch)
+  Includes the per-action `Confirmations` toggles (boost/galaxy/sacrifice/crunch),
+  the `Animations`/`ShowHintText`/`AwayProgress` toggle groups, header-gain
+  coloring, the sidebar resource id, and the hidden-tab bitmasks
+  (`hidden_tab_bits`/`hidden_subtab_bits`, keyed by the original tab ids)
 - `src/observed.rs` — `ObservedState`: read-only snapshot of `GameState` plus
   computed fields (costs, affordability, `next_sacrifice_boost`). The decision
   input for `ad-sim` controllers and the trace/GUI view.

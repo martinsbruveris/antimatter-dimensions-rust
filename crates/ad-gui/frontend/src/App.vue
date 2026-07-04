@@ -11,6 +11,10 @@ import HeaderChallengeDisplay from "./components/HeaderChallengeDisplay.vue";
 import InfoButtons from "./components/InfoButtons.vue";
 import HotkeysModal from "./components/HotkeysModal.vue";
 import NotationModal from "./components/NotationModal.vue";
+import AnimationOptionsModal from "./components/AnimationOptionsModal.vue";
+import InfoDisplayOptionsModal from "./components/InfoDisplayOptionsModal.vue";
+import AwayProgressOptionsModal from "./components/AwayProgressOptionsModal.vue";
+import HiddenTabsModal from "./components/HiddenTabsModal.vue";
 import ImportSaveModal from "./components/ImportSaveModal.vue";
 import HardResetModal from "./components/HardResetModal.vue";
 import LoadGameModal from "./components/LoadGameModal.vue";
@@ -125,11 +129,26 @@ function loop() {
 }
 
 function onKeydown(e) {
+  // Track Shift for the Info-Display hints (original ui.view.shiftDown):
+  // holding it shows all hint text regardless of the options.
+  ui.shiftDown = e.shiftKey;
   handleShortcut(e, game, ui);
+}
+
+function onKeyup(e) {
+  ui.shiftDown = e.shiftKey;
+}
+
+// Releasing Shift outside the window (e.g. during Cmd+Tab) never fires a
+// keyup here; clear the flag when focus leaves so hints don't stick on.
+function onBlur() {
+  ui.shiftDown = false;
 }
 
 onMounted(async () => {
   window.addEventListener("keydown", onKeydown);
+  window.addEventListener("keyup", onKeyup);
+  window.addEventListener("blur", onBlur);
 
   // Seed the first snapshot, then replay any away-time (from the loaded save's
   // lastUpdate) as offline progress before the live loop starts — so the startup
@@ -150,6 +169,8 @@ onMounted(async () => {
 onUnmounted(() => {
   if (raf) cancelAnimationFrame(raf);
   window.removeEventListener("keydown", onKeydown);
+  window.removeEventListener("keyup", onKeyup);
+  window.removeEventListener("blur", onBlur);
 });
 </script>
 
@@ -235,6 +256,28 @@ onUnmounted(() => {
 
   <NotationModal
     v-if="ui.openModal === 'notation'"
+    @close="ui.closeModal()"
+  />
+
+  <!-- Visual-tab options popups (Animation / Info Display / Away Progress /
+       Modify Visible Tabs). -->
+  <AnimationOptionsModal
+    v-if="ui.openModal === 'animationOptions'"
+    @close="ui.closeModal()"
+  />
+
+  <InfoDisplayOptionsModal
+    v-if="ui.openModal === 'infoDisplayOptions'"
+    @close="ui.closeModal()"
+  />
+
+  <AwayProgressOptionsModal
+    v-if="ui.openModal === 'awayProgressOptions'"
+    @close="ui.closeModal()"
+  />
+
+  <HiddenTabsModal
+    v-if="ui.openModal === 'hiddenTabs'"
     @close="ui.closeModal()"
   />
 

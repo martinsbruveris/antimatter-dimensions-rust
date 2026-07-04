@@ -7,11 +7,19 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
+import { useUiStore } from "../../stores/ui";
 import { formatDecimal } from "../../util/format";
 import { NORMAL_CHALLENGES } from "../../data/normalChallenges";
 
 const game = useGameStore();
+const ui = useUiStore();
 const s = computed(() => game.snapshot);
+
+// The corner "C1"-style IDs obey the "Challenge IDs" Info-Display option;
+// holding Shift always shows them (original HintText type="challenges").
+const showIds = computed(
+  () => Boolean(s.value?.options?.show_hint_text?.challenges) || ui.shiftDown,
+);
 
 // Live challenge state (is_unlocked/is_running/is_completed) keyed by id.
 const viewById = computed(
@@ -109,7 +117,10 @@ function restartChallenge() {
         class="l-challenge-grid__cell"
       >
         <div class="c-challenge-box l-challenge-box c-challenge-box--normal">
-          <div class="o-hint-text l-hint-text l-hint-text--challenge">
+          <div
+            v-show="showIds"
+            class="o-hint-text l-hint-text l-hint-text--challenge"
+          >
             C{{ b.meta.id }}
           </div>
           <span>{{ b.meta.description }}</span>

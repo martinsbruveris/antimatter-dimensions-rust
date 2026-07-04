@@ -190,6 +190,25 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         json!(state.options.confirmations.antimatter_galaxy);
     confirmations["sacrifice"] = json!(state.options.confirmations.sacrifice);
     confirmations["bigCrunch"] = json!(state.options.confirmations.big_crunch);
+    options["animations"]["bigCrunch"] = json!(state.options.animations.big_crunch);
+    let hints = &mut options["showHintText"];
+    hints["showPercentage"] = json!(state.options.show_hint_text.show_percentage);
+    hints["achievements"] = json!(state.options.show_hint_text.achievements);
+    hints["achievementUnlockStates"] =
+        json!(state.options.show_hint_text.achievement_unlock_states);
+    hints["challenges"] = json!(state.options.show_hint_text.challenges);
+    let away = &mut options["awayProgress"];
+    away["antimatter"] = json!(state.options.away_progress.antimatter);
+    away["dimensionBoosts"] = json!(state.options.away_progress.dimension_boosts);
+    away["antimatterGalaxies"] = json!(state.options.away_progress.antimatter_galaxies);
+    away["infinities"] = json!(state.options.away_progress.infinities);
+    away["infinityPoints"] = json!(state.options.away_progress.infinity_points);
+    away["replicanti"] = json!(state.options.away_progress.replicanti);
+    away["replicantiGalaxies"] = json!(state.options.away_progress.replicanti_galaxies);
+    options["headerTextColored"] = json!(state.options.header_text_colored);
+    options["sidebarResourceID"] = json!(state.options.sidebar_resource_id);
+    options["hiddenTabBits"] = json!(state.options.hidden_tab_bits);
+    options["hiddenSubtabBits"] = json!(state.options.hidden_subtab_bits);
 
     // Autobuyers. `lastTick`/`bulk` stay the template's derived state; we write the
     // flags/modes plus the interval-upgrade state (interval + IP cost, Feature 2.6).
@@ -325,6 +344,53 @@ mod tests {
             assert_eq!(reloaded.autobuyers.enabled, state.autobuyers.enabled);
             assert_eq!(reloaded.options, state.options);
         }
+    }
+
+    #[test]
+    fn visual_options_round_trip() {
+        // The Visual-tab option set (animations / hint text / away progress /
+        // header coloring / sidebar resource / hidden tabs) survives
+        // encode → decode, keys matching the original schema.
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.options.set_animation("bigCrunch", false);
+        state.options.set_hint_text("achievements", false);
+        state.options.set_hint_text("showPercentage", false);
+        state.options.set_away_progress("replicanti", false);
+        state.options.header_text_colored = true;
+        state.options.set_sidebar_resource(3);
+        state.options.toggle_tab_visibility(5);
+        state.options.toggle_subtab_visibility(6, 2);
+        state.options.toggle_subtab_visibility(0, 1);
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.options, state.options);
+        assert!(!reloaded.options.animations.big_crunch);
+        assert!(!reloaded.options.show_hint_text.achievements);
+        assert!(reloaded.options.show_hint_text.challenges);
+        assert!(!reloaded.options.away_progress.replicanti);
+        assert!(reloaded.options.header_text_colored);
+        assert_eq!(reloaded.options.sidebar_resource_id, 3);
+        assert_eq!(reloaded.options.hidden_tab_bits, 1 << 5);
+        assert_eq!(reloaded.options.hidden_subtab_bits[6], 1 << 2);
+        assert_eq!(reloaded.options.hidden_subtab_bits[0], 1 << 1);
+
+        // The raw JSON uses the original's keys (incl. the capital-ID quirk).
+        let player: Value =
+            serde_json::from_str(&decode_pipeline(&encode_save(&state, 0)).unwrap())
+                .unwrap();
+        assert_eq!(player["options"]["sidebarResourceID"], 3);
+        assert_eq!(player["options"]["headerTextColored"], true);
+        assert_eq!(player["options"]["animations"]["bigCrunch"], false);
+        assert_eq!(player["options"]["showHintText"]["showPercentage"], false);
+        assert_eq!(player["options"]["awayProgress"]["replicanti"], false);
+        assert_eq!(player["options"]["hiddenTabBits"], 1 << 5);
+        assert_eq!(
+            player["options"]["hiddenSubtabBits"]
+                .as_array()
+                .unwrap()
+                .len(),
+            11
+        );
     }
 
     #[test]

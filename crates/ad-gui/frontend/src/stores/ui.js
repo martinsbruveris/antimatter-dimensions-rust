@@ -20,10 +20,15 @@ export const useUiStore = defineStore("ui", {
     // Remembers the last-open subtab per tab: { [tabKey]: subtabKey }.
     currentSubtabKey: {},
     // Which popup is open, if any: "help" | "info" | "credits" | "hotkeys" |
-    // "notation" | "importSave" | "hardReset" | "loadGame" | "backup"
-    // (null = none). Centralised here so both InfoButtons and the keyboard
-    // shortcuts (?, H) drive the same state; only one modal is open at once.
+    // "notation" | "importSave" | "hardReset" | "loadGame" | "backup" |
+    // "animationOptions" | "infoDisplayOptions" | "awayProgressOptions" |
+    // "hiddenTabs" (null = none). Centralised here so both InfoButtons and the
+    // keyboard shortcuts (?, H) drive the same state; only one modal is open
+    // at once.
     openModal: null,
+    // Whether Shift is currently held (original ui.view.shiftDown): overrides
+    // the Info-Display hint options so hint text always shows while held.
+    shiftDown: false,
     // Whether the How-To-Play tutorial emphasis (emphasizeH2P — the pulsing
     // gold "?" highlight) has already been shown. Pre-set to true so it does
     // NOT appear right now: it would overlay the always-visible dev speed/
@@ -65,20 +70,56 @@ export const useUiStore = defineStore("ui", {
     hideCompletedAchievementRows: false,
   }),
   getters: {
-    // Tabs currently visible, honouring each tab's optional unlock condition
-    // (evaluated against the latest game snapshot). Hidden tabs are skipped
-    // by the sidebar and by arrow-key navigation.
-    visibleTabs() {
+    // Whether the player has hidden `subtab` via the Modify Visible Tabs modal
+    // (original SubtabState.isHidden): its bit in the engine's
+    // `hidden_subtab_bits` is set and it is hidable. The bit positions are the
+    // *original game's* tab/subtab ids (`hideId` in config/tabs.js), so the
+    // state round-trips through real saves.
+    subtabIsHidden() {
       const game = useGameStore();
-      return TABS.filter((t) => !t.condition || t.condition(game.snapshot));
+      return (subtab) => {
+        if (subtab.hidable === false) return false;
+        const [tabId, subtabId] = subtab.hideId;
+        const bits = game.snapshot?.options?.hidden_subtab_bits?.[tabId] ?? 0;
+        return (bits & (1 << subtabId)) !== 0;
+      };
+    },
+    // Whether the player has hidden `tab` (original TabState.isHidden): its
+    // own bit is set, or every subtab of it is unavailable — and it is hidable.
+    tabIsHidden() {
+      const game = useGameStore();
+      return (tab) => {
+        if (tab.hidable === false) return false;
+        const bits = game.snapshot?.options?.hidden_tab_bits ?? 0;
+        const hasVisibleSubtab = this.visibleSubtabs(tab).length > 0;
+        return (bits & (1 << tab.hideId)) !== 0 || !hasVisibleSubtab;
+      };
+    },
+    // Tabs currently visible, honouring each tab's optional unlock condition
+    // (evaluated against the latest game snapshot) and the hidden-tab option
+    // bits. Hidden tabs are skipped by the sidebar and by arrow-key
+    // navigation; like the original (TabState.isAvailable), the tab currently
+    // open stays visible even if hidden, so the view never yanks away.
+    visibleTabs(state) {
+      const game = useGameStore();
+      return TABS.filter(
+        (t) =>
+          (!t.condition || t.condition(game.snapshot)) &&
+          (t.key === state.currentTabKey || !this.tabIsHidden(t)),
+      );
     },
     // A subtab may carry its own `condition(snapshot)` (e.g. Break Infinity, shown
-    // only after breaking) — filter those the same way as tabs.
-    visibleSubtabs() {
+    // only after breaking) — filter those the same way as tabs, then drop
+    // player-hidden subtabs (except the one currently open).
+    visibleSubtabs(state) {
       const game = useGameStore();
       return (tab) =>
         tab.subtabs.filter(
-          (st) => !st.condition || st.condition(game.snapshot),
+          (st) =>
+            (!st.condition || st.condition(game.snapshot)) &&
+            ((tab.key === state.currentTabKey &&
+              st.key === state.currentSubtabKey[tab.key]) ||
+              !this.subtabIsHidden(st)),
         );
     },
     currentTab(state) {
@@ -149,6 +190,9 @@ export const useUiStore = defineStore("ui", {
     moveSubtab(delta) {
       const tab = this.currentTab;
       const subtabs = this.visibleSubtabs(tab);
+      // Every subtab can be hidden (e.g. by an imported save's hidden-tab
+      // bits) — nothing to cycle through then.
+      if (subtabs.length === 0) return;
       const idx = subtabs.findIndex((st) => st.key === this.currentSubtab.key);
       const next = (idx + delta + subtabs.length) % subtabs.length;
       this.setSubtab(tab.key, subtabs[next].key);

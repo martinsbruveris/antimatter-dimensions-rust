@@ -52,6 +52,12 @@ pub const MAX_AUTOSAVE_INTERVAL_MS: u32 = 60_000;
 /// Maximum length of the custom save-file name (original input `maxlength="16"`).
 pub const MAX_SAVE_FILE_NAME_LEN: usize = 16;
 
+/// Number of top-level tabs in the original game (`hiddenSubtabBits` is an
+/// 11-entry array indexed by the original tab id). We keep the original's tab
+/// ids and array shape so hidden-tab state round-trips through the save
+/// unchanged, even for tabs we don't render yet.
+pub const TAB_COUNT: usize = 11;
+
 /// Per-action confirmation toggles, mirroring the subset of
 /// `player.options.confirmations` we model. Each is "show the explanatory modal
 /// before performing this action"; all default `true`. The modal's "Don't show
@@ -77,6 +83,95 @@ impl Confirmations {
 }
 
 impl Default for Confirmations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Animation toggles (original `player.options.animations`, modelled subset).
+/// Only the Big Crunch animation is in-frontier; the rest are added as the
+/// matching prestige layers land.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Animations {
+    pub big_crunch: bool,
+}
+
+impl Animations {
+    pub fn new() -> Self {
+        Self { big_crunch: true }
+    }
+}
+
+impl Default for Animations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Info-display hint toggles (original `player.options.showHintText`, modelled
+/// subset). Each shows a piece of overlay info; holding Shift shows them all
+/// regardless (a frontend behaviour).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ShowHintText {
+    /// "Show % gain" — the per-second growth rate on dimension rows.
+    pub show_percentage: bool,
+    /// Achievement IDs on the Achievements-tab tiles.
+    pub achievements: bool,
+    /// Achievement unlock-state indicators (the ✓/✗ corner icons).
+    pub achievement_unlock_states: bool,
+    /// Challenge IDs on the challenge boxes.
+    pub challenges: bool,
+}
+
+impl ShowHintText {
+    pub fn new() -> Self {
+        Self {
+            show_percentage: true,
+            achievements: true,
+            achievement_unlock_states: true,
+            challenges: true,
+        }
+    }
+}
+
+impl Default for ShowHintText {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Away-progress display toggles (original `player.options.awayProgress`,
+/// modelled subset): which resources may appear in the "While you were away"
+/// summary. A resource still only shows if it actually increased.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct AwayProgress {
+    pub antimatter: bool,
+    pub dimension_boosts: bool,
+    pub antimatter_galaxies: bool,
+    pub infinities: bool,
+    pub infinity_points: bool,
+    pub replicanti: bool,
+    pub replicanti_galaxies: bool,
+}
+
+impl AwayProgress {
+    pub fn new() -> Self {
+        Self {
+            antimatter: true,
+            dimension_boosts: true,
+            antimatter_galaxies: true,
+            infinities: true,
+            infinity_points: true,
+            replicanti: true,
+            replicanti_galaxies: true,
+        }
+    }
+}
+
+impl Default for AwayProgress {
     fn default() -> Self {
         Self::new()
     }
@@ -116,6 +211,28 @@ pub struct Options {
     pub save_file_name: String,
     /// Per-action confirmation toggles (original `confirmations`).
     pub confirmations: Confirmations,
+    /// Animation toggles (original `animations`, modelled subset).
+    pub animations: Animations,
+    /// Info-display hint toggles (original `showHintText`, modelled subset).
+    pub show_hint_text: ShowHintText,
+    /// Away-progress display toggles (original `awayProgress`, modelled subset).
+    pub away_progress: AwayProgress,
+    /// Whether the header's prestige-gain number is colored relative to the
+    /// current amount (original `headerTextColored`). The consumer is the
+    /// post-break header crunch button, which isn't built yet.
+    pub header_text_colored: bool,
+    /// Which resource the Modern-UI sidebar shows (original `sidebarResourceID`):
+    /// `0` = the latest unlocked resource, otherwise the original's resource id
+    /// (2 = Antimatter, 3 = Infinity Points, 4 = Replicanti, …). Ids past our
+    /// frontier are preserved for save round-trips; the frontend falls back to
+    /// the latest resource when it can't render one.
+    pub sidebar_resource_id: u32,
+    /// Bitmask of hidden top-level tabs (original `hiddenTabBits`), indexed by
+    /// the original tab ids (0 = Dimensions, … 10 = Shop).
+    pub hidden_tab_bits: u32,
+    /// Per-tab bitmasks of hidden subtabs (original `hiddenSubtabBits`), indexed
+    /// by the original tab id, then the original subtab id within that tab.
+    pub hidden_subtab_bits: [u32; TAB_COUNT],
 }
 
 impl Options {
@@ -131,6 +248,13 @@ impl Options {
             show_time_since_save: true,
             save_file_name: String::new(),
             confirmations: Confirmations::new(),
+            animations: Animations::new(),
+            show_hint_text: ShowHintText::new(),
+            away_progress: AwayProgress::new(),
+            header_text_colored: false,
+            sidebar_resource_id: 0,
+            hidden_tab_bits: 0,
+            hidden_subtab_bits: [0; TAB_COUNT],
         }
     }
 
@@ -178,6 +302,83 @@ impl Options {
             .filter(|c| c.is_ascii_alphanumeric() || *c == ' ' || *c == '-')
             .take(MAX_SAVE_FILE_NAME_LEN)
             .collect();
+    }
+
+    /// Set a single animation toggle by its original camelCase name
+    /// (`bigCrunch`). An unknown name is ignored.
+    pub fn set_animation(&mut self, kind: &str, enabled: bool) {
+        if kind == "bigCrunch" {
+            self.animations.big_crunch = enabled;
+        }
+    }
+
+    /// Set a single info-display hint toggle by its original camelCase name
+    /// (`showPercentage`, `achievements`, `achievementUnlockStates`,
+    /// `challenges`). An unknown name is ignored.
+    pub fn set_hint_text(&mut self, kind: &str, enabled: bool) {
+        match kind {
+            "showPercentage" => self.show_hint_text.show_percentage = enabled,
+            "achievements" => self.show_hint_text.achievements = enabled,
+            "achievementUnlockStates" => {
+                self.show_hint_text.achievement_unlock_states = enabled
+            }
+            "challenges" => self.show_hint_text.challenges = enabled,
+            _ => {}
+        }
+    }
+
+    /// Set a single away-progress display toggle by its original camelCase name
+    /// (`antimatter`, `dimensionBoosts`, `antimatterGalaxies`, `infinities`,
+    /// `infinityPoints`, `replicanti`, `replicantiGalaxies`). An unknown name is
+    /// ignored.
+    pub fn set_away_progress(&mut self, kind: &str, enabled: bool) {
+        match kind {
+            "antimatter" => self.away_progress.antimatter = enabled,
+            "dimensionBoosts" => self.away_progress.dimension_boosts = enabled,
+            "antimatterGalaxies" => self.away_progress.antimatter_galaxies = enabled,
+            "infinities" => self.away_progress.infinities = enabled,
+            "infinityPoints" => self.away_progress.infinity_points = enabled,
+            "replicanti" => self.away_progress.replicanti = enabled,
+            "replicantiGalaxies" => self.away_progress.replicanti_galaxies = enabled,
+            _ => {}
+        }
+    }
+
+    /// Set the sidebar resource id. Any value is accepted **as-is**: ids past our
+    /// frontier come from imported saves and must round-trip unchanged; the
+    /// frontend falls back to the latest resource when it can't render one.
+    pub fn set_sidebar_resource(&mut self, id: u32) {
+        self.sidebar_resource_id = id;
+    }
+
+    /// Toggle a top-level tab's hidden bit (original `Tab.toggleVisibility`).
+    /// The "cannot hide the current tab / a non-hidable tab" rules live in the
+    /// frontend, which knows the open tab; an out-of-range id is ignored.
+    pub fn toggle_tab_visibility(&mut self, tab_id: u32) {
+        if (tab_id as usize) < TAB_COUNT {
+            self.hidden_tab_bits ^= 1 << tab_id;
+        }
+    }
+
+    /// Clear a top-level tab's hidden bit (original `Tab.unhideTab`).
+    pub fn unhide_tab(&mut self, tab_id: u32) {
+        if (tab_id as usize) < TAB_COUNT {
+            self.hidden_tab_bits &= !(1 << tab_id);
+        }
+    }
+
+    /// Toggle a subtab's hidden bit (original `SubtabState.toggleVisibility`).
+    /// Ids are the original tab/subtab ids; out-of-range ids are ignored.
+    pub fn toggle_subtab_visibility(&mut self, tab_id: u32, subtab_id: u32) {
+        if (tab_id as usize) < TAB_COUNT && subtab_id < u32::BITS {
+            self.hidden_subtab_bits[tab_id as usize] ^= 1 << subtab_id;
+        }
+    }
+
+    /// Unhide every tab and subtab (the modal's "Show all tabs" button).
+    pub fn show_all_tabs(&mut self) {
+        self.hidden_tab_bits = 0;
+        self.hidden_subtab_bits = [0; TAB_COUNT];
     }
 
     /// Set the notation, ignoring any name not in [`NOTATIONS`].
@@ -268,6 +469,85 @@ mod tests {
         o.set_save_file_name("abcdefghijklmnopqrstuvwxyz");
         assert_eq!(o.save_file_name, "abcdefghijklmnop");
         assert_eq!(o.save_file_name.len(), MAX_SAVE_FILE_NAME_LEN);
+    }
+
+    #[test]
+    fn animation_and_hint_toggles_default_on_and_set_by_name() {
+        let mut o = Options::new();
+        assert!(o.animations.big_crunch);
+        assert!(o.show_hint_text.show_percentage);
+        assert!(o.show_hint_text.achievement_unlock_states);
+
+        o.set_animation("bigCrunch", false);
+        assert!(!o.animations.big_crunch);
+        o.set_hint_text("achievementUnlockStates", false);
+        assert!(!o.show_hint_text.achievement_unlock_states);
+        // Other toggles untouched; unknown names are no-ops.
+        assert!(o.show_hint_text.achievements);
+        o.set_hint_text("nope", false);
+        o.set_animation("nope", false);
+        assert!(o.show_hint_text.show_percentage);
+        assert!(o.show_hint_text.challenges);
+    }
+
+    #[test]
+    fn away_progress_toggles_default_on_and_set_by_name() {
+        let mut o = Options::new();
+        assert!(o.away_progress.antimatter);
+        assert!(o.away_progress.replicanti_galaxies);
+
+        o.set_away_progress("dimensionBoosts", false);
+        o.set_away_progress("infinityPoints", false);
+        assert!(!o.away_progress.dimension_boosts);
+        assert!(!o.away_progress.infinity_points);
+        assert!(o.away_progress.antimatter_galaxies);
+        o.set_away_progress("nope", false);
+        assert!(o.away_progress.infinities);
+    }
+
+    #[test]
+    fn hidden_tab_bits_toggle_unhide_and_show_all() {
+        let mut o = Options::new();
+        assert_eq!(o.hidden_tab_bits, 0);
+        assert_eq!(o.hidden_subtab_bits, [0; TAB_COUNT]);
+
+        o.toggle_tab_visibility(5);
+        o.toggle_tab_visibility(2);
+        assert_eq!(o.hidden_tab_bits, (1 << 5) | (1 << 2));
+        // Toggling again clears the bit; unhide is idempotent.
+        o.toggle_tab_visibility(5);
+        assert_eq!(o.hidden_tab_bits, 1 << 2);
+        o.unhide_tab(2);
+        o.unhide_tab(2);
+        assert_eq!(o.hidden_tab_bits, 0);
+
+        o.toggle_subtab_visibility(6, 1);
+        o.toggle_subtab_visibility(0, 1);
+        assert_eq!(o.hidden_subtab_bits[6], 1 << 1);
+        assert_eq!(o.hidden_subtab_bits[0], 1 << 1);
+
+        // Out-of-range ids are ignored.
+        o.toggle_tab_visibility(11);
+        o.toggle_subtab_visibility(11, 0);
+        o.toggle_subtab_visibility(0, 32);
+        assert_eq!(o.hidden_tab_bits, 0);
+        assert_eq!(o.hidden_subtab_bits[0], 1 << 1);
+
+        o.toggle_tab_visibility(3);
+        o.show_all_tabs();
+        assert_eq!(o.hidden_tab_bits, 0);
+        assert_eq!(o.hidden_subtab_bits, [0; TAB_COUNT]);
+    }
+
+    #[test]
+    fn sidebar_resource_accepts_any_id() {
+        let mut o = Options::new();
+        assert_eq!(o.sidebar_resource_id, 0);
+        o.set_sidebar_resource(3);
+        assert_eq!(o.sidebar_resource_id, 3);
+        // Past-frontier ids from imported saves are preserved.
+        o.set_sidebar_resource(14);
+        assert_eq!(o.sidebar_resource_id, 14);
     }
 
     #[test]

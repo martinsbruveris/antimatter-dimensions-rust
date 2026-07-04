@@ -3,7 +3,7 @@
 // game's ImportSaveModal.vue (../antimatter-dimensions/src/components/modals).
 // The user pastes an AD save string into the text input; clicking Import
 // decodes it via the Rust engine and replaces the running game state.
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 
 import { useGameStore } from "../stores/game";
 import { useUiStore } from "../stores/ui";
@@ -16,6 +16,11 @@ const ui = useUiStore();
 const input = ref("");
 const error = ref("");
 const importing = ref(false);
+const inputElement = ref(null);
+
+// Focus the input on open (the original's `this.$refs.input.select()`), so a
+// save can be pasted immediately with Cmd/Ctrl+V.
+onMounted(() => inputElement.value?.select());
 
 async function doImport() {
   if (!input.value.trim()) return;
@@ -41,6 +46,7 @@ async function doImport() {
     @close="$emit('close')"
   >
     <input
+      ref="inputElement"
       v-model="input"
       type="text"
       class="c-modal-input c-modal-import__input"
@@ -72,6 +78,14 @@ async function doImport() {
 </template>
 
 <style scoped>
+/* The vendored .c-modal-input has no padding, so the box collapses to the
+   webview's bare input height and looks cramped. Deliberate deviation from
+   the original: give it a little vertical room. */
+.c-modal-import__input {
+  padding: 0.5rem 0.8rem;
+  font-size: 1.4rem;
+}
+
 .c-modal-import__error {
   color: var(--color-bad, #e74c3c);
   margin-top: 0.5rem;

@@ -328,6 +328,44 @@ export const useGameStore = defineStore("game", {
     setNotationDigits(comma, notation) {
       return invoke("set_notation_digits", { comma, notation });
     },
+    // Flip an animation toggle (original `player.options.animations.*`);
+    // `kind` is the camelCase name ("bigCrunch").
+    setAnimation(kind, enabled) {
+      return invoke("set_animation", { kind, enabled });
+    },
+    // Flip an info-display hint toggle (original
+    // `player.options.showHintText.*`), e.g. "showPercentage".
+    setHintText(kind, enabled) {
+      return invoke("set_hint_text", { kind, enabled });
+    },
+    // Flip an away-progress display toggle (original
+    // `player.options.awayProgress.*`), e.g. "infinityPoints".
+    setAwayProgress(kind, enabled) {
+      return invoke("set_away_progress", { kind, enabled });
+    },
+    // Relative prestige-gain text coloring (original `headerTextColored`).
+    setHeaderTextColored(enabled) {
+      return invoke("set_header_text_colored", { enabled });
+    },
+    // Sidebar resource picker (original `sidebarResourceID`; 0 = latest).
+    setSidebarResource(id) {
+      return invoke("set_sidebar_resource", { id });
+    },
+    // Hidden-tab bits (original `hiddenTabBits`/`hiddenSubtabBits`, original
+    // tab/subtab ids). The "cannot hide current/non-hidable" guards live in
+    // the modal; the engine just flips bits.
+    toggleTabVisibility(tabId) {
+      return invoke("toggle_tab_visibility", { tabId });
+    },
+    unhideTab(tabId) {
+      return invoke("unhide_tab", { tabId });
+    },
+    toggleSubtabVisibility(tabId, subtabId) {
+      return invoke("toggle_subtab_visibility", { tabId, subtabId });
+    },
+    showAllTabs() {
+      return invoke("show_all_tabs");
+    },
     // --- Save / Load ---
     // Returns the current game state as an AD-compatible save string.
     exportSave() {

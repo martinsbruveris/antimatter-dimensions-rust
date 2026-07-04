@@ -1,19 +1,22 @@
 <script setup>
 // Visual options subtab. The grid layout mirrors the original
-// `OptionsVisualTab.vue` (rows of three controls). Implemented so far: the
-// Update Rate slider (row 1), and on row 2 the Notation picker (middle) and the
-// Open Exponent Notation Options button (right) — each in its original
-// position; every other slot is an invisible placeholder so the implemented
-// controls keep their original positions. The Classic-UI toggle is
-// intentionally dropped (Modern UI only). Other controls land iteratively
-// (see design-docs/2026-06-27-options-tabs.md).
+// `OptionsVisualTab.vue` (rows of three controls): row 1 the Update Rate
+// slider; row 2 the Notation picker + Exponent Notation Options button; row 3
+// the Animation / Info Display / Away Progress modal buttons; row 4 the
+// Modify Visible Tabs button, the prestige-gain coloring toggle, and the
+// Sidebar resource picker. Remaining slots (Classic-UI toggle — intentionally
+// dropped, Modern UI only; News; Theme) are invisible placeholders so the
+// implemented controls keep their original positions (see
+// design-docs/2026-06-27-options-tabs.md).
 import { ref } from "vue";
 
 import { useGameStore } from "../../stores/game";
 import { useUiStore } from "../../stores/ui";
 import OptionsSlider from "../options/OptionsSlider.vue";
 import OpenHotkeysButton from "../options/OpenHotkeysButton.vue";
+import PrimaryToggleButton from "../options/PrimaryToggleButton.vue";
 import SelectNotationDropdown from "../options/SelectNotationDropdown.vue";
+import SelectSidebarDropdown from "../options/SelectSidebarDropdown.vue";
 
 const game = useGameStore();
 const ui = useUiStore();
@@ -60,14 +63,39 @@ function setUpdateRate(value) {
         </button>
       </div>
       <div class="l-options-grid__row">
-        <div class="l-options-grid__button l-options-grid__button--hidden" />
-        <div class="l-options-grid__button l-options-grid__button--hidden" />
-        <div class="l-options-grid__button l-options-grid__button--hidden" />
+        <button
+          class="o-primary-btn o-primary-btn--option l-options-grid__button"
+          @click="ui.showModal('animationOptions')"
+        >
+          Open Animation Options
+        </button>
+        <button
+          class="o-primary-btn o-primary-btn--option l-options-grid__button"
+          @click="ui.showModal('infoDisplayOptions')"
+        >
+          Open Info Display Options
+        </button>
+        <button
+          class="o-primary-btn o-primary-btn--option l-options-grid__button"
+          @click="ui.showModal('awayProgressOptions')"
+        >
+          Open Away Progress Options
+        </button>
       </div>
       <div class="l-options-grid__row">
-        <div class="l-options-grid__button l-options-grid__button--hidden" />
-        <div class="l-options-grid__button l-options-grid__button--hidden" />
-        <div class="l-options-grid__button l-options-grid__button--hidden" />
+        <button
+          class="o-primary-btn o-primary-btn--option l-options-grid__button"
+          @click="ui.showModal('hiddenTabs')"
+        >
+          Modify Visible Tabs
+        </button>
+        <PrimaryToggleButton
+          class="o-primary-btn--option l-options-grid__button"
+          label="Relative prestige gain text coloring:"
+          :model-value="game.snapshot.options.header_text_colored"
+          @update:model-value="game.setHeaderTextColored($event)"
+        />
+        <SelectSidebarDropdown />
       </div>
       <OpenHotkeysButton />
     </div>

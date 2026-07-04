@@ -28,6 +28,19 @@ const unlocked = computed(
   () => new Set(game.snapshot?.unlocked_achievements ?? [])
 );
 
+// Info-Display options: the tile-corner achievement IDs obey the
+// "Achievement IDs" toggle (holding Shift always shows them, mirroring the
+// original HintText); the ✓/✗ unlock-state indicators obey their own toggle
+// (no Shift override, as in the original).
+const showIds = computed(
+  () =>
+    Boolean(game.snapshot?.options?.show_hint_text?.achievements) ||
+    ui.shiftDown
+);
+const showUnlockState = computed(() =>
+  Boolean(game.snapshot?.options?.show_hint_text?.achievement_unlock_states)
+);
+
 // Global achievement-power multiplier (1.25^rows × 1.03^count), shown as the
 // boost the tab grants to all Antimatter Dimensions.
 const powerText = computed(() =>
@@ -165,7 +178,10 @@ function cellClass(ach) {
           :class="cellClass(ach)"
           :style="spriteStyle(ach.id)"
         >
-          <div class="o-hint-text l-hint-text l-hint-text--achievement">
+          <div
+            v-show="showIds"
+            class="o-hint-text l-hint-text l-hint-text--achievement"
+          >
             {{ isObscured(ach) ? garble(ach.id, "id") : ach.id }}
           </div>
           <div class="o-achievement__tooltip">
@@ -191,6 +207,7 @@ function cellClass(ach) {
             <i class="fas fa-star" />
           </div>
           <div
+            v-if="showUnlockState"
             class="o-achievement__indicator"
             :class="{ 'o-achievement__indicator--locked': !unlocked.has(ach.id) }"
           >

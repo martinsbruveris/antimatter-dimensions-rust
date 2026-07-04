@@ -32,9 +32,9 @@ use crate::infinity_challenges::InfinityChallengeState;
 use crate::infinity_dimensions::{InfinityDimension, INFINITY_DIMENSION_COUNT};
 use crate::infinity_upgrades::InfinityUpgrade;
 use crate::options::{
-    Confirmations, Options, MAX_AUTOSAVE_INTERVAL_MS, MAX_NOTATION_DIGITS,
-    MAX_UPDATE_RATE_MS, MIN_AUTOSAVE_INTERVAL_MS, MIN_NOTATION_DIGITS,
-    MIN_UPDATE_RATE_MS,
+    AwayProgress, Confirmations, Options, ShowHintText, MAX_AUTOSAVE_INTERVAL_MS,
+    MAX_NOTATION_DIGITS, MAX_UPDATE_RATE_MS, MIN_AUTOSAVE_INTERVAL_MS,
+    MIN_NOTATION_DIGITS, MIN_UPDATE_RATE_MS, TAB_COUNT,
 };
 use crate::records::{BestInfinity, Records, ThisInfinity};
 use crate::replicanti::ReplicantiState;
@@ -327,6 +327,52 @@ pub struct OptionsDTO {
     pub save_file_name: String,
     /// `player.options.confirmations` (modelled subset).
     pub confirmations: ConfirmationsDTO,
+    /// `player.options.animations` (modelled subset).
+    pub animations: AnimationsDTO,
+    /// `player.options.showHintText` (modelled subset).
+    pub show_hint_text: ShowHintTextDTO,
+    /// `player.options.awayProgress` (modelled subset).
+    pub away_progress: AwayProgressDTO,
+    /// `player.options.headerTextColored` — relative prestige-gain coloring.
+    pub header_text_colored: bool,
+    /// `player.options.sidebarResourceID` (note the capitalized `ID` in the
+    /// original key) — the Modern-UI sidebar resource (0 = latest).
+    #[serde(rename = "sidebarResourceID")]
+    pub sidebar_resource_id: u32,
+    /// `player.options.hiddenTabBits` — hidden top-level tabs bitmask.
+    pub hidden_tab_bits: u32,
+    /// `player.options.hiddenSubtabBits` — 11 per-tab hidden-subtab bitmasks.
+    pub hidden_subtab_bits: Vec<u32>,
+}
+
+/// `player.options.animations` — the animation toggles we model.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnimationsDTO {
+    pub big_crunch: bool,
+}
+
+/// `player.options.showHintText` — the info-display hints we model.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShowHintTextDTO {
+    pub show_percentage: bool,
+    pub achievements: bool,
+    pub achievement_unlock_states: bool,
+    pub challenges: bool,
+}
+
+/// `player.options.awayProgress` — the away-progress toggles we model.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AwayProgressDTO {
+    pub antimatter: bool,
+    pub dimension_boosts: bool,
+    pub antimatter_galaxies: bool,
+    pub infinities: bool,
+    pub infinity_points: bool,
+    pub replicanti: bool,
+    pub replicanti_galaxies: bool,
 }
 
 /// `player.options.notationDigits`.
@@ -574,6 +620,39 @@ impl GameState {
             sacrifice: dto.options.confirmations.sacrifice,
             big_crunch: dto.options.confirmations.big_crunch,
         };
+        options.animations.big_crunch = dto.options.animations.big_crunch;
+        options.show_hint_text = ShowHintText {
+            show_percentage: dto.options.show_hint_text.show_percentage,
+            achievements: dto.options.show_hint_text.achievements,
+            achievement_unlock_states: dto
+                .options
+                .show_hint_text
+                .achievement_unlock_states,
+            challenges: dto.options.show_hint_text.challenges,
+        };
+        options.away_progress = AwayProgress {
+            antimatter: dto.options.away_progress.antimatter,
+            dimension_boosts: dto.options.away_progress.dimension_boosts,
+            antimatter_galaxies: dto.options.away_progress.antimatter_galaxies,
+            infinities: dto.options.away_progress.infinities,
+            infinity_points: dto.options.away_progress.infinity_points,
+            replicanti: dto.options.away_progress.replicanti,
+            replicanti_galaxies: dto.options.away_progress.replicanti_galaxies,
+        };
+        options.header_text_colored = dto.options.header_text_colored;
+        options.set_sidebar_resource(dto.options.sidebar_resource_id);
+        // Hidden-tab state: the original always writes 11 per-tab bitmask
+        // entries; a different length signals an unexpected save format.
+        if dto.options.hidden_subtab_bits.len() != TAB_COUNT {
+            return Err(SaveError::UnexpectedArrayLength {
+                field: "options.hiddenSubtabBits",
+                expected: TAB_COUNT,
+                found: dto.options.hidden_subtab_bits.len(),
+            });
+        }
+        options.hidden_tab_bits = dto.options.hidden_tab_bits;
+        options.hidden_subtab_bits =
+            std::array::from_fn(|i| dto.options.hidden_subtab_bits[i]);
 
         Ok(GameState {
             antimatter: dto.antimatter,
