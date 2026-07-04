@@ -39,6 +39,7 @@ const firstTime = computed(() => !s.value?.eternity_unlocked);
 const inEC = computed(() =>
   (s.value?.eternity_challenges ?? []).some((c) => c.is_running)
 );
+const inDilation = computed(() => Boolean(s.value?.dilation?.active));
 
 const showEPRate = computed(
   () => log10(s.value.best_ep_min) <= RATE_THRESHOLD_LOG10
@@ -104,8 +105,12 @@ const amountStyle = computed(() => {
 <template>
   <button
     v-if="isVisible"
-    class="o-prestige-button o-eternity-button"
-    :class="{ 'o-eternity-button--unavailable': !canEternity }"
+    class="o-prestige-button"
+    :class="{
+      'o-eternity-button': !inDilation,
+      'o-eternity-button--dilation': inDilation,
+      'o-eternity-button--unavailable': !canEternity,
+    }"
     @click="game.requestEternity()"
     @mouseover="hover = true"
     @mouseleave="hover = false"
@@ -125,6 +130,14 @@ const amountStyle = computed(() => {
     <!-- Eternity Challenge running -->
     <template v-else-if="inEC">
       Other challenges await... I need to become Eternal
+    </template>
+
+    <!-- Dilated run -->
+    <template v-else-if="inDilation">
+      Eternity for
+      <span>{{ formatDecimal(s.dilation.tachyon_gain, 2, 1) }}</span>
+      {{ s.dilation.tachyon_gain.m === 1 && s.dilation.tachyon_gain.e === 0
+        ? "Tachyon Particle" : "Tachyon Particles" }}
     </template>
 
     <!-- Normal -->

@@ -28,6 +28,7 @@ use crate::achievements::ACHIEVEMENT_ROW_COUNT;
 use crate::autobuyers::{AutobuyerMode, AutobuyerState};
 use crate::break_infinity_upgrades::BreakInfinityUpgrade;
 use crate::challenges::NormalChallengeState;
+use crate::dilation::DilationState;
 use crate::infinity_challenges::InfinityChallengeState;
 use crate::infinity_dimensions::{InfinityDimension, INFINITY_DIMENSION_COUNT};
 use crate::infinity_upgrades::InfinityUpgrade;
@@ -98,6 +99,8 @@ pub struct PlayerDTO {
     /// EC8's per-run purchase budgets.
     pub eterc8ids: i32,
     pub eterc8repl: i32,
+    /// `player.dilation` — Time Dilation state.
+    pub dilation: DilationDTO,
     /// `player.eternityUpgrades` — owned Eternity Upgrades (a Set of ids 1–6).
     pub eternity_upgrades: Vec<u8>,
     /// `player.epmultUpgrades` — rebuyable ×5 EP-multiplier purchases.
@@ -171,6 +174,33 @@ pub struct ReplicantiDTO {
     pub bought_galaxy_cap: u32,
     /// Replicanti Galaxies made.
     pub galaxies: u32,
+}
+
+/// `player.dilation` (modelled subset). `rebuyables` is an id-keyed object map
+/// (ids 1–3 in frontier; the Pelle ids 11–13 are ignored/written as 0).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DilationDTO {
+    /// Dilation studies bought (ids 1–6; 6 is out of frontier but carried).
+    pub studies: Vec<u8>,
+    /// Whether a dilated Eternity is running.
+    pub active: bool,
+    #[serde(with = "break_infinity::serde_string")]
+    pub tachyon_particles: Decimal,
+    #[serde(with = "break_infinity::serde_string")]
+    pub dilated_time: Decimal,
+    #[serde(with = "break_infinity::serde_string")]
+    pub next_threshold: Decimal,
+    /// Plain numbers in the save (total may be fractional past 1000 TGs).
+    pub base_tachyon_galaxies: f64,
+    pub total_tachyon_galaxies: f64,
+    /// One-time upgrade ids (a Set serialized as an array).
+    pub upgrades: Vec<u8>,
+    /// Rebuyable purchase counts, keyed by id string.
+    pub rebuyables: std::collections::HashMap<String, u32>,
+    /// Save key `lastEP` (capital EP).
+    #[serde(rename = "lastEP", with = "break_infinity::serde_string")]
+    pub last_ep: Decimal,
 }
 
 /// `player.challenge` — the `normal`, `infinity`, and `eternity` run states.
@@ -500,6 +530,7 @@ pub struct ConfirmationsDTO {
     pub sacrifice: bool,
     pub big_crunch: bool,
     pub eternity: bool,
+    pub dilation: bool,
 }
 
 impl GameState {
@@ -801,6 +832,7 @@ impl GameState {
             sacrifice: dto.options.confirmations.sacrifice,
             big_crunch: dto.options.confirmations.big_crunch,
             eternity: dto.options.confirmations.eternity,
+            dilation: dto.options.confirmations.dilation,
         };
         options.animations.big_crunch = dto.options.animations.big_crunch;
         options.show_hint_text = ShowHintText {
@@ -869,6 +901,35 @@ impl GameState {
             ec_requirement_bits: dto.challenge.eternity.requirement_bits,
             eterc8_ids: dto.eterc8ids,
             eterc8_repl: dto.eterc8repl,
+            dilation: {
+                let mut rebuyables = [0u32; 3];
+                for (key, count) in &dto.dilation.rebuyables {
+                    if let Ok(id) = key.parse::<usize>() {
+                        if (1..=3).contains(&id) {
+                            rebuyables[id - 1] = *count;
+                        }
+                    }
+                }
+                let mut upgrades = 0u32;
+                for id in &dto.dilation.upgrades {
+                    if (4..=10).contains(id) {
+                        upgrades |= 1 << id;
+                    }
+                }
+                DilationState {
+                    studies: dto.dilation.studies.clone(),
+                    active: dto.dilation.active,
+                    tachyon_particles: dto.dilation.tachyon_particles,
+                    dilated_time: dto.dilation.dilated_time,
+                    next_threshold: dto.dilation.next_threshold,
+                    base_tachyon_galaxies: dto.dilation.base_tachyon_galaxies.max(0.0)
+                        as u32,
+                    total_tachyon_galaxies: dto.dilation.total_tachyon_galaxies,
+                    upgrades,
+                    rebuyables,
+                    last_ep: dto.dilation.last_ep,
+                }
+            },
             eternity_upgrades: {
                 let mut bits = 0u32;
                 for id in &dto.eternity_upgrades {

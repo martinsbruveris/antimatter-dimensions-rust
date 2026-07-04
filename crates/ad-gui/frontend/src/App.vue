@@ -29,6 +29,7 @@ import AntimatterGalaxyConfirmModal from "./components/AntimatterGalaxyConfirmMo
 import SacrificeConfirmModal from "./components/SacrificeConfirmModal.vue";
 import BigCrunchConfirmModal from "./components/BigCrunchConfirmModal.vue";
 import EternityConfirmModal from "./components/EternityConfirmModal.vue";
+import DilationConfirmModal from "./components/DilationConfirmModal.vue";
 
 const game = useGameStore();
 const ui = useUiStore();
@@ -320,6 +321,8 @@ onUnmounted(() => {
   <BigCrunchConfirmModal v-if="ui.openModal === 'bigCrunchConfirm'" />
 
   <EternityConfirmModal v-if="ui.openModal === 'eternityConfirm'" />
+
+  <DilationConfirmModal v-if="ui.openModal === 'dilationConfirm'" />
 
   <!-- Transient top-right toast popups (e.g. autobuyer pause/resume). -->
   <NotificationContainer />

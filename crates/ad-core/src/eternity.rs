@@ -154,6 +154,16 @@ impl GameState {
     /// reset plus the pieces exclusive to a *real* Eternity — the autobuyer /
     /// Break-Infinity handling and the respec.
     fn eternity_full_reset(&mut self, entering_ec: bool) {
+        // A dilated run banks its Tachyon Particles on any Eternity reset
+        // (`if (player.dilation.active) rewardTP()`; the reward itself is
+        // gated on the Eternity goal), then ends — unless entering an EC.
+        if self.dilation.active {
+            self.reward_tp();
+            if !entering_ec {
+                self.dilation.active = false;
+            }
+        }
+
         self.eternity_challenge_current = 0;
 
         // Without the keepAutobuyers milestone, Infinity un-breaks (it can only

@@ -264,6 +264,10 @@ impl GameState {
                 .max(&Decimal::ONE)
                 .min(&Decimal::new_unchecked(1.0, 30_000));
         }
+        // Time Dilation compresses the final multiplier.
+        if self.dilation.active {
+            mult = self.dilated_value_of(mult);
+        }
         mult
     }
 

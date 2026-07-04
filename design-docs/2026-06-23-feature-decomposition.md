@@ -794,6 +794,17 @@ TP_gain = (log10(antimatter) / 400)^1.5 * tachyon_mult
 - Bought with DT (escalating cost)
 - Act like free galaxies for tickspeed calculation (same as replicanti galaxies)
 
+**Status:** ✅ Implemented (dilation studies 1–5 with the real unlock gate —
+TS231–234 + EC11/EC12 fully completed + 12900 all-time TT — which also
+unlocked TD5–8; the dilated run entered/exited through the Eternity flow with
+`dilatedValueOf` compressing the final AD/ID/TD multipliers and the tickspeed
+interval; TP reward `(log10(AM)/400)^1.5 × 3^tachyonGain` gated on the
+Eternity goal; passive DT generation and threshold-crossing Tachyon Galaxies
+feeding the galaxy count; save round-trip; the Dilation subtab + dilate
+button/confirmation + tree nodes + TP display on the Eternity button). Note:
+TGs are earned by *crossing DT thresholds*, not "bought"; DT/s is
+`TP × 2^dtGain`, not `TP^0.5`. See `design-docs/2026-07-04-dilation.md`.
+
 ---
 
 ### Feature 5.2: Dilation Upgrades
@@ -811,6 +822,14 @@ TP_gain = (log10(antimatter) / 400)^1.5 * tachyon_mult
 - Time dimension mult from DT
 - Tachyon Particle multiplier (rebuyable)
 - Dilation penalty reduced (0.75 → higher)
+
+**Status:** ✅ Implemented (the 3 rebuyables — dtGain ×2, galaxyThreshold ×0.8
+with its DT/TG reset + 38-purchase cap, tachyonGain ×3 — and the 7 one-time
+upgrades: doubleGalaxies, tdMultReplicanti, ndMultDT (post-dilation),
+ipMultDT, timeStudySplit (3 dimension paths), dilationPenalty (×1.05
+exponent), ttGenerator (TP/20000 TT/s); all effects at their engine sites;
+save round-trip; the vendored upgrade-grid UI). The Pelle-only upgrades
+(11–15) are out of frontier. See `design-docs/2026-07-04-dilation.md`.
 
 ---
 

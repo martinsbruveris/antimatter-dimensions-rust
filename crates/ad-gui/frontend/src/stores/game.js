@@ -154,6 +154,28 @@ export const useGameStore = defineStore("game", {
         useUiStore().setSubtab("eternity", "timedims");
       }
     },
+    // --- Time Dilation ---
+    async toggleDilation() {
+      await invoke("toggle_dilation");
+      this.snapshot = await this.getState();
+    },
+    // Dilation request (original `startDilatedEternityRequest`): pops the
+    // confirmation modal when the dilation confirmation is on.
+    requestDilation() {
+      if (!this.snapshot?.dilation?.unlocked) return;
+      const ui = useUiStore();
+      if (this.snapshot?.options?.confirmations?.dilation) {
+        ui.showModal("dilationConfirm");
+      } else {
+        this.toggleDilation();
+      }
+    },
+    buyDilationStudy(id) {
+      return invoke("buy_dilation_study", { id });
+    },
+    buyDilationUpgrade(id) {
+      return invoke("buy_dilation_upgrade", { id });
+    },
     // --- Eternity Upgrades ---
     buyEternityUpgrade(id) {
       return invoke("buy_eternity_upgrade", { id });

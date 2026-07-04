@@ -62,9 +62,15 @@ impl GameState {
     /// Decimal too.
     pub fn current_tickspeed_ms(&self) -> Decimal {
         let multiplier = self.tickspeed_purchase_multiplier();
-        Decimal::from_float(INITIAL_TICKSPEED_MS)
+        let tickspeed = Decimal::from_float(INITIAL_TICKSPEED_MS)
             * Decimal::from_float(multiplier)
-                .pow(&Decimal::from(self.total_tickspeed_upgrades()))
+                .pow(&Decimal::from(self.total_tickspeed_upgrades()));
+        // Time Dilation compresses the interval too (`Tickspeed.current`).
+        if self.dilation.active {
+            self.dilated_value_of(tickspeed)
+        } else {
+            tickspeed
+        }
     }
 
     /// The per-purchase tickspeed multiplier (fraction of

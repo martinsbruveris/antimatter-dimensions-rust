@@ -108,6 +108,10 @@ impl GameState {
         // .tryFail()` in the game loop).
         self.ec_try_fail(12);
 
+        // Dilated Time generation, Tachyon Galaxies, and the ttGenerator
+        // upgrade's TT stream.
+        self.tick_dilation(dt_ms);
+
         // Advance time records. Pre-Infinity the game-speed multiplier is 1, so
         // game time and real time both advance by `dt_ms` (mirrors the original's
         // `records.totalTimePlayed += diff` in the game loop). Runs during offline

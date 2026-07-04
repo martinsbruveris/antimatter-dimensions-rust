@@ -317,6 +317,8 @@ struct GameView {
     eternity_challenges: Vec<EternityChallengeView>,
     /// Eternity Upgrades tab state (6 upgrades + the EP multiplier).
     eternity_upgrades: EternityUpgradesView,
+    /// Time Dilation tab state.
+    dilation: DilationView,
     /// Whether the EC subtab is available (a study held or any completion).
     eternity_challenges_unlocked: bool,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
@@ -472,6 +474,54 @@ struct TimeStudyView {
     can_buy: bool,
 }
 
+/// Serializable view of the Time Dilation tab.
+#[derive(Serialize)]
+struct DilationView {
+    /// Whether Dilation is unlocked (study 1).
+    unlocked: bool,
+    /// Whether a dilated Eternity is running.
+    active: bool,
+    tachyon_particles: Num,
+    dilated_time: Num,
+    /// DT gained per second.
+    dt_per_second: Num,
+    /// DT needed for the next Tachyon Galaxy.
+    next_threshold: Num,
+    base_tachyon_galaxies: u32,
+    total_tachyon_galaxies: f64,
+    /// TGs granted per threshold (2 with doubleGalaxies below 500 base).
+    tachyon_galaxy_gain: u32,
+    /// TP an exit right now would leave the player with vs. gain.
+    tachyon_gain: Num,
+    /// The 3 rebuyables + 7 one-time upgrades.
+    upgrades: Vec<DilationUpgradeView>,
+    /// The 5 dilation studies (tree nodes): per-study state.
+    studies: Vec<DilationStudyView>,
+}
+
+/// Serializable view of one Dilation Upgrade tile.
+#[derive(Serialize)]
+struct DilationUpgradeView {
+    /// Original id (1–10; 1–3 rebuyable).
+    id: u8,
+    cost: Num,
+    is_rebuyable: bool,
+    /// Rebuyable purchase count.
+    count: u32,
+    is_bought: bool,
+    is_capped: bool,
+    can_buy: bool,
+}
+
+/// Serializable view of one dilation study (ids 1–5).
+#[derive(Serialize)]
+struct DilationStudyView {
+    id: u8,
+    cost: f64,
+    is_bought: bool,
+    can_buy: bool,
+}
+
 /// Serializable view of the Eternity Upgrades tab.
 #[derive(Serialize)]
 struct EternityUpgradesView {
@@ -580,6 +630,7 @@ struct ConfirmationsView {
     sacrifice: bool,
     big_crunch: bool,
     eternity: bool,
+    dilation: bool,
 }
 
 /// Serializable view of the animation toggles (modelled subset).
@@ -885,6 +936,47 @@ fn build_time_studies_view(game: &GameState) -> TimeStudiesView {
     }
 }
 
+fn build_dilation_view(game: &GameState) -> DilationView {
+    let tachyon_galaxy_gain = if game.dilation_upgrade_bought(4)
+        && game.dilation.base_tachyon_galaxies < 500
+    {
+        2
+    } else {
+        1
+    };
+    DilationView {
+        unlocked: game.dilation_unlocked(),
+        active: game.dilation.active,
+        tachyon_particles: num(&game.dilation.tachyon_particles),
+        dilated_time: num(&game.dilation.dilated_time),
+        dt_per_second: num(&game.dilation_gain_per_second()),
+        next_threshold: num(&game.dilation.next_threshold),
+        base_tachyon_galaxies: game.dilation.base_tachyon_galaxies,
+        total_tachyon_galaxies: game.dilation.total_tachyon_galaxies,
+        tachyon_galaxy_gain,
+        tachyon_gain: num(&game.tachyon_gain()),
+        upgrades: (1u8..=10)
+            .map(|id| DilationUpgradeView {
+                id,
+                cost: num(&game.dilation_upgrade_cost(id)),
+                is_rebuyable: id <= 3,
+                count: game.dilation_rebuyable_count(id),
+                is_bought: id > 3 && game.dilation_upgrade_bought(id),
+                is_capped: game.dilation_rebuyable_capped(id),
+                can_buy: game.can_buy_dilation_upgrade(id),
+            })
+            .collect(),
+        studies: (1u8..=5)
+            .map(|id| DilationStudyView {
+                id,
+                cost: GameState::dilation_study_cost(id),
+                is_bought: game.dilation_study_bought(id),
+                can_buy: game.can_buy_dilation_study(id),
+            })
+            .collect(),
+    }
+}
+
 fn build_eternity_upgrades_view(game: &GameState) -> EternityUpgradesView {
     use ad_core::EternityUpgrade;
     let effect = |u: EternityUpgrade| -> Decimal {
@@ -1032,6 +1124,7 @@ fn build_game_view(game: &GameState) -> GameView {
         time_studies: build_time_studies_view(game),
         eternity_challenges: build_eternity_challenges_view(game),
         eternity_upgrades: build_eternity_upgrades_view(game),
+        dilation: build_dilation_view(game),
         eternity_challenges_unlocked: game.eternity_challenge_unlocked != 0
             || (1..=12).any(|id| game.eternity_challenge_completions(id) > 0),
         eternity_milestones: ad_core::ETERNITY_MILESTONES
@@ -1101,6 +1194,7 @@ fn build_game_view(game: &GameState) -> GameView {
                 sacrifice: game.options.confirmations.sacrifice,
                 big_crunch: game.options.confirmations.big_crunch,
                 eternity: game.options.confirmations.eternity,
+                dilation: game.options.confirmations.dilation,
             },
             animations: AnimationsView {
                 big_crunch: game.options.animations.big_crunch,
@@ -1274,6 +1368,26 @@ fn max_all(state: State<'_, Mutex<GameState>>) {
 fn big_crunch(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.big_crunch();
+}
+
+#[tauri::command]
+fn buy_dilation_study(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_dilation_study(id);
+}
+
+#[tauri::command]
+fn buy_dilation_upgrade(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_dilation_upgrade(id);
+}
+
+#[tauri::command]
+fn toggle_dilation(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    if game.dilation.active {
+        game.exit_dilation();
+    } else {
+        game.start_dilated_eternity();
+    }
 }
 
 #[tauri::command]
@@ -2061,6 +2175,9 @@ pub fn run() {
             buy_max_time_dimension,
             max_all_time_dimensions,
             buy_time_study,
+            buy_dilation_study,
+            buy_dilation_upgrade,
+            toggle_dilation,
             buy_eternity_upgrade,
             buy_ep_mult,
             buy_max_ep_mult,

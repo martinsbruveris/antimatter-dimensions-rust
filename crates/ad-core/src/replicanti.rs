@@ -225,7 +225,10 @@ impl GameState {
             let in_cap = self.replicanti.galaxies.min(self.replicanti.galaxy_cap);
             rgs += in_cap as f64 * self.ec8_reward_rg_strength();
         }
-        self.galaxies + rgs as u32 + self.extra_replicanti_galaxies()
+        // Tachyon Galaxies are free galaxies too (`freeGalaxies`); the
+        // fractional past-1000 part is floored here.
+        let tachyon = self.dilation.total_tachyon_galaxies as u32;
+        self.galaxies + rgs as u32 + self.extra_replicanti_galaxies() + tachyon
     }
 
     /// The "extra" Replicanti Galaxies (`Replicanti.galaxies.extra`): TS225

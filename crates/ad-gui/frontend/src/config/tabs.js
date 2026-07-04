@@ -7,6 +7,7 @@ import ChallengesTab from "../components/tabs/ChallengesTab.vue";
 import InfinityChallengesTab from "../components/tabs/InfinityChallengesTab.vue";
 import EternityChallengesTab from "../components/tabs/EternityChallengesTab.vue";
 import EternityUpgradesTab from "../components/tabs/EternityUpgradesTab.vue";
+import TimeDilationTab from "../components/tabs/TimeDilationTab.vue";
 import EternityMilestonesTab from "../components/tabs/EternityMilestonesTab.vue";
 import TimeDimensionsTab from "../components/tabs/TimeDimensionsTab.vue";
 import TimeStudiesTab from "../components/tabs/TimeStudiesTab.vue";
@@ -137,6 +138,15 @@ export const TABS = [
       { key: "timedims", name: "Time Dimensions", symbol: "Δ", component: TimeDimensionsTab, hideId: [0, 2] },
       { key: "upgrades", name: "Eternity Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: EternityUpgradesTab, hideId: [7, 1] },
       { key: "milestones", name: "Eternity Milestones", symbol: "<i class='fas fa-star'></i>", component: EternityMilestonesTab, hideId: [7, 2] },
+      // Time Dilation: appears once unlocked (dilation study 1).
+      {
+        key: "dilation",
+        name: "Time Dilation",
+        symbol: "Ψ",
+        component: TimeDilationTab,
+        condition: (s) => Boolean(s?.dilation?.unlocked),
+        hideId: [7, 3],
+      },
     ],
   },
   {

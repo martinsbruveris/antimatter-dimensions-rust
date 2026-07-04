@@ -184,6 +184,23 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         json!(state.ec_requirement_bits);
     player["eterc8ids"] = json!(state.eterc8_ids);
     player["eterc8repl"] = json!(state.eterc8_repl);
+    // Time Dilation.
+    let dilation = &mut player["dilation"];
+    dilation["studies"] = json!(state.dilation.studies);
+    dilation["active"] = json!(state.dilation.active);
+    dilation["tachyonParticles"] = decimal(&state.dilation.tachyon_particles);
+    dilation["dilatedTime"] = decimal(&state.dilation.dilated_time);
+    dilation["nextThreshold"] = decimal(&state.dilation.next_threshold);
+    dilation["baseTachyonGalaxies"] = json!(state.dilation.base_tachyon_galaxies);
+    dilation["totalTachyonGalaxies"] = json!(state.dilation.total_tachyon_galaxies);
+    dilation["upgrades"] = json!((4u8..=10)
+        .filter(|&id| state.dilation_upgrade_bought(id))
+        .collect::<Vec<_>>());
+    for (i, count) in state.dilation.rebuyables.iter().enumerate() {
+        dilation["rebuyables"][(i + 1).to_string()] = json!(count);
+    }
+    dilation["lastEP"] = decimal(&state.dilation.last_ep);
+
     // Eternity Upgrades (a Set of numeric ids) + the rebuyable EP multiplier.
     player["eternityUpgrades"] = json!(crate::ALL_ETERNITY_UPGRADES
         .iter()
@@ -271,6 +288,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     confirmations["sacrifice"] = json!(state.options.confirmations.sacrifice);
     confirmations["bigCrunch"] = json!(state.options.confirmations.big_crunch);
     confirmations["eternity"] = json!(state.options.confirmations.eternity);
+    confirmations["dilation"] = json!(state.options.confirmations.dilation);
     options["animations"]["bigCrunch"] = json!(state.options.animations.big_crunch);
     let hints = &mut options["showHintText"];
     hints["showPercentage"] = json!(state.options.show_hint_text.show_percentage);
@@ -594,6 +612,39 @@ mod tests {
         // A fresh save has no eternity progress → not unlocked.
         let fresh = decode_save(INITIAL_SAVE.trim()).unwrap();
         assert!(!fresh.eternity_unlocked);
+    }
+
+    #[test]
+    fn dilation_round_trips() {
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.dilation.studies = vec![1, 2, 3];
+        state.dilation.active = true;
+        state.dilation.tachyon_particles = Decimal::from_float(123.0);
+        state.dilation.dilated_time = Decimal::new(1.5, 7);
+        state.dilation.next_threshold = Decimal::from_float(5000.0);
+        state.dilation.base_tachyon_galaxies = 4;
+        state.dilation.total_tachyon_galaxies = 8.0;
+        state.dilation.upgrades = (1 << 4) | (1 << 10);
+        state.dilation.rebuyables = [3, 1, 2];
+        state.dilation.last_ep = Decimal::new(1.0, 60);
+        state.options.set_confirmation("dilation", false);
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.dilation.studies, vec![1, 2, 3]);
+        assert!(reloaded.dilation.active);
+        assert_eq!(
+            reloaded.dilation.tachyon_particles,
+            Decimal::from_float(123.0)
+        );
+        assert_eq!(reloaded.dilation.dilated_time, Decimal::new(1.5, 7));
+        assert_eq!(reloaded.dilation.base_tachyon_galaxies, 4);
+        assert_eq!(reloaded.dilation.total_tachyon_galaxies, 8.0);
+        assert!(reloaded.dilation_upgrade_bought(4));
+        assert!(reloaded.dilation_upgrade_bought(10));
+        assert!(!reloaded.dilation_upgrade_bought(5));
+        assert_eq!(reloaded.dilation.rebuyables, [3, 1, 2]);
+        assert_eq!(reloaded.dilation.last_ep, Decimal::new(1.0, 60));
+        assert!(!reloaded.options.confirmations.dilation);
     }
 
     #[test]

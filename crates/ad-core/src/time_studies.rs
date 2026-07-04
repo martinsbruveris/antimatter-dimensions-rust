@@ -240,10 +240,12 @@ impl GameState {
             .count()
     }
 
-    /// Allowed Dimension-split paths: 1, or 2 with TS201 (3 needs a Dilation
-    /// upgrade, out of frontier).
+    /// Allowed Dimension-split paths: 1; 2 with TS201; all 3 with the
+    /// `timeStudySplit` Dilation Upgrade.
     fn allowed_dim_path_count(&self) -> usize {
-        if self.time_study_bought(201) {
+        if self.dilation_upgrade_bought(8) {
+            3
+        } else if self.time_study_bought(201) {
             2
         } else {
             1

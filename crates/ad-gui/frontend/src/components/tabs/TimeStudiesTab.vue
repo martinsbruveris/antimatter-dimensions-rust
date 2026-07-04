@@ -10,6 +10,7 @@ import { useGameStore } from "../../stores/game";
 import { formatDecimal } from "../../util/format";
 import {
   TIME_STUDY_DESCRIPTIONS,
+  DILATION_STUDY_DESCRIPTIONS,
   TREE_ROWS,
   TREE_CONNECTIONS,
   studyPath,
@@ -75,6 +76,12 @@ const ecById = computed(() => {
   return map;
 });
 
+const dilationStudyById = computed(() => {
+  const map = new Map();
+  for (const ds of s.value?.dilation?.studies ?? []) map.set(ds.id, ds);
+  return map;
+});
+
 // Renderable nodes: normal studies + EC placeholders.
 const nodes = computed(() => {
   const list = [];
@@ -102,6 +109,31 @@ const nodes = computed(() => {
         description: TIME_STUDY_DESCRIPTIONS[item] ?? "",
         cost: study.cost,
         clickable: study.can_buy,
+      });
+    } else if (item.startsWith("D")) {
+      // Dilation study (D1 = unlock dilation, D2–D5 = TD5–8).
+      const dsId = Number(item.slice(1));
+      const ds = dilationStudyById.value.get(dsId) ?? {};
+      const state = ds.is_bought
+        ? "bought"
+        : ds.can_buy
+          ? "available"
+          : "unavailable";
+      list.push({
+        key: item,
+        id: null,
+        dsId,
+        pos,
+        classes: [
+          "o-time-study",
+          "l-time-study",
+          `o-time-study--${state}`,
+          `o-time-study-dilation--${state}`,
+        ],
+        description: DILATION_STUDY_DESCRIPTIONS[dsId] ?? "",
+        cost: ds.cost ?? null,
+        clickable: Boolean(ds.can_buy),
+        dilation: true,
       });
     } else {
       // EC study slot: buy the unlock study, then click again to start the
@@ -147,7 +179,12 @@ const lines = computed(() => {
     if (!a || !b) continue;
     const fromBought =
       typeof from === "number" ? Boolean(studyById.value.get(from)?.is_bought) : false;
-    const toPath = typeof to === "number" ? studyPath(to) : "eternity-challenge";
+    const toPath =
+      typeof to === "number"
+        ? studyPath(to)
+        : String(to).startsWith("D")
+          ? "dilation"
+          : "eternity-challenge";
     const pathClass =
       typeof to === "number" && toPath === "normal"
         ? typeof from === "number"
@@ -174,6 +211,10 @@ function buy(node) {
   if (!node.clickable) return;
   if (node.id !== null) {
     game.buyTimeStudy(node.id);
+    return;
+  }
+  if (node.dilation) {
+    game.buyDilationStudy(node.dsId);
     return;
   }
   // EC node: buy the study first, then a further click starts the challenge.

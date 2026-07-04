@@ -5,6 +5,7 @@ pub mod break_infinity_upgrades;
 pub mod challenges;
 pub mod crunch;
 pub mod data;
+pub mod dilation;
 pub mod dimensions;
 pub mod eternity;
 pub mod eternity_challenges;
@@ -37,6 +38,7 @@ pub use break_infinity_upgrades::{
     ALL_BREAK_INFINITY_UPGRADES, BREAK_INFINITY_UPGRADE_COUNT,
 };
 pub use challenges::{NormalChallengeState, NORMAL_CHALLENGE_COUNT};
+pub use dilation::DilationState;
 pub use eternity::ETERNITY_GOAL;
 pub use eternity_challenges::{ec_study_cost, ETERNITY_CHALLENGE_COUNT};
 pub use eternity_milestones::{EternityMilestone, ETERNITY_MILESTONES};

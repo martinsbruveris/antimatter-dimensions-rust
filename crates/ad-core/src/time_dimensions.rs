@@ -117,10 +117,10 @@ pub fn time_dimension_cost(tier: usize, bought: u64) -> Decimal {
 }
 
 impl GameState {
-    /// Whether tier `t` (0-indexed) is unlocked: tiers 1–4 always; 5–8 need
-    /// their Dilation study (Phase 5, so currently locked).
+    /// Whether tier `t` (0-indexed) is unlocked: tiers 1–4 always; 5–8 by
+    /// Dilation studies 2–5 (`TimeStudy.timeDimension(tier)`).
     pub fn td_is_unlocked(&self, tier: usize) -> bool {
-        tier < 4
+        tier < 4 || self.dilation_study_bought(tier as u8 - 2)
     }
 
     /// Whether tier `t` can be bought now (unlocked + affordable).
@@ -224,6 +224,13 @@ impl GameState {
                 .max(1.0);
             mult *= Decimal::from_float(log2_power.powi(4)).max(&Decimal::ONE);
         }
+        // The `tdMultReplicanti` Dilation Upgrade (while Replicanti exist).
+        if self.dilation_upgrade_bought(5)
+            && self.replicanti.unlocked
+            && self.replicanti.amount > Decimal::ONE
+        {
+            mult *= self.dilation_td_mult_replicanti();
+        }
         mult
     }
 
@@ -252,6 +259,10 @@ impl GameState {
         if tier == 3 && self.time_study_bought(227) {
             let log = self.sacrifice_multiplier().pos_log10();
             mult *= Decimal::from_float(log.powi(10).max(1.0));
+        }
+        // Time Dilation compresses the final multiplier.
+        if self.dilation.active {
+            mult = self.dilated_value_of(mult);
         }
         mult
     }

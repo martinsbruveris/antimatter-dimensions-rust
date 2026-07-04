@@ -3,6 +3,15 @@
 // connection list (time-study-connections.js), and per-study path classes.
 // EC nodes render as locked placeholders until Feature 4.5 wires them.
 
+// Dilation study descriptions (dilation-time-studies.js).
+export const DILATION_STUDY_DESCRIPTIONS = {
+  1: "Unlock Time Dilation",
+  2: "Unlock the 5th Time Dimension",
+  3: "Unlock the 6th Time Dimension",
+  4: "Unlock the 7th Time Dimension",
+  5: "Unlock the 8th Time Dimension",
+};
+
 export const TIME_STUDY_DESCRIPTIONS = {
   11: "Tickspeed affects 1st Time Dimension with reduced effect",
   21: "Improve Replicanti multiplier formula to (log2(x)^2)+x^0.032",
@@ -116,6 +125,10 @@ export const TREE_ROWS = [
   },
   { items: [231, 232, 233, 234] },
   { items: ["EC11", null, "EC12"] },
+  // Dilation studies (D1 = unlock, D2–D5 = TD5–8; D6 Reality is post-frontier).
+  { items: ["D1"] },
+  { items: ["D2", "D3"] },
+  { items: ["D4", "D5"] },
 ];
 
 // Connections [from, to] (time-study-connections.js, pre-dilation slice;
@@ -152,4 +165,6 @@ export const TREE_CONNECTIONS = [
   [221, 231], [222, 231], [223, 232], [224, 232],
   [225, 233], [226, 233], [227, 234], [228, 234],
   [231, "EC11"], [232, "EC11"], [233, "EC12"], [234, "EC12"],
+  ["EC11", "D1"], ["EC12", "D1"],
+  ["D1", "D2"], ["D2", "D3"], ["D3", "D4"], ["D4", "D5"],
 ];

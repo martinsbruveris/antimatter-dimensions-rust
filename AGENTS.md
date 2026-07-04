@@ -126,6 +126,12 @@ antimatter-dimensions-rust/
   start/exit/complete flow through the Eternity reset, scaled goals (×5
   completions), EC4/EC12 restriction failures, the EC12 game-speed factor,
   and the restriction/reward effect readers consumed across the engine.
+- `src/dilation.rs` — Time Dilation (Features 5.1 + 5.2): dilation studies
+  (the real unlock gate + TD5–8), the dilated-run flow through the Eternity
+  reset (`dilatedValueOf` compression applied to the final AD/ID/TD
+  multipliers and the tickspeed interval), Tachyon Particles / Dilated Time /
+  Tachyon Galaxies (threshold crossings, free galaxies), and the Dilation
+  Upgrades (3 rebuyables + 7 one-time) with their effects at the usual sites.
 - `src/eternity_upgrades.rs` — Eternity Upgrades (Feature 4.6): the 6 one-time
   EP upgrades (ID mults from EP/eternities/IC record times — with per-IC
   best-time records written on completion in crunch.rs — TD mults from
@@ -345,6 +351,7 @@ Located in `design-docs/`:
 | `2026-07-02-infinity-points-and-records.md` | Completing Feature 2.1: Infinity Points / Infinities currency, the `Records` struct (time played, this/best infinity), the IP gain formula (pre-break = 1), Big Crunch reward+reset semantics, save/load round-trip, and the Infinity tab + IP header |
 | `2026-07-03-infinity-upgrades.md` | Feature 2.2: the 16-upgrade Infinity grid — data table, bitmask state, purchase/column prereqs, every effect and its engine application site, passive `ipGen`, save/load, and the grid UI; bottom row (`ipMult`/`ipOffline`) deferred |
 | `2026-07-03-normal-challenges.md` | Feature 2.5: the 12 Normal Challenges — run state machine (start/complete/exit, forced Big-Crunch reset, unlock chain), all 12 modifiers mapped to their engine sites, reward→autobuyer wiring, save/load, the Challenges tab UI, and an incremental plan (NC1 slice first) |
+| `2026-07-04-dilation.md` | Phase 5 (Time Dilation): design for Features 5.1–5.2 — dilation studies, the dilated run + TP/DT/Tachyon-Galaxy mechanics, and the Dilation Upgrades |
 | `2026-07-04-eternity.md` | Phase 4 (Eternity): design for Features 4.1–4.6 — EP formula + reset semantics, milestones, Time Dimensions/free tickspeed, the Time Studies tree + effect map, Eternity Challenges, Eternity Upgrades; frontier corrections (TD5–8 are Dilation-gated; Big Crunch resets Replicanti) |
 | `2026-07-04-tab-notifications.md` | Tab notification badges (the yellow `!` on tabs): the original's two-field state + trigger/clear semantics, the 5 in-frontier notifications, and the engine-owned port (trigger hooks, save round-trip, sidebar rendering + seen-acknowledgement) |
 

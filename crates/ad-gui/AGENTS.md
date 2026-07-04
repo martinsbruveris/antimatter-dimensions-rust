@@ -510,6 +510,21 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md` and
   like-named `stores/game.js` actions. The first Eternity navigates to the
   Time Dimensions subtab.
 
+## Time Dilation (Phase 5)
+
+- **Time Dilation subtab** (`TimeDilationTab.vue`, Eternity tab hide-bit
+  (7,3), condition `dilation.unlocked`): TP readout, the vendored
+  `o-dilation-btn` dilate button (routed through `requestDilation` → the
+  `dilationConfirm` modal / `toggle_dilation`), DT income, the Tachyon-Galaxy
+  threshold line, and the `o-dilation-upgrade` grid (3 rebuyables + 2×3
+  one-time + the TT generator).
+- The study tree gained the dilation rows (D1 unlock, D2–D5 = TD5–8) with
+  `o-time-study-dilation` coloring; the Eternity button shows the pending TP
+  gain while dilated (`o-eternity-button--dilation`).
+- **Commands:** `buy_dilation_study`, `buy_dilation_upgrade`,
+  `toggle_dilation` — mirrored by `stores/game.js` actions
+  (`requestDilation` gates on `confirmations.dilation`).
+
 ## Conventions
 
 - **Vendored CSS, verbatim.** All game-component styling comes from the

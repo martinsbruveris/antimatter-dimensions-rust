@@ -62,6 +62,14 @@ impl GameState {
         if self.time_study_bought(143) {
             mult *= Self::this_infinity_mult(infinity_secs);
         }
+        // The `ipMultDT` Dilation Upgrade: ×DT^1000.
+        if self.dilation_upgrade_bought(7) {
+            mult *= self
+                .dilation
+                .dilated_time
+                .pow(&Decimal::from_float(1000.0))
+                .max(&Decimal::ONE);
+        }
         mult
     }
 

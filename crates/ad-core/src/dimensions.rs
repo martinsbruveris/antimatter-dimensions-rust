@@ -293,11 +293,25 @@ impl GameState {
         // ...then `applyNDPowers` raises it to the IC4 power (`^0.25` for the
         // non-latest dimensions while IC4 runs, `^1.05` all-tier once completed).
         let power = self.infinity_challenge_mult_power(tier);
-        if power == 1.0 {
+        let mut mult = if power == 1.0 {
             mult
         } else {
             mult.pow(&Decimal::from_float(power))
+        };
+
+        // Time Dilation compresses the final multiplier; the `ndMultDT`
+        // Dilation Upgrade applies *after* (unaffected by dilation).
+        if self.dilation.active {
+            mult = self.dilated_value_of(mult);
         }
+        if self.dilation_upgrade_bought(6) {
+            mult *= self
+                .dilation
+                .dilated_time
+                .pow(&Decimal::from_float(308.0))
+                .max(&Decimal::ONE);
+        }
+        mult
     }
 
     /// Get the per-second production rate for a dimension tier.

@@ -6,6 +6,7 @@ use crate::challenges::NormalChallengeState;
 use crate::data::constants::{
     INITIAL_ANTIMATTER, TICKSPEED_BASE_COST, TICKSPEED_COST_MULTIPLIER,
 };
+use crate::dilation::DilationState;
 use crate::infinity_challenges::InfinityChallengeState;
 use crate::infinity_dimensions::InfinityDimension;
 use crate::options::Options;
@@ -287,6 +288,11 @@ pub struct GameState {
     /// Eternity Upgrade 3.
     #[cfg_attr(feature = "serde", serde(default = "default_ic_best_times"))]
     pub ic_best_times_ms: [f64; 8],
+    /// Time Dilation (`player.dilation`): studies, the active-run flag,
+    /// Tachyon Particles / Dilated Time / Tachyon Galaxies, and the Dilation
+    /// Upgrades. Persists across Eternities. See `dilation.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub dilation: DilationState,
     /// Owned Infinity Upgrades, one bit per [`InfinityUpgrade`](crate::InfinityUpgrade)
     /// (the original's `player.infinityUpgrades` string set as a bitmask).
     /// Persists across a Big Crunch. See `infinity_upgrades.rs`.
@@ -462,6 +468,7 @@ impl GameState {
             eternity_upgrades: 0,
             epmult_upgrades: 0,
             ic_best_times_ms: [f64::MAX; 8],
+            dilation: DilationState::new(),
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),
