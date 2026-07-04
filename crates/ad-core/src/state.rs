@@ -173,9 +173,24 @@ pub struct GameState {
     pub infinity_points: Decimal,
     /// Number of Infinities performed. Mirrors `Currency.infinities`:
     /// incremented on each Big Crunch and persists across crunches. Shown in the
-    /// Statistics tab and feeds later infinity-count multipliers.
+    /// Statistics tab and feeds later infinity-count multipliers. Reset on
+    /// Eternity.
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinities: Decimal,
+    /// Current Eternity Points (`Currency.eternityPoints`): gained on an
+    /// Eternity, cumulative, spent on Time Dimensions / Eternity Upgrades /
+    /// Time Theorems. Reset only on Reality (out of frontier). See `eternity.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub eternity_points: Decimal,
+    /// Number of Eternities performed (`Currency.eternities`, a Decimal in the
+    /// original). Drives the Eternity Milestones. Reset only on Reality.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub eternities: Decimal,
+    /// Whether the player has performed at least one Eternity. Mirrors
+    /// `PlayerProgress.eternityUnlocked()`; derived on load from
+    /// eternities/EP. Gates the Eternity tab and header EP readout.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub eternity_unlocked: bool,
     /// Owned Infinity Upgrades, one bit per [`InfinityUpgrade`](crate::InfinityUpgrade)
     /// (the original's `player.infinityUpgrades` string set as a bitmask).
     /// Persists across a Big Crunch. See `infinity_upgrades.rs`.
@@ -328,6 +343,9 @@ impl GameState {
             sacrificed: Decimal::ZERO,
             infinity_points: Decimal::ZERO,
             infinities: Decimal::ZERO,
+            eternity_points: Decimal::ZERO,
+            eternities: Decimal::ZERO,
+            eternity_unlocked: false,
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),

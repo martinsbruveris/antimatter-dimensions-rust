@@ -33,6 +33,8 @@ pub enum Action {
     Sacrifice,
     /// Perform a Big Crunch (first Infinity).
     Crunch,
+    /// Perform an Eternity (second prestige).
+    Eternity,
     /// Buy an Infinity Upgrade from the grid.
     BuyInfinityUpgrade(InfinityUpgrade),
     /// Start a normal challenge (2..=12).
@@ -99,6 +101,7 @@ impl GameState {
             Action::DimBoost => ActionOutcome::single(self.buy_dim_boost()),
             Action::Sacrifice => ActionOutcome::single(self.sacrifice()),
             Action::Crunch => ActionOutcome::single(self.big_crunch()),
+            Action::Eternity => ActionOutcome::single(self.eternity()),
             Action::BuyInfinityUpgrade(upgrade) => {
                 ActionOutcome::single(self.buy_infinity_upgrade(upgrade))
             }

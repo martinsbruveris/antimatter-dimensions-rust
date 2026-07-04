@@ -142,6 +142,25 @@ export const useGameStore = defineStore("game", {
         useUiStore().setSubtab("dimensions", "antimatter");
       }
     },
+    // Eternity (second prestige): resets the whole Infinity layer in the engine
+    // and awards Eternity Points. The original's first-eternity tab change
+    // (`Tab.dimensions.time.show()` when eternities was 0) lands with the Time
+    // Dimensions tab (Feature 4.3).
+    async eternity() {
+      await invoke("eternity");
+      this.snapshot = await this.getState();
+    },
+    // Eternity request (original `eternityResetRequest` → askEternityConfirmation):
+    // pops the confirmation modal when the eternity confirmation is on.
+    requestEternity() {
+      if (!this.snapshot?.can_eternity) return;
+      const ui = useUiStore();
+      if (this.snapshot?.options?.confirmations?.eternity) {
+        ui.showModal("eternityConfirm");
+      } else {
+        this.eternity();
+      }
+    },
     // Break Infinity: lift the 1e308 cap so antimatter can grow further and the
     // IP formula scales. Offered once the Big Crunch autobuyer's interval is maxed.
     breakInfinity() {

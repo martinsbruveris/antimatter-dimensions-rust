@@ -36,7 +36,7 @@ use crate::options::{
     MAX_NOTATION_DIGITS, MAX_UPDATE_RATE_MS, MIN_AUTOSAVE_INTERVAL_MS,
     MIN_NOTATION_DIGITS, MIN_UPDATE_RATE_MS, TAB_COUNT,
 };
-use crate::records::{BestInfinity, Records, ThisInfinity};
+use crate::records::{BestEternity, BestInfinity, Records, ThisEternity, ThisInfinity};
 use crate::replicanti::ReplicantiState;
 use crate::state::{DimensionTier, GameState, TickspeedState};
 
@@ -72,6 +72,12 @@ pub struct PlayerDTO {
     pub infinities: Decimal,
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_points: Decimal,
+    /// `player.eternityPoints` — the Eternity prestige currency.
+    #[serde(with = "break_infinity::serde_string")]
+    pub eternity_points: Decimal,
+    /// `player.eternities` — number of Eternities performed (a Decimal).
+    #[serde(with = "break_infinity::serde_string")]
+    pub eternities: Decimal,
     /// `player.infinityPower` — produced by the Infinity Dimensions.
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_power: Decimal,
@@ -218,16 +224,42 @@ pub struct RecordsDTO {
     pub this_infinity: ThisInfinityDTO,
     pub best_infinity: BestInfinityDTO,
     pub this_eternity: ThisEternityDTO,
+    pub best_eternity: BestEternityDTO,
 }
 
-/// `player.records.thisEternity` (modelled subset): the peak antimatter this
-/// eternity, which gates Infinity-Challenge unlocks.
+/// `player.records.thisEternity` (modelled subset): timing plus the peak
+/// antimatter (gates IC/ID unlocks) and peak IP (drives the Eternity goal and
+/// the EP formula) this eternity.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThisEternityDTO {
+    /// Game time in this eternity (ms).
+    pub time: f64,
+    /// Real time in this eternity (ms).
+    pub real_time: f64,
     /// Peak antimatter this eternity. Save key `maxAM` (capital AM).
     #[serde(rename = "maxAM", with = "break_infinity::serde_string")]
     pub max_am: Decimal,
+    /// Peak Infinity Points this eternity. Save key `maxIP` (capital IP).
+    #[serde(rename = "maxIP", with = "break_infinity::serde_string")]
+    pub max_ip: Decimal,
+    /// Peak EP/min this eternity (`bestEPmin`).
+    #[serde(rename = "bestEPmin", with = "break_infinity::serde_string")]
+    pub best_ep_min: Decimal,
+    /// The Eternity EP gain when the peak rate was set (`bestEPminVal`).
+    #[serde(rename = "bestEPminVal", with = "break_infinity::serde_string")]
+    pub best_ep_min_val: Decimal,
+}
+
+/// `player.records.bestEternity` (modelled subset). Times are
+/// `Number.MAX_VALUE` when no eternity has been performed.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BestEternityDTO {
+    /// Fastest eternity by game time (ms).
+    pub time: f64,
+    /// Fastest eternity by real time (ms).
+    pub real_time: f64,
 }
 
 /// `player.records.thisInfinity` (modelled subset).
@@ -242,6 +274,12 @@ pub struct ThisInfinityDTO {
     /// which `camelCase` would render as `maxAm`, so it is renamed explicitly.
     #[serde(rename = "maxAM", with = "break_infinity::serde_string")]
     pub max_am: Decimal,
+    /// Peak IP/min this infinity (`bestIPmin`).
+    #[serde(rename = "bestIPmin", with = "break_infinity::serde_string")]
+    pub best_ip_min: Decimal,
+    /// The crunch IP gain when the peak rate was set (`bestIPminVal`).
+    #[serde(rename = "bestIPminVal", with = "break_infinity::serde_string")]
+    pub best_ip_min_val: Decimal,
 }
 
 /// `player.records.bestInfinity` (modelled subset). Times are `Number.MAX_VALUE`
@@ -392,6 +430,7 @@ pub struct ConfirmationsDTO {
     pub antimatter_galaxy: bool,
     pub sacrifice: bool,
     pub big_crunch: bool,
+    pub eternity: bool,
 }
 
 impl GameState {
@@ -471,6 +510,10 @@ impl GameState {
         let infinity_unlocked = broke_infinity
             || dto.infinities > Decimal::ZERO
             || dto.infinity_points > Decimal::ZERO;
+        // Eternity-unlocked is likewise derived (`PlayerProgress.eternityUnlocked`
+        // ⇔ eternities gained or EP held).
+        let eternity_unlocked =
+            dto.eternities > Decimal::ZERO || dto.eternity_points > Decimal::ZERO;
 
         // Infinity Upgrades + one-time Break Infinity Upgrades share the string
         // set: set the bit in whichever bitmask a modelled id belongs to; unknown
@@ -507,12 +550,25 @@ impl GameState {
                 // Transient IC8 decay timer: start it at the current time on load so
                 // production isn't spuriously decayed before the next purchase.
                 last_buy_time_ms: dto.records.this_infinity.time,
+                best_ip_min: dto.records.this_infinity.best_ip_min,
+                best_ip_min_val: dto.records.this_infinity.best_ip_min_val,
             },
             best_infinity: BestInfinity {
                 time_ms: dto.records.best_infinity.time,
                 real_time_ms: dto.records.best_infinity.real_time,
             },
-            max_am_this_eternity: dto.records.this_eternity.max_am,
+            this_eternity: ThisEternity {
+                time_ms: dto.records.this_eternity.time,
+                real_time_ms: dto.records.this_eternity.real_time,
+                max_am: dto.records.this_eternity.max_am,
+                max_ip: dto.records.this_eternity.max_ip,
+                best_ep_min: dto.records.this_eternity.best_ep_min,
+                best_ep_min_val: dto.records.this_eternity.best_ep_min_val,
+            },
+            best_eternity: BestEternity {
+                time_ms: dto.records.best_eternity.time,
+                real_time_ms: dto.records.best_eternity.real_time,
+            },
         };
 
         // Achievement bitmask. The original's `achievementBits` is 17 rows in a
@@ -619,6 +675,7 @@ impl GameState {
             antimatter_galaxy: dto.options.confirmations.antimatter_galaxy,
             sacrifice: dto.options.confirmations.sacrifice,
             big_crunch: dto.options.confirmations.big_crunch,
+            eternity: dto.options.confirmations.eternity,
         };
         options.animations.big_crunch = dto.options.animations.big_crunch;
         options.show_hint_text = ShowHintText {
@@ -667,6 +724,9 @@ impl GameState {
             sacrificed: dto.sacrificed,
             infinity_points: dto.infinity_points,
             infinities: dto.infinities,
+            eternity_points: dto.eternity_points,
+            eternities: dto.eternities,
+            eternity_unlocked,
             infinity_upgrades,
             part_infinity_point: dto.part_infinity_point,
             challenge: NormalChallengeState {

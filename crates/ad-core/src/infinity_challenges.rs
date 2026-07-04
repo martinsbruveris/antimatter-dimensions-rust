@@ -98,7 +98,7 @@ impl GameState {
         if !(1..=INFINITY_CHALLENGE_COUNT).contains(&id) {
             return false;
         }
-        self.records.max_am_this_eternity >= IC_UNLOCK_AM[(id - 1) as usize]
+        self.records.this_eternity.max_am >= IC_UNLOCK_AM[(id - 1) as usize]
     }
 
     /// Whether any infinity challenge is unlocked (the subtab gate).
@@ -236,7 +236,7 @@ mod tests {
         let mut game = GameState::new();
         assert!(!game.infinity_challenge_unlocked(1));
         // IC1 unlocks at 1e2000 peak antimatter this eternity.
-        game.records.max_am_this_eternity = Decimal::new(1.0, 2000);
+        game.records.this_eternity.max_am = Decimal::new(1.0, 2000);
         assert!(game.infinity_challenge_unlocked(1));
         assert!(!game.infinity_challenge_unlocked(2)); // needs 1e11000
         assert!(game.infinity_challenges_unlocked());
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn start_infinity_challenge_breaks_infinity_and_enters() {
         let mut game = GameState::new();
-        game.records.max_am_this_eternity = Decimal::new(1.0, 2000);
+        game.records.this_eternity.max_am = Decimal::new(1.0, 2000);
         assert!(!game.broke_infinity);
         assert!(game.start_infinity_challenge(1));
         assert!(game.infinity_challenge_running(1));
@@ -257,7 +257,7 @@ mod tests {
     fn crunching_at_ic_goal_completes_it() {
         let mut game = GameState::new();
         // IC3 unlocks at 1e12000 peak AM this eternity; its goal is the lower 1e5000.
-        game.records.max_am_this_eternity = Decimal::new(1.0, 12000);
+        game.records.this_eternity.max_am = Decimal::new(1.0, 12000);
         game.start_infinity_challenge(3);
         assert!(game.infinity_challenge_running(3));
 
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn ic1_composes_normal_challenge_modifiers() {
         let mut game = GameState::new();
-        game.records.max_am_this_eternity = Decimal::new(1.0, 2000);
+        game.records.this_eternity.max_am = Decimal::new(1.0, 2000);
         game.start_infinity_challenge(1);
         // IC1 runs every Normal Challenge except NC9 and NC12.
         assert!(game.challenge_running(2));
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn ic3_neutralizes_tickspeed_and_grants_static_mult() {
         let mut game = GameState::new();
-        game.records.max_am_this_eternity = Decimal::new(1.0, 12000);
+        game.records.this_eternity.max_am = Decimal::new(1.0, 12000);
         game.start_infinity_challenge(3);
         game.tickspeed.bought = 10;
         game.galaxies = 2;
@@ -303,7 +303,7 @@ mod tests {
     #[test]
     fn ic7_disables_galaxies_and_boosts_dim_boost_power() {
         let mut game = GameState::new();
-        game.records.max_am_this_eternity = Decimal::new(1.0, 23000);
+        game.records.this_eternity.max_am = Decimal::new(1.0, 23000);
         game.start_infinity_challenge(7);
         game.dimensions[7].amount = Decimal::from_float(1e9);
         assert!(!game.can_buy_galaxy());
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn ic4_weakens_all_but_the_latest_dimension() {
         let mut game = GameState::new();
-        game.records.max_am_this_eternity = Decimal::new(1.0, 14000);
+        game.records.this_eternity.max_am = Decimal::new(1.0, 14000);
         game.start_infinity_challenge(4);
         game.post_c4_tier = 3; // the 3rd AD (index 2) is the last bought
         assert_eq!(game.infinity_challenge_mult_power(2), 1.0);

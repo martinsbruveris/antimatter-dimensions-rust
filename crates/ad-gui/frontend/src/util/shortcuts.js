@@ -153,6 +153,10 @@ export function handleShortcut(e, game, ui) {
       // Big Crunch; the engine no-ops unless antimatter is at the threshold.
       game.requestBigCrunch();
       break;
+    case "KeyE":
+      // Eternity; no-ops unless the Eternity goal is met.
+      game.requestEternity();
+      break;
     default:
       break;
   }

@@ -280,6 +280,33 @@ struct GameView {
     infinity_points: Num,
     /// Number of Infinities performed (shown on locked challenge tiles as X/Y).
     infinities: Num,
+    /// IP a Big Crunch would grant right now (the post-break header button).
+    gained_infinity_points: Num,
+    /// The current antimatter crunch goal (an IC's own goal while one runs,
+    /// else 1.8e308), for the header button's "Reach X antimatter" line.
+    infinity_goal: Num,
+    /// Real time in the current infinity (ms), for the button's IP/min line.
+    this_infinity_real_time_ms: f64,
+    /// Peak IP/min this infinity + the gain when that peak was set.
+    best_ip_min: Num,
+    best_ip_min_val: Num,
+    /// Current Eternity Points (header readout once Eternity is unlocked).
+    eternity_points: Num,
+    /// Number of Eternities performed (drives milestones).
+    eternities: Num,
+    /// Whether the player has performed at least one Eternity.
+    eternity_unlocked: bool,
+    /// Whether the Eternity goal (1.8e308 peak IP) is met.
+    can_eternity: bool,
+    /// The IP goal for an Eternity (the "Reach X IP" line).
+    eternity_goal: Num,
+    /// EP an Eternity would grant right now.
+    gained_eternity_points: Num,
+    /// Real time in the current eternity (ms), for the button's EP/min line.
+    this_eternity_real_time_ms: f64,
+    /// Peak EP/min this eternity + the gain when that peak was set.
+    best_ep_min: Num,
+    best_ep_min_val: Num,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
     infinity_upgrades: Vec<InfinityUpgradeView>,
     /// Whether the Challenges tab is available (post first Infinity).
@@ -416,6 +443,7 @@ struct ConfirmationsView {
     antimatter_galaxy: bool,
     sacrifice: bool,
     big_crunch: bool,
+    eternity: bool,
 }
 
 /// Serializable view of the animation toggles (modelled subset).
@@ -738,6 +766,20 @@ fn build_game_view(game: &GameState) -> GameView {
         antimatter_per_sec: num(&game.antimatter_per_second()),
         infinity_points: num(&game.infinity_points),
         infinities: num(&game.infinities),
+        gained_infinity_points: num(&game.gained_infinity_points()),
+        infinity_goal: num(&game.infinity_goal()),
+        this_infinity_real_time_ms: game.records.this_infinity.real_time_ms,
+        best_ip_min: num(&game.records.this_infinity.best_ip_min),
+        best_ip_min_val: num(&game.records.this_infinity.best_ip_min_val),
+        eternity_points: num(&game.eternity_points),
+        eternities: num(&game.eternities),
+        eternity_unlocked: game.eternity_unlocked,
+        can_eternity: game.can_eternity(),
+        eternity_goal: num(&game.eternity_goal()),
+        gained_eternity_points: num(&game.gained_eternity_points()),
+        this_eternity_real_time_ms: game.records.this_eternity.real_time_ms,
+        best_ep_min: num(&game.records.this_eternity.best_ep_min),
+        best_ep_min_val: num(&game.records.this_eternity.best_ep_min_val),
         infinity_upgrades: build_infinity_upgrades_view(game),
         challenges_unlocked: game.challenges_unlocked(),
         challenges: build_challenges_view(game),
@@ -796,6 +838,7 @@ fn build_game_view(game: &GameState) -> GameView {
                 antimatter_galaxy: game.options.confirmations.antimatter_galaxy,
                 sacrifice: game.options.confirmations.sacrifice,
                 big_crunch: game.options.confirmations.big_crunch,
+                eternity: game.options.confirmations.eternity,
             },
             animations: AnimationsView {
                 big_crunch: game.options.animations.big_crunch,
@@ -969,6 +1012,12 @@ fn max_all(state: State<'_, Mutex<GameState>>) {
 fn big_crunch(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.big_crunch();
+}
+
+#[tauri::command]
+fn eternity(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.eternity();
 }
 
 #[tauri::command]
@@ -1662,6 +1711,7 @@ pub fn run() {
             sacrifice,
             max_all,
             big_crunch,
+            eternity,
             break_infinity,
             buy_break_infinity_upgrade,
             buy_break_infinity_rebuyable,

@@ -81,6 +81,9 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // Infinity currency (Decimal strings, matching the save schema).
     player["infinityPoints"] = decimal(&state.infinity_points);
     player["infinities"] = decimal(&state.infinities);
+    // Eternity currency. `eternity_unlocked` is derived on load (eternities/EP).
+    player["eternityPoints"] = decimal(&state.eternity_points);
+    player["eternities"] = decimal(&state.eternities);
     // Infinity Upgrades + one-time Break Infinity Upgrades share the id set:
     // write the owned ids from both, plus the ipGen fractional accumulator and the
     // rebuyable Break Infinity Upgrade counts.
@@ -121,10 +124,25 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     records["thisInfinity"]["realTime"] =
         json!(state.records.this_infinity.real_time_ms);
     records["thisInfinity"]["maxAM"] = decimal(&state.records.this_infinity.max_am);
+    records["thisInfinity"]["bestIPmin"] =
+        decimal(&state.records.this_infinity.best_ip_min);
+    records["thisInfinity"]["bestIPminVal"] =
+        decimal(&state.records.this_infinity.best_ip_min_val);
     records["bestInfinity"]["time"] = json!(state.records.best_infinity.time_ms);
     records["bestInfinity"]["realTime"] =
         json!(state.records.best_infinity.real_time_ms);
-    records["thisEternity"]["maxAM"] = decimal(&state.records.max_am_this_eternity);
+    records["thisEternity"]["time"] = json!(state.records.this_eternity.time_ms);
+    records["thisEternity"]["realTime"] =
+        json!(state.records.this_eternity.real_time_ms);
+    records["thisEternity"]["maxAM"] = decimal(&state.records.this_eternity.max_am);
+    records["thisEternity"]["maxIP"] = decimal(&state.records.this_eternity.max_ip);
+    records["thisEternity"]["bestEPmin"] =
+        decimal(&state.records.this_eternity.best_ep_min);
+    records["thisEternity"]["bestEPminVal"] =
+        decimal(&state.records.this_eternity.best_ep_min_val);
+    records["bestEternity"]["time"] = json!(state.records.best_eternity.time_ms);
+    records["bestEternity"]["realTime"] =
+        json!(state.records.best_eternity.real_time_ms);
     // Achievement bitmask, written back verbatim (one int per row).
     player["achievementBits"] = json!(state.achievement_bits);
     // Tab notification badges: the badged keys (a Set serialized as an array,
@@ -190,6 +208,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         json!(state.options.confirmations.antimatter_galaxy);
     confirmations["sacrifice"] = json!(state.options.confirmations.sacrifice);
     confirmations["bigCrunch"] = json!(state.options.confirmations.big_crunch);
+    confirmations["eternity"] = json!(state.options.confirmations.eternity);
     options["animations"]["bigCrunch"] = json!(state.options.animations.big_crunch);
     let hints = &mut options["showHintText"];
     hints["showPercentage"] = json!(state.options.show_hint_text.show_percentage);
@@ -475,11 +494,52 @@ mod tests {
     }
 
     #[test]
+    fn eternity_state_round_trips() {
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.eternity_points = Decimal::new(1.5, 10);
+        state.eternities = Decimal::from_float(7.0);
+        state.records.this_eternity.time_ms = 123_000.0;
+        state.records.this_eternity.real_time_ms = 124_000.0;
+        state.records.this_eternity.max_ip = Decimal::new(1.0, 200);
+        state.records.this_eternity.best_ep_min = Decimal::from_float(42.0);
+        state.records.this_eternity.best_ep_min_val = Decimal::from_float(84.0);
+        state.records.best_eternity.time_ms = 60_000.0;
+        state.records.this_infinity.best_ip_min = Decimal::new(1.0, 5);
+        state.options.set_confirmation("eternity", false);
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.eternity_points, Decimal::new(1.5, 10));
+        assert_eq!(reloaded.eternities, Decimal::from_float(7.0));
+        // Eternity-unlocked is derived from the eternities count.
+        assert!(reloaded.eternity_unlocked);
+        assert_eq!(reloaded.records.this_eternity.time_ms, 123_000.0);
+        assert_eq!(reloaded.records.this_eternity.real_time_ms, 124_000.0);
+        assert_eq!(
+            reloaded.records.this_eternity.max_ip,
+            Decimal::new(1.0, 200)
+        );
+        assert_eq!(
+            reloaded.records.this_eternity.best_ep_min,
+            Decimal::from_float(42.0)
+        );
+        assert_eq!(reloaded.records.best_eternity.time_ms, 60_000.0);
+        assert_eq!(
+            reloaded.records.this_infinity.best_ip_min,
+            Decimal::new(1.0, 5)
+        );
+        assert!(!reloaded.options.confirmations.eternity);
+
+        // A fresh save has no eternity progress → not unlocked.
+        let fresh = decode_save(INITIAL_SAVE.trim()).unwrap();
+        assert!(!fresh.eternity_unlocked);
+    }
+
+    #[test]
     fn infinity_challenge_state_round_trips() {
         let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
         state.infinity_challenge.current = 3;
         state.infinity_challenge.completed = (1 << 1) | (1 << 5);
-        state.records.max_am_this_eternity = Decimal::new(1.0, 14000);
+        state.records.this_eternity.max_am = Decimal::new(1.0, 14000);
 
         let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
         assert_eq!(reloaded.infinity_challenge.current, 3);
@@ -487,7 +547,7 @@ mod tests {
         assert!(reloaded.infinity_challenge_completed(5));
         assert!(!reloaded.infinity_challenge_completed(2));
         assert_eq!(
-            reloaded.records.max_am_this_eternity,
+            reloaded.records.this_eternity.max_am,
             Decimal::new(1.0, 14000)
         );
     }

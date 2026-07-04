@@ -131,6 +131,10 @@ impl GameState {
             // once Break Infinity lands; both persist across the crunch).
             self.infinity_points += self.gained_infinity_points();
             self.infinities += self.gained_infinities();
+            // The IP setter tracks the eternity's IP peak (drives the Eternity
+            // goal and the EP formula).
+            self.records.this_eternity.max_ip =
+                self.records.this_eternity.max_ip.max(&self.infinity_points);
 
             // Complete the running challenge, or NC1 on the first Infinity performed
             // outside a challenge (mirrors `handleChallengeCompletion`).

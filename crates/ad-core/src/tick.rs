@@ -92,15 +92,25 @@ impl GameState {
         self.records.real_time_played_ms += dt_ms;
         self.records.this_infinity.time_ms += dt_ms;
         self.records.this_infinity.real_time_ms += dt_ms;
+        self.records.this_eternity.time_ms += dt_ms;
+        self.records.this_eternity.real_time_ms += dt_ms;
+        // Track the peak Infinity Points this eternity (the original updates
+        // `thisEternity.maxIP` in the `Currency.infinityPoints` setter; the
+        // in-tick IP source is the passive `ipGen` upgrade).
+        self.records.this_eternity.max_ip =
+            self.records.this_eternity.max_ip.max(&self.infinity_points);
         // Track the peak antimatter this infinity (capped value), mirroring the
         // antimatter setter's `thisInfinity.maxAM = maxAM.max(value)`.
         self.records.this_infinity.max_am =
             self.records.this_infinity.max_am.max(&self.antimatter);
         // Peak antimatter this eternity (persists across crunches; gates Infinity
         // Challenge unlocks).
-        let prev_peak = self.records.max_am_this_eternity;
-        self.records.max_am_this_eternity =
-            self.records.max_am_this_eternity.max(&self.antimatter);
+        let prev_peak = self.records.this_eternity.max_am;
+        self.records.this_eternity.max_am =
+            self.records.this_eternity.max_am.max(&self.antimatter);
+
+        // `updatePrestigeRates`: peak IP/min / EP/min for the header buttons.
+        self.update_prestige_rates();
 
         // Tab-notification checks the original runs from the antimatter setter:
         // a newly crossed IC unlock threshold and an affordable autobuyer unlock.

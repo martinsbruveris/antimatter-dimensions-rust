@@ -35,6 +35,14 @@ pub struct ThisInfinity {
     /// AD production decays with `time - lastBuyTime`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub last_buy_time_ms: f64,
+    /// Peak IP-per-minute rate this infinity (`thisInfinity.bestIPmin`),
+    /// updated while a crunch is possible; shown on the header crunch button.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_ip_min: Decimal,
+    /// The crunch IP gain at the moment the peak rate was set
+    /// (`thisInfinity.bestIPminVal`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_ip_min_val: Decimal,
 }
 
 impl ThisInfinity {
@@ -44,11 +52,84 @@ impl ThisInfinity {
             real_time_ms: 0.0,
             max_am: Decimal::ZERO,
             last_buy_time_ms: 0.0,
+            best_ip_min: Decimal::ZERO,
+            best_ip_min_val: Decimal::ZERO,
         }
     }
 }
 
 impl Default for ThisInfinity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Records for the current (in-progress) eternity. Reset by an Eternity; the
+/// modelled slice of `player.records.thisEternity`.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ThisEternity {
+    /// Game time elapsed in this eternity (ms).
+    pub time_ms: f64,
+    /// Real (wall-clock-equivalent) time elapsed in this eternity (ms).
+    pub real_time_ms: f64,
+    /// Peak antimatter reached this eternity (`thisEternity.maxAM`). Persists
+    /// across a Big Crunch; gates Infinity-Challenge and Infinity-Dimension
+    /// unlocks.
+    pub max_am: Decimal,
+    /// Peak Infinity Points reached this eternity (`thisEternity.maxIP`).
+    /// Drives the Eternity goal check and the EP formula. Zeroed whenever IP is
+    /// reset (i.e. on Eternity, mirroring `Currency.infinityPoints.reset()`).
+    pub max_ip: Decimal,
+    /// Peak EP-per-minute rate this eternity (`thisEternity.bestEPmin`),
+    /// updated while an Eternity is possible; shown on the Eternity button.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_ep_min: Decimal,
+    /// The Eternity EP gain at the moment the peak rate was set
+    /// (`thisEternity.bestEPminVal`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_ep_min_val: Decimal,
+}
+
+impl ThisEternity {
+    pub fn new() -> Self {
+        Self {
+            time_ms: 0.0,
+            real_time_ms: 0.0,
+            max_am: Decimal::ZERO,
+            max_ip: Decimal::ZERO,
+            best_ep_min: Decimal::ZERO,
+            best_ep_min_val: Decimal::ZERO,
+        }
+    }
+}
+
+impl Default for ThisEternity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Records for the fastest eternity performed. Persists across an Eternity.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BestEternity {
+    /// Fastest eternity by game time (ms). `f64::MAX` = "no eternity yet".
+    pub time_ms: f64,
+    /// Fastest eternity by real time (ms). Same sentinel.
+    pub real_time_ms: f64,
+}
+
+impl BestEternity {
+    pub fn new() -> Self {
+        Self {
+            time_ms: f64::MAX,
+            real_time_ms: f64::MAX,
+        }
+    }
+}
+
+impl Default for BestEternity {
     fn default() -> Self {
         Self::new()
     }
@@ -94,11 +175,14 @@ pub struct Records {
     pub this_infinity: ThisInfinity,
     /// The fastest infinity's records (kept on crunch).
     pub best_infinity: BestInfinity,
-    /// Peak antimatter reached this eternity (`player.records.thisEternity.maxAM`).
-    /// Persists across a Big Crunch (would reset on Eternity, a later feature);
-    /// gates Infinity-Challenge unlocks. Pre-Eternity it is an all-time max.
+    /// The current eternity's records (reset on Eternity). The peak-antimatter
+    /// component persists across a Big Crunch and gates Infinity-Challenge /
+    /// Infinity-Dimension unlocks.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub max_am_this_eternity: Decimal,
+    pub this_eternity: ThisEternity,
+    /// The fastest eternity's records (kept on Eternity).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_eternity: BestEternity,
 }
 
 impl Records {
@@ -108,7 +192,8 @@ impl Records {
             real_time_played_ms: 0.0,
             this_infinity: ThisInfinity::new(),
             best_infinity: BestInfinity::new(),
-            max_am_this_eternity: Decimal::ZERO,
+            this_eternity: ThisEternity::new(),
+            best_eternity: BestEternity::new(),
         }
     }
 }

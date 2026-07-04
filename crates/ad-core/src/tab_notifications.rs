@@ -155,7 +155,7 @@ impl GameState {
                 continue;
             }
             let unlock_am = Self::infinity_challenge_unlock_am(id);
-            if prev_peak < unlock_am && self.records.max_am_this_eternity >= unlock_am {
+            if prev_peak < unlock_am && self.records.this_eternity.max_am >= unlock_am {
                 self.clear_tab_notification_trigger(TabNotificationId::IcUnlock);
                 self.try_trigger_tab_notification(TabNotificationId::IcUnlock);
             }
@@ -264,22 +264,22 @@ mod tests {
         let mut game = GameState::new();
 
         // Cross IC1's 1e2000 unlock threshold.
-        let prev = game.records.max_am_this_eternity;
-        game.records.max_am_this_eternity = Decimal::new(1.0, 2000);
+        let prev = game.records.this_eternity.max_am;
+        game.records.this_eternity.max_am = Decimal::new(1.0, 2000);
         game.notify_ic_unlock(prev);
         assert!(badged(&game, "challengesinfinity"));
 
         // Seen, then no new crossing: stays clear (the bit is still set).
         game.tab_notification_seen("challengesinfinity");
-        let prev = game.records.max_am_this_eternity;
+        let prev = game.records.this_eternity.max_am;
         game.notify_ic_unlock(prev);
         assert!(!badged(&game, "challengesinfinity"));
 
         // Completing an IC clears the trigger, so the next crossing (IC2 at
         // 1e11000) re-badges.
         game.clear_tab_notification_trigger(TabNotificationId::IcUnlock);
-        let prev = game.records.max_am_this_eternity;
-        game.records.max_am_this_eternity = Decimal::new(1.0, 11_000);
+        let prev = game.records.this_eternity.max_am;
+        game.records.this_eternity.max_am = Decimal::new(1.0, 11_000);
         game.notify_ic_unlock(prev);
         assert!(badged(&game, "challengesinfinity"));
     }

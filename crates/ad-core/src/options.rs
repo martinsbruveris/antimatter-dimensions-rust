@@ -69,6 +69,15 @@ pub struct Confirmations {
     pub antimatter_galaxy: bool,
     pub sacrifice: bool,
     pub big_crunch: bool,
+    /// Eternity confirmation (original `confirmations.eternity`).
+    #[cfg_attr(feature = "serde", serde(default = "confirmation_default"))]
+    pub eternity: bool,
+}
+
+/// serde default for newer confirmation toggles (on, like the originals).
+#[cfg(feature = "serde")]
+fn confirmation_default() -> bool {
+    true
 }
 
 impl Confirmations {
@@ -78,6 +87,7 @@ impl Confirmations {
             antimatter_galaxy: true,
             sacrifice: true,
             big_crunch: true,
+            eternity: true,
         }
     }
 }
@@ -267,6 +277,7 @@ impl Options {
             "antimatterGalaxy" => self.confirmations.antimatter_galaxy = enabled,
             "sacrifice" => self.confirmations.sacrifice = enabled,
             "bigCrunch" => self.confirmations.big_crunch = enabled,
+            "eternity" => self.confirmations.eternity = enabled,
             _ => {}
         }
     }

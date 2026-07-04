@@ -19,6 +19,7 @@ export const shortcuts = [
   { name: "Dimension Boost", keys: ["d"] },
   { name: "Antimatter Galaxy", keys: ["g"] },
   { name: "Big Crunch", keys: ["c"] },
+  { name: "Eternity", keys: ["e"] },
   { name: "Save game", keys: ["mod", "s"] },
   { name: "Export game", keys: ["mod", "e"] },
   { name: "Open Hotkey List Modal", keys: ["?"] },

@@ -6,6 +6,7 @@ pub mod challenges;
 pub mod crunch;
 pub mod data;
 pub mod dimensions;
+pub mod eternity;
 pub mod galaxy;
 pub mod infinity_challenges;
 pub mod infinity_dimensions;
@@ -31,6 +32,7 @@ pub use break_infinity_upgrades::{
     ALL_BREAK_INFINITY_UPGRADES, BREAK_INFINITY_UPGRADE_COUNT,
 };
 pub use challenges::{NormalChallengeState, NORMAL_CHALLENGE_COUNT};
+pub use eternity::ETERNITY_GOAL;
 pub use infinity_challenges::{InfinityChallengeState, INFINITY_CHALLENGE_COUNT};
 pub use infinity_dimensions::{InfinityDimension, INFINITY_DIMENSION_COUNT};
 pub use infinity_upgrades::{
@@ -38,7 +40,7 @@ pub use infinity_upgrades::{
 };
 pub use observed::{ObservedDimensionTier, ObservedState, ObservedTickspeedState};
 pub use options::Options;
-pub use records::{BestInfinity, Records, ThisInfinity};
+pub use records::{BestEternity, BestInfinity, Records, ThisEternity, ThisInfinity};
 pub use replicanti::{ReplicantiState, REPLICANTI_CAP, REPLICANTI_UNLOCK_COST};
 pub use state::{DimensionTier, GameState, TickspeedState};
 pub use tab_notifications::TabNotificationId;

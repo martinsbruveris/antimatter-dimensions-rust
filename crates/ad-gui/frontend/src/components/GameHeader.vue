@@ -1,13 +1,15 @@
 <script setup>
 // Mirrors HeaderPrestigeGroup.vue: a 14rem header row with absolutely
-// positioned blocks — the antimatter text centered (HeaderCenterContainer)
-// and, once Infinity is unlocked, the Infinity-Points readout at the right
-// quarter (HeaderInfinityContainer). The eternity block (left quarter) and
-// the post-break header crunch button are later features.
+// positioned blocks — the Eternity block at the left quarter
+// (HeaderEternityContainer), the antimatter text centered
+// (HeaderCenterContainer), and the Infinity-Points readout + post-break
+// crunch button at the right quarter (HeaderInfinityContainer).
 import { computed } from "vue";
 
 import { useGameStore } from "../stores/game";
 import { formatDecimal } from "../util/format";
+import EternityButton from "./EternityButton.vue";
+import HeaderBigCrunchButton from "./HeaderBigCrunchButton.vue";
 
 const game = useGameStore();
 const s = computed(() => game.snapshot);
@@ -23,9 +25,19 @@ const showInfinity = computed(() =>
   Boolean(s.value?.broke_infinity || s.value?.infinity_unlocked)
 );
 
+// JS (HeaderEternityContainer): `showContainer = player.break ||
+// PlayerProgress.eternityUnlocked()`; the EP readout needs eternityUnlocked.
+const showEternity = computed(() =>
+  Boolean(s.value?.broke_infinity || s.value?.eternity_unlocked)
+);
+const showEP = computed(() => Boolean(s.value?.eternity_unlocked));
+
 // JS floors the displayed IP (`Currency.infinityPoints.value.floor()`).
 const ipIsOne = computed(
   () => s.value?.infinity_points.m === 1 && s.value?.infinity_points.e === 0
+);
+const epIsOne = computed(
+  () => s.value?.eternity_points.m === 1 && s.value?.eternity_points.e === 0
 );
 </script>
 
@@ -34,6 +46,20 @@ const ipIsOne = computed(
     v-if="s"
     class="c-prestige-info-blocks"
   >
+    <div
+      v-if="showEternity"
+      class="c-prestige-button-container l-game-header__eternity"
+    >
+      <div
+        v-if="showEP"
+        class="c-eternity-points"
+      >
+        You have
+        <span class="c-game-header__ep-amount">{{ formatDecimal(s.eternity_points, 2) }}</span>
+        {{ epIsOne ? "Eternity Point" : "Eternity Points" }}.
+      </div>
+      <EternityButton />
+    </div>
     <div class="c-prestige-button-container l-game-header__center">
       <span>You have
         <span class="c-game-header__antimatter">{{ formatDecimal(s.antimatter, 2, 1) }}</span>
@@ -56,6 +82,7 @@ const ipIsOne = computed(
         <span class="c-game-header__ip-amount">{{ formatDecimal(s.infinity_points, 2) }}</span>
         {{ ipIsOne ? "Infinity Point" : "Infinity Points" }}.
       </div>
+      <HeaderBigCrunchButton />
     </div>
   </div>
 </template>
@@ -71,6 +98,12 @@ const ipIsOne = computed(
   color: var(--color-text);
 }
 
+.l-game-header__eternity {
+  position: absolute;
+  left: calc(25% - 22rem);
+  width: 22rem;
+}
+
 .l-game-header__center {
   position: absolute;
   right: calc(50% - 25rem);
@@ -83,8 +116,9 @@ const ipIsOne = computed(
   width: 22rem;
 }
 
-/* From HeaderInfinityContainer.vue's scoped styles. */
-.c-infinity-points {
+/* From HeaderInfinityContainer.vue / HeaderEternityContainer.vue. */
+.c-infinity-points,
+.c-eternity-points {
   font-size: 1.2rem;
   padding-bottom: 0.5rem;
 }

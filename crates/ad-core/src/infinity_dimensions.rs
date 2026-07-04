@@ -105,7 +105,7 @@ impl GameState {
         if self.infinity_dimensions[tier].is_unlocked {
             return false;
         }
-        let am_ok = self.records.max_am_this_eternity >= ID_UNLOCK_AM[tier];
+        let am_ok = self.records.this_eternity.max_am >= ID_UNLOCK_AM[tier];
         let ip_ok = tier != 0 || self.infinity_points >= ID1_IP_REQUIREMENT;
         am_ok && ip_ok
     }
@@ -246,7 +246,7 @@ mod tests {
 
     fn game_with_id1_unlockable() -> GameState {
         let mut game = GameState::new();
-        game.records.max_am_this_eternity = Decimal::new(1.0, 1100);
+        game.records.this_eternity.max_am = Decimal::new(1.0, 1100);
         game.infinity_points = Decimal::new(1.0, 12);
         game
     }
@@ -257,7 +257,7 @@ mod tests {
         game.infinity_points = Decimal::new(1.0, 12);
         // Antimatter requirement not yet met.
         assert!(!game.can_unlock_infinity_dimension(0));
-        game.records.max_am_this_eternity = Decimal::new(1.0, 1100);
+        game.records.this_eternity.max_am = Decimal::new(1.0, 1100);
         assert!(game.can_unlock_infinity_dimension(0));
         // Without the 1e8 IP, tier 1 stays locked.
         game.infinity_points = Decimal::new(1.0, 7);
