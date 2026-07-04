@@ -5,6 +5,7 @@ import InfinityDimensionsTab from "../components/tabs/InfinityDimensionsTab.vue"
 import ReplicantiTab from "../components/tabs/ReplicantiTab.vue";
 import ChallengesTab from "../components/tabs/ChallengesTab.vue";
 import InfinityChallengesTab from "../components/tabs/InfinityChallengesTab.vue";
+import EternityMilestonesTab from "../components/tabs/EternityMilestonesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
@@ -105,6 +106,20 @@ export const TABS = [
         component: ReplicantiTab,
         hideId: [6, 2],
       },
+    ],
+  },
+  {
+    key: "eternity",
+    name: "Eternity",
+    hideId: 7,
+    // JS: `condition: () => PlayerProgress.eternityUnlocked()` (or Reality,
+    // out of frontier). `uiClass` gives the tab its eternity coloring.
+    condition: (s) => Boolean(s?.eternity_unlocked),
+    uiClass: "o-tab-btn--eternity",
+    subtabs: [
+      { key: "studies", name: "Time Studies", symbol: "<i class='fas fa-book'></i>", component: null, hideId: [7, 0] },
+      { key: "upgrades", name: "Eternity Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: null, hideId: [7, 1] },
+      { key: "milestones", name: "Eternity Milestones", symbol: "<i class='fas fa-star'></i>", component: EternityMilestonesTab, hideId: [7, 2] },
     ],
   },
   {

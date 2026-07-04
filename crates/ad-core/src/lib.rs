@@ -7,6 +7,7 @@ pub mod crunch;
 pub mod data;
 pub mod dimensions;
 pub mod eternity;
+pub mod eternity_milestones;
 pub mod galaxy;
 pub mod infinity_challenges;
 pub mod infinity_dimensions;
@@ -33,6 +34,7 @@ pub use break_infinity_upgrades::{
 };
 pub use challenges::{NormalChallengeState, NORMAL_CHALLENGE_COUNT};
 pub use eternity::ETERNITY_GOAL;
+pub use eternity_milestones::{EternityMilestone, ETERNITY_MILESTONES};
 pub use infinity_challenges::{InfinityChallengeState, INFINITY_CHALLENGE_COUNT};
 pub use infinity_dimensions::{InfinityDimension, INFINITY_DIMENSION_COUNT};
 pub use infinity_upgrades::{

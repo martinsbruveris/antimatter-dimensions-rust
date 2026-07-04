@@ -307,6 +307,8 @@ struct GameView {
     /// Peak EP/min this eternity + the gain when that peak was set.
     best_ep_min: Num,
     best_ep_min_val: Num,
+    /// The Eternity Milestones (threshold order), for the Milestones subtab.
+    eternity_milestones: Vec<EternityMilestoneView>,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
     infinity_upgrades: Vec<InfinityUpgradeView>,
     /// Whether the Challenges tab is available (post first Infinity).
@@ -391,6 +393,17 @@ struct GameView {
     /// Whether the current tutorial step's highlight is active
     /// (`player.tutorialActive`).
     tutorial_active: bool,
+}
+
+/// Serializable view of one Eternity Milestone (grid order = threshold order).
+#[derive(Serialize)]
+struct EternityMilestoneView {
+    /// Original config key (frontend keys its reward text on this).
+    id: &'static str,
+    /// Eternities required.
+    eternities: u64,
+    /// Whether the milestone is reached.
+    is_reached: bool,
 }
 
 /// Serializable view of the player options the frontend reads/writes.
@@ -780,6 +793,14 @@ fn build_game_view(game: &GameState) -> GameView {
         this_eternity_real_time_ms: game.records.this_eternity.real_time_ms,
         best_ep_min: num(&game.records.this_eternity.best_ep_min),
         best_ep_min_val: num(&game.records.this_eternity.best_ep_min_val),
+        eternity_milestones: ad_core::ETERNITY_MILESTONES
+            .iter()
+            .map(|m| EternityMilestoneView {
+                id: m.id,
+                eternities: m.eternities,
+                is_reached: game.eternity_milestone_reached(m.eternities),
+            })
+            .collect(),
         infinity_upgrades: build_infinity_upgrades_view(game),
         challenges_unlocked: game.challenges_unlocked(),
         challenges: build_challenges_view(game),

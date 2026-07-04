@@ -150,6 +150,11 @@ impl GameState {
     /// threshold of a not-yet-completed IC, clear-then-trigger so each new IC
     /// re-badges. `prev_peak` is the record's value before this tick's update.
     pub(crate) fn notify_ic_unlock(&mut self, prev_peak: Decimal) {
+        // The badge is pointless once ICs auto-complete (`notifyICUnlock`
+        // returns early under the autoIC milestone).
+        if self.eternity_milestone_reached(7) {
+            return;
+        }
         for id in 1..=INFINITY_CHALLENGE_COUNT {
             if self.infinity_challenge_completed(id) {
                 continue;

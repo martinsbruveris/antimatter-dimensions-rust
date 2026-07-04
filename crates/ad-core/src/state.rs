@@ -380,6 +380,11 @@ impl GameState {
     /// [`max_dimensions_unlockable`](Self::max_dimensions_unlockable) (6 under
     /// Normal Challenge 10, otherwise 8).
     pub fn unlocked_dimensions(&self) -> usize {
+        // unlockAllND milestone (30 eternities): every dimension is available
+        // regardless of Dimension Boosts.
+        if self.eternity_milestone_reached(30) {
+            return self.max_dimensions_unlockable();
+        }
         let base = 4;
         let from_boosts = (self.dim_boosts as usize).min(4);
         (base + from_boosts).min(self.max_dimensions_unlockable())
@@ -399,9 +404,15 @@ impl GameState {
     pub fn dim_available_for_purchase(&self, tier: usize) -> bool {
         // Under Normal Challenge 10 only 6 dimensions exist (`tier < 7 ||
         // !NC10` in `isAvailableForPurchase`); otherwise all 8.
-        if tier >= self.max_dimensions_unlockable()
-            || tier > self.dim_boosts as usize + 3
-        {
+        if tier >= self.max_dimensions_unlockable() {
+            return false;
+        }
+        // unlockAllND milestone (30 eternities): the boost band and the
+        // own-the-tier-below rule are both bypassed.
+        if self.eternity_milestone_reached(30) {
+            return true;
+        }
+        if tier > self.dim_boosts as usize + 3 {
             return false;
         }
         tier == 0 || self.dimensions[tier - 1].amount > Decimal::ZERO
@@ -432,7 +443,7 @@ impl GameState {
     /// `Tickspeed.isUnlocked` requires `AntimatterDimension(2).bought > 0`
     /// (the later Eternity/Reality unlock conditions don't exist yet).
     pub fn tickspeed_unlocked(&self) -> bool {
-        self.dimensions[1].bought > 0
+        self.dimensions[1].bought > 0 || self.eternity_milestone_reached(30)
     }
 }
 

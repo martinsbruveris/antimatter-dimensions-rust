@@ -84,6 +84,12 @@ impl GameState {
         // the original's `replicantiLoop` running after the dimension ticks).
         self.tick_replicanti(dt_ms);
 
+        // Eternity-Milestone per-tick effects: auto-complete Infinity
+        // Challenges (autoIC, 7 eternities) and auto-unlock Infinity
+        // Dimensions (autoUnlockID, 25).
+        self.try_complete_infinity_challenges();
+        self.try_auto_unlock_infinity_dimensions();
+
         // Advance time records. Pre-Infinity the game-speed multiplier is 1, so
         // game time and real time both advance by `dt_ms` (mirrors the original's
         // `records.totalTimePlayed += diff` in the game loop). Runs during offline

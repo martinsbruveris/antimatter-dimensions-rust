@@ -555,6 +555,12 @@ eternity milestones, eternity challenges.
 - Fastest eternity time
 - Best EP/min
 
+**Status:** ✅ Implemented (EP formula incl. pending crunch IP, milestone-aware
+Eternity reset, ThisEternity/BestEternity records + bestIP/EPmin rates, save
+round-trip, header EP readout + Eternity button + confirmation modal + E
+hotkey, post-break header Big Crunch button). See
+`design-docs/2026-07-04-eternity.md` §1.
+
 ---
 
 ### Feature 4.2: Eternity Milestones
@@ -586,6 +592,14 @@ by auto-keeping resources across resets.
 | 100 | Keep various infinity progress |
 | 200 | Start with higher IP |
 | 1000 | Keep galaxies on eternity |
+
+**Status:** ✅ Implemented (derived milestone state, reset-time keeps
+2/4/8/10, per-tick autoIC + autoUnlockID, unlockAllND, replicantiNoReset,
+milestone grid UI). The milestones unlocking not-yet-built autobuyer types and
+the offline generators display as reached but gain their effects with the
+automation/offline systems. See `design-docs/2026-07-04-eternity.md` §2.
+(Note: the table above is approximate; the exact catalogue is in the design
+doc / `eternity_milestones.rs`.)
 
 ---
 

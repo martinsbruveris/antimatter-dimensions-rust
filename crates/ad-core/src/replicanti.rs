@@ -170,8 +170,12 @@ impl GameState {
         self.replicanti.timer_ms = 0.0;
         self.replicanti.amount = Decimal::ONE;
         self.replicanti.galaxies += 1;
-        self.dim_boosts = 0;
-        self.dim_boost_reset();
+        // replicantiNoReset milestone (40 eternities): the RG no longer wipes
+        // Dimension Boosts / dimensions / antimatter (`addReplicantiGalaxies`).
+        if !self.eternity_milestone_reached(40) {
+            self.dim_boosts = 0;
+            self.dim_boost_reset();
+        }
         true
     }
 
