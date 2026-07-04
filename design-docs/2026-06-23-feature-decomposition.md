@@ -728,6 +728,17 @@ goal. Rewards scale with completion count.
 | 11 | 1e500 × 1e200 | AD multiplier formula (11111/amount) | AD mult from time spent |
 | 12 | 1e110000 × 1e12000 | AD = AD^0.1; ID disabled; TD = TD^0.5 | TD mult based on AM produced |
 
+**Status:** ✅ Implemented (EC studies with TT costs + secondary requirements +
+requirementBits waivers + EC11/12 path exclusions, one-slot unlock model,
+start/exit/complete flow through the Eternity reset with auto-respec, scaled
+goals, EC4/EC12 restriction failures, EC12 game-speed 0.001 with game-vs-real
+time split, all 12 restrictions and 10 of 12 rewards wired at their engine
+sites — the EC6/EC11 cost-growth rewards await the Break-Infinity cost-scaling
+knobs; EC8's eterc8 budgets; save round-trip; the EC subtab UI + live EC nodes
+in the study tree). **Note:** the table above is approximate — the actual
+restrictions/goals in `eternity_challenges.rs` follow the real game data,
+which differs for several entries. See `design-docs/2026-07-04-eternity.md` §5.
+
 ---
 
 ### Feature 4.6: Eternity Upgrades

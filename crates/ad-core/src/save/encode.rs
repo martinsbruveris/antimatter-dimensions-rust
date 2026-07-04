@@ -179,6 +179,11 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // EC state: the held study slot and the completion-count map.
     player["challenge"]["eternity"]["unlocked"] =
         json!(state.eternity_challenge_unlocked);
+    player["challenge"]["eternity"]["current"] = json!(state.eternity_challenge_current);
+    player["challenge"]["eternity"]["requirementBits"] =
+        json!(state.ec_requirement_bits);
+    player["eterc8ids"] = json!(state.eterc8_ids);
+    player["eterc8repl"] = json!(state.eterc8_repl);
     let mut ec_map = serde_json::Map::new();
     for (i, &count) in state.eternity_challenges.iter().enumerate() {
         if count > 0 {

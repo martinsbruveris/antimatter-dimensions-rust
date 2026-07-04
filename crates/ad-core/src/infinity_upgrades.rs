@@ -212,7 +212,9 @@ impl GameState {
             let value = (1.0 + self.dim_boosts as f64 / 5.0).min(2.0);
             return Decimal::from_float(value);
         }
-        let mut mult = Decimal::from_float(BUY_TEN_MULTIPLIER);
+        // EC3's reward adds +0.72/completion to the base before the ×1.1.
+        let mut mult =
+            Decimal::from_float(BUY_TEN_MULTIPLIER + self.ec3_buy_ten_bonus());
         if self.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult) {
             mult *= Decimal::from_float(1.1);
         }

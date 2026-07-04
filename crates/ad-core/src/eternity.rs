@@ -31,10 +31,13 @@ const BEST_INFINITY_RESET_MS: f64 = 999_999_999_999.0;
 
 impl GameState {
     /// The Infinity-Point goal for an Eternity (`Player.eternityGoal`): the
-    /// scaled Eternity-Challenge goal while one runs (Feature 4.5), else
-    /// [`ETERNITY_GOAL`].
+    /// running Eternity Challenge's scaled goal, else [`ETERNITY_GOAL`].
     pub fn eternity_goal(&self) -> Decimal {
-        ETERNITY_GOAL
+        if self.any_ec_running() {
+            self.ec_current_goal(self.eternity_challenge_current)
+        } else {
+            ETERNITY_GOAL
+        }
     }
 
     /// Whether the player can Eternity now (`Player.canEternity`): the peak IP
@@ -86,6 +89,12 @@ impl GameState {
     /// Perform an Eternity: award EP / an Eternity, then reset the whole
     /// Infinity layer. Returns whether it happened.
     pub fn eternity(&mut self) -> bool {
+        self.eternity_with_options(false)
+    }
+
+    /// The rewarded Eternity, with the `enteringEC` special condition (respec
+    /// suppressed) used when starting an Eternity Challenge from the goal.
+    pub(crate) fn eternity_with_options(&mut self, entering_ec: bool) -> bool {
         if !self.can_eternity() {
             return false;
         }
@@ -107,6 +116,12 @@ impl GameState {
         self.eternities += gained_eternities;
         self.eternity_unlocked = true;
 
+        // A running Eternity Challenge banks a completion (which auto-respecs
+        // the study tree and consumes the study slot).
+        if self.any_ec_running() {
+            self.complete_running_ec();
+        }
+
         // TS191: bank 5% of the Infinities on each Eternity (Achievement 131's
         // extra share is a later feature).
         if self.time_study_bought(191) {
@@ -126,14 +141,40 @@ impl GameState {
             },
         );
 
-        self.eternity_reset();
+        self.eternity_full_reset(entering_ec);
         true
     }
 
-    /// The Eternity reset shared by the rewarded path ([`eternity`]) and, later,
-    /// the Eternity-Challenge enter/exit paths. Mirrors the reset half of the
-    /// original `eternity()`.
+    /// The unrewarded (forced) Eternity reset: what an EC exit performs.
     pub(crate) fn eternity_reset(&mut self) {
+        self.eternity_full_reset(false);
+    }
+
+    /// The full Eternity reset (`eternity()`'s reset half): the shared layer
+    /// reset plus the pieces exclusive to a *real* Eternity — the autobuyer /
+    /// Break-Infinity handling and the respec.
+    fn eternity_full_reset(&mut self, entering_ec: bool) {
+        self.eternity_challenge_current = 0;
+
+        // Without the keepAutobuyers milestone, Infinity un-breaks (it can only
+        // re-break after the Big Crunch autobuyer interval is maxed again).
+        if !self.eternity_milestone_reached(2) {
+            self.broke_infinity = false;
+        }
+        self.reset_autobuyers_on_eternity();
+
+        self.eternity_reset_core();
+
+        // Respec the study tree if the player ticked the box (`player.respec`);
+        // suppressed when the reset enters an Eternity Challenge.
+        if !entering_ec && self.respec {
+            self.respec_time_studies_now();
+            self.respec = false;
+        }
+    }
+
+    /// The layer reset shared by an Eternity and `startEternityChallenge()`.
+    pub(crate) fn eternity_reset_core(&mut self) {
         // `initializeChallengeCompletions`: completions cleared; with the
         // keepAutobuyers milestone all Normal Challenges come back completed
         // (which re-grants the autobuyer rewards).
@@ -141,6 +182,8 @@ impl GameState {
         self.infinity_challenge.completed = 0;
         self.challenge.current = 0;
         self.infinity_challenge.current = 0;
+        // (`challenge.eternity.current` is handled by the callers: cleared by a
+        // real Eternity, restored by `startEternityChallenge`.)
         if self.eternity_milestone_reached(2) {
             for id in 1..=crate::NORMAL_CHALLENGE_COUNT {
                 self.complete_challenge(id);
@@ -160,14 +203,9 @@ impl GameState {
         self.infinity_power = Decimal::ZERO;
         self.time_shards = Decimal::ZERO;
         self.total_tick_gained = 0;
+        self.eterc8_ids = 50;
+        self.eterc8_repl = 40;
         self.records.this_eternity = ThisEternity::new();
-
-        // Without the keepAutobuyers milestone, Infinity un-breaks (it can only
-        // re-break after the Big Crunch autobuyer interval is maxed again).
-        if !self.eternity_milestone_reached(2) {
-            self.broke_infinity = false;
-        }
-        self.reset_autobuyers_on_eternity();
 
         // Infinity Dimensions *full* reset (purchases/costs/unlocks too).
         self.infinity_dimensions = std::array::from_fn(InfinityDimension::new);
@@ -202,12 +240,6 @@ impl GameState {
         // `Currency.infinityPoints.reset()` writes `thisEternity.maxIP`).
         self.infinity_points = Decimal::ZERO;
         self.records.this_eternity.max_ip = Decimal::ZERO;
-
-        // Respec the study tree if the player ticked the box (`player.respec`).
-        if self.respec {
-            self.respec_time_studies_now();
-            self.respec = false;
-        }
 
         // `playerInfinityUpgradesOnReset` (milestone-aware).
         self.reset_infinity_upgrades_on_eternity();

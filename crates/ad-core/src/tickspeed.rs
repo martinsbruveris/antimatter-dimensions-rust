@@ -10,6 +10,10 @@ use crate::state::GameState;
 impl GameState {
     /// Buy one tickspeed upgrade. Returns true if successful.
     pub fn buy_tickspeed(&mut self) -> bool {
+        // EC9: Tickspeed upgrades cannot be purchased.
+        if self.ec_running(9) {
+            return false;
+        }
         if self.antimatter >= self.tickspeed.cost {
             // Clear the TICKSPEED tutorial highlight on the purchase, like the
             // original's buyTickSpeed (no-op once past that step).

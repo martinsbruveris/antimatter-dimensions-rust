@@ -85,6 +85,10 @@ impl GameState {
     /// base 1 (Achievement 87 is post-Reality) times TS32's Dimension-Boost
     /// multiplier.
     pub fn gained_infinities(&self) -> Decimal {
+        // EC4 disables the Infinity generators (`gainedInfinities` returns 1).
+        if self.ec_running(4) {
+            return Decimal::ONE;
+        }
         let mut gain = Decimal::ONE;
         if self.time_study_bought(32) {
             gain *= Decimal::from((self.dim_boosts as u64).max(1));
@@ -224,6 +228,10 @@ impl GameState {
         // Reset the current infinity's records (time/maxAM back to 0); the
         // fastest-infinity record and total time played persist.
         self.records.this_infinity = ThisInfinity::new();
+
+        // EC4's Infinity limit is checked on each crunch
+        // (`bigCrunchCheckUnlocks` → `EternityChallenge(4).tryFail()`).
+        self.ec_try_fail(4);
 
         // Replicanti-affordable badge (the original's BIG_CRUNCH_AFTER event,
         // dispatched at the end of every reset, forced ones included; the

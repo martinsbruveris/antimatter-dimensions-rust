@@ -313,6 +313,10 @@ struct GameView {
     time_dimensions: TimeDimensionsView,
     /// Time Studies tab state (TT + the study tree).
     time_studies: TimeStudiesView,
+    /// The 12 Eternity Challenges (tab tiles + tree EC nodes).
+    eternity_challenges: Vec<EternityChallengeView>,
+    /// Whether the EC subtab is available (a study held or any completion).
+    eternity_challenges_unlocked: bool,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
     infinity_upgrades: Vec<InfinityUpgradeView>,
     /// Whether the Challenges tab is available (post first Infinity).
@@ -464,6 +468,28 @@ struct TimeStudyView {
     cost: f64,
     is_bought: bool,
     can_buy: bool,
+}
+
+/// Serializable view of one Eternity Challenge (tiles + tree nodes).
+#[derive(Serialize)]
+struct EternityChallengeView {
+    /// Challenge id (1..=12).
+    id: u8,
+    /// Completions so far (0..=5).
+    completions: u8,
+    /// Whether this EC is currently running.
+    is_running: bool,
+    /// Whether its unlock study is currently held.
+    is_unlocked: bool,
+    /// Whether the unlock study can be bought right now.
+    can_unlock: bool,
+    /// TT cost of the unlock study.
+    study_cost: f64,
+    /// The current IP goal.
+    goal: Num,
+    /// Secondary unlock requirement (current/required), absent for EC11/12.
+    secondary_current: Option<Num>,
+    secondary_required: Option<Num>,
 }
 
 /// Serializable view of one Eternity Milestone (grid order = threshold order).
@@ -833,6 +859,25 @@ fn build_time_studies_view(game: &GameState) -> TimeStudiesView {
     }
 }
 
+fn build_eternity_challenges_view(game: &GameState) -> Vec<EternityChallengeView> {
+    (1..=12u8)
+        .map(|id| {
+            let secondary = game.ec_secondary_requirement(id);
+            EternityChallengeView {
+                id,
+                completions: game.eternity_challenge_completions(id),
+                is_running: game.ec_running(id),
+                is_unlocked: game.eternity_challenge_unlocked == id,
+                can_unlock: game.can_buy_ec_study(id),
+                study_cost: ad_core::ec_study_cost(id),
+                goal: num(&game.ec_current_goal(id)),
+                secondary_current: secondary.as_ref().map(|(c, _)| num(c)),
+                secondary_required: secondary.as_ref().map(|(_, r)| num(r)),
+            }
+        })
+        .collect()
+}
+
 fn build_game_view(game: &GameState) -> GameView {
     let unlocked = game.unlocked_dimensions();
     let mut dimensions = Vec::with_capacity(8);
@@ -927,6 +972,9 @@ fn build_game_view(game: &GameState) -> GameView {
         best_ep_min_val: num(&game.records.this_eternity.best_ep_min_val),
         time_dimensions: build_time_dimensions_view(game),
         time_studies: build_time_studies_view(game),
+        eternity_challenges: build_eternity_challenges_view(game),
+        eternity_challenges_unlocked: game.eternity_challenge_unlocked != 0
+            || (1..=12).any(|id| game.eternity_challenge_completions(id) > 0),
         eternity_milestones: ad_core::ETERNITY_MILESTONES
             .iter()
             .map(|m| EternityMilestoneView {
@@ -1167,6 +1215,21 @@ fn max_all(state: State<'_, Mutex<GameState>>) {
 fn big_crunch(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.big_crunch();
+}
+
+#[tauri::command]
+fn buy_ec_study(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_ec_study(id);
+}
+
+#[tauri::command]
+fn start_eternity_challenge(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().start_eternity_challenge(id);
+}
+
+#[tauri::command]
+fn exit_eternity_challenge(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().exit_eternity_challenge();
 }
 
 #[tauri::command]
@@ -1922,6 +1985,9 @@ pub fn run() {
             buy_max_time_dimension,
             max_all_time_dimensions,
             buy_time_study,
+            buy_ec_study,
+            start_eternity_challenge,
+            exit_eternity_challenge,
             buy_time_theorem,
             buy_max_time_theorems,
             set_respec,

@@ -14,6 +14,10 @@ impl GameState {
         if self.challenge_running(10) {
             return false;
         }
+        // EC3 disables Dimensional Sacrifice.
+        if self.ec_running(3) {
+            return false;
+        }
         self.dim_boosts >= 5
             && self.dimensions[7].amount > Decimal::ZERO
             && self.next_sacrifice_boost() > Decimal::ONE

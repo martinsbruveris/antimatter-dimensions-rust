@@ -53,6 +53,16 @@ fn default_infinity_dimensions() -> [InfinityDimension; 8] {
     std::array::from_fn(InfinityDimension::new)
 }
 
+/// serde defaults for EC8's per-run purchase budgets.
+#[cfg(feature = "serde")]
+fn default_eterc8_ids() -> i32 {
+    50
+}
+#[cfg(feature = "serde")]
+fn default_eterc8_repl() -> i32 {
+    40
+}
+
 /// serde default for `time_dimensions` (8 fresh tiers).
 #[cfg(feature = "serde")]
 fn default_time_dimensions() -> [TimeDimension; 8] {
@@ -245,6 +255,19 @@ pub struct GameState {
     /// Per-EC completion counts (`player.eternityChalls`, "eterc<N>" → count).
     #[cfg_attr(feature = "serde", serde(default))]
     pub eternity_challenges: [u8; 12],
+    /// The EC currently running (`player.challenge.eternity.current`, 0 = none).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub eternity_challenge_current: u8,
+    /// Which EC studies have had their secondary requirement met before
+    /// (`player.challenge.eternity.requirementBits`) — re-unlocks skip it.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub ec_requirement_bits: u16,
+    /// EC8's Infinity-Dimension purchase budget (`player.eterc8ids`, 50/run).
+    #[cfg_attr(feature = "serde", serde(default = "default_eterc8_ids"))]
+    pub eterc8_ids: i32,
+    /// EC8's Replicanti-upgrade purchase budget (`player.eterc8repl`, 40/run).
+    #[cfg_attr(feature = "serde", serde(default = "default_eterc8_repl"))]
+    pub eterc8_repl: i32,
     /// Owned Infinity Upgrades, one bit per [`InfinityUpgrade`](crate::InfinityUpgrade)
     /// (the original's `player.infinityUpgrades` string set as a bitmask).
     /// Persists across a Big Crunch. See `infinity_upgrades.rs`.
@@ -413,6 +436,10 @@ impl GameState {
             infinities_banked: Decimal::ZERO,
             eternity_challenge_unlocked: 0,
             eternity_challenges: [0; 12],
+            eternity_challenge_current: 0,
+            ec_requirement_bits: 0,
+            eterc8_ids: 50,
+            eterc8_repl: 40,
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),

@@ -69,6 +69,12 @@ const studyById = computed(() => {
   return map;
 });
 
+const ecById = computed(() => {
+  const map = new Map();
+  for (const ec of s.value?.eternity_challenges ?? []) map.set(ec.id, ec);
+  return map;
+});
+
 // Renderable nodes: normal studies + EC placeholders.
 const nodes = computed(() => {
   const list = [];
@@ -98,21 +104,34 @@ const nodes = computed(() => {
         clickable: study.can_buy,
       });
     } else {
-      // EC study slot: a locked placeholder until Feature 4.5.
+      // EC study slot: buy the unlock study, then click again to start the
+      // challenge (the original's double-click flow, simplified).
       const ecId = Number(item.slice(2));
+      const ec = ecById.value.get(ecId) ?? {};
+      const state = ec.is_running
+        ? "bought"
+        : ec.is_unlocked
+          ? "bought"
+          : ec.can_unlock
+            ? "available"
+            : "unavailable";
       list.push({
         key: item,
         id: null,
+        ecId,
         pos,
         classes: [
           "o-time-study",
           "l-time-study",
-          "o-time-study--unavailable",
-          "o-time-study-eternity-challenge--unavailable",
+          `o-time-study--${state}`,
+          `o-time-study-eternity-challenge--${state}`,
+          ec.is_running ? "o-time-study-eternity-challenge--running" : "",
         ],
         description: `Eternity Challenge ${ecId}`,
-        cost: null,
-        clickable: false,
+        cost: ec.study_cost ?? null,
+        completions: ec.completions ?? 0,
+        clickable: Boolean(ec.can_unlock || (ec.is_unlocked && !ec.is_running)),
+        ec,
       });
     }
   }
@@ -152,7 +171,15 @@ const lines = computed(() => {
 });
 
 function buy(node) {
-  if (node.clickable) game.buyTimeStudy(node.id);
+  if (!node.clickable) return;
+  if (node.id !== null) {
+    game.buyTimeStudy(node.id);
+    return;
+  }
+  // EC node: buy the study first, then a further click starts the challenge.
+  if (node.ec.can_unlock) game.buyEcStudy(node.ecId);
+  else if (node.ec.is_unlocked && !node.ec.is_running)
+    game.startEternityChallenge(node.ecId);
 }
 </script>
 
@@ -222,13 +249,17 @@ function buy(node) {
         @click="buy(node)"
       >
         {{ node.description }}
+        <template v-if="node.id === null">
+          <br>
+          Completed {{ node.completions }}/5
+          <template v-if="node.ec.is_unlocked && !node.ec.is_running">
+            <br>
+            Click to start
+          </template>
+        </template>
         <template v-if="node.cost !== null">
           <br>
           Cost: {{ node.cost }} Time {{ node.cost === 1 ? "Theorem" : "Theorems" }}
-        </template>
-        <template v-else>
-          <br>
-          (Feature 4.5)
         </template>
       </button>
       <svg

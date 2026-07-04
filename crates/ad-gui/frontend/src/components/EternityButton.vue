@@ -36,6 +36,9 @@ const isVisible = computed(() => {
 
 const canEternity = computed(() => Boolean(s.value?.can_eternity));
 const firstTime = computed(() => !s.value?.eternity_unlocked);
+const inEC = computed(() =>
+  (s.value?.eternity_challenges ?? []).some((c) => c.is_running)
+);
 
 const showEPRate = computed(
   () => log10(s.value.best_ep_min) <= RATE_THRESHOLD_LOG10
@@ -117,6 +120,11 @@ const amountStyle = computed(() => {
     <!-- First time -->
     <template v-else-if="firstTime">
       Other times await.. I need to become Eternal
+    </template>
+
+    <!-- Eternity Challenge running -->
+    <template v-else-if="inEC">
+      Other challenges await... I need to become Eternal
     </template>
 
     <!-- Normal -->

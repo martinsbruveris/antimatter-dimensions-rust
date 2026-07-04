@@ -13,13 +13,20 @@ impl GameState {
     /// Production chain: AD[n+1] produces AD[n], AD1 produces antimatter.
     /// All production is scaled by the dimension's multiplier and tickspeed effect.
     pub fn tick(&mut self, dt_ms: f64) {
+        // Game-speed factor (`getGameSpeedupFactor`): EC12 runs the game 1000×
+        // slower. Production, currencies, and game-time records use the scaled
+        // interval; autobuyer timers and real-time records stay on real time.
+        let real_dt_ms = dt_ms;
+        let dt_ms = dt_ms * self.game_speed_factor();
+
         // Advance the per-run challenge accumulators first, matching the original
         // game loop (`updateNormalAndInfinityChallenges` runs before autobuyers
         // and production).
         self.update_challenges(dt_ms);
 
-        // Run autobuyers before production
-        self.tick_autobuyers(dt_ms);
+        // Run autobuyers before production (real time — autobuyer intervals are
+        // wall-clock in the original).
+        self.tick_autobuyers(real_dt_ms);
 
         // Passive Infinity-Point generation from the `ipGen` Infinity Upgrade
         // (mirrors the original's `preProductionGenerateIP`).
@@ -59,7 +66,9 @@ impl GameState {
         } else {
             self.antimatter += productions[0];
             self.total_antimatter += productions[0];
-            for tier in 1..unlocked {
+            // EC3 stops the chain above the 4th dimension (`maxTierProduced = 3`).
+            let max_feeder = if self.ec_running(3) { 4 } else { unlocked };
+            for tier in 1..max_feeder.min(unlocked) {
                 self.dimensions[tier - 1].amount += productions[tier];
             }
         }
@@ -95,16 +104,20 @@ impl GameState {
         self.try_complete_infinity_challenges();
         self.try_auto_unlock_infinity_dimensions();
 
+        // EC12's time limit is checked every tick (`EternityChallenge(12)
+        // .tryFail()` in the game loop).
+        self.ec_try_fail(12);
+
         // Advance time records. Pre-Infinity the game-speed multiplier is 1, so
         // game time and real time both advance by `dt_ms` (mirrors the original's
         // `records.totalTimePlayed += diff` in the game loop). Runs during offline
         // replay too, since that loops `tick`.
         self.records.total_time_played_ms += dt_ms;
-        self.records.real_time_played_ms += dt_ms;
+        self.records.real_time_played_ms += real_dt_ms;
         self.records.this_infinity.time_ms += dt_ms;
-        self.records.this_infinity.real_time_ms += dt_ms;
+        self.records.this_infinity.real_time_ms += real_dt_ms;
         self.records.this_eternity.time_ms += dt_ms;
-        self.records.this_eternity.real_time_ms += dt_ms;
+        self.records.this_eternity.real_time_ms += real_dt_ms;
         // Track the peak Infinity Points this eternity (the original updates
         // `thisEternity.maxIP` in the `Currency.infinityPoints` setter; the
         // in-tick IP source is the passive `ipGen` upgrade).

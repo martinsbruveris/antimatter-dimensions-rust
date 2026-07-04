@@ -219,6 +219,12 @@ impl GameState {
             strength += 0.5;
         }
         rgs *= strength;
+        // EC8's reward: the RGs within the bought cap are strengthened by
+        // Infinity Power (`nonActivePathReplicantiGalaxies × EC8 reward`).
+        if self.ec_completed(8) {
+            let in_cap = self.replicanti.galaxies.min(self.replicanti.galaxy_cap);
+            rgs += in_cap as f64 * self.ec8_reward_rg_strength();
+        }
         self.galaxies + rgs as u32 + self.extra_replicanti_galaxies()
     }
 
@@ -303,10 +309,23 @@ impl GameState {
         (self.replicanti.chance * 100.0).round() / 100.0 >= CHANCE_CAP
     }
 
+    /// Whether EC8's Replicanti-upgrade budget still allows a purchase.
+    fn ec8_repl_budget_ok(&self) -> bool {
+        !self.ec_running(8) || self.eterc8_repl > 0
+    }
+
+    /// Spend one unit of EC8's Replicanti-upgrade budget (while it runs).
+    fn ec8_spend_repl_budget(&mut self) {
+        if self.ec_running(8) {
+            self.eterc8_repl -= 1;
+        }
+    }
+
     /// Whether the chance upgrade can be bought (not capped, affordable).
     pub fn can_buy_replicanti_chance(&self) -> bool {
         !self.replicanti_chance_capped()
             && self.infinity_points >= self.replicanti.chance_cost
+            && self.ec8_repl_budget_ok()
     }
 
     /// Buy one chance upgrade: `+0.01` chance (rounded to the nearest %), cost ×1e15.
@@ -319,6 +338,7 @@ impl GameState {
         // nearestPercent(value + 0.01).
         self.replicanti.chance =
             ((self.replicanti.chance + 0.01) * 100.0).round() / 100.0;
+        self.ec8_spend_repl_budget();
         true
     }
 
@@ -341,6 +361,7 @@ impl GameState {
     pub fn can_buy_replicanti_interval(&self) -> bool {
         !self.replicanti_interval_capped()
             && self.infinity_points >= self.replicanti.interval_cost
+            && self.ec8_repl_budget_ok()
     }
 
     /// Buy one interval upgrade: `×0.9` ms (floored at 50 ms), cost ×1e10.
@@ -352,6 +373,7 @@ impl GameState {
         self.replicanti.interval_cost *= Decimal::from_float(INTERVAL_COST_MULT);
         self.replicanti.interval_ms =
             (self.replicanti.interval_ms * 0.9).max(self.replicanti_interval_floor());
+        self.ec8_spend_repl_budget();
         true
     }
 
@@ -360,7 +382,13 @@ impl GameState {
     /// past our frontier): `10^(170 + 25·count + 5·count·(count−1)/2)`.
     pub fn replicanti_galaxy_cost(&self) -> Decimal {
         let count = self.replicanti.galaxy_cap as f64;
-        let log_cost = 170.0 + 25.0 * count + 5.0 * count * (count - 1.0) / 2.0;
+        // EC6 massively cheapens the upgrade (log increments 25/5 → 2/2).
+        let (base_inc, scaling) = if self.ec_running(6) {
+            (2.0, 2.0)
+        } else {
+            (25.0, 5.0)
+        };
+        let log_cost = 170.0 + base_inc * count + scaling * count * (count - 1.0) / 2.0;
         let mut cost = Decimal::pow10(log_cost);
         // TS233: cheaper based on the current Replicanti amount.
         if self.time_study_bought(233) {
@@ -376,6 +404,7 @@ impl GameState {
     /// Whether the galaxy-cap upgrade can be bought (affordable).
     pub fn can_buy_replicanti_galaxy_cap(&self) -> bool {
         self.infinity_points >= self.replicanti_galaxy_cost()
+            && self.ec8_repl_budget_ok()
     }
 
     /// Buy one galaxy-cap upgrade: `+1` max Replicanti Galaxy.
@@ -386,6 +415,7 @@ impl GameState {
         }
         self.infinity_points -= cost;
         self.replicanti.galaxy_cap += 1;
+        self.ec8_spend_repl_budget();
         true
     }
 }

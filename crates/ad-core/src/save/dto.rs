@@ -95,6 +95,9 @@ pub struct PlayerDTO {
     pub infinities_banked: Decimal,
     /// `player.eternityChalls` — per-EC completion counts (`"eterc<N>"` keys).
     pub eternity_challs: std::collections::HashMap<String, u8>,
+    /// EC8's per-run purchase budgets.
+    pub eterc8ids: i32,
+    pub eterc8repl: i32,
     /// `player.infinityPower` — produced by the Infinity Dimensions.
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_power: Decimal,
@@ -183,6 +186,8 @@ pub struct EternityChallengeDTO {
     pub current: u8,
     /// The EC whose unlock study is held (`0` = none).
     pub unlocked: u8,
+    /// Which EC studies' secondary requirements were previously met.
+    pub requirement_bits: u16,
 }
 
 /// `player.timestudy` (modelled subset; presets/preferred paths are
@@ -854,6 +859,10 @@ impl GameState {
             infinities_banked: dto.infinities_banked,
             eternity_challenge_unlocked: dto.challenge.eternity.unlocked,
             eternity_challenges,
+            eternity_challenge_current: dto.challenge.eternity.current,
+            ec_requirement_bits: dto.challenge.eternity.requirement_bits,
+            eterc8_ids: dto.eterc8ids,
+            eterc8_repl: dto.eterc8repl,
             infinity_upgrades,
             part_infinity_point: dto.part_infinity_point,
             challenge: NormalChallengeState {

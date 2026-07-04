@@ -29,6 +29,8 @@ impl GameState {
         if self.time_study_bought(224) {
             start += self.dim_boosts as u64 / 2000;
         }
+        // EC5's reward pushes Distant scaling 5 galaxies later per completion.
+        start += 5 * self.eternity_challenge_completions(5) as u64;
         start
     }
 
@@ -58,11 +60,17 @@ impl GameState {
         let _ = NC10_GALAXY_REQUIREMENT_INCREMENT; // step handled in galaxy_cost_mult
         let mut amount = (base_cost + galaxies * self.galaxy_cost_mult()) as f64;
 
-        // Distant scaling: quadratic growth past the scaling start.
-        let scaling_start = self.galaxy_cost_scaling_start();
-        if galaxies >= scaling_start {
-            let before_distant = (galaxies - scaling_start + 1) as f64;
-            amount += before_distant * before_distant + before_distant;
+        // Distant scaling: quadratic growth past the scaling start. Under EC5
+        // it starts immediately (`galaxies² + galaxies`).
+        if self.ec_running(5) {
+            let g = galaxies as f64;
+            amount += g * g + g;
+        } else {
+            let scaling_start = self.galaxy_cost_scaling_start();
+            if galaxies >= scaling_start {
+                let before_distant = (galaxies - scaling_start + 1) as f64;
+                amount += before_distant * before_distant + before_distant;
+            }
         }
         // Remote scaling: exponential growth past galaxy 800.
         const REMOTE_START: u64 = 800;
@@ -82,6 +90,10 @@ impl GameState {
     /// (`Galaxy.canBeBought`).
     pub fn can_buy_galaxy(&self) -> bool {
         if self.challenge_running(8) || self.infinity_challenge_running(7) {
+            return false;
+        }
+        // EC6: Antimatter Galaxies cannot be gained normally.
+        if self.ec_running(6) {
             return false;
         }
         // Check total amount (floor) of the required-tier dimension.
@@ -168,6 +180,12 @@ impl GameState {
         } else if tier_1indexed == 8 {
             amount += (target_resets.saturating_sub(5)) as u64
                 * (DIM_BOOST_SCALING_REQUIREMENT - discount);
+        }
+        // EC5: Dimension Boost costs scale massively
+        // (`+(targetResets−1)³ + (targetResets−1)`).
+        if self.ec_running(5) {
+            let t = (target_resets - 1) as u64;
+            amount += t * t * t + t;
         }
         // The `resetBoost` Infinity Upgrade reduces the requirement by 9, and a
         // completed Infinity Challenge 5 by a further 1.

@@ -203,6 +203,25 @@ impl GameState {
             mult *=
                 Decimal::from_float(1.0025).pow(&Decimal::from(self.dim_boosts as u64));
         }
+        // EC1's reward: TD multiplier from time spent this Eternity.
+        if self.ec_completed(1) {
+            let completions = self.eternity_challenge_completions(1) as f64;
+            let base = (self.records.this_eternity.time_ms / 10.0).max(0.9);
+            mult *= Decimal::from_float(base)
+                .pow(&Decimal::from_float(0.3 + completions * 0.05));
+        }
+        // EC10's reward: TD multiplier from Infinities.
+        if self.ec_completed(10) {
+            mult *= self.ec10_reward_td_mult();
+        }
+        // EC9 (running): Infinity Power multiplies Time Dimensions instead of
+        // Antimatter Dimensions, with a greatly reduced effect.
+        if self.ec_running(9) {
+            let log2_power = (self.infinity_power.max(&Decimal::ONE).ln()
+                / std::f64::consts::LN_2)
+                .max(1.0);
+            mult *= Decimal::from_float(log2_power.powi(4)).max(&Decimal::ONE);
+        }
         mult
     }
 
@@ -235,9 +254,23 @@ impl GameState {
         mult
     }
 
-    /// Tier `t`'s production per second (`amount × multiplier`).
+    /// Tier `t`'s production per second (`amount × multiplier`; EC-modified).
     pub fn td_production_per_second(&self, tier: usize) -> Decimal {
-        self.time_dimensions[tier].amount * self.td_multiplier(tier)
+        // EC1/EC10: Time Dimensions are disabled.
+        if self.ec_running(1) || self.ec_running(10) {
+            return Decimal::ZERO;
+        }
+        // EC11: production without any multiplier.
+        if self.ec_running(11) {
+            return self.time_dimensions[tier].amount;
+        }
+        let mut production =
+            self.time_dimensions[tier].amount * self.td_multiplier(tier);
+        // EC7: Tickspeed directly applies to Time Dimensions.
+        if self.ec_running(7) {
+            production *= self.tickspeed_effect();
+        }
+        production
     }
 
     /// Advance Time Dimension production (`TimeDimensions.tick`): each tier
@@ -252,7 +285,17 @@ impl GameState {
         for tier in (1..TIME_DIMENSION_COUNT).rev() {
             self.time_dimensions[tier - 1].amount += prod[tier] * dt10;
         }
-        self.time_shards += prod[0] * Decimal::from_float(dt_s);
+        // EC7 (running): TD1 produces 8th Infinity Dimensions instead of
+        // Time Shards. EC7's reward does the same passively once completed.
+        if self.ec_running(7) {
+            self.infinity_dimensions[7].amount += prod[0] * Decimal::from_float(dt_s);
+        } else {
+            self.time_shards += prod[0] * Decimal::from_float(dt_s);
+        }
+        if self.ec_completed(7) {
+            self.infinity_dimensions[7].amount +=
+                self.ec7_reward_id8_per_second() * Decimal::from_float(dt_s);
+        }
 
         self.update_free_tickspeed();
     }

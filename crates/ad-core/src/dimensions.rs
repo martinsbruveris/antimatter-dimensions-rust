@@ -166,6 +166,19 @@ impl GameState {
     /// - Tier-dependent dim boost multiplier
     /// - Sacrifice multiplier (only for tier 8 / index 7)
     pub fn dimension_multiplier(&self, tier: usize) -> Decimal {
+        // EC11: every multiplier is disabled except Infinity Power and
+        // Dimension Boosts (`getDimensionFinalMultiplierUncached`).
+        if self.ec_running(11) {
+            let exponent = (self.dim_boosts as i64 - tier as i64).max(0);
+            let mut mult = self.infinity_power_ad_multiplier();
+            if exponent > 0 {
+                mult *= self
+                    .dim_boost_power()
+                    .pow(&Decimal::from_float(exponent as f64));
+            }
+            return mult;
+        }
+
         let mut mult = Decimal::from_float(1.0);
 
         // Buy-10 multiplier: base^(bought / 10). Base is 2, or 2.2 with the
@@ -263,8 +276,15 @@ impl GameState {
         mult *= self.infinity_challenge_common_mult();
 
         // Infinity Power (from the Infinity Dimensions) gives an `^7` all-tier
-        // multiplier (`infinityPower.pow(powerConversionRate).max(1)`).
-        mult *= self.infinity_power_ad_multiplier();
+        // multiplier (`infinityPower.pow(powerConversionRate).max(1)`) — except
+        // under EC9, where it multiplies Time Dimensions instead.
+        if !self.ec_running(9) {
+            mult *= self.infinity_power_ad_multiplier();
+        }
+        // EC10's restriction-side boost: an immense multiplier from Infinities.
+        if self.ec_running(10) {
+            mult *= self.ec10_ad_multiplier();
+        }
 
         // `applyNDMultipliers` clamps the multiplier to >= 1 (so e.g. IC6's divide
         // and a tiny `totalTimeMult` cannot push it below the base)...
@@ -286,6 +306,10 @@ impl GameState {
     /// Production = amount * multiplier * tickspeed_effect
     pub fn dimension_production_per_second(&self, tier: usize) -> Decimal {
         if tier >= 8 || !self.is_dimension_unlocked(tier) {
+            return Decimal::ZERO;
+        }
+        // EC3: Antimatter Dimensions 5–8 don't produce anything.
+        if self.ec_running(3) && tier > 3 {
             return Decimal::ZERO;
         }
 

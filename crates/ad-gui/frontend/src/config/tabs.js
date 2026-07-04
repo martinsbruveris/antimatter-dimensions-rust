@@ -5,6 +5,7 @@ import InfinityDimensionsTab from "../components/tabs/InfinityDimensionsTab.vue"
 import ReplicantiTab from "../components/tabs/ReplicantiTab.vue";
 import ChallengesTab from "../components/tabs/ChallengesTab.vue";
 import InfinityChallengesTab from "../components/tabs/InfinityChallengesTab.vue";
+import EternityChallengesTab from "../components/tabs/EternityChallengesTab.vue";
 import EternityMilestonesTab from "../components/tabs/EternityMilestonesTab.vue";
 import TimeDimensionsTab from "../components/tabs/TimeDimensionsTab.vue";
 import TimeStudiesTab from "../components/tabs/TimeStudiesTab.vue";
@@ -65,6 +66,15 @@ export const TABS = [
         component: InfinityChallengesTab,
         condition: (s) => Boolean(s?.infinity_challenges_unlocked),
         hideId: [5, 1],
+      },
+      // Eternity Challenges: appear once an EC study is held or any completed.
+      {
+        key: "eternity",
+        name: "Eternity Challenges",
+        symbol: "Δ",
+        component: EternityChallengesTab,
+        condition: (s) => Boolean(s?.eternity_challenges_unlocked),
+        hideId: [5, 2],
       },
     ],
   },

@@ -123,8 +123,16 @@ impl GameState {
         true
     }
 
-    /// Whether tier `t` can be bought now (unlocked, affordable, not capped).
+    /// Whether tier `t` can be bought now (unlocked, affordable, not capped;
+    /// `InfinityDimensions.canBuy` blocks purchases in EC2/EC10 and once EC8's
+    /// budget is spent).
     pub fn id_available_for_purchase(&self, tier: usize) -> bool {
+        if self.ec_running(2) || self.ec_running(10) {
+            return false;
+        }
+        if self.ec_running(8) && self.eterc8_ids <= 0 {
+            return false;
+        }
         let d = &self.infinity_dimensions[tier];
         d.is_unlocked && self.infinity_points >= d.cost && !self.id_is_capped(tier)
     }
@@ -140,7 +148,12 @@ impl GameState {
         }
         let cost = self.infinity_dimensions[tier].cost;
         self.infinity_points -= cost;
-        let mult = Decimal::from_float(ID_COST_MULT[tier]);
+        // EC12's reward softens the per-purchase cost multiplier.
+        let mult = Decimal::from_float(ID_COST_MULT[tier].powf(self.ec12_id_cost_pow()));
+        // EC8: each purchase spends the run's ID budget.
+        if self.ec_running(8) {
+            self.eterc8_ids -= 1;
+        }
         let d = &mut self.infinity_dimensions[tier];
         d.cost = (cost * mult).round();
         d.amount += Decimal::from_float(10.0);
@@ -205,6 +218,24 @@ impl GameState {
         if self.time_study_bought(162) {
             mult *= Decimal::new_unchecked(1.0, 11);
         }
+        // EC4's reward: ID multiplier from unspent IP.
+        if self.ec_completed(4) {
+            let completions = self.eternity_challenge_completions(4) as f64;
+            mult *= self
+                .infinity_points
+                .max(&Decimal::ONE)
+                .pow(&Decimal::from_float(0.003 + completions * 0.002))
+                .min(&Decimal::new_unchecked(1.0, 200));
+        }
+        // EC9's reward: ID multiplier from Time Shards.
+        if self.ec_completed(9) {
+            let completions = self.eternity_challenge_completions(9) as f64;
+            mult *= self
+                .time_shards
+                .max(&Decimal::ONE)
+                .pow(&Decimal::from_float(completions * 0.1))
+                .min(&Decimal::new_unchecked(1.0, 400));
+        }
         mult
     }
 
@@ -214,6 +245,15 @@ impl GameState {
         let purchases = self.infinity_dimensions[tier].purchases();
         let mut mult = self.id_common_multiplier()
             * Decimal::from_float(ID_POWER_MULT[tier]).pow(&Decimal::from(purchases));
+        // EC2's reward: 1st-ID multiplier from Infinity Power.
+        if tier == 0 && self.ec_completed(2) {
+            let completions = self.eternity_challenge_completions(2) as f64;
+            mult *= self
+                .infinity_power
+                .max(&Decimal::ONE)
+                .pow(&Decimal::from_float(1.5 / (700.0 - completions * 100.0)))
+                .min(&Decimal::new_unchecked(1.0, 100));
+        }
         // TS72: sacrifice affects the 4th Infinity Dimension (greatly reduced).
         if tier == 3 && self.time_study_bought(72) {
             mult *= self
@@ -225,13 +265,26 @@ impl GameState {
         mult
     }
 
-    /// Tier `t`'s production per second (`amount × multiplier`).
+    /// Tier `t`'s production per second (`amount × multiplier`; EC-modified).
     pub fn id_production_per_second(&self, tier: usize) -> Decimal {
         let d = &self.infinity_dimensions[tier];
         if !d.is_unlocked {
             return Decimal::ZERO;
         }
-        d.amount * self.id_multiplier(tier)
+        // EC2/EC10: Infinity Dimensions are disabled.
+        if self.ec_running(2) || self.ec_running(10) {
+            return Decimal::ZERO;
+        }
+        // EC11: production without any multiplier.
+        if self.ec_running(11) {
+            return d.amount;
+        }
+        let mut production = d.amount * self.id_multiplier(tier);
+        // EC7: Tickspeed directly applies to Infinity Dimensions.
+        if self.ec_running(7) {
+            production *= self.tickspeed_effect();
+        }
+        production
     }
 
     /// The Antimatter-Dimension multiplier from Infinity Power:
@@ -254,7 +307,13 @@ impl GameState {
         for tier in (1..INFINITY_DIMENSION_COUNT).rev() {
             self.infinity_dimensions[tier - 1].amount += prod[tier] * dt10;
         }
-        self.infinity_power += prod[0] * Decimal::from_float(dt_s);
+        // EC7: the 1st Infinity Dimension produces 7th Antimatter Dimensions
+        // instead of Infinity Power.
+        if self.ec_running(7) {
+            self.dimensions[6].amount += prod[0] * Decimal::from_float(dt_s);
+        } else {
+            self.infinity_power += prod[0] * Decimal::from_float(dt_s);
+        }
     }
 
     /// Big-Crunch reset for Infinity Dimensions: Infinity Power → 0 and each tier's
