@@ -156,7 +156,7 @@ fn tickspeed_multiplier_50_galaxies() {
 fn tickspeed_value_no_upgrades() {
     let state = GameState::new();
     // 0 galaxies, 0 bought: current = 1000 * mult^0 = 1000
-    let current = state.current_tickspeed_ms();
+    let current = state.current_tickspeed_ms().to_f64();
     assert_approx_eq_f64(
         current,
         1000.0,
@@ -173,7 +173,7 @@ fn tickspeed_value_with_purchases() {
 
     let mult = state.tickspeed_purchase_multiplier();
     let expected_ms = 1000.0 * mult.powi(10);
-    let current = state.current_tickspeed_ms();
+    let current = state.current_tickspeed_ms().to_f64();
     assert_approx_eq_f64(
         current,
         expected_ms,
@@ -190,7 +190,7 @@ fn tickspeed_value_with_galaxies() {
 
     let mult = state.tickspeed_purchase_multiplier();
     let expected_ms = 1000.0 * mult.powi(10);
-    let current = state.current_tickspeed_ms();
+    let current = state.current_tickspeed_ms().to_f64();
     assert_approx_eq_f64(
         current,
         expected_ms,

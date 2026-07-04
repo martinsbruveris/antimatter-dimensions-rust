@@ -630,6 +630,13 @@ cost per free upgrade increases).
 **Persistence:** Time dimensions persist across eternities (never reset except on
 Reality).
 
+**Status:** ✅ Implemented (TD1–4 purchase/production chain, Time Shards → free
+Tickspeed upgrades incl. the 300 000 softcap + Newton inversion, the full
+threshold/e6000 cost curve, Decimal tickspeed refactor, save round-trip, tab
+UI). **Correction:** TD5–8 are unlocked by *Dilation* studies 2–5 (Phase 5),
+not time studies 71–74 as stated above; they are modelled but stay locked. See
+`design-docs/2026-07-04-eternity.md` §3.
+
 ---
 
 ### Feature 4.4: Time Studies (Tree)

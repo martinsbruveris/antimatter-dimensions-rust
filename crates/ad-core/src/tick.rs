@@ -76,6 +76,9 @@ impl GameState {
             self.antimatter = goal;
         }
 
+        // Time Dimensions produce Time Shards → free Tickspeed upgrades.
+        self.tick_time_dimensions(dt_ms);
+
         // Infinity Dimensions produce Infinity Power (which feeds the AD multiplier
         // on the next tick).
         self.tick_infinity_dimensions(dt_ms);

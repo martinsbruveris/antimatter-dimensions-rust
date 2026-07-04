@@ -143,12 +143,26 @@ export const useGameStore = defineStore("game", {
       }
     },
     // Eternity (second prestige): resets the whole Infinity layer in the engine
-    // and awards Eternity Points. The original's first-eternity tab change
-    // (`Tab.dimensions.time.show()` when eternities was 0) lands with the Time
-    // Dimensions tab (Feature 4.3).
+    // and awards Eternity Points. On the first eternity, navigate to the Time
+    // Dimensions tab (original: `Tab.dimensions.time.show()` when eternities
+    // was 0 and few were gained).
     async eternity() {
+      const firstEternity = !this.snapshot?.eternity_unlocked;
       await invoke("eternity");
       this.snapshot = await this.getState();
+      if (firstEternity) {
+        useUiStore().setSubtab("eternity", "timedims");
+      }
+    },
+    // --- Time Dimensions ---
+    buyTimeDimension(tier) {
+      return invoke("buy_time_dimension", { tier });
+    },
+    buyMaxTimeDimension(tier) {
+      return invoke("buy_max_time_dimension", { tier });
+    },
+    maxAllTimeDimensions() {
+      return invoke("max_all_time_dimensions");
     },
     // Eternity request (original `eternityResetRequest` → askEternityConfirmation):
     // pops the confirmation modal when the eternity confirmation is on.

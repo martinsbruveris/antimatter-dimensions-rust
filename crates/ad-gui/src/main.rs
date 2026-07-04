@@ -309,6 +309,8 @@ struct GameView {
     best_ep_min_val: Num,
     /// The Eternity Milestones (threshold order), for the Milestones subtab.
     eternity_milestones: Vec<EternityMilestoneView>,
+    /// Time Dimensions tab state (8 tiers + Time Shards / free tickspeed).
+    time_dimensions: TimeDimensionsView,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
     infinity_upgrades: Vec<InfinityUpgradeView>,
     /// Whether the Challenges tab is available (post first Infinity).
@@ -393,6 +395,42 @@ struct GameView {
     /// Whether the current tutorial step's highlight is active
     /// (`player.tutorialActive`).
     tutorial_active: bool,
+}
+
+/// Serializable view of the Time Dimensions tab.
+#[derive(Serialize)]
+struct TimeDimensionsView {
+    /// Current Time Shards.
+    time_shards: Num,
+    /// Free Tickspeed upgrades gained from shards.
+    total_tick_gained: u64,
+    /// Shard total the next free Tickspeed upgrade needs.
+    next_shards: Num,
+    /// Shard-requirement multiplier per upgrade (1.33; 1.25 with TS171).
+    mult_to_next: f64,
+    /// Upgrade count where requirements start growing faster (300000).
+    softcap: f64,
+    /// TD1 production (the "you are getting X Time Shards per second" line).
+    shards_per_second: Num,
+    /// The 8 tiers (index 0 = 1st Time Dimension).
+    dimensions: Vec<TimeDimensionView>,
+}
+
+/// Serializable view of one Time Dimension row.
+#[derive(Serialize)]
+struct TimeDimensionView {
+    /// 0-indexed tier.
+    tier: usize,
+    amount: Num,
+    multiplier: Num,
+    bought: u64,
+    cost: Num,
+    /// Tiers 1–4 pre-dilation; 5–8 stay locked until Phase 5.
+    is_unlocked: bool,
+    /// Unlocked + affordable (buy button enabled).
+    available_for_purchase: bool,
+    /// Per-second growth (+X%/s) from the tier above.
+    rate_percent: f64,
 }
 
 /// Serializable view of one Eternity Milestone (grid order = threshold order).
@@ -701,6 +739,40 @@ fn build_break_infinity_view(game: &GameState) -> BreakInfinityView {
     }
 }
 
+fn build_time_dimensions_view(game: &GameState) -> TimeDimensionsView {
+    let dimensions = (0..8)
+        .map(|tier| {
+            let d = &game.time_dimensions[tier];
+            let rate_percent = if tier < 7 && d.amount > Decimal::ZERO {
+                let to_gain = game.td_production_per_second(tier + 1);
+                let denom = d.amount.max(&Decimal::ONE);
+                (to_gain * Decimal::from_float(10.0) / denom).to_f64()
+            } else {
+                0.0
+            };
+            TimeDimensionView {
+                tier,
+                amount: num(&d.amount),
+                multiplier: num(&game.td_multiplier(tier)),
+                bought: d.bought,
+                cost: num(&d.cost),
+                is_unlocked: game.td_is_unlocked(tier),
+                available_for_purchase: game.td_available_for_purchase(tier),
+                rate_percent,
+            }
+        })
+        .collect();
+    TimeDimensionsView {
+        time_shards: num(&game.time_shards),
+        total_tick_gained: game.total_tick_gained,
+        next_shards: num(&game.next_free_tickspeed_shards()),
+        mult_to_next: game.free_tickspeed_mult(),
+        softcap: 300_000.0,
+        shards_per_second: num(&game.td_production_per_second(0)),
+        dimensions,
+    }
+}
+
 fn build_game_view(game: &GameState) -> GameView {
     let unlocked = game.unlocked_dimensions();
     let mut dimensions = Vec::with_capacity(8);
@@ -793,6 +865,7 @@ fn build_game_view(game: &GameState) -> GameView {
         this_eternity_real_time_ms: game.records.this_eternity.real_time_ms,
         best_ep_min: num(&game.records.this_eternity.best_ep_min),
         best_ep_min_val: num(&game.records.this_eternity.best_ep_min_val),
+        time_dimensions: build_time_dimensions_view(game),
         eternity_milestones: ad_core::ETERNITY_MILESTONES
             .iter()
             .map(|m| EternityMilestoneView {
@@ -1033,6 +1106,25 @@ fn max_all(state: State<'_, Mutex<GameState>>) {
 fn big_crunch(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.big_crunch();
+}
+
+#[tauri::command]
+fn buy_time_dimension(tier: usize, state: State<'_, Mutex<GameState>>) {
+    if tier < 8 {
+        state.lock().unwrap().buy_time_dimension(tier);
+    }
+}
+
+#[tauri::command]
+fn buy_max_time_dimension(tier: usize, state: State<'_, Mutex<GameState>>) {
+    if tier < 8 {
+        state.lock().unwrap().buy_max_time_dimension(tier);
+    }
+}
+
+#[tauri::command]
+fn max_all_time_dimensions(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().max_all_time_dimensions();
 }
 
 #[tauri::command]
@@ -1733,6 +1825,9 @@ pub fn run() {
             max_all,
             big_crunch,
             eternity,
+            buy_time_dimension,
+            buy_max_time_dimension,
+            max_all_time_dimensions,
             break_infinity,
             buy_break_infinity_upgrade,
             buy_break_infinity_rebuyable,

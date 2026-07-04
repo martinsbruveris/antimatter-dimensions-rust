@@ -55,7 +55,7 @@ pub struct ObservedTickspeedState {
     /// Cost multiplier per purchase.
     pub cost_multiplier: Decimal,
     /// Current tickspeed interval in milliseconds.
-    pub tickspeed_ms: f64,
+    pub tickspeed_ms: Decimal,
     /// Production multiplier from tickspeed.
     pub tickspeed_effect: Decimal,
 }

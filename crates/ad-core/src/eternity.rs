@@ -123,6 +123,8 @@ impl GameState {
         self.galaxies = if keep_infinity_upgrades { 1 } else { 0 };
         self.part_infinity_point = 0.0;
         self.infinity_power = Decimal::ZERO;
+        self.time_shards = Decimal::ZERO;
+        self.total_tick_gained = 0;
         self.records.this_eternity = ThisEternity::new();
 
         // Without the keepAutobuyers milestone, Infinity un-breaks (it can only
@@ -156,6 +158,10 @@ impl GameState {
         // Antimatter Dimensions + Tickspeed reset.
         self.dimensions = std::array::from_fn(|_| DimensionTier::new());
         self.tickspeed = TickspeedState::new();
+
+        // Time Dimension amounts return to the bought base; purchases persist
+        // (`resetTimeDimensions`).
+        self.reset_time_dimension_amounts();
 
         // IP reset — which also zeroes the eternity's IP peak (the original
         // `Currency.infinityPoints.reset()` writes `thisEternity.maxIP`).

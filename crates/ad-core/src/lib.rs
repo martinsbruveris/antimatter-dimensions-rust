@@ -23,6 +23,7 @@ pub mod state;
 pub mod tab_notifications;
 pub mod tick;
 pub mod tickspeed;
+pub mod time_dimensions;
 pub mod tutorial;
 
 pub use action::{Action, ActionOutcome};
@@ -47,3 +48,4 @@ pub use replicanti::{ReplicantiState, REPLICANTI_CAP, REPLICANTI_UNLOCK_COST};
 pub use state::{DimensionTier, GameState, TickspeedState};
 pub use tab_notifications::TabNotificationId;
 pub use tick::offline_plan;
+pub use time_dimensions::{TimeDimension, TIME_DIMENSION_COUNT};

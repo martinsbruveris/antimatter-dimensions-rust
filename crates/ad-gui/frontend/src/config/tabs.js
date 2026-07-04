@@ -6,6 +6,7 @@ import ReplicantiTab from "../components/tabs/ReplicantiTab.vue";
 import ChallengesTab from "../components/tabs/ChallengesTab.vue";
 import InfinityChallengesTab from "../components/tabs/InfinityChallengesTab.vue";
 import EternityMilestonesTab from "../components/tabs/EternityMilestonesTab.vue";
+import TimeDimensionsTab from "../components/tabs/TimeDimensionsTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
@@ -118,6 +119,10 @@ export const TABS = [
     uiClass: "o-tab-btn--eternity",
     subtabs: [
       { key: "studies", name: "Time Studies", symbol: "<i class='fas fa-book'></i>", component: null, hideId: [7, 0] },
+      // Time Dimensions: hide-bit-wise the original's Dimensions-tab "Time
+      // Dimensions" subtab (0,2) — we host the page under the Eternity tab,
+      // like Infinity Dimensions under Infinity.
+      { key: "timedims", name: "Time Dimensions", symbol: "Δ", component: TimeDimensionsTab, hideId: [0, 2] },
       { key: "upgrades", name: "Eternity Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: null, hideId: [7, 1] },
       { key: "milestones", name: "Eternity Milestones", symbol: "<i class='fas fa-star'></i>", component: EternityMilestonesTab, hideId: [7, 2] },
     ],

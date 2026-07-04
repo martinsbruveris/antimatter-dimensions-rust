@@ -11,6 +11,7 @@ use crate::infinity_dimensions::InfinityDimension;
 use crate::options::Options;
 use crate::records::Records;
 use crate::replicanti::ReplicantiState;
+use crate::time_dimensions::TimeDimension;
 
 /// serde default for boolean fields that default to `true` (e.g.
 /// `tutorial_active`), since `bool`'s own `Default` is `false`.
@@ -50,6 +51,12 @@ fn default_post_c4_tier() -> u8 {
 #[cfg(feature = "serde")]
 fn default_infinity_dimensions() -> [InfinityDimension; 8] {
     std::array::from_fn(InfinityDimension::new)
+}
+
+/// serde default for `time_dimensions` (8 fresh tiers).
+#[cfg(feature = "serde")]
+fn default_time_dimensions() -> [TimeDimension; 8] {
+    std::array::from_fn(TimeDimension::new)
 }
 
 /// A single antimatter dimension tier.
@@ -191,6 +198,20 @@ pub struct GameState {
     /// eternities/EP. Gates the Eternity tab and header EP readout.
     #[cfg_attr(feature = "serde", serde(default))]
     pub eternity_unlocked: bool,
+    /// The 8 Time Dimensions (bought with EP, produce Time Shards). Purchases
+    /// and costs persist across an Eternity; only `amount` resets. See
+    /// `time_dimensions.rs`.
+    #[cfg_attr(feature = "serde", serde(default = "default_time_dimensions"))]
+    pub time_dimensions: [TimeDimension; 8],
+    /// Time Shards (`Currency.timeShards`): produced by the 1st Time
+    /// Dimension; converted into free Tickspeed upgrades. Reset on Eternity.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub time_shards: Decimal,
+    /// Free Tickspeed upgrades gained from Time Shards
+    /// (`player.totalTickGained`). Added to the bought count in the tickspeed
+    /// formula. Reset on Eternity.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub total_tick_gained: u64,
     /// Owned Infinity Upgrades, one bit per [`InfinityUpgrade`](crate::InfinityUpgrade)
     /// (the original's `player.infinityUpgrades` string set as a bitmask).
     /// Persists across a Big Crunch. See `infinity_upgrades.rs`.
@@ -346,6 +367,9 @@ impl GameState {
             eternity_points: Decimal::ZERO,
             eternities: Decimal::ZERO,
             eternity_unlocked: false,
+            time_dimensions: std::array::from_fn(TimeDimension::new),
+            time_shards: Decimal::ZERO,
+            total_tick_gained: 0,
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),

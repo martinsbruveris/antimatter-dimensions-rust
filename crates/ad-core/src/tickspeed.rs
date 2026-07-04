@@ -45,11 +45,22 @@ impl GameState {
         count
     }
 
-    /// Compute the current tickspeed in milliseconds.
-    /// Formula: INITIAL_TICKSPEED_MS * multiplier^bought
-    pub fn current_tickspeed_ms(&self) -> f64 {
+    /// Total Tickspeed upgrades: bought plus the free upgrades from Time
+    /// Shards (`Tickspeed.totalUpgrades = totalTickBought + totalTickGained`).
+    pub fn total_tickspeed_upgrades(&self) -> u64 {
+        self.tickspeed.bought + self.total_tick_gained
+    }
+
+    /// Compute the current tickspeed in milliseconds:
+    /// `INITIAL_TICKSPEED_MS × multiplier^totalUpgrades`. A `Decimal` because
+    /// free Tickspeed upgrades push the count far past what `f64` can hold
+    /// (`0.8^300000` underflows) — the original's `Tickspeed.current` is a
+    /// Decimal too.
+    pub fn current_tickspeed_ms(&self) -> Decimal {
         let multiplier = self.tickspeed_purchase_multiplier();
-        INITIAL_TICKSPEED_MS * multiplier.powi(self.tickspeed.bought as i32)
+        Decimal::from_float(INITIAL_TICKSPEED_MS)
+            * Decimal::from_float(multiplier)
+                .pow(&Decimal::from(self.total_tickspeed_upgrades()))
     }
 
     /// The per-purchase tickspeed multiplier (fraction of
@@ -110,9 +121,9 @@ impl GameState {
             return Decimal::ONE;
         }
         let current = self.current_tickspeed_ms();
-        if current <= 0.0 {
+        if current <= Decimal::ZERO {
             return Decimal::from_float(1.0);
         }
-        Decimal::from_float(INITIAL_TICKSPEED_MS / current)
+        Decimal::from_float(INITIAL_TICKSPEED_MS) / current
     }
 }

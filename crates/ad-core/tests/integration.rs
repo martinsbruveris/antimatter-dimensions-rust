@@ -135,7 +135,7 @@ fn test_production_chain_all_4_dims() {
 #[test]
 fn test_initial_tickspeed() {
     let game = GameState::new();
-    assert_eq!(game.current_tickspeed_ms(), 1000.0);
+    assert_eq!(game.current_tickspeed_ms(), Decimal::from_float(1000.0));
     assert_eq!(game.tickspeed_effect(), Decimal::from_float(1.0));
 }
 
@@ -146,7 +146,7 @@ fn test_buy_tickspeed() {
     assert!(game.buy_tickspeed());
     assert_eq!(game.tickspeed.bought, 1);
     // Tickspeed should be faster (less than 1000ms)
-    assert!(game.current_tickspeed_ms() < 1000.0);
+    assert!(game.current_tickspeed_ms() < Decimal::from_float(1000.0));
 }
 
 #[test]

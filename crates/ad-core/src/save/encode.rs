@@ -166,6 +166,16 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // NC9 tickspeed cost bumps.
     player["chall9TickspeedCostBumps"] = json!(state.tickspeed.cost_bumps);
 
+    // Time Dimensions + Time Shards + free tickspeed upgrades.
+    player["timeShards"] = decimal(&state.time_shards);
+    player["totalTickGained"] = json!(state.total_tick_gained);
+    for (tier, d) in state.time_dimensions.iter().enumerate() {
+        let entry = &mut player["dimensions"]["time"][tier];
+        entry["amount"] = decimal(&d.amount);
+        entry["bought"] = json!(d.bought);
+        entry["cost"] = decimal(&d.cost);
+    }
+
     // Infinity Dimensions + Infinity Power.
     player["infinityPower"] = decimal(&state.infinity_power);
     for (tier, d) in state.infinity_dimensions.iter().enumerate() {

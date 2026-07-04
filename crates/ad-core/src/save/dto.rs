@@ -39,6 +39,7 @@ use crate::options::{
 use crate::records::{BestEternity, BestInfinity, Records, ThisEternity, ThisInfinity};
 use crate::replicanti::ReplicantiState;
 use crate::state::{DimensionTier, GameState, TickspeedState};
+use crate::time_dimensions::{time_dimension_cost, TimeDimension, TIME_DIMENSION_COUNT};
 
 use super::SaveError;
 
@@ -78,6 +79,11 @@ pub struct PlayerDTO {
     /// `player.eternities` — number of Eternities performed (a Decimal).
     #[serde(with = "break_infinity::serde_string")]
     pub eternities: Decimal,
+    /// `player.timeShards` — produced by the 1st Time Dimension.
+    #[serde(with = "break_infinity::serde_string")]
+    pub time_shards: Decimal,
+    /// `player.totalTickGained` — free Tickspeed upgrades from Time Shards.
+    pub total_tick_gained: u64,
     /// `player.infinityPower` — produced by the Infinity Dimensions.
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_power: Decimal,
@@ -178,11 +184,22 @@ pub struct NormalChallengeDTO {
     pub completed_bits: u16,
 }
 
-/// `player.dimensions` — the `antimatter` and `infinity` arrays.
+/// `player.dimensions` — the `antimatter`, `infinity`, and `time` arrays.
 #[derive(Debug, Clone, Deserialize)]
 pub struct DimensionsDTO {
     pub antimatter: Vec<DimensionDTO>,
     pub infinity: Vec<InfinityDimensionDTO>,
+    pub time: Vec<TimeDimensionDTO>,
+}
+
+/// One entry of `player.dimensions.time[]`. The stored `cost` is derived from
+/// `bought` on load (like tickspeed), so it is ignored here.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeDimensionDTO {
+    #[serde(with = "break_infinity::serde_string")]
+    pub amount: Decimal,
+    pub bought: u64,
 }
 
 /// One entry of `player.dimensions.infinity[]` (modelled subset).
@@ -470,6 +487,22 @@ impl GameState {
             cost_bumps: dims[tier].cost_bumps,
         });
 
+        // The 8 time dimensions are likewise fixed-length; their cost is
+        // derived from the purchase count on load.
+        let time_dims = &dto.dimensions.time;
+        if time_dims.len() != TIME_DIMENSION_COUNT {
+            return Err(SaveError::UnexpectedArrayLength {
+                field: "dimensions.time",
+                expected: TIME_DIMENSION_COUNT,
+                found: time_dims.len(),
+            });
+        }
+        let time_dimensions = std::array::from_fn(|tier| TimeDimension {
+            amount: time_dims[tier].amount,
+            bought: time_dims[tier].bought,
+            cost: time_dimension_cost(tier, time_dims[tier].bought),
+        });
+
         // The 8 infinity dimensions are likewise fixed-length.
         let inf_dims = &dto.dimensions.infinity;
         if inf_dims.len() != INFINITY_DIMENSION_COUNT {
@@ -727,6 +760,9 @@ impl GameState {
             eternity_points: dto.eternity_points,
             eternities: dto.eternities,
             eternity_unlocked,
+            time_dimensions,
+            time_shards: dto.time_shards,
+            total_tick_gained: dto.total_tick_gained,
             infinity_upgrades,
             part_infinity_point: dto.part_infinity_point,
             challenge: NormalChallengeState {

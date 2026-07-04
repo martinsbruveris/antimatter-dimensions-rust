@@ -133,9 +133,10 @@ pub struct PyTickspeedState {
     /// Cost multiplier per purchase.
     #[pyo3(get)]
     pub cost_multiplier: PyDecimal,
-    /// Current tickspeed interval in milliseconds.
+    /// Current tickspeed interval in milliseconds (a Decimal: free Tickspeed
+    /// upgrades push it below f64 range).
     #[pyo3(get)]
-    pub tickspeed_ms: f64,
+    pub tickspeed_ms: PyDecimal,
     /// Production multiplier from tickspeed.
     #[pyo3(get)]
     pub tickspeed_effect: PyDecimal,
@@ -147,7 +148,7 @@ impl PyTickspeedState {
             bought: ts.bought,
             cost: PyDecimal::from_decimal(&ts.cost),
             cost_multiplier: PyDecimal::from_decimal(&ts.cost_multiplier),
-            tickspeed_ms: ts.tickspeed_ms,
+            tickspeed_ms: PyDecimal::from_decimal(&ts.tickspeed_ms),
             tickspeed_effect: PyDecimal::from_decimal(&ts.tickspeed_effect),
         }
     }
