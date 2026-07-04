@@ -154,6 +154,16 @@ export const useGameStore = defineStore("game", {
         useUiStore().setSubtab("eternity", "timedims");
       }
     },
+    // --- Eternity Upgrades ---
+    buyEternityUpgrade(id) {
+      return invoke("buy_eternity_upgrade", { id });
+    },
+    buyEpMult() {
+      return invoke("buy_ep_mult");
+    },
+    buyMaxEpMult() {
+      return invoke("buy_max_ep_mult");
+    },
     // --- Eternity Challenges ---
     buyEcStudy(id) {
       return invoke("buy_ec_study", { id });

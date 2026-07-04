@@ -47,10 +47,10 @@ impl GameState {
         self.records.this_eternity.max_ip >= self.eternity_goal()
     }
 
-    /// The global Eternity-Point multiplier (`totalEPMult`): Time Studies
-    /// 61/121/122/123 (the `epMult` Eternity Upgrade joins with Feature 4.6).
+    /// The global Eternity-Point multiplier (`totalEPMult`): the rebuyable
+    /// `epMult` Eternity Upgrade and Time Studies 61/121/122/123.
     pub(crate) fn total_ep_mult(&self) -> Decimal {
-        let mut mult = Decimal::ONE;
+        let mut mult = self.ep_mult_effect();
         if self.time_study_bought(61) {
             mult *= Decimal::from_float(15.0);
         }

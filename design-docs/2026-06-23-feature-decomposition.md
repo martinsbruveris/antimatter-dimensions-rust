@@ -754,6 +754,14 @@ which differs for several entries. See `design-docs/2026-07-04-eternity.md` §5.
 - Time dimension multiplier by eternities performed
 - Reduce galaxy requirement by 5 per purchase
 
+**Status:** ✅ Implemented (the actual catalogue differs from the sketch above:
+3 ID multipliers — unspent EP / eternities with 1e5 softcap / IC record times,
+with new per-IC best-time tracking — and 3 TD multipliers — achievement power /
+unspent TT / days played; plus the rebuyable ×5 `epMult` with the
+50/100/500/1000-step cost thresholds and super-exponential tail, feeding
+`totalEPMult`. Save round-trip; the vendored 2×3 grid + EP-multiplier box UI).
+See `design-docs/2026-07-04-eternity.md` §6.
+
 ---
 
 ## Phase 5: Time Dilation

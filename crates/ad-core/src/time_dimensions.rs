@@ -203,6 +203,8 @@ impl GameState {
             mult *=
                 Decimal::from_float(1.0025).pow(&Decimal::from(self.dim_boosts as u64));
         }
+        // Eternity Upgrades 4–6 (achievement power / unspent TT / days played).
+        mult *= self.eternity_upgrade_td_mult();
         // EC1's reward: TD multiplier from time spent this Eternity.
         if self.ec_completed(1) {
             let completions = self.eternity_challenge_completions(1) as f64;

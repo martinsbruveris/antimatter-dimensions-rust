@@ -227,6 +227,8 @@ impl GameState {
                 .pow(&Decimal::from_float(0.003 + completions * 0.002))
                 .min(&Decimal::new_unchecked(1.0, 200));
         }
+        // Eternity Upgrades 1–3 (unspent EP / eternities / IC records).
+        mult *= self.eternity_upgrade_id_mult();
         // EC9's reward: ID multiplier from Time Shards.
         if self.ec_completed(9) {
             let completions = self.eternity_challenge_completions(9) as f64;

@@ -184,6 +184,15 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         json!(state.ec_requirement_bits);
     player["eterc8ids"] = json!(state.eterc8_ids);
     player["eterc8repl"] = json!(state.eterc8_repl);
+    // Eternity Upgrades (a Set of numeric ids) + the rebuyable EP multiplier.
+    player["eternityUpgrades"] = json!(crate::ALL_ETERNITY_UPGRADES
+        .iter()
+        .filter(|u| state.eternity_upgrade_bought(**u))
+        .map(|u| u.id())
+        .collect::<Vec<_>>());
+    player["epmultUpgrades"] = json!(state.epmult_upgrades);
+    // Infinity Challenge record times.
+    player["challenge"]["infinity"]["bestTimes"] = json!(state.ic_best_times_ms);
     let mut ec_map = serde_json::Map::new();
     for (i, &count) in state.eternity_challenges.iter().enumerate() {
         if count > 0 {

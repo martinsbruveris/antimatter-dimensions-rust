@@ -169,8 +169,15 @@ impl GameState {
             self.records.this_eternity.max_ip =
                 self.records.this_eternity.max_ip.max(&self.infinity_points);
 
-            // Complete the running challenge, or NC1 on the first Infinity performed
-            // outside a challenge (mirrors `handleChallengeCompletion`).
+            // Record the running Infinity Challenge's fastest completion
+            // (`bigCrunchUpdateStatistics` → `challenge.infinity.bestTimes`),
+            // then complete the running challenge, or NC1 on the first Infinity
+            // performed outside a challenge (mirrors `handleChallengeCompletion`).
+            let ic = self.infinity_challenge.current;
+            if ic != 0 {
+                let slot = &mut self.ic_best_times_ms[(ic - 1) as usize];
+                *slot = slot.min(self.records.this_infinity.time_ms);
+            }
             self.handle_challenge_completion();
 
             // Lower the fastest-infinity record to this run before resetting it

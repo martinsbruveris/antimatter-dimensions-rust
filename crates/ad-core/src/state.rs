@@ -53,6 +53,12 @@ fn default_infinity_dimensions() -> [InfinityDimension; 8] {
     std::array::from_fn(InfinityDimension::new)
 }
 
+/// serde default for `ic_best_times_ms` (`Number.MAX_VALUE` = never completed).
+#[cfg(feature = "serde")]
+fn default_ic_best_times() -> [f64; 8] {
+    [f64::MAX; 8]
+}
+
 /// serde defaults for EC8's per-run purchase budgets.
 #[cfg(feature = "serde")]
 fn default_eterc8_ids() -> i32 {
@@ -268,6 +274,19 @@ pub struct GameState {
     /// EC8's Replicanti-upgrade purchase budget (`player.eterc8repl`, 40/run).
     #[cfg_attr(feature = "serde", serde(default = "default_eterc8_repl"))]
     pub eterc8_repl: i32,
+    /// Owned one-time Eternity Upgrades, one bit per
+    /// [`EternityUpgrade`](crate::EternityUpgrade) (`player.eternityUpgrades`,
+    /// a Set of ids 1–6). Persist across Eternities (reset only on Reality).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub eternity_upgrades: u32,
+    /// Purchases of the rebuyable ×5 EP multiplier (`player.epmultUpgrades`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub epmult_upgrades: u32,
+    /// Fastest completion of each Infinity Challenge in game ms
+    /// (`player.challenge.infinity.bestTimes`; `f64::MAX` = never). Feeds
+    /// Eternity Upgrade 3.
+    #[cfg_attr(feature = "serde", serde(default = "default_ic_best_times"))]
+    pub ic_best_times_ms: [f64; 8],
     /// Owned Infinity Upgrades, one bit per [`InfinityUpgrade`](crate::InfinityUpgrade)
     /// (the original's `player.infinityUpgrades` string set as a bitmask).
     /// Persists across a Big Crunch. See `infinity_upgrades.rs`.
@@ -440,6 +459,9 @@ impl GameState {
             ec_requirement_bits: 0,
             eterc8_ids: 50,
             eterc8_repl: 40,
+            eternity_upgrades: 0,
+            epmult_upgrades: 0,
+            ic_best_times_ms: [f64::MAX; 8],
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),

@@ -98,6 +98,10 @@ pub struct PlayerDTO {
     /// EC8's per-run purchase budgets.
     pub eterc8ids: i32,
     pub eterc8repl: i32,
+    /// `player.eternityUpgrades` — owned Eternity Upgrades (a Set of ids 1–6).
+    pub eternity_upgrades: Vec<u8>,
+    /// `player.epmultUpgrades` — rebuyable ×5 EP-multiplier purchases.
+    pub epmult_upgrades: u32,
     /// `player.infinityPower` — produced by the Infinity Dimensions.
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_power: Decimal,
@@ -213,6 +217,8 @@ pub struct InfinityChallengeDTO {
     pub current: u8,
     /// Completed-challenge bitmask (bit `1 << id`).
     pub completed_bits: u16,
+    /// Fastest completion times (ms), `Number.MAX_VALUE` = never.
+    pub best_times: Vec<f64>,
 }
 
 /// `player.challenge.normal` (modelled subset). `bestTimes` is ignored until a
@@ -863,6 +869,25 @@ impl GameState {
             ec_requirement_bits: dto.challenge.eternity.requirement_bits,
             eterc8_ids: dto.eterc8ids,
             eterc8_repl: dto.eterc8repl,
+            eternity_upgrades: {
+                let mut bits = 0u32;
+                for id in &dto.eternity_upgrades {
+                    if let Some(upgrade) = crate::EternityUpgrade::from_id(*id) {
+                        bits |= upgrade.bit();
+                    }
+                }
+                bits
+            },
+            epmult_upgrades: dto.epmult_upgrades,
+            ic_best_times_ms: {
+                let mut times = [f64::MAX; 8];
+                for (i, t) in
+                    dto.challenge.infinity.best_times.iter().take(8).enumerate()
+                {
+                    times[i] = *t;
+                }
+                times
+            },
             infinity_upgrades,
             part_infinity_point: dto.part_infinity_point,
             challenge: NormalChallengeState {

@@ -315,6 +315,8 @@ struct GameView {
     time_studies: TimeStudiesView,
     /// The 12 Eternity Challenges (tab tiles + tree EC nodes).
     eternity_challenges: Vec<EternityChallengeView>,
+    /// Eternity Upgrades tab state (6 upgrades + the EP multiplier).
+    eternity_upgrades: EternityUpgradesView,
     /// Whether the EC subtab is available (a study held or any completion).
     eternity_challenges_unlocked: bool,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
@@ -468,6 +470,30 @@ struct TimeStudyView {
     cost: f64,
     is_bought: bool,
     can_buy: bool,
+}
+
+/// Serializable view of the Eternity Upgrades tab.
+#[derive(Serialize)]
+struct EternityUpgradesView {
+    /// The six one-time upgrades (grid order).
+    upgrades: Vec<EternityUpgradeView>,
+    /// The rebuyable ×5 EP multiplier.
+    ep_mult_purchases: u32,
+    ep_mult_cost: Num,
+    ep_mult_effect: Num,
+    can_buy_ep_mult: bool,
+}
+
+/// Serializable view of one Eternity Upgrade tile.
+#[derive(Serialize)]
+struct EternityUpgradeView {
+    /// Original id (1–6); the frontend keys descriptions on it.
+    id: u8,
+    cost: Num,
+    is_bought: bool,
+    can_buy: bool,
+    /// Current effect value (a multiplier).
+    effect: Num,
 }
 
 /// Serializable view of one Eternity Challenge (tiles + tree nodes).
@@ -859,6 +885,38 @@ fn build_time_studies_view(game: &GameState) -> TimeStudiesView {
     }
 }
 
+fn build_eternity_upgrades_view(game: &GameState) -> EternityUpgradesView {
+    use ad_core::EternityUpgrade;
+    let effect = |u: EternityUpgrade| -> Decimal {
+        match u {
+            EternityUpgrade::IdMultEp => game.eternity_points + Decimal::ONE,
+            EternityUpgrade::IdMultEternities => game.eu2_effect_public(),
+            EternityUpgrade::IdMultIcRecords => game.eu3_effect_public(),
+            EternityUpgrade::TdMultAchievements => game.achievement_power(),
+            EternityUpgrade::TdMultTheorems => game.time_theorems.max(&Decimal::ONE),
+            EternityUpgrade::TdMultRealTime => Decimal::from_float(
+                (game.records.total_time_played_ms / 86_400_000.0).max(1.0),
+            ),
+        }
+    };
+    EternityUpgradesView {
+        upgrades: ad_core::ALL_ETERNITY_UPGRADES
+            .iter()
+            .map(|u| EternityUpgradeView {
+                id: u.id(),
+                cost: num(&u.cost()),
+                is_bought: game.eternity_upgrade_bought(*u),
+                can_buy: game.can_buy_eternity_upgrade(*u),
+                effect: num(&effect(*u)),
+            })
+            .collect(),
+        ep_mult_purchases: game.epmult_upgrades,
+        ep_mult_cost: num(&game.ep_mult_cost()),
+        ep_mult_effect: num(&game.ep_mult_effect()),
+        can_buy_ep_mult: game.eternity_points >= game.ep_mult_cost(),
+    }
+}
+
 fn build_eternity_challenges_view(game: &GameState) -> Vec<EternityChallengeView> {
     (1..=12u8)
         .map(|id| {
@@ -973,6 +1031,7 @@ fn build_game_view(game: &GameState) -> GameView {
         time_dimensions: build_time_dimensions_view(game),
         time_studies: build_time_studies_view(game),
         eternity_challenges: build_eternity_challenges_view(game),
+        eternity_upgrades: build_eternity_upgrades_view(game),
         eternity_challenges_unlocked: game.eternity_challenge_unlocked != 0
             || (1..=12).any(|id| game.eternity_challenge_completions(id) > 0),
         eternity_milestones: ad_core::ETERNITY_MILESTONES
@@ -1215,6 +1274,23 @@ fn max_all(state: State<'_, Mutex<GameState>>) {
 fn big_crunch(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.big_crunch();
+}
+
+#[tauri::command]
+fn buy_eternity_upgrade(id: u8, state: State<'_, Mutex<GameState>>) {
+    if let Some(upgrade) = ad_core::EternityUpgrade::from_id(id) {
+        state.lock().unwrap().buy_eternity_upgrade(upgrade);
+    }
+}
+
+#[tauri::command]
+fn buy_ep_mult(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_ep_mult();
+}
+
+#[tauri::command]
+fn buy_max_ep_mult(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_max_ep_mult();
 }
 
 #[tauri::command]
@@ -1985,6 +2061,9 @@ pub fn run() {
             buy_max_time_dimension,
             max_all_time_dimensions,
             buy_time_study,
+            buy_eternity_upgrade,
+            buy_ep_mult,
+            buy_max_ep_mult,
             buy_ec_study,
             start_eternity_challenge,
             exit_eternity_challenge,
