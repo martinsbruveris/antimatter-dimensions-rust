@@ -99,6 +99,38 @@ antimatter-dimensions-rust/
   folded into `id_common_multiplier` (`infinity_dimensions.rs`). Three IP upgrades
   (chance / interval / galaxy cap). Persists across a Big Crunch. See
   `design-docs/2026-07-03-replicanti.md`.
+- `src/eternity.rs` — Eternity (Feature 4.1): the second prestige.
+  `eternity_goal`/`can_eternity` (peak IP this eternity, or the running EC's
+  scaled goal), the EP formula (`5^(log10(maxIP + pending crunch IP)/308 − 0.7)
+  × totalEPMult`), `eternity()` rewards (EP, eternities, TS191 banked
+  infinities, the recent-eternities ring) and the layered reset —
+  `eternity_full_reset` (autobuyers/break + respec) over `eternity_reset_core`
+  (shared with `startEternityChallenge`), with the Eternity-Milestone keeps.
+  Also `update_prestige_rates` (bestIP/EPmin).
+- `src/eternity_milestones.rs` — Eternity Milestones (Feature 4.2): the
+  27-milestone catalogue (pure derived state, `eternities >= threshold`);
+  per-tick autoIC/autoUnlockID hooks; unlockAllND/replicantiNoReset are read at
+  their sites (state.rs / replicanti.rs), the reset keeps in eternity.rs.
+- `src/time_dimensions.rs` — Time Dimensions (Feature 4.3): 8 EP-bought tiers
+  (TD5–8 await Dilation), the threshold/e6000 cost curve, production chain →
+  Time Shards → free Tickspeed upgrades (`FreeTickspeed.fromShards` port with
+  the 300k softcap + Newton inversion). Made tickspeed a `Decimal`
+  (`current_tickspeed_ms`).
+- `src/time_studies.rs` — Time Studies (Feature 4.4): Time Theorems (AM/IP/EP
+  purchases gated on owning a TD), the 58-study pre-dilation catalogue with the
+  original structural rules (Dimension split + TS201, exclusive Pace columns,
+  Light/Dark pairs, EC-gated specials), respec. ~40 study effects live at
+  their engine sites (each site names its study).
+- `src/eternity_challenges.rs` — Eternity Challenges (Feature 4.5): EC study
+  slots (TT cost + secondary requirements + requirementBits waivers),
+  start/exit/complete flow through the Eternity reset, scaled goals (×5
+  completions), EC4/EC12 restriction failures, the EC12 game-speed factor,
+  and the restriction/reward effect readers consumed across the engine.
+- `src/eternity_upgrades.rs` — Eternity Upgrades (Feature 4.6): the 6 one-time
+  EP upgrades (ID mults from EP/eternities/IC record times — with per-IC
+  best-time records written on completion in crunch.rs — TD mults from
+  achievements/TT/days played) and the rebuyable ×5 `epMult` feeding
+  `totalEPMult`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
@@ -313,6 +345,7 @@ Located in `design-docs/`:
 | `2026-07-02-infinity-points-and-records.md` | Completing Feature 2.1: Infinity Points / Infinities currency, the `Records` struct (time played, this/best infinity), the IP gain formula (pre-break = 1), Big Crunch reward+reset semantics, save/load round-trip, and the Infinity tab + IP header |
 | `2026-07-03-infinity-upgrades.md` | Feature 2.2: the 16-upgrade Infinity grid — data table, bitmask state, purchase/column prereqs, every effect and its engine application site, passive `ipGen`, save/load, and the grid UI; bottom row (`ipMult`/`ipOffline`) deferred |
 | `2026-07-03-normal-challenges.md` | Feature 2.5: the 12 Normal Challenges — run state machine (start/complete/exit, forced Big-Crunch reset, unlock chain), all 12 modifiers mapped to their engine sites, reward→autobuyer wiring, save/load, the Challenges tab UI, and an incremental plan (NC1 slice first) |
+| `2026-07-04-eternity.md` | Phase 4 (Eternity): design for Features 4.1–4.6 — EP formula + reset semantics, milestones, Time Dimensions/free tickspeed, the Time Studies tree + effect map, Eternity Challenges, Eternity Upgrades; frontier corrections (TD5–8 are Dilation-gated; Big Crunch resets Replicanti) |
 | `2026-07-04-tab-notifications.md` | Tab notification badges (the yellow `!` on tabs): the original's two-field state + trigger/clear semantics, the 5 in-frontier notifications, and the engine-owned port (trigger hooks, save round-trip, sidebar rendering + seen-acknowledgement) |
 
 The table lists key documents; see the `design-docs/` folder for the full,

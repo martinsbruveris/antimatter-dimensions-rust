@@ -478,6 +478,38 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md` and
   (store `tabNotificationSeen`) for the open subtab's key — together replacing
   the original's exclude-current-tab-at-trigger-time rule.
 
+## Eternity (Phase 4)
+
+- **Header** (`GameHeader.vue`): restructured to the original three prestige
+  containers — the EP readout + `EternityButton.vue` (left quarter), the
+  antimatter center, and the IP readout + post-break `HeaderBigCrunchButton.vue`
+  (right quarter), both buttons with the IP/EP-per-minute rate lines and the
+  red↔green relative-gain coloring. `EternityConfirmModal.vue` +
+  `confirmations.eternity`; `E` hotkey.
+- **Eternity tab** (`config/tabs.js`, hideId 7, condition
+  `eternity_unlocked`): subtabs **Time Studies** (`TimeStudiesTab.vue` — the
+  vendored tree: `data/timeStudies.js` holds the layout rows / connections /
+  descriptions, the engine ships per-study `{id, cost, is_bought, can_buy}`
+  and per-EC state for the EC nodes; vendored `time-studies.css` added to the
+  index.html cascade between styles.css and tooltips.css like the original),
+  **Time Dimensions** (`TimeDimensionsTab.vue`, hide-bit (0,2)), **Eternity
+  Upgrades** (`EternityUpgradesTab.vue` — vendored `o-eternity-upgrade` tiles +
+  the epMult spoon-group), and **Eternity Milestones**
+  (`EternityMilestonesTab.vue` — the 3-column vendored grid,
+  `data/eternityMilestones.js` strings).
+- **Eternity Challenges** (`EternityChallengesTab.vue`, Challenges tab hide-bit
+  (5,2), condition `eternity_challenges_unlocked`): 12 `c-challenge-box`
+  tiles with completions ×5, scaled goals, Start/Running/Exit;
+  `data/eternityChallenges.js` strings. The study tree's EC nodes buy the
+  unlock study, then a further click starts the challenge.
+- **Commands:** `eternity`, `buy_time_dimension` / `buy_max_time_dimension` /
+  `max_all_time_dimensions`, `buy_time_study`, `buy_time_theorem(currency)` /
+  `buy_max_time_theorems`, `set_respec`, `buy_ec_study` /
+  `start_eternity_challenge` / `exit_eternity_challenge`,
+  `buy_eternity_upgrade` / `buy_ep_mult` / `buy_max_ep_mult` — mirrored by
+  like-named `stores/game.js` actions. The first Eternity navigates to the
+  Time Dimensions subtab.
+
 ## Conventions
 
 - **Vendored CSS, verbatim.** All game-component styling comes from the
