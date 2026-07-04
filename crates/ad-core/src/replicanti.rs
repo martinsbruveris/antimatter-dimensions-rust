@@ -36,6 +36,10 @@ const INTERVAL_CAP_MS: f64 = 50.0;
 const INITIAL_CHANCE: f64 = 0.01;
 const INITIAL_INTERVAL_MS: f64 = 1000.0;
 
+/// Interval scale factor per `1.8e308` of Replicanti above the cap
+/// (`ReplicantiGrowth.scaleFactor`, the pre-alchemy 1.2 default).
+const OVER_CAP_SCALE_FACTOR: f64 = 1.2;
+
 /// Replicanti state (`player.replicanti`). Persists across a Big Crunch.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -104,15 +108,58 @@ impl GameState {
         true
     }
 
-    /// Grow Replicanti over `dt_ms` (`replicantiLoop`, simplified for pre-Eternity:
-    /// always capped, speed mult 1, no over-cap scaling). Uses the continuous "fast
-    /// gain" approximation `amount ·= (1 + chance)^ticks`; the binomial/Poisson
-    /// randomness at tiny amounts is dropped as a faithful aggregate.
+    /// Whether Replicanti may exceed the 1.8e308 cap (`Replicanti.isUncapped`,
+    /// TS192).
+    pub fn replicanti_uncapped(&self) -> bool {
+        self.time_study_bought(192)
+    }
+
+    /// The total Replicanti speed multiplier (`totalReplicantiSpeedMult`):
+    /// TS62 (×3), TS213 (×20), and TS132's ×1.5 (Achievement 134's pre-cap ×2
+    /// is a later feature).
+    fn replicanti_speed_mult(&self) -> f64 {
+        let mut mult = 1.0;
+        if self.time_study_bought(62) {
+            mult *= 3.0;
+        }
+        if self.time_study_bought(213) {
+            mult *= 20.0;
+        }
+        if self.time_study_bought(132) {
+            mult *= 1.5;
+        }
+        mult
+    }
+
+    /// The effective reproduction interval (`getReplicantiInterval`): the base
+    /// interval, ×10 under TS133 (pre-Achievement-138) or while over the cap,
+    /// scaled up by ×1.2 per 1.8e308 above the cap, divided by the speed
+    /// multiplier.
+    fn replicanti_effective_interval(&self, over_cap: bool) -> f64 {
+        let mut interval = self.replicanti.interval_ms;
+        if self.time_study_bought(133) || over_cap {
+            interval *= 10.0;
+        }
+        if over_cap {
+            let increases = (self.replicanti.amount.log10() - REPLICANTI_CAP.log10())
+                / REPLICANTI_CAP.log10();
+            interval *= OVER_CAP_SCALE_FACTOR.powf(increases);
+        }
+        interval / self.replicanti_speed_mult()
+    }
+
+    /// Grow Replicanti over `dt_ms` (`replicantiLoop`'s continuous "fast gain"
+    /// path; the binomial/Poisson randomness at tiny amounts is dropped as a
+    /// faithful aggregate). With TS192 the amount may pass the 1.8e308 cap;
+    /// past it, growth follows the original's slowed formula
+    /// `ln(new/old) = ln(1 + gain·s)/s` with `s = log10(1.2)/308.25`.
     pub fn tick_replicanti(&mut self, dt_ms: f64) {
         if !self.replicanti.unlocked {
             return;
         }
-        let interval = self.replicanti.interval_ms;
+        let over_cap =
+            self.replicanti_uncapped() && self.replicanti.amount > REPLICANTI_CAP;
+        let interval = self.replicanti_effective_interval(over_cap);
         if interval <= 0.0 {
             return;
         }
@@ -128,17 +175,74 @@ impl GameState {
         if whole <= 0.0 {
             return;
         }
-        // amount ·= (1 + chance)^whole, then clamp to the cap. Decimal::pow handles
-        // the f64 overflow that a fast interval would otherwise cause.
-        let growth = Decimal::from_float(1.0 + self.replicanti.chance)
-            .pow(&Decimal::from_float(whole));
-        self.replicanti.amount = (self.replicanti.amount * growth).min(&REPLICANTI_CAP);
+        // Natural-log growth this tick: ticks × ln(1 + chance).
+        let mut gain_ln = whole * (1.0 + self.replicanti.chance).ln();
+
+        if !self.replicanti_uncapped() {
+            let growth = Decimal::from_float(1.0 + self.replicanti.chance)
+                .pow(&Decimal::from_float(whole));
+            self.replicanti.amount =
+                (self.replicanti.amount * growth).min(&REPLICANTI_CAP);
+            return;
+        }
+
+        // Uncapped (TS192): spend gain up to the cap at full rate first.
+        if self.replicanti.amount < REPLICANTI_CAP {
+            let to_cap_ln =
+                (REPLICANTI_CAP / self.replicanti.amount.max(&Decimal::ONE)).ln();
+            if gain_ln <= to_cap_ln {
+                let growth = Decimal::from_float(gain_ln).exp();
+                self.replicanti.amount *= growth;
+                return;
+            }
+            self.replicanti.amount = REPLICANTI_CAP;
+            gain_ln -= to_cap_ln;
+        }
+        // Over the cap growth slows: post-scale per the original's formula.
+        let post_scale = OVER_CAP_SCALE_FACTOR.log10() / REPLICANTI_CAP.log10();
+        let new_ln =
+            (1.0 + gain_ln * post_scale).ln() / post_scale + self.replicanti.amount.ln();
+        self.replicanti.amount = Decimal::from_float(new_ln).exp();
     }
 
-    /// Total galaxies feeding the tickspeed formula: antimatter galaxies plus
-    /// Replicanti Galaxies (`effectiveBaseGalaxies`, pre-time-studies).
+    /// Total galaxies feeding the tickspeed formula (`effectiveBaseGalaxies`):
+    /// antimatter galaxies plus Replicanti Galaxies — RGs strengthened by
+    /// TS132 (+40%) / TS133 (+50%) and joined by the "extra" RGs from
+    /// TS225/TS226 (which the strength boosts do not affect).
     pub fn effective_galaxies(&self) -> u32 {
-        self.galaxies + self.replicanti.galaxies
+        let mut rgs = self.replicanti.galaxies as f64;
+        let mut strength = 1.0;
+        if self.time_study_bought(132) {
+            strength += 0.4;
+        }
+        if self.time_study_bought(133) {
+            strength += 0.5;
+        }
+        rgs *= strength;
+        self.galaxies + rgs as u32 + self.extra_replicanti_galaxies()
+    }
+
+    /// The "extra" Replicanti Galaxies (`Replicanti.galaxies.extra`): TS225
+    /// (from the Replicanti amount's exponent) + TS226 (from the bought cap).
+    pub fn extra_replicanti_galaxies(&self) -> u32 {
+        let mut extra = 0;
+        if self.time_study_bought(225) {
+            extra += (self.replicanti.amount.exponent().max(0) / 1000) as u32;
+        }
+        if self.time_study_bought(226) {
+            extra += self.replicanti.galaxy_cap / 15;
+        }
+        extra
+    }
+
+    /// Max purchasable Replicanti Galaxies (`Replicanti.galaxies.max`): the
+    /// bought cap plus TS131's +50%.
+    pub fn replicanti_galaxy_max(&self) -> u32 {
+        let mut max = self.replicanti.galaxy_cap;
+        if self.time_study_bought(131) {
+            max += self.replicanti.galaxy_cap / 2;
+        }
+        max
     }
 
     /// Replicanti's multiplier to all Infinity Dimensions: `log2(max(amount, 1))^2`,
@@ -147,7 +251,20 @@ impl GameState {
     pub fn replicanti_mult(&self) -> Decimal {
         let log2 = self.replicanti.amount.max(&Decimal::ONE).log10()
             / std::f64::consts::LOG10_2;
-        Decimal::from_float(log2 * log2).max(&Decimal::ONE)
+        let mut mult = Decimal::from_float(log2 * log2);
+        // TS21 adds `amount^0.032`; TS102 multiplies by `5^RGs`.
+        if self.time_study_bought(21) {
+            mult += self
+                .replicanti
+                .amount
+                .max(&Decimal::ONE)
+                .pow(&Decimal::from_float(0.032));
+        }
+        if self.time_study_bought(102) {
+            mult *= Decimal::from_float(5.0)
+                .pow(&Decimal::from(self.replicanti.galaxies as u64));
+        }
+        mult.max(&Decimal::ONE)
     }
 
     // --- Replicanti Galaxies -------------------------------------------------
@@ -156,7 +273,7 @@ impl GameState {
     /// bought-galaxy cap (`Replicanti.galaxies.canBuyMore`).
     pub fn can_buy_replicanti_galaxy(&self) -> bool {
         self.replicanti.amount >= REPLICANTI_CAP
-            && self.replicanti.galaxies < self.replicanti.galaxy_cap
+            && self.replicanti.galaxies < self.replicanti_galaxy_max()
     }
 
     /// Buy one Replicanti Galaxy (`replicantiGalaxy`): reset replicanti to 1, add an
@@ -205,9 +322,19 @@ impl GameState {
         true
     }
 
-    /// Whether the interval upgrade is capped (interval ≤ 50 ms).
+    /// The interval upgrade floor (`Effects.min(50, TimeStudy(22))`): 50 ms,
+    /// or 1 ms with TS22.
+    fn replicanti_interval_floor(&self) -> f64 {
+        if self.time_study_bought(22) {
+            1.0
+        } else {
+            INTERVAL_CAP_MS
+        }
+    }
+
+    /// Whether the interval upgrade is capped (interval at the floor).
     pub fn replicanti_interval_capped(&self) -> bool {
-        self.replicanti.interval_ms <= INTERVAL_CAP_MS
+        self.replicanti.interval_ms <= self.replicanti_interval_floor()
     }
 
     /// Whether the interval upgrade can be bought (not capped, affordable).
@@ -224,7 +351,7 @@ impl GameState {
         self.infinity_points -= self.replicanti.interval_cost;
         self.replicanti.interval_cost *= Decimal::from_float(INTERVAL_COST_MULT);
         self.replicanti.interval_ms =
-            (self.replicanti.interval_ms * 0.9).max(INTERVAL_CAP_MS);
+            (self.replicanti.interval_ms * 0.9).max(self.replicanti_interval_floor());
         true
     }
 
@@ -234,7 +361,16 @@ impl GameState {
     pub fn replicanti_galaxy_cost(&self) -> Decimal {
         let count = self.replicanti.galaxy_cap as f64;
         let log_cost = 170.0 + 25.0 * count + 5.0 * count * (count - 1.0) / 2.0;
-        Decimal::pow10(log_cost)
+        let mut cost = Decimal::pow10(log_cost);
+        // TS233: cheaper based on the current Replicanti amount.
+        if self.time_study_bought(233) {
+            cost /= self
+                .replicanti
+                .amount
+                .max(&Decimal::ONE)
+                .pow(&Decimal::from_float(0.3));
+        }
+        cost
     }
 
     /// Whether the galaxy-cap upgrade can be bought (affordable).
@@ -402,7 +538,9 @@ mod tests {
     }
 
     #[test]
-    fn replicanti_survive_a_crunch() {
+    fn crunch_resets_replicanti_amount_and_galaxies() {
+        // `secondSoftReset`: a Big Crunch resets the amount to 1 and RGs to 0
+        // (the upgrades persist). Achievement 95 / TS33 keep some (below).
         let mut game = unlocked_game();
         game.replicanti.amount = Decimal::from_float(1e6);
         game.replicanti.galaxies = 2;
@@ -411,10 +549,38 @@ mod tests {
         game.antimatter = BIG_CRUNCH_THRESHOLD;
         assert!(game.big_crunch());
 
-        // Replicanti are untouched by a Big Crunch (they reset only on Eternity).
         assert!(game.replicanti.unlocked);
-        assert_eq!(game.replicanti.amount, Decimal::from_float(1e6));
-        assert_eq!(game.replicanti.galaxies, 2);
+        assert_eq!(game.replicanti.amount, Decimal::ONE);
+        assert_eq!(game.replicanti.galaxies, 0);
         assert_eq!(game.replicanti.chance, 0.05);
+    }
+
+    #[test]
+    fn ts33_keeps_half_the_rgs_on_crunch() {
+        let mut game = unlocked_game();
+        game.studies = vec![33];
+        game.replicanti.galaxies = 5;
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+        assert_eq!(game.replicanti.galaxies, 2);
+    }
+
+    #[test]
+    fn ts192_lets_replicanti_pass_the_cap() {
+        let mut game = unlocked_game();
+        game.studies = vec![192];
+        game.replicanti.chance = 1.0;
+        game.replicanti.interval_ms = 50.0;
+        game.replicanti.amount = REPLICANTI_CAP;
+        game.tick_replicanti(10_000.0);
+        assert!(game.replicanti.amount > REPLICANTI_CAP);
+
+        // Without TS192 the amount stays clamped.
+        let mut capped = unlocked_game();
+        capped.replicanti.chance = 1.0;
+        capped.replicanti.interval_ms = 50.0;
+        capped.replicanti.amount = REPLICANTI_CAP;
+        capped.tick_replicanti(10_000.0);
+        assert_eq!(capped.replicanti.amount, REPLICANTI_CAP);
     }
 }

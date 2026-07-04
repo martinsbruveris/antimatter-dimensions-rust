@@ -135,6 +135,39 @@ impl Default for BestEternity {
     }
 }
 
+/// One entry of the last-10-eternities ring (`player.records.recentEternities`
+/// tuples `[time, realTime, EP, eternities]`; the trailing challenge/TT slots
+/// are not modelled). The `f64::MAX` sentinel means "no run yet".
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RecentEternity {
+    /// Game time of the run (ms).
+    pub time_ms: f64,
+    /// Real time of the run (ms). Feeds TS121's average-eternity-speed effect.
+    pub real_time_ms: f64,
+    /// EP gained by the run.
+    pub ep: Decimal,
+    /// Eternities gained by the run.
+    pub eternities: Decimal,
+}
+
+impl RecentEternity {
+    pub fn placeholder() -> Self {
+        Self {
+            time_ms: f64::MAX,
+            real_time_ms: f64::MAX,
+            ep: Decimal::ONE,
+            eternities: Decimal::ONE,
+        }
+    }
+}
+
+/// serde default for the recent-eternities ring (10 placeholders).
+#[cfg(feature = "serde")]
+fn default_recent_eternities() -> Vec<RecentEternity> {
+    vec![RecentEternity::placeholder(); 10]
+}
+
 /// Records for the fastest infinity performed. Persists across a Big Crunch.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -183,6 +216,9 @@ pub struct Records {
     /// The fastest eternity's records (kept on Eternity).
     #[cfg_attr(feature = "serde", serde(default))]
     pub best_eternity: BestEternity,
+    /// The last 10 eternities, newest first (`records.recentEternities`).
+    #[cfg_attr(feature = "serde", serde(default = "default_recent_eternities"))]
+    pub recent_eternities: Vec<RecentEternity>,
 }
 
 impl Records {
@@ -194,6 +230,7 @@ impl Records {
             best_infinity: BestInfinity::new(),
             this_eternity: ThisEternity::new(),
             best_eternity: BestEternity::new(),
+            recent_eternities: vec![RecentEternity::placeholder(); 10],
         }
     }
 }

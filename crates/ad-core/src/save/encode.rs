@@ -166,6 +166,44 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // NC9 tickspeed cost bumps.
     player["chall9TickspeedCostBumps"] = json!(state.tickspeed.cost_bumps);
 
+    // Time Studies + Time Theorems.
+    let ts = &mut player["timestudy"];
+    ts["theorem"] = decimal(&state.time_theorems);
+    ts["maxTheorem"] = decimal(&state.max_theorem);
+    ts["amBought"] = json!(state.tt_am_bought);
+    ts["ipBought"] = json!(state.tt_ip_bought);
+    ts["epBought"] = json!(state.tt_ep_bought);
+    ts["studies"] = json!(state.studies);
+    player["respec"] = json!(state.respec);
+    player["infinitiesBanked"] = decimal(&state.infinities_banked);
+    // EC state: the held study slot and the completion-count map.
+    player["challenge"]["eternity"]["unlocked"] =
+        json!(state.eternity_challenge_unlocked);
+    let mut ec_map = serde_json::Map::new();
+    for (i, &count) in state.eternity_challenges.iter().enumerate() {
+        if count > 0 {
+            ec_map.insert(format!("eterc{}", i + 1), json!(count));
+        }
+    }
+    player["eternityChalls"] = Value::Object(ec_map);
+    // The recent-eternities ring, as the original's 6-tuples (challenge text
+    // and TT-gain slots are unmodelled → "" and "0").
+    player["records"]["recentEternities"] = json!(state
+        .records
+        .recent_eternities
+        .iter()
+        .map(|r| {
+            json!([
+                r.time_ms,
+                r.real_time_ms,
+                r.ep.to_string(),
+                r.eternities.to_string(),
+                "",
+                "0"
+            ])
+        })
+        .collect::<Vec<_>>());
+
     // Time Dimensions + Time Shards + free tickspeed upgrades.
     player["timeShards"] = decimal(&state.time_shards);
     player["totalTickGained"] = json!(state.total_tick_gained);

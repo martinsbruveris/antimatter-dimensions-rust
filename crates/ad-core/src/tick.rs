@@ -24,6 +24,8 @@ impl GameState {
         // Passive Infinity-Point generation from the `ipGen` Infinity Upgrade
         // (mirrors the original's `preProductionGenerateIP`).
         self.generate_passive_ip(dt_ms);
+        // TS181: 1% of the pending crunch IP per second.
+        self.generate_ts181_ip(dt_ms);
 
         let dt_seconds = dt_ms / 1000.0;
         let dt = Decimal::from_float(dt_seconds);

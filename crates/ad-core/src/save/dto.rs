@@ -36,7 +36,9 @@ use crate::options::{
     MAX_NOTATION_DIGITS, MAX_UPDATE_RATE_MS, MIN_AUTOSAVE_INTERVAL_MS,
     MIN_NOTATION_DIGITS, MIN_UPDATE_RATE_MS, TAB_COUNT,
 };
-use crate::records::{BestEternity, BestInfinity, Records, ThisEternity, ThisInfinity};
+use crate::records::{
+    BestEternity, BestInfinity, RecentEternity, Records, ThisEternity, ThisInfinity,
+};
 use crate::replicanti::ReplicantiState;
 use crate::state::{DimensionTier, GameState, TickspeedState};
 use crate::time_dimensions::{time_dimension_cost, TimeDimension, TIME_DIMENSION_COUNT};
@@ -84,6 +86,15 @@ pub struct PlayerDTO {
     pub time_shards: Decimal,
     /// `player.totalTickGained` — free Tickspeed upgrades from Time Shards.
     pub total_tick_gained: u64,
+    /// `player.timestudy` — Time Theorems + bought studies.
+    pub timestudy: TimestudyDTO,
+    /// `player.respec` — respec the study tree on the next Eternity.
+    pub respec: bool,
+    /// `player.infinitiesBanked` — banked Infinities (TS191).
+    #[serde(with = "break_infinity::serde_string")]
+    pub infinities_banked: Decimal,
+    /// `player.eternityChalls` — per-EC completion counts (`"eterc<N>"` keys).
+    pub eternity_challs: std::collections::HashMap<String, u8>,
     /// `player.infinityPower` — produced by the Infinity Dimensions.
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_power: Decimal,
@@ -155,12 +166,38 @@ pub struct ReplicantiDTO {
     pub galaxies: u32,
 }
 
-/// `player.challenge` — the `normal` and `infinity` run states (eternity
-/// challenges are a later feature).
+/// `player.challenge` — the `normal`, `infinity`, and `eternity` run states.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChallengeDTO {
     pub normal: NormalChallengeDTO,
     pub infinity: InfinityChallengeDTO,
+    pub eternity: EternityChallengeDTO,
+}
+
+/// `player.challenge.eternity` (modelled subset; `requirementBits` is ignored
+/// until a consumer exists).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EternityChallengeDTO {
+    /// Active challenge id (`0` = none).
+    pub current: u8,
+    /// The EC whose unlock study is held (`0` = none).
+    pub unlocked: u8,
+}
+
+/// `player.timestudy` (modelled subset; presets/preferred paths are
+/// frontend-free for now and ignored).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimestudyDTO {
+    #[serde(with = "break_infinity::serde_string")]
+    pub theorem: Decimal,
+    #[serde(with = "break_infinity::serde_string")]
+    pub max_theorem: Decimal,
+    pub am_bought: u32,
+    pub ip_bought: u32,
+    pub ep_bought: u32,
+    pub studies: Vec<u16>,
 }
 
 /// `player.challenge.infinity` (modelled subset).
@@ -242,6 +279,10 @@ pub struct RecordsDTO {
     pub best_infinity: BestInfinityDTO,
     pub this_eternity: ThisEternityDTO,
     pub best_eternity: BestEternityDTO,
+    /// `records.recentEternities` — 10 mixed-type tuples
+    /// `[time, realTime, EP, eternities, challenge, TT]`; parsed leniently
+    /// (unrecognized shapes fall back to the placeholder entry).
+    pub recent_eternities: Vec<serde_json::Value>,
 }
 
 /// `player.records.thisEternity` (modelled subset): timing plus the peak
@@ -573,6 +614,45 @@ impl GameState {
         }
         let infinity_rebuyables = [rebuyables[0], rebuyables[1], rebuyables[2]];
 
+        // Parse the recent-eternities tuples: `[time, realTime, EP-string,
+        // eternities-string, ...]`. Decimals may be strings or plain numbers.
+        let parse_decimal = |v: &serde_json::Value| -> Option<Decimal> {
+            match v {
+                serde_json::Value::String(s) => s.parse().ok(),
+                serde_json::Value::Number(n) => n.as_f64().map(Decimal::from_float),
+                _ => None,
+            }
+        };
+        let mut recent_eternities = Vec::with_capacity(10);
+        for entry in dto.records.recent_eternities.iter().take(10) {
+            let parsed = entry.as_array().and_then(|t| {
+                Some(RecentEternity {
+                    time_ms: t.first()?.as_f64()?,
+                    real_time_ms: t.get(1)?.as_f64()?,
+                    ep: parse_decimal(t.get(2)?)?,
+                    eternities: parse_decimal(t.get(3)?)?,
+                })
+            });
+            recent_eternities.push(parsed.unwrap_or_else(RecentEternity::placeholder));
+        }
+        while recent_eternities.len() < 10 {
+            recent_eternities.push(RecentEternity::placeholder());
+        }
+
+        // Per-EC completion counts from the `eternityChalls` map.
+        let mut eternity_challenges = [0u8; 12];
+        for (key, count) in &dto.eternity_challs {
+            if let Some(id) = key
+                .strip_prefix("eterc")
+                .and_then(|n| n.parse::<usize>().ok())
+            {
+                if (1..=12).contains(&id) {
+                    eternity_challenges[id - 1] =
+                        (*count).min(crate::eternity_challenges::EC_MAX_COMPLETIONS);
+                }
+            }
+        }
+
         let records = Records {
             total_time_played_ms: dto.records.total_time_played,
             real_time_played_ms: dto.records.real_time_played,
@@ -602,6 +682,7 @@ impl GameState {
                 time_ms: dto.records.best_eternity.time,
                 real_time_ms: dto.records.best_eternity.real_time,
             },
+            recent_eternities,
         };
 
         // Achievement bitmask. The original's `achievementBits` is 17 rows in a
@@ -763,6 +844,16 @@ impl GameState {
             time_dimensions,
             time_shards: dto.time_shards,
             total_tick_gained: dto.total_tick_gained,
+            time_theorems: dto.timestudy.theorem,
+            max_theorem: dto.timestudy.max_theorem,
+            tt_am_bought: dto.timestudy.am_bought,
+            tt_ip_bought: dto.timestudy.ip_bought,
+            tt_ep_bought: dto.timestudy.ep_bought,
+            studies: dto.timestudy.studies.clone(),
+            respec: dto.respec,
+            infinities_banked: dto.infinities_banked,
+            eternity_challenge_unlocked: dto.challenge.eternity.unlocked,
+            eternity_challenges,
             infinity_upgrades,
             part_infinity_point: dto.part_infinity_point,
             challenge: NormalChallengeState {

@@ -192,6 +192,51 @@ impl GameState {
         // Sacrifice multiplier applies only to 8th dimension
         if tier == 7 {
             mult *= self.sacrifice_multiplier();
+            // TS214: Dimensional Sacrifice boosts the 8th dimension even more
+            // (each term exponent-capped like the original's clampMaxExponent).
+            if self.time_study_bought(214) {
+                let total = self.sacrifice_multiplier();
+                let first = total
+                    .pow(&Decimal::from_float(7.6))
+                    .min(&Decimal::new_unchecked(1.0, 44_000));
+                let second = total
+                    .pow(&Decimal::from_float(1.05))
+                    .min(&Decimal::new_unchecked(1.0, 120_000));
+                mult *= (first * second).min(&Decimal::new_unchecked(1.0, 164_000));
+            }
+        } else if self.time_study_bought(71) {
+            // TS71: sacrifice affects all other ADs with reduced effect.
+            mult *= self
+                .sacrifice_multiplier()
+                .pow(&Decimal::from_float(0.25))
+                .max(&Decimal::ONE)
+                .min(&Decimal::new_unchecked(1.0, 210_000));
+        }
+        // TS234: sacrifice applies to the 1st dimension in full.
+        if tier == 0 && self.time_study_bought(234) {
+            mult *= self.sacrifice_multiplier();
+        }
+
+        // All-tier Time Study multipliers.
+        // TS91: based on time spent this eternity (caps at 20 minutes).
+        if self.time_study_bought(91) {
+            let minutes = (self.records.this_eternity.time_ms / 60_000.0).min(20.0);
+            mult *= Decimal::pow10(minutes * 15.0);
+        }
+        // TS101: equal to the Replicanti amount.
+        if self.time_study_bought(101) {
+            mult *= self.replicanti.amount.max(&Decimal::ONE);
+        }
+        // TS161: flat ×1e616.
+        if self.time_study_bought(161) {
+            mult *= Decimal::new_unchecked(1.0, 616);
+        }
+        // TS193: based on Eternities (caps at 1e13000 at 1e6 eternities).
+        if self.time_study_bought(193) {
+            let frac = (self.eternities / Decimal::from_float(1e6))
+                .min(&Decimal::ONE)
+                .to_f64();
+            mult *= Decimal::pow10(13_000.0 * frac);
         }
 
         // Achievement effects. The global achievement power applies to every

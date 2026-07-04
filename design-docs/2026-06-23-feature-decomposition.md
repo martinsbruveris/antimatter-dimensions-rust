@@ -677,6 +677,17 @@ After initial splits, paths converge and diverge through:
 **Respec:** Can refund all Time Studies, getting back Time Theorems. Some resets auto-
 respec (on eternity by default, configurable).
 
+**Status:** ✅ Implemented (TT purchases with AM/IP/EP — note the IP cost step
+is ×1e100, not the ×10 above; the 58-study pre-dilation catalogue with the
+Dimension split, mutually exclusive Pace columns and Light/Dark pairs, respec
+flag + refund; ~40 in-frontier study effects wired at their engine sites incl.
+banked Infinities (TS191), uncapped Replicanti (TS192), the crunch-time RG keeps
+(TS33) — which also fixed our port to reset Replicanti on a Big Crunch like the
+original — distant/remote galaxy scaling (needed by TS223/224), and the last-10-
+eternities record ring (TS121); save round-trip; the vendored tree UI with SVG
+connections + vendored time-studies.css). EC study slots render as placeholders
+until Feature 4.5. See `design-docs/2026-07-04-eternity.md` §4.
+
 ---
 
 ### Feature 4.5: Eternity Challenges (12)

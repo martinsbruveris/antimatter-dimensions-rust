@@ -26,7 +26,7 @@ impl GameState {
     /// achievement/time-study factors that further raise the exponent are later
     /// features.) Mirrors `Sacrifice.sacrificeExponent`.
     fn sacrifice_exponent(&self) -> f64 {
-        if self.challenge_running(8) {
+        let base = if self.challenge_running(8) {
             1.0
         } else if self.infinity_challenge_completed(2) {
             // IC2 completed drops a log10 (a much stronger sacrifice); the exponent
@@ -34,7 +34,15 @@ impl GameState {
             1.0 / 120.0
         } else {
             SACRIFICE_EXPONENT
-        }
+        };
+        // `base × preIC2 × postIC2`: achievements 32/57 (preIC2) and 88 are
+        // later features; TS228 contributes +0.2 to the postIC2 factor.
+        let post_ic2 = if self.time_study_bought(228) {
+            1.2
+        } else {
+            1.0
+        };
+        base * post_ic2
     }
 
     /// Whether the IC2-completed sacrifice formula is active (the "pre-power" value

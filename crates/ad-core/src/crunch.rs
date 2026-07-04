@@ -25,20 +25,44 @@ impl GameState {
     }
 
     /// The Infinity-Point formula divisor (`Effects.min(308, Achievement(103),
-    /// TimeStudy(111))`). Both reducers are post-Infinity content we don't model
-    /// yet, so this is a constant 308 for now; kept as a method so those slot in
-    /// by lowering the value rather than rewriting `gained_infinity_points`.
+    /// TimeStudy(111))`). TS111 lowers it to 285; Achievement 103 is a later
+    /// feature.
     fn ip_gain_divisor(&self) -> f64 {
-        308.0
+        if self.time_study_bought(111) {
+            285.0
+        } else {
+            308.0
+        }
     }
 
-    /// The global Infinity-Point multiplier (`GameCache.totalIPMult`). Every
-    /// source (the IP-mult Infinity Upgrade, achievements 85/93/116/125, time
-    /// studies, …) is a later feature, so this is 1 for now; kept as a method so
-    /// those become multiplicative additions here. Read by
+    /// The global Infinity-Point multiplier (`totalIPMult`): Time Studies
+    /// 41/51/141/142/143. The IP-mult Infinity Upgrade and achievements
+    /// 85/93/116/125 are later features. Read by
     /// [`GameState::generate_passive_ip`] too.
     pub(crate) fn total_ip_mult(&self) -> Decimal {
-        Decimal::ONE
+        let mut mult = Decimal::ONE;
+        // TS41: ×1.2 per galaxy of any kind.
+        if self.time_study_bought(41) {
+            let galaxies = self.effective_galaxies();
+            mult *= Decimal::from_float(1.2).pow(&Decimal::from(galaxies as u64));
+        }
+        if self.time_study_bought(51) {
+            mult *= Decimal::new_unchecked(1.0, 15);
+        }
+        // The Pace-split IP studies: decaying (Active), flat (Passive), growing
+        // (Idle) over the current infinity.
+        let infinity_secs = self.records.this_infinity.time_ms / 1000.0;
+        if self.time_study_bought(141) {
+            let decay = Self::this_infinity_mult(infinity_secs);
+            mult *= (Decimal::new_unchecked(1.0, 45) / decay).max(&Decimal::ONE);
+        }
+        if self.time_study_bought(142) {
+            mult *= Decimal::new_unchecked(1.0, 25);
+        }
+        if self.time_study_bought(143) {
+            mult *= Self::this_infinity_mult(infinity_secs);
+        }
+        mult
     }
 
     /// Infinity Points a Big Crunch would grant right now. Mirrors
@@ -58,9 +82,14 @@ impl GameState {
     }
 
     /// Infinities a Big Crunch would grant right now. Mirrors `gainedInfinities`:
-    /// `Effects.max(1, Achievement(87)) × …`, all sources post-Reality, so 1 here.
+    /// base 1 (Achievement 87 is post-Reality) times TS32's Dimension-Boost
+    /// multiplier.
     pub fn gained_infinities(&self) -> Decimal {
-        Decimal::ONE
+        let mut gain = Decimal::ONE;
+        if self.time_study_bought(32) {
+            gain *= Decimal::from((self.dim_boosts as u64).max(1));
+        }
+        gain
     }
 
     /// Perform the first Big Crunch (Infinity): reset all pre-Infinity progress
@@ -168,6 +197,23 @@ impl GameState {
         // Reset Infinity Power and each Infinity Dimension's amount to its bought
         // base (`InfinityDimensions.resetAmount`); purchases/cost/unlock persist.
         self.reset_infinity_dimension_amounts();
+        // Replicanti reset (`secondSoftReset` + `bigCrunchResetValues`): amount
+        // back to 1 and Replicanti Galaxies to 0 — except Achievement 95 keeps
+        // the amount (and 1 RG) and TS33 keeps half the RGs.
+        let current_replicanti = self.replicanti.amount;
+        let current_rgs = self.replicanti.galaxies;
+        if self.replicanti.unlocked {
+            self.replicanti.amount = Decimal::ONE;
+        }
+        let mut remaining_rgs = 0;
+        if self.achievement_unlocked(95) {
+            self.replicanti.amount = current_replicanti;
+            remaining_rgs += current_rgs.min(1);
+        }
+        if self.time_study_bought(33) {
+            remaining_rgs += current_rgs / 2;
+        }
+        self.replicanti.galaxies = remaining_rgs.min(current_rgs);
         // Re-apply skip-reset Infinity Upgrades (original `secondSoftReset` →
         // `softReset` → `skipResetsIfPossible`): start the next infinity already at
         // the highest owned skip level (and with a Galaxy for skipResetGalaxy).

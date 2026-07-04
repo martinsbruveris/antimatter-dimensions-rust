@@ -311,6 +311,8 @@ struct GameView {
     eternity_milestones: Vec<EternityMilestoneView>,
     /// Time Dimensions tab state (8 tiers + Time Shards / free tickspeed).
     time_dimensions: TimeDimensionsView,
+    /// Time Studies tab state (TT + the study tree).
+    time_studies: TimeStudiesView,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
     infinity_upgrades: Vec<InfinityUpgradeView>,
     /// Whether the Challenges tab is available (post first Infinity).
@@ -431,6 +433,37 @@ struct TimeDimensionView {
     available_for_purchase: bool,
     /// Per-second growth (+X%/s) from the tier above.
     rate_percent: f64,
+}
+
+/// Serializable view of the Time Studies tab.
+#[derive(Serialize)]
+struct TimeStudiesView {
+    /// Unspent Time Theorems.
+    theorems: Num,
+    /// Whether TT can be bought at all (a 1st Time Dimension is owned).
+    can_buy_tt: bool,
+    /// Next TT cost per currency + affordability.
+    am_cost: Num,
+    ip_cost: Num,
+    ep_cost: Num,
+    can_afford_am: bool,
+    can_afford_ip: bool,
+    can_afford_ep: bool,
+    /// Whether the next Eternity respecs the tree.
+    respec: bool,
+    /// Per-study state, in catalogue order.
+    studies: Vec<TimeStudyView>,
+    /// The EC whose unlock study is held (0 = none; Feature 4.5).
+    ec_unlocked: u8,
+}
+
+/// Serializable view of one time study node.
+#[derive(Serialize)]
+struct TimeStudyView {
+    id: u16,
+    cost: f64,
+    is_bought: bool,
+    can_buy: bool,
 }
 
 /// Serializable view of one Eternity Milestone (grid order = threshold order).
@@ -773,6 +806,33 @@ fn build_time_dimensions_view(game: &GameState) -> TimeDimensionsView {
     }
 }
 
+fn build_time_studies_view(game: &GameState) -> TimeStudiesView {
+    TimeStudiesView {
+        theorems: num(&game.time_theorems),
+        can_buy_tt: game.can_buy_time_theorems(),
+        am_cost: num(&game.tt_cost_am()),
+        ip_cost: num(&game.tt_cost_ip()),
+        ep_cost: num(&game.tt_cost_ep()),
+        can_afford_am: game.can_buy_time_theorems()
+            && game.antimatter >= game.tt_cost_am(),
+        can_afford_ip: game.can_buy_time_theorems()
+            && game.infinity_points >= game.tt_cost_ip(),
+        can_afford_ep: game.can_buy_time_theorems()
+            && game.eternity_points >= game.tt_cost_ep(),
+        respec: game.respec,
+        studies: ad_core::TIME_STUDIES
+            .iter()
+            .map(|d| TimeStudyView {
+                id: d.id,
+                cost: d.cost,
+                is_bought: game.time_study_bought(d.id),
+                can_buy: game.can_buy_time_study(d.id),
+            })
+            .collect(),
+        ec_unlocked: game.eternity_challenge_unlocked,
+    }
+}
+
 fn build_game_view(game: &GameState) -> GameView {
     let unlocked = game.unlocked_dimensions();
     let mut dimensions = Vec::with_capacity(8);
@@ -866,6 +926,7 @@ fn build_game_view(game: &GameState) -> GameView {
         best_ep_min: num(&game.records.this_eternity.best_ep_min),
         best_ep_min_val: num(&game.records.this_eternity.best_ep_min_val),
         time_dimensions: build_time_dimensions_view(game),
+        time_studies: build_time_studies_view(game),
         eternity_milestones: ad_core::ETERNITY_MILESTONES
             .iter()
             .map(|m| EternityMilestoneView {
@@ -1106,6 +1167,38 @@ fn max_all(state: State<'_, Mutex<GameState>>) {
 fn big_crunch(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.big_crunch();
+}
+
+#[tauri::command]
+fn buy_time_study(id: u16, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_time_study(id);
+}
+
+#[tauri::command]
+fn buy_time_theorem(currency: String, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    match currency.as_str() {
+        "am" => {
+            game.buy_tt_with_am();
+        }
+        "ip" => {
+            game.buy_tt_with_ip();
+        }
+        "ep" => {
+            game.buy_tt_with_ep();
+        }
+        _ => {}
+    }
+}
+
+#[tauri::command]
+fn buy_max_time_theorems(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_max_time_theorems();
+}
+
+#[tauri::command]
+fn set_respec(respec: bool, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().set_respec(respec);
 }
 
 #[tauri::command]
@@ -1828,6 +1921,10 @@ pub fn run() {
             buy_time_dimension,
             buy_max_time_dimension,
             max_all_time_dimensions,
+            buy_time_study,
+            buy_time_theorem,
+            buy_max_time_theorems,
+            set_respec,
             break_infinity,
             buy_break_infinity_upgrade,
             buy_break_infinity_rebuyable,

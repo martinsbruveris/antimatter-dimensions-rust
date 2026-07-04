@@ -237,7 +237,24 @@ impl GameState {
         if self.infinity_challenge_running(7) {
             power = power.max(10.0);
         }
-        Decimal::from_float(power)
+        // TS81 raises the base to ×10 (`Effects.max`).
+        if self.time_study_bought(81) {
+            power = power.max(10.0);
+        }
+        let mut boost = Decimal::from_float(power);
+        // TS83: ×1.0004 per free tickspeed upgrade, capped at 1e30.
+        if self.time_study_bought(83) {
+            boost *= Decimal::from_float(1.0004)
+                .pow(&Decimal::from(self.total_tick_gained))
+                .min(&Decimal::new_unchecked(1.0, 30));
+        }
+        // TS231: Dimension Boosts are stronger based on their amount.
+        if self.time_study_bought(231) {
+            boost *= Decimal::from(self.dim_boosts as u64)
+                .pow(&Decimal::from_float(0.3))
+                .max(&Decimal::ONE);
+        }
+        boost
     }
 
     /// The galaxy-strength effect that scales the tickspeed formula's per-galaxy

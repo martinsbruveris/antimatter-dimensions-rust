@@ -7,6 +7,7 @@ pub mod crunch;
 pub mod data;
 pub mod dimensions;
 pub mod eternity;
+pub mod eternity_challenges;
 pub mod eternity_milestones;
 pub mod galaxy;
 pub mod infinity_challenges;
@@ -24,6 +25,7 @@ pub mod tab_notifications;
 pub mod tick;
 pub mod tickspeed;
 pub mod time_dimensions;
+pub mod time_studies;
 pub mod tutorial;
 
 pub use action::{Action, ActionOutcome};
@@ -35,6 +37,7 @@ pub use break_infinity_upgrades::{
 };
 pub use challenges::{NormalChallengeState, NORMAL_CHALLENGE_COUNT};
 pub use eternity::ETERNITY_GOAL;
+pub use eternity_challenges::{ec_study_cost, ETERNITY_CHALLENGE_COUNT};
 pub use eternity_milestones::{EternityMilestone, ETERNITY_MILESTONES};
 pub use infinity_challenges::{InfinityChallengeState, INFINITY_CHALLENGE_COUNT};
 pub use infinity_dimensions::{InfinityDimension, INFINITY_DIMENSION_COUNT};
@@ -49,3 +52,4 @@ pub use state::{DimensionTier, GameState, TickspeedState};
 pub use tab_notifications::TabNotificationId;
 pub use tick::offline_plan;
 pub use time_dimensions::{TimeDimension, TIME_DIMENSION_COUNT};
+pub use time_studies::{time_study_def, TimeStudyDef, TsRequirement, TIME_STUDIES};

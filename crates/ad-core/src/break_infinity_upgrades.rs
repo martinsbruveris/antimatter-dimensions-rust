@@ -247,7 +247,15 @@ impl GameState {
             mult *= Decimal::from_float(e.max(0.0).powf(0.5));
         }
         if self.break_infinity_upgrade_bought(BreakInfinityUpgrade::InfinitiedMult) {
-            mult *= Decimal::from_float(1.0 + self.infinities.pos_log10() * 10.0);
+            // Reads infinitiesTotal (banked included); TS31 raises the whole
+            // infinity-count bonus to the 4th power.
+            let base =
+                Decimal::from_float(1.0 + self.infinities_total().pos_log10() * 10.0);
+            mult *= if self.time_study_bought(31) {
+                base.pow(&Decimal::from_float(4.0))
+            } else {
+                base
+            };
         }
         if self.break_infinity_upgrade_bought(BreakInfinityUpgrade::AchievementMult) {
             let count = self.achievement_count() as f64;

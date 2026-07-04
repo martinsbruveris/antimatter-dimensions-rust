@@ -179,11 +179,31 @@ impl GameState {
     }
 
     /// The all-tier Time Dimension multiplier
-    /// (`timeDimensionCommonMultiplier`). In-frontier sources land with Time
-    /// Studies (93/103/151/221), Eternity Upgrades 4–6, and the EC1/EC10
-    /// rewards; ×1 until then.
+    /// (`timeDimensionCommonMultiplier`): Time Studies 93/103/151/221.
+    /// Eternity Upgrades 4–6 join with Feature 4.6, the EC1/EC10 rewards with
+    /// 4.5.
     pub(crate) fn td_common_multiplier(&self) -> Decimal {
-        Decimal::ONE
+        let mut mult = Decimal::ONE;
+        // TS93: tick upgrades gained ^0.25 (min 1).
+        if self.time_study_bought(93) {
+            mult *= Decimal::from(self.total_tick_gained)
+                .pow(&Decimal::from_float(0.25))
+                .max(&Decimal::ONE);
+        }
+        // TS103: equal to the Replicanti Galaxy count (min 1).
+        if self.time_study_bought(103) {
+            mult *= Decimal::from((self.replicanti.galaxies as u64).max(1));
+        }
+        // TS151: flat ×1e4.
+        if self.time_study_bought(151) {
+            mult *= Decimal::from_float(1e4);
+        }
+        // TS221: based on Dimension Boosts.
+        if self.time_study_bought(221) {
+            mult *=
+                Decimal::from_float(1.0025).pow(&Decimal::from(self.dim_boosts as u64));
+        }
+        mult
     }
 
     /// Tier `t`'s production multiplier: `commonMult × 4^bought` (tier 8's
@@ -194,8 +214,25 @@ impl GameState {
         if tier == TIME_DIMENSION_COUNT - 1 {
             bought = bought.min(TD8_MULT_BOUGHT_CAP);
         }
-        self.td_common_multiplier()
-            * Decimal::from_float(TD_POWER_MULT).pow(&Decimal::from(bought))
+        let mut mult = self.td_common_multiplier()
+            * Decimal::from_float(TD_POWER_MULT).pow(&Decimal::from(bought));
+        // Per-tier studies: TS11 (tier 1, tickspeed-based), TS73 (tier 3,
+        // sacrifice^0.005 cap 1e1300), TS227 (tier 4, sacrifice-log^10).
+        if tier == 0 && self.time_study_bought(11) {
+            mult *= self.ts11_effect();
+        }
+        if tier == 2 && self.time_study_bought(73) {
+            mult *= self
+                .sacrifice_multiplier()
+                .pow(&Decimal::from_float(0.005))
+                .max(&Decimal::ONE)
+                .min(&Decimal::new_unchecked(1.0, 1300));
+        }
+        if tier == 3 && self.time_study_bought(227) {
+            let log = self.sacrifice_multiplier().pos_log10();
+            mult *= Decimal::from_float(log.powi(10).max(1.0));
+        }
+        mult
     }
 
     /// Tier `t`'s production per second (`amount × multiplier`).
@@ -221,10 +258,13 @@ impl GameState {
     }
 
     /// The free-tickspeed cost multiplier between upgrades (`FreeTickspeed
-    /// .multToNext` base): 1.33, improved to 1.25 by Time Study 171 (Feature
-    /// 4.4).
+    /// .multToNext` base): 1.33, improved to 1.25 by Time Study 171.
     pub fn free_tickspeed_mult(&self) -> f64 {
-        1.33
+        if self.time_study_bought(171) {
+            1.25
+        } else {
+            1.33
+        }
     }
 
     /// Convert Time Shards into the total free-Tickspeed-upgrade count

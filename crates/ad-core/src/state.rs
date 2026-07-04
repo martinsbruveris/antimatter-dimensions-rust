@@ -212,6 +212,39 @@ pub struct GameState {
     /// formula. Reset on Eternity.
     #[cfg_attr(feature = "serde", serde(default))]
     pub total_tick_gained: u64,
+    /// Unspent Time Theorems (`player.timestudy.theorem`, a Decimal).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub time_theorems: Decimal,
+    /// All-time Time-Theorem peak (`player.timestudy.maxTheorem`); gates
+    /// dilation later.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub max_theorem: Decimal,
+    /// TT purchase counts per currency (`timestudy.amBought/ipBought/epBought`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub tt_am_bought: u32,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub tt_ip_bought: u32,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub tt_ep_bought: u32,
+    /// Bought time studies in purchase order (`timestudy.studies`). See
+    /// `time_studies.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub studies: Vec<u16>,
+    /// Whether the next Eternity respecs the study tree (`player.respec`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub respec: bool,
+    /// Banked Infinities (`Currency.infinitiesBanked`): kept across Eternities
+    /// once TS191 grants them; part of `infinities_total()`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub infinities_banked: Decimal,
+    /// The EC whose unlock study is currently held
+    /// (`player.challenge.eternity.unlocked`, 0 = none). See
+    /// `eternity_challenges.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub eternity_challenge_unlocked: u8,
+    /// Per-EC completion counts (`player.eternityChalls`, "eterc<N>" → count).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub eternity_challenges: [u8; 12],
     /// Owned Infinity Upgrades, one bit per [`InfinityUpgrade`](crate::InfinityUpgrade)
     /// (the original's `player.infinityUpgrades` string set as a bitmask).
     /// Persists across a Big Crunch. See `infinity_upgrades.rs`.
@@ -370,6 +403,16 @@ impl GameState {
             time_dimensions: std::array::from_fn(TimeDimension::new),
             time_shards: Decimal::ZERO,
             total_tick_gained: 0,
+            time_theorems: Decimal::ZERO,
+            max_theorem: Decimal::ZERO,
+            tt_am_bought: 0,
+            tt_ip_bought: 0,
+            tt_ep_bought: 0,
+            studies: Vec::new(),
+            respec: false,
+            infinities_banked: Decimal::ZERO,
+            eternity_challenge_unlocked: 0,
+            eternity_challenges: [0; 12],
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),

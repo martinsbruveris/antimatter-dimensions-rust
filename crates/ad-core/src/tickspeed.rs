@@ -80,9 +80,19 @@ impl GameState {
         // galaxies are possible while the effective count is < 3.
         let eff = self.effective_galaxies();
         let galaxies = eff as f64;
-        // The original's `effects` product scales the per-galaxy term; the only
-        // pre-Infinity contributor is the `galaxyBoost` Infinity Upgrade (×2).
-        let effects = self.galaxy_strength_effect();
+        // The original's `effects` product scales the per-galaxy term: the
+        // `galaxyBoost` Infinity/Break-Infinity Upgrades plus the galaxy-strength
+        // Time Studies — TS212 (from Time Shards, cap ×1.1) and TS232 (from
+        // Antimatter Galaxies).
+        let mut effects = self.galaxy_strength_effect();
+        if self.time_study_bought(212) {
+            let log2_shards = self.time_shards.max(&Decimal::from_float(2.0)).ln()
+                / std::f64::consts::LN_2;
+            effects *= log2_shards.powf(0.005).min(1.1);
+        }
+        if self.time_study_bought(232) {
+            effects *= (1.0 + self.galaxies as f64 / 1000.0).powf(0.2);
+        }
 
         // Normal Challenge 5 lowers the base multiplier (the tickspeed purchase
         // multiplier starts at ×1.080 instead of ×1.1245).

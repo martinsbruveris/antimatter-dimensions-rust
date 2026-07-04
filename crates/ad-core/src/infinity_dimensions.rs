@@ -186,14 +186,43 @@ impl GameState {
         if self.replicanti.unlocked && self.replicanti.amount > Decimal::ONE {
             mult *= self.replicanti_mult();
         }
+        // TS82: Dimension Boosts affect Infinity Dimensions.
+        if self.time_study_bought(82) {
+            let boosts = self.dim_boosts as f64;
+            mult *= Decimal::from_float(1.0000109)
+                .pow(&Decimal::from_float(boosts * boosts))
+                .min(&Decimal::new_unchecked(1.0, 10_000_000));
+        }
+        // TS92: based on the fastest Eternity (2^(60/max(t, 2)), cap 2^30).
+        if self.time_study_bought(92) {
+            let best_secs = (self.records.best_eternity.time_ms / 1000.0).max(2.0);
+            let capped = Decimal::from_float(2.0)
+                .pow(&Decimal::from_float(60.0 / best_secs))
+                .min(&Decimal::from_float(2f64.powi(30)));
+            mult *= capped;
+        }
+        // TS162: flat ×1e11.
+        if self.time_study_bought(162) {
+            mult *= Decimal::new_unchecked(1.0, 11);
+        }
         mult
     }
 
-    /// Tier `t`'s production multiplier: `commonMult × powerMultiplier^purchases`.
+    /// Tier `t`'s production multiplier: `commonMult × powerMultiplier^purchases`
+    /// (plus TS72's sacrifice term on the 4th dimension).
     pub fn id_multiplier(&self, tier: usize) -> Decimal {
         let purchases = self.infinity_dimensions[tier].purchases();
-        self.id_common_multiplier()
-            * Decimal::from_float(ID_POWER_MULT[tier]).pow(&Decimal::from(purchases))
+        let mut mult = self.id_common_multiplier()
+            * Decimal::from_float(ID_POWER_MULT[tier]).pow(&Decimal::from(purchases));
+        // TS72: sacrifice affects the 4th Infinity Dimension (greatly reduced).
+        if tier == 3 && self.time_study_bought(72) {
+            mult *= self
+                .sacrifice_multiplier()
+                .pow(&Decimal::from_float(0.04))
+                .max(&Decimal::ONE)
+                .min(&Decimal::new_unchecked(1.0, 30_000));
+        }
+        mult
     }
 
     /// Tier `t`'s production per second (`amount × multiplier`).

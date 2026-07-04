@@ -44,11 +44,25 @@ impl GameState {
         self.records.this_eternity.max_ip >= self.eternity_goal()
     }
 
-    /// The global Eternity-Point multiplier (`totalEPMult`). Sources are the
-    /// `epMult` Eternity Upgrade (Feature 4.6) and Time Studies 61/121/122/123
-    /// (Feature 4.4); ×1 until they land.
+    /// The global Eternity-Point multiplier (`totalEPMult`): Time Studies
+    /// 61/121/122/123 (the `epMult` Eternity Upgrade joins with Feature 4.6).
     pub(crate) fn total_ep_mult(&self) -> Decimal {
-        Decimal::ONE
+        let mut mult = Decimal::ONE;
+        if self.time_study_bought(61) {
+            mult *= Decimal::from_float(15.0);
+        }
+        // The Pace-split EP studies (mutually exclusive columns).
+        if self.time_study_bought(121) {
+            mult *= Decimal::from_float(self.ts121_effect());
+        }
+        if self.time_study_bought(122) {
+            mult *= Decimal::from_float(35.0);
+        }
+        if self.time_study_bought(123) {
+            let secs = self.records.this_eternity.time_ms / 1000.0;
+            mult *= Decimal::from_float((1.39 * secs).sqrt());
+        }
+        mult
     }
 
     /// Eternity Points an Eternity would grant right now. Mirrors
@@ -87,9 +101,30 @@ impl GameState {
             .best_eternity
             .real_time_ms
             .min(self.records.this_eternity.real_time_ms);
-        self.eternity_points += self.gained_eternity_points();
-        self.eternities += self.gained_eternities();
+        let gained_ep = self.gained_eternity_points();
+        let gained_eternities = self.gained_eternities();
+        self.eternity_points += gained_ep;
+        self.eternities += gained_eternities;
         self.eternity_unlocked = true;
+
+        // TS191: bank 5% of the Infinities on each Eternity (Achievement 131's
+        // extra share is a later feature).
+        if self.time_study_bought(191) {
+            self.infinities_banked +=
+                (self.infinities * Decimal::from_float(0.05)).floor();
+        }
+
+        // `addEternityTime`: push this run onto the last-10-eternities ring.
+        self.records.recent_eternities.pop();
+        self.records.recent_eternities.insert(
+            0,
+            crate::records::RecentEternity {
+                time_ms: self.records.this_eternity.time_ms,
+                real_time_ms: self.records.this_eternity.real_time_ms,
+                ep: gained_ep,
+                eternities: gained_eternities,
+            },
+        );
 
         self.eternity_reset();
         true
@@ -167,6 +202,12 @@ impl GameState {
         // `Currency.infinityPoints.reset()` writes `thisEternity.maxIP`).
         self.infinity_points = Decimal::ZERO;
         self.records.this_eternity.max_ip = Decimal::ZERO;
+
+        // Respec the study tree if the player ticked the box (`player.respec`).
+        if self.respec {
+            self.respec_time_studies_now();
+            self.respec = false;
+        }
 
         // `playerInfinityUpgradesOnReset` (milestone-aware).
         self.reset_infinity_upgrades_on_eternity();

@@ -1,0 +1,155 @@
+// Time Study display data: descriptions (engine owns state/effects), the tree
+// layout (a port of the original time-study-tree-layout.js NORMAL layout), the
+// connection list (time-study-connections.js), and per-study path classes.
+// EC nodes render as locked placeholders until Feature 4.5 wires them.
+
+export const TIME_STUDY_DESCRIPTIONS = {
+  11: "Tickspeed affects 1st Time Dimension with reduced effect",
+  21: "Improve Replicanti multiplier formula to (log2(x)^2)+x^0.032",
+  22: "Base Replicanti interval limit 50ms ➜ 1ms",
+  31: "Powers up multipliers that are based on your Infinities (Bonuses^4)",
+  32: "You gain more Infinities based on Dimension Boosts",
+  33: "You keep half of your Replicanti Galaxies on Infinity",
+  41: "All Galaxies give a ×1.2 multiplier to Infinity Points gained",
+  42: "Antimatter Galaxy requirement increases by 52 8th Dimensions instead of 60",
+  51: "You gain ×1e15 more Infinity Points",
+  61: "You gain ×15 more Eternity Points",
+  62: "You gain Replicanti 3 times faster",
+  71: "Dimensional Sacrifice affects all other Antimatter Dimensions with reduced effect",
+  72: "Dimensional Sacrifice affects 4th Infinity Dimension with greatly reduced effect",
+  73: "Dimensional Sacrifice affects 3rd Time Dimension with greatly reduced effect",
+  81: "Base Dimension Boost power becomes ×10",
+  82: "Dimension Boosts affect Infinity Dimensions",
+  83: "Dimension Boost multiplier based on tick upgrades gained from TDs",
+  91: "Antimatter Dimension multiplier based on time spent in this Eternity",
+  92: "Infinity Dimension multiplier based on fastest Eternity time",
+  93: "Time Dimension multiplier based on tick upgrades gained",
+  101: "Antimatter Dimension multiplier equal to Replicanti amount",
+  102: "Replicanti Galaxies boost Replicanti multiplier",
+  103: "Time Dimension multiplier equal to Replicanti Galaxy amount",
+  111: "Make the Infinity Point formula better: log(x)/308 ➜ log(x)/285",
+  121: "You gain more EP based on how fast your last ten Eternities were",
+  122: "You gain ×35 more Eternity Points",
+  123: "You gain more Eternity Points based on time spent this Eternity",
+  131: "Automatic Replicanti Galaxies are disabled, but you can get 50% more",
+  132: "Replicanti Galaxies are 40% stronger and Replicanti are ×1.5 faster",
+  133: "Replicanti are ×10 slower until 1.80e308, but Replicanti Galaxies are 50% stronger",
+  141: "Multiplier to Infinity Points, which decays over this Infinity",
+  142: "You gain ×1e25 more Infinity Points",
+  143: "Multiplier to Infinity Points, which increases over this Infinity",
+  151: "×1e4 multiplier on all Time Dimensions",
+  161: "×1e616 multiplier on all Antimatter Dimensions",
+  162: "×1e11 multiplier on all Infinity Dimensions",
+  171: "Time Shard requirement for the next Tickspeed upgrade goes up slower: ×1.33 ➜ ×1.25",
+  181: "You gain 1% of your Infinity Points gained on crunch each second",
+  191: "After Eternity you permanently keep 5% of your Infinities as Banked Infinities",
+  192: "Replicanti can go beyond 1.80e308, but growth slows down at higher amounts",
+  193: "Antimatter Dimension multiplier based on Eternities",
+  201: "Pick a second path from the Dimension Split",
+  211: "Dimension Boost requirement scaling is reduced by 5",
+  212: "All Galaxies are stronger based on your Time Shards",
+  213: "You gain Replicanti 20 times faster",
+  214: "Dimensional Sacrifice boosts the 8th Antimatter Dimension even more",
+  221: "Time Dimension multiplier based on Dimension Boosts",
+  222: "Dimension Boost costs scale by another 2 less",
+  223: "Distant Galaxy cost scaling starts 7 Galaxies later",
+  224: "Distant Galaxy cost scaling starts 1 Galaxy later per 2000 Dim Boosts",
+  225: "You gain extra Replicanti Galaxies based on Replicanti amount",
+  226: "You gain extra Replicanti Galaxies based on their max",
+  227: "Dimensional Sacrifice affects 4th Time Dimension with reduced effect",
+  228: "Dimensional Sacrifice formula scales better: x^2 ➜ x^2.4",
+  231: "Dimension Boosts are stronger based on their amount",
+  232: "All Galaxies are stronger based on Antimatter Galaxies",
+  233: "Max Replicanti Galaxy upgrade is cheaper based on current Replicanti",
+  234: "Dimensional Sacrifice applies to 1st Antimatter Dimension",
+};
+
+// Path class per study id (o-time-study-<path>), from NormalTimeStudies.pathList.
+const PATHS = {
+  "antimatter-dim": [71, 81, 91, 101],
+  "infinity-dim": [72, 82, 92, 102],
+  "time-dim": [73, 83, 93, 103],
+  active: [121, 131, 141],
+  passive: [122, 132, 142],
+  idle: [123, 133, 143],
+  light: [221, 223, 225, 227, 231, 233],
+  dark: [222, 224, 226, 228, 232, 234],
+};
+
+export function studyPath(id) {
+  for (const [path, ids] of Object.entries(PATHS)) {
+    if (ids.includes(id)) return path;
+  }
+  return "normal";
+}
+
+// The NORMAL tree layout (time-study-tree-layout.js): rows of nodes.
+// Nodes: numbers = normal studies, "EC5" = EC study slots, null = spacer.
+// `wide: true` marks the 8-item Light/Dark row (smaller buttons).
+export const TREE_ROWS = [
+  { items: [null, 11, null] },
+  { items: [21, 22] },
+  { items: [null, 31, 32, 33] },
+  { items: [41, 42] },
+  { items: [null, 51, "EC5"] },
+  { items: [null, 61, 62] },
+  { items: [71, 72, 73] },
+  { items: [81, 82, 83] },
+  { items: [91, 92, 93] },
+  { items: [101, 102, 103] },
+  { items: ["EC7", 111, null] },
+  { items: [121, 122, 123] },
+  { items: ["EC6", 131, 132, 133, "EC8"] },
+  { items: [141, 142, 143] },
+  { items: [null, "EC9", 151, null, "EC4"] },
+  { items: [161, 162] },
+  { items: [171] },
+  { items: ["EC1", "EC2", "EC3"] },
+  { items: [181] },
+  { items: ["EC10"] },
+  { items: [191, 192, 193] },
+  { items: [201] },
+  { items: [211, 212, 213, 214] },
+  {
+    items: [221, 222, 223, 224, 225, 226, 227, 228],
+    wide: true,
+  },
+  { items: [231, 232, 233, 234] },
+  { items: ["EC11", null, "EC12"] },
+];
+
+// Connections [from, to] (time-study-connections.js, pre-dilation slice;
+// perk-conditional overrides dropped).
+export const TREE_CONNECTIONS = [
+  [11, 21], [11, 22],
+  [21, 31], [22, 33], [22, 32],
+  [31, 41], [32, 42],
+  [41, 51], [42, 51], [42, "EC5"],
+  [42, 62],
+  [51, 61],
+  [61, 71], [61, 72], [61, 73],
+  [71, 81], [72, 82], [73, 83],
+  [81, 91], [82, 92], [83, 93],
+  [91, 101], [92, 102], [93, 103],
+  [101, 111], [102, 111], [103, 111],
+  [111, "EC7"],
+  [111, 121], [111, 122], [111, 123],
+  [121, 131], [122, 132], [123, 133],
+  [121, "EC6"], [123, "EC8"],
+  [131, 141], [132, 142], [133, 143],
+  [141, 151], [142, 151], [143, 151], [143, "EC4"],
+  [151, "EC9"],
+  [151, 161], [151, 162],
+  [161, 171], [162, 171],
+  [171, "EC1"], [171, "EC2"], [171, "EC3"],
+  [171, 181],
+  [181, "EC10"],
+  ["EC10", 191], ["EC10", 192], ["EC10", 193],
+  [192, 201],
+  [191, 211], [191, 212], [193, 213], [193, 214],
+  [211, 221], [211, 222], [212, 223], [212, 224],
+  [213, 225], [213, 226], [214, 227], [214, 228],
+  [221, 231], [222, 231], [223, 232], [224, 232],
+  [225, 233], [226, 233], [227, 234], [228, 234],
+  [231, "EC11"], [232, "EC11"], [233, "EC12"], [234, "EC12"],
+];

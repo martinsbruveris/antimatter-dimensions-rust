@@ -7,6 +7,7 @@ import ChallengesTab from "../components/tabs/ChallengesTab.vue";
 import InfinityChallengesTab from "../components/tabs/InfinityChallengesTab.vue";
 import EternityMilestonesTab from "../components/tabs/EternityMilestonesTab.vue";
 import TimeDimensionsTab from "../components/tabs/TimeDimensionsTab.vue";
+import TimeStudiesTab from "../components/tabs/TimeStudiesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
@@ -118,7 +119,7 @@ export const TABS = [
     condition: (s) => Boolean(s?.eternity_unlocked),
     uiClass: "o-tab-btn--eternity",
     subtabs: [
-      { key: "studies", name: "Time Studies", symbol: "<i class='fas fa-book'></i>", component: null, hideId: [7, 0] },
+      { key: "studies", name: "Time Studies", symbol: "<i class='fas fa-book'></i>", component: TimeStudiesTab, hideId: [7, 0] },
       // Time Dimensions: hide-bit-wise the original's Dimensions-tab "Time
       // Dimensions" subtab (0,2) — we host the page under the Eternity tab,
       // like Infinity Dimensions under Infinity.

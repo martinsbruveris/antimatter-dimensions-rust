@@ -18,21 +18,61 @@ impl GameState {
         }
     }
 
-    /// Get the number of required-tier dimensions needed for the next galaxy.
-    /// Normal Challenge 10 raises the cost (base 99, +90 per galaxy).
-    pub fn galaxy_requirement(&self) -> u64 {
-        let (base_cost, cost_mult) = if self.challenge_running(10) {
-            (
-                NC10_FIRST_GALAXY_REQUIREMENT,
-                NC10_GALAXY_REQUIREMENT_INCREMENT,
-            )
+    /// The galaxy count where Distant cost scaling starts
+    /// (`Galaxy.costScalingStart`): 100, pushed later by TS223 (+7) and TS224
+    /// (+1 per 2000 Dimension Boosts). The EC5 reward joins with Feature 4.5.
+    pub fn galaxy_cost_scaling_start(&self) -> u64 {
+        let mut start = 100;
+        if self.time_study_bought(223) {
+            start += 7;
+        }
+        if self.time_study_bought(224) {
+            start += self.dim_boosts as u64 / 2000;
+        }
+        start
+    }
+
+    /// The per-galaxy requirement step (`Galaxy.costMult`): 60 (90 under NC10),
+    /// reduced to 52 by TS42.
+    fn galaxy_cost_mult(&self) -> u64 {
+        if self.challenge_running(10) {
+            90
+        } else if self.time_study_bought(42) {
+            52
         } else {
-            (FIRST_GALAXY_REQUIREMENT, GALAXY_REQUIREMENT_INCREMENT)
+            GALAXY_REQUIREMENT_INCREMENT
+        }
+    }
+
+    /// Get the number of required-tier dimensions needed for the next galaxy.
+    /// Normal Challenge 10 raises the cost (base 99, +90 per galaxy); Distant
+    /// scaling (past `galaxy_cost_scaling_start`) adds a quadratic term and
+    /// Remote scaling (past 800) an exponential one (`Galaxy.requirementAt`).
+    pub fn galaxy_requirement(&self) -> u64 {
+        let galaxies = self.galaxies as u64;
+        let base_cost = if self.challenge_running(10) {
+            NC10_FIRST_GALAXY_REQUIREMENT
+        } else {
+            FIRST_GALAXY_REQUIREMENT
         };
-        let base = base_cost + self.galaxies as u64 * cost_mult;
+        let _ = NC10_GALAXY_REQUIREMENT_INCREMENT; // step handled in galaxy_cost_mult
+        let mut amount = (base_cost + galaxies * self.galaxy_cost_mult()) as f64;
+
+        // Distant scaling: quadratic growth past the scaling start.
+        let scaling_start = self.galaxy_cost_scaling_start();
+        if galaxies >= scaling_start {
+            let before_distant = (galaxies - scaling_start + 1) as f64;
+            amount += before_distant * before_distant + before_distant;
+        }
+        // Remote scaling: exponential growth past galaxy 800.
+        const REMOTE_START: u64 = 800;
+        if galaxies >= REMOTE_START {
+            amount *= 1.002f64.powi((galaxies - (REMOTE_START - 1)) as i32);
+        }
+
         // The `resetBoost` Infinity Upgrade reduces the requirement by 9, and a
         // completed Infinity Challenge 5 by a further 1.
-        base.saturating_sub(
+        (amount.floor() as u64).saturating_sub(
             self.reset_boost_reduction() + self.ic5_requirement_reduction(),
         )
     }
@@ -113,13 +153,21 @@ impl GameState {
         // 1-indexed tier that gates it.
         let tier_1indexed = (target_resets + 3).min(max_dim);
 
+        // TS211/TS222 reduce the per-boost requirement scaling (by 5 / 2).
+        let mut discount = 0;
+        if self.time_study_bought(211) {
+            discount += 5;
+        }
+        if self.time_study_bought(222) {
+            discount += 2;
+        }
         let mut amount = DIM_BOOST_INITIAL_REQUIREMENT;
         if tier_1indexed == 6 && self.challenge_running(10) {
             amount += (target_resets.saturating_sub(3)) as u64
-                * NC10_DIM_BOOST_SCALING_REQUIREMENT;
+                * (NC10_DIM_BOOST_SCALING_REQUIREMENT - discount);
         } else if tier_1indexed == 8 {
-            amount +=
-                (target_resets.saturating_sub(5)) as u64 * DIM_BOOST_SCALING_REQUIREMENT;
+            amount += (target_resets.saturating_sub(5)) as u64
+                * (DIM_BOOST_SCALING_REQUIREMENT - discount);
         }
         // The `resetBoost` Infinity Upgrade reduces the requirement by 9, and a
         // completed Infinity Challenge 5 by a further 1.

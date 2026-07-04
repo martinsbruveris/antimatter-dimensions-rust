@@ -154,6 +154,19 @@ export const useGameStore = defineStore("game", {
         useUiStore().setSubtab("eternity", "timedims");
       }
     },
+    // --- Time Studies ---
+    buyTimeStudy(id) {
+      return invoke("buy_time_study", { id });
+    },
+    buyTimeTheorem(currency) {
+      return invoke("buy_time_theorem", { currency });
+    },
+    buyMaxTimeTheorems() {
+      return invoke("buy_max_time_theorems");
+    },
+    setRespec(respec) {
+      return invoke("set_respec", { respec });
+    },
     // --- Time Dimensions ---
     buyTimeDimension(tier) {
       return invoke("buy_time_dimension", { tier });
