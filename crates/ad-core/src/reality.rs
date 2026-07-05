@@ -106,6 +106,10 @@ pub struct RealityState {
     /// totals. See `glyphs.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub glyphs: crate::glyphs::GlyphState,
+    /// `player.reality.automator.forceUnlock`: the dev/testing flag that
+    /// unlocks the Automator regardless of AP (see `automator_points.rs`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub automator_force_unlock: bool,
 }
 
 impl RealityState {
@@ -131,6 +135,7 @@ impl RealityState {
             auto_achieve: true,
             gained_auto_achievements: true,
             glyphs: crate::glyphs::GlyphState::new(),
+            automator_force_unlock: false,
         }
     }
 }
@@ -560,6 +565,12 @@ impl GameState {
         // Post-reset upgrades/perks kick in (RU10 package etc., Feature 6.4).
         self.apply_post_reality_upgrades();
 
+        // The prestige autobuyers' config resets (`Autobuyers.reset()` on
+        // REALITY_RESET_AFTER). Runs after RU10's package so its 100
+        // eternities keep the crunch modes / Eternity autobuyer, matching the
+        // original's event ordering.
+        self.reset_prestige_autobuyer_configs();
+
         self.reality.gained_auto_achievements = false;
     }
 
@@ -692,7 +703,7 @@ impl GameState {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// A state eligible for Reality: study bought, 1e4000 peak EP.

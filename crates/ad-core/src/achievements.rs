@@ -65,7 +65,15 @@ impl GameState {
     /// already a no-op when the bit is held.
     pub(crate) fn unlock_achievement(&mut self, id: u16) {
         let (row, mask) = Self::achievement_index(id);
+        if self.achievement_bits[row] & mask != 0 {
+            return;
+        }
         self.achievement_bits[row] |= mask;
+        // Achievements 85/93 multiply IP gain ×4; the Big Crunch autobuyer's
+        // "Dynamic amount" threshold scales along (`bumpAmount(4)`).
+        if id == 85 || id == 93 {
+            self.bump_big_crunch_amount(break_infinity::Decimal::from_float(4.0));
+        }
     }
 
     /// Sorted list of unlocked achievement ids — the presentation-layer view of

@@ -25,7 +25,10 @@ use break_infinity::Decimal;
 use serde::Deserialize;
 
 use crate::achievements::ACHIEVEMENT_ROW_COUNT;
-use crate::autobuyers::{AutobuyerMode, AutobuyerState};
+use crate::autobuyers::{
+    AutoRealityMode, AutobuyerMode, AutobuyerState, EternityAutobuyer,
+    PrestigeAutobuyerMode, PrestigeGoalSettings, RealityAutobuyer,
+};
 use crate::break_infinity_upgrades::BreakInfinityUpgrade;
 use crate::challenges::NormalChallengeState;
 use crate::dilation::DilationState;
@@ -191,6 +194,16 @@ pub struct RealityDTO {
     pub auto_achieve: bool,
     pub gained_auto_achievements: bool,
     pub glyphs: GlyphsDTO,
+    /// `player.reality.automator` (Stage A subset: only the force-unlock
+    /// flag; scripts/constants/state land with Feature 6.6 Stage B).
+    pub automator: RealityAutomatorDTO,
+}
+
+/// `player.reality.automator` (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RealityAutomatorDTO {
+    pub force_unlock: bool,
 }
 
 /// One entry of `player.blackHole[]`.
@@ -342,8 +355,8 @@ pub struct EternityChallengeDTO {
     pub requirement_bits: u16,
 }
 
-/// `player.timestudy` (modelled subset; presets/preferred paths are
-/// frontend-free for now and ignored).
+/// `player.timestudy` (modelled subset; preferred paths are frontend-free for
+/// now and ignored).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TimestudyDTO {
@@ -355,6 +368,15 @@ pub struct TimestudyDTO {
     pub ip_bought: u32,
     pub ep_bought: u32,
     pub studies: Vec<u16>,
+    /// The six preset slots (`{name, studies}` each).
+    pub presets: Vec<StudyPresetDTO>,
+}
+
+/// One `player.timestudy.presets[]` slot.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StudyPresetDTO {
+    pub name: String,
+    pub studies: String,
 }
 
 /// `player.challenge.infinity` (modelled subset).
@@ -560,9 +582,60 @@ pub struct AutoDTO {
     pub dim_boost: PrestigeAutobuyerDTO,
     /// `player.auto.galaxy` (NC11 autobuyer).
     pub galaxy: PrestigeAutobuyerDTO,
-    /// `player.auto.bigCrunch` (NC12 autobuyer). Its mode/amount/time config is
-    /// ignored (pre-break it always crunches at the goal).
-    pub big_crunch: PrestigeAutobuyerDTO,
+    /// `player.auto.bigCrunch` (NC12 autobuyer): interval-upgrade state plus
+    /// the post-break goal settings (mode/amount/time/xHighest).
+    pub big_crunch: BigCrunchAutobuyerDTO,
+    /// `player.auto.eternity` (100-Eternities milestone autobuyer).
+    pub eternity: EternityAutobuyerDTO,
+    /// `player.auto.reality` (Reality Upgrade 25 autobuyer). The Effarig
+    /// `shard` target is out of frontier and ignored.
+    pub reality: RealityAutobuyerDTO,
+}
+
+/// `player.auto.bigCrunch`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BigCrunchAutobuyerDTO {
+    pub is_active: bool,
+    pub interval: f64,
+    pub cost: f64,
+    /// `AUTO_CRUNCH_MODE`: 0 amount, 1 time, 2 X highest.
+    pub mode: i64,
+    #[serde(with = "break_infinity::serde_string")]
+    pub amount: Decimal,
+    pub increase_with_mult: bool,
+    pub time: f64,
+    #[serde(with = "break_infinity::serde_string")]
+    pub x_highest: Decimal,
+}
+
+/// `player.auto.eternity`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EternityAutobuyerDTO {
+    pub is_active: bool,
+    /// `AUTO_ETERNITY_MODE`: 0 amount, 1 time, 2 X highest.
+    pub mode: i64,
+    #[serde(with = "break_infinity::serde_string")]
+    pub amount: Decimal,
+    pub increase_with_mult: bool,
+    pub time: f64,
+    #[serde(with = "break_infinity::serde_string")]
+    pub x_highest: Decimal,
+}
+
+/// `player.auto.reality`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RealityAutobuyerDTO {
+    pub is_active: bool,
+    /// `AUTO_REALITY_MODE`: 0 RM, 1 glyph, 2 either, 3 both, 4 time,
+    /// 5 relic shards (out of frontier — loads as RM).
+    pub mode: i64,
+    #[serde(with = "break_infinity::serde_string")]
+    pub rm: Decimal,
+    pub glyph: f64,
+    pub time: f64,
 }
 
 /// A Dim Boost / Galaxy / Big Crunch autobuyer entry. These have no antimatter
@@ -980,6 +1053,7 @@ impl GameState {
                 auto_achieve: dto.reality.auto_achieve,
                 gained_auto_achievements: dto.reality.gained_auto_achievements,
                 glyphs,
+                automator_force_unlock: dto.reality.automator.force_unlock,
             }
         };
         let requirement_checks = crate::reality::RequirementChecks {
@@ -1036,15 +1110,65 @@ impl GameState {
         autobuyers.tickspeed.cost = dto.auto.tickspeed.cost;
         // The prestige autobuyers (Dim Boost / Galaxy / Big Crunch): active flag +
         // interval-upgrade state. They unlock by challenge, not `is_bought`.
-        for (ab, src) in [
-            (&mut autobuyers.dim_boost, &dto.auto.dim_boost),
-            (&mut autobuyers.galaxy, &dto.auto.galaxy),
-            (&mut autobuyers.big_crunch, &dto.auto.big_crunch),
+        for (ab, is_active, interval, cost) in [
+            (
+                &mut autobuyers.dim_boost,
+                dto.auto.dim_boost.is_active,
+                dto.auto.dim_boost.interval,
+                dto.auto.dim_boost.cost,
+            ),
+            (
+                &mut autobuyers.galaxy,
+                dto.auto.galaxy.is_active,
+                dto.auto.galaxy.interval,
+                dto.auto.galaxy.cost,
+            ),
+            (
+                &mut autobuyers.big_crunch,
+                dto.auto.big_crunch.is_active,
+                dto.auto.big_crunch.interval,
+                dto.auto.big_crunch.cost,
+            ),
         ] {
-            ab.is_active = src.is_active;
-            ab.interval_ms = src.interval;
-            ab.cost = src.cost;
+            ab.is_active = is_active;
+            ab.interval_ms = interval;
+            ab.cost = cost;
         }
+        // Big Crunch goal settings + the Eternity / Reality autobuyers.
+        autobuyers.big_crunch_settings = PrestigeGoalSettings {
+            mode: prestige_goal_mode_from_raw(dto.auto.big_crunch.mode)?,
+            amount: dto.auto.big_crunch.amount,
+            increase_with_mult: dto.auto.big_crunch.increase_with_mult,
+            time: dto.auto.big_crunch.time,
+            x_highest: dto.auto.big_crunch.x_highest,
+        };
+        autobuyers.eternity = EternityAutobuyer {
+            is_active: dto.auto.eternity.is_active,
+            settings: PrestigeGoalSettings {
+                mode: prestige_goal_mode_from_raw(dto.auto.eternity.mode)?,
+                amount: dto.auto.eternity.amount,
+                increase_with_mult: dto.auto.eternity.increase_with_mult,
+                time: dto.auto.eternity.time,
+                x_highest: dto.auto.eternity.x_highest,
+            },
+        };
+        autobuyers.reality = RealityAutobuyer {
+            is_active: dto.auto.reality.is_active,
+            mode: match dto.auto.reality.mode {
+                0 => AutoRealityMode::Rm,
+                1 => AutoRealityMode::Glyph,
+                2 => AutoRealityMode::Either,
+                3 => AutoRealityMode::Both,
+                4 => AutoRealityMode::Time,
+                // RELIC_SHARD (5) is Effarig content — past the frontier it
+                // resets to the RM default rather than erroring.
+                5 => AutoRealityMode::Rm,
+                other => return Err(SaveError::InvalidAutobuyerMode(other)),
+            },
+            rm: dto.auto.reality.rm,
+            glyph: dto.auto.reality.glyph.max(0.0) as u32,
+            time: dto.auto.reality.time,
+        };
 
         // Options: numeric values must be in range — we reject rather than clamp.
         // Notation is the one intentional exception: a name we don't model (the
@@ -1155,6 +1279,17 @@ impl GameState {
             tt_ip_bought: dto.timestudy.ip_bought,
             tt_ep_bought: dto.timestudy.ep_bought,
             studies: dto.timestudy.studies.clone(),
+            study_presets: {
+                let mut presets: [crate::time_studies::StudyPreset; 6] =
+                    Default::default();
+                for (slot, src) in dto.timestudy.presets.iter().take(6).enumerate() {
+                    presets[slot] = crate::time_studies::StudyPreset {
+                        name: src.name.clone(),
+                        studies: src.studies.clone(),
+                    };
+                }
+                presets
+            },
             respec: dto.respec,
             infinities_banked: dto.infinities_banked,
             eternity_challenge_unlocked: dto.challenge.eternity.unlocked,
@@ -1274,6 +1409,17 @@ fn autobuyer_mode_from_raw(mode: i64) -> Result<AutobuyerMode, SaveError> {
     match mode {
         AUTOBUYER_MODE_BUY_SINGLE => Ok(AutobuyerMode::BuySingle),
         AUTOBUYER_MODE_BUY_10 => Ok(AutobuyerMode::BuyMax),
+        other => Err(SaveError::InvalidAutobuyerMode(other)),
+    }
+}
+
+/// Maps the original numeric `AUTO_CRUNCH_MODE` / `AUTO_ETERNITY_MODE`
+/// (0 amount / 1 time / 2 X highest) to [`PrestigeAutobuyerMode`].
+fn prestige_goal_mode_from_raw(mode: i64) -> Result<PrestigeAutobuyerMode, SaveError> {
+    match mode {
+        0 => Ok(PrestigeAutobuyerMode::Amount),
+        1 => Ok(PrestigeAutobuyerMode::Time),
+        2 => Ok(PrestigeAutobuyerMode::XHighest),
         other => Err(SaveError::InvalidAutobuyerMode(other)),
     }
 }

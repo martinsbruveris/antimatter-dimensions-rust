@@ -5,10 +5,11 @@
 //! Mirrors `src/core/reality-upgrades.js` and
 //! `secret-formula/reality/reality-upgrades.js`; costs use the original's
 //! hybrid scaling (`getHybridCostScaling`: geometric below 1e30, then
-//! linearly-growing multiplier). RU13 (TD/EP autobuyers) and RU25 (Reality
-//! autobuyer) are deferred with the automation they'd improve; the
-//! requirement-lock QoL (`reqLock`) round-trips but isn't enforced. See
-//! `design-docs/2026-07-05-reality.md`.
+//! linearly-growing multiplier). RU13's Eternity-autobuyer mode unlock and
+//! RU25's Reality autobuyer are wired in `autobuyers.rs` (Automator Stage A);
+//! RU13's TD / ×5-EP autobuyers remain deferred with those autobuyer types.
+//! The requirement-lock QoL (`reqLock`) round-trips but isn't enforced. See
+//! `design-docs/2026-07-05-reality.md` and `2026-07-05-automator.md`.
 
 use break_infinity::Decimal;
 

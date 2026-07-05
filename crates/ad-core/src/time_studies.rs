@@ -129,6 +129,159 @@ pub fn time_study_def(id: u16) -> Option<&'static TimeStudyDef> {
     TIME_STUDIES.iter().find(|d| d.id == id)
 }
 
+// --- Study import strings + presets (`TimeStudyTree` / `timestudy.presets`) ---
+
+/// One Time Study preset slot (`player.timestudy.presets[i]`): a display name
+/// (≤ 4 ASCII chars) and a study import string.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StudyPreset {
+    pub name: String,
+    pub studies: String,
+}
+
+/// Maximum preset name length (`nicknameBlur` slices to 4).
+pub const STUDY_PRESET_NAME_MAX: usize = 4;
+
+/// The path-name shorthands accepted in import strings (`TimeStudyTree.sets`;
+/// the Ra-gated `triad` set is out of frontier).
+const STUDY_SETS: [(&str, &[u16]); 8] = [
+    ("antimatter", &[71, 81, 91, 101]),
+    ("infinity", &[72, 82, 92, 102]),
+    ("time", &[73, 83, 93, 103]),
+    ("active", &[121, 131, 141]),
+    ("passive", &[122, 132, 142]),
+    ("idle", &[123, 133, 143]),
+    ("light", &[221, 223, 225, 227, 231, 233]),
+    ("dark", &[222, 224, 226, 228, 232, 234]),
+];
+
+/// A parsed study import string (`TimeStudyTree.parseStudyImport`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ParsedStudyImport {
+    /// Valid study ids, in the listed order (set names and ranges expanded).
+    pub studies: Vec<u16>,
+    /// The EC id from a trailing `|N` (0 = none).
+    pub ec: u8,
+    /// Whether the string ends with `!` (start the EC on commit).
+    pub start_ec: bool,
+    /// Tokens that were well-formed but named nonexistent studies/ECs.
+    pub invalid: Vec<String>,
+}
+
+/// `TimeStudyTree.truncateInput`: lowercase, expand set names into id lists,
+/// strip spaces, collapse duplicate commas and a comma before `|`, drop a
+/// trailing `,`/`|`.
+fn truncate_study_import(input: &str) -> String {
+    let mut s = input.to_lowercase();
+    for (name, ids) in STUDY_SETS {
+        if s.contains(name) {
+            let list = ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            s = s.replace(name, &list);
+        }
+    }
+    s.retain(|c| c != ' ');
+    while s.contains(",,") {
+        s = s.replace(",,", ",");
+    }
+    s = s.replace(",|", "|");
+    while s.ends_with(',') || s.ends_with('|') {
+        s.pop();
+    }
+    s
+}
+
+/// `TimeStudyTree.isValidImportString`: pure format check (existence is
+/// checked separately so error messages can distinguish the two). Equivalent
+/// to the original's `^,?((\d{2,3}(-\d{2,3})?)\b,?)*(\|\d{1,2}!?)?$` after
+/// set-name removal.
+pub fn is_valid_study_import(input: &str) -> bool {
+    if input.trim().is_empty() {
+        return false;
+    }
+    let mut s: String = input.chars().filter(|&c| c != ' ').collect();
+    s = s.to_lowercase();
+    for (name, _) in STUDY_SETS {
+        while let Some(pos) = s.find(name) {
+            let mut removed: String = s[..pos].to_string();
+            let rest = &s[pos + name.len()..];
+            removed.push_str(rest.strip_prefix(',').unwrap_or(rest));
+            s = removed;
+        }
+    }
+    let (studies_part, ec_part) = match s.split_once('|') {
+        Some((a, b)) => (a, Some(b)),
+        None => (s.as_str(), None),
+    };
+    let studies_part = studies_part.strip_prefix(',').unwrap_or(studies_part);
+    let entry_ok = |entry: &str| -> bool {
+        let ok_num = |n: &str| {
+            n.len() >= 2 && n.len() <= 3 && n.bytes().all(|b| b.is_ascii_digit())
+        };
+        match entry.split_once('-') {
+            Some((a, b)) => ok_num(a) && ok_num(b),
+            None => ok_num(entry),
+        }
+    };
+    if !studies_part.is_empty() && !studies_part.split(',').all(entry_ok) {
+        return false;
+    }
+    match ec_part {
+        None => true,
+        Some(ec) => {
+            let ec = ec.strip_suffix('!').unwrap_or(ec);
+            !ec.is_empty() && ec.len() <= 2 && ec.bytes().all(|b| b.is_ascii_digit())
+        }
+    }
+}
+
+/// Parse a study import string into ids + EC (`parseStudyImport`). Invalid
+/// study/EC ids are collected rather than failing the parse.
+pub fn parse_study_import(input: &str) -> ParsedStudyImport {
+    let mut out = ParsedStudyImport {
+        start_ec: input.trim_end().ends_with('!'),
+        ..Default::default()
+    };
+    let truncated = truncate_study_import(input);
+    let studies_part = truncated.split('|').next().unwrap_or("");
+    for entry in studies_part.split(',').filter(|e| !e.is_empty()) {
+        match entry.split_once('-') {
+            // A range (`studyRangeToArray`): both endpoints must be existing
+            // studies, then every existing id in between is included; a bad
+            // range contributes nothing (and records nothing) like the
+            // original.
+            Some((first, last)) => {
+                let (Ok(a), Ok(b)) = (first.parse::<u16>(), last.parse::<u16>()) else {
+                    out.invalid.push(entry.to_string());
+                    continue;
+                };
+                if time_study_def(a).is_none() || time_study_def(b).is_none() {
+                    continue;
+                }
+                out.studies
+                    .extend((a..=b).filter(|&id| time_study_def(id).is_some()));
+            }
+            None => match entry.parse::<u16>() {
+                Ok(id) if time_study_def(id).is_some() => out.studies.push(id),
+                _ => out.invalid.push(entry.to_string()),
+            },
+        }
+    }
+    if let Some(ec_str) = truncated.split('|').nth(1) {
+        let ec_str = ec_str.strip_suffix('!').unwrap_or(ec_str);
+        match ec_str.parse::<u8>() {
+            // 0 is allowed (saved presets contain it by default).
+            Ok(ec) if ec <= 12 => out.ec = ec,
+            _ => out.invalid.push(format!("EC{ec_str}")),
+        }
+    }
+    out
+}
+
 /// Time-Theorem purchase costs: AM `1e20000 × 1e20000^n`, IP `1 × 1e100^n`,
 /// EP `1 × 2^n` (`TimeTheoremPurchaseType`).
 const TT_AM_COST_EXP: f64 = 20_000.0;
@@ -345,6 +498,112 @@ impl GameState {
         self.respec = respec;
     }
 
+    // --- Study presets ---------------------------------------------------------
+
+    /// The current tree as an import string (`TimeStudyTree.exportString`):
+    /// bought study ids joined by commas, `|<held EC id>` (0 when none), and a
+    /// trailing `!` while an EC runs.
+    pub fn study_tree_export_string(&self) -> String {
+        let ids = self
+            .studies
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        let bang = if self.eternity_challenge_current != 0 {
+            "!"
+        } else {
+            ""
+        };
+        format!("{ids}|{}{bang}", self.eternity_challenge_unlocked)
+    }
+
+    /// Buy a parsed study list into the current tree, in order (the effect of
+    /// `commitToGameState` on a combined current+import tree): each study is
+    /// attempted once; failures are skipped. A trailing EC study is bought and
+    /// — with `start_ec` — started.
+    pub(crate) fn commit_study_import(&mut self, parsed: &ParsedStudyImport) {
+        for &id in &parsed.studies {
+            self.buy_time_study(id);
+        }
+        if parsed.ec != 0 {
+            self.buy_ec_study(parsed.ec);
+            if parsed.start_ec && self.eternity_challenge_unlocked == parsed.ec {
+                self.start_eternity_challenge(parsed.ec);
+            }
+        }
+    }
+
+    /// Load preset `slot` (0-indexed) into the current tree
+    /// (`TimeStudySaveLoadButton.load`). Returns false for an empty preset.
+    pub fn load_study_preset(&mut self, slot: usize) -> bool {
+        let Some(preset) = self.study_presets.get(slot) else {
+            return false;
+        };
+        if preset.studies.is_empty() {
+            return false;
+        }
+        let parsed = parse_study_import(&preset.studies.clone());
+        self.commit_study_import(&parsed);
+        true
+    }
+
+    /// "Respec and Load": flag a respec, Eternity, then buy the preset tree
+    /// from scratch (`respecAndLoad`). No-op unless an Eternity is available.
+    pub fn respec_and_load_study_preset(&mut self, slot: usize) -> bool {
+        if !self.can_eternity() {
+            return false;
+        }
+        self.respec = true;
+        if !self.eternity() {
+            return false;
+        }
+        self.load_study_preset(slot)
+    }
+
+    /// Save the current tree into preset `slot` (`TimeStudySaveLoadButton
+    /// .save`).
+    pub fn save_study_preset(&mut self, slot: usize) -> bool {
+        if slot >= self.study_presets.len() {
+            return false;
+        }
+        self.study_presets[slot].studies = self.study_tree_export_string();
+        true
+    }
+
+    /// Rename preset `slot`: at most [`STUDY_PRESET_NAME_MAX`] ASCII
+    /// (≤ `\u{ff}`) characters, unique among presets; empty clears the name
+    /// (the button then shows the slot number). Mirrors `nicknameBlur`.
+    pub fn set_study_preset_name(&mut self, slot: usize, name: &str) -> bool {
+        if slot >= self.study_presets.len() {
+            return false;
+        }
+        let name: String = name.chars().take(STUDY_PRESET_NAME_MAX).collect();
+        let name = name.trim().to_string();
+        if name.chars().any(|c| c > '\u{ff}') {
+            return false;
+        }
+        if !name.is_empty() && self.study_presets.iter().any(|p| p.name == name) {
+            return false;
+        }
+        self.study_presets[slot].name = name;
+        true
+    }
+
+    /// Overwrite preset `slot`'s study string (the Edit modal). The string
+    /// must be well-formed, or empty (the Delete action).
+    pub fn set_study_preset_studies(&mut self, slot: usize, studies: &str) -> bool {
+        if slot >= self.study_presets.len() {
+            return false;
+        }
+        let studies = studies.trim();
+        if !studies.is_empty() && !is_valid_study_import(studies) {
+            return false;
+        }
+        self.study_presets[slot].studies = studies.to_string();
+        true
+    }
+
     // --- Effect helpers used by the formula sites ----------------------------
 
     /// `Currency.infinitiesTotal`: infinities this eternity plus banked
@@ -539,6 +798,123 @@ mod tests {
         assert!(game.buy_time_study(71));
         // Not a third.
         assert!(!game.can_buy_time_study(73));
+    }
+
+    #[test]
+    fn import_string_validation() {
+        assert!(is_valid_study_import("11,21,22"));
+        assert!(is_valid_study_import("11-62"));
+        assert!(is_valid_study_import("11,21|4"));
+        assert!(is_valid_study_import("11,21|4!"));
+        assert!(is_valid_study_import("antimatter,infinity"));
+        assert!(is_valid_study_import("11, 21, 22"));
+        // Trailing separators are tolerated by truncation in the original's
+        // regex via the optional groups.
+        assert!(!is_valid_study_import(""));
+        assert!(!is_valid_study_import("  "));
+        assert!(!is_valid_study_import("abc"));
+        assert!(!is_valid_study_import("1"));
+        assert!(!is_valid_study_import("11;21"));
+        assert!(!is_valid_study_import("11|123"));
+    }
+
+    #[test]
+    fn import_parsing_expands_ranges_sets_and_ec() {
+        let parsed = parse_study_import("11,21-33,antimatter|4!");
+        assert!(parsed.studies.starts_with(&[11, 21, 22, 31, 32, 33]));
+        // The antimatter set: 71, 81, 91, 101.
+        assert!(parsed.studies.ends_with(&[71, 81, 91, 101]));
+        assert_eq!(parsed.ec, 4);
+        assert!(parsed.start_ec);
+        assert!(parsed.invalid.is_empty());
+
+        // Nonexistent single ids are recorded; bad ranges contribute nothing.
+        let parsed = parse_study_import("11,99,12-14");
+        assert_eq!(parsed.studies, vec![11]);
+        assert_eq!(parsed.invalid, vec!["99"]);
+        assert_eq!(parsed.ec, 0);
+        assert!(!parsed.start_ec);
+    }
+
+    #[test]
+    fn export_string_matches_original_format() {
+        let mut game = game_with_tt(10.0);
+        game.buy_time_study(11);
+        game.buy_time_study(21);
+        assert_eq!(game.study_tree_export_string(), "11,21|0");
+        game.eternity_challenge_unlocked = 4;
+        assert_eq!(game.study_tree_export_string(), "11,21|4");
+    }
+
+    #[test]
+    fn preset_save_and_load_round_trip() {
+        let mut game = game_with_tt(100.0);
+        game.buy_time_study(11);
+        game.buy_time_study(21);
+        assert!(game.save_study_preset(0));
+        assert_eq!(game.study_presets[0].studies, "11,21|0");
+
+        // Respec, then load the preset back.
+        game.respec_time_studies_now();
+        assert!(game.studies.is_empty());
+        assert!(game.load_study_preset(0));
+        assert_eq!(game.studies, vec![11, 21]);
+
+        // An empty slot refuses to load.
+        assert!(!game.load_study_preset(1));
+    }
+
+    #[test]
+    fn preset_load_skips_unaffordable_studies() {
+        let mut game = game_with_tt(4.0); // enough for 11 (1) + 21 (3) only
+        game.study_presets[0].studies = "11,21,22".into();
+        assert!(game.load_study_preset(0));
+        assert_eq!(game.studies, vec![11, 21]);
+    }
+
+    #[test]
+    fn preset_names_are_validated() {
+        let mut game = GameState::new();
+        assert!(game.set_study_preset_name(0, "ANTI"));
+        assert_eq!(game.study_presets[0].name, "ANTI");
+        // Over-long names are truncated to 4 chars, like the original input.
+        assert!(game.set_study_preset_name(1, "TOOLONG"));
+        assert_eq!(game.study_presets[1].name, "TOOL");
+        // Duplicates are rejected.
+        assert!(!game.set_study_preset_name(2, "ANTI"));
+        // Non-ASCII (beyond U+00FF) is rejected.
+        assert!(!game.set_study_preset_name(2, "日本"));
+        // Clearing is allowed.
+        assert!(game.set_study_preset_name(0, ""));
+    }
+
+    #[test]
+    fn preset_studies_edit_validates_format() {
+        let mut game = GameState::new();
+        assert!(game.set_study_preset_studies(0, "11,21|4"));
+        assert!(!game.set_study_preset_studies(0, "garbage"));
+        assert_eq!(game.study_presets[0].studies, "11,21|4");
+        // Deleting (empty string) is allowed.
+        assert!(game.set_study_preset_studies(0, ""));
+        assert_eq!(game.study_presets[0].studies, "");
+    }
+
+    #[test]
+    fn respec_and_load_eternities_first() {
+        let mut game = game_with_tt(10.0);
+        game.buy_time_study(11);
+        game.buy_time_study(22);
+        game.study_presets[0].studies = "11,21".into();
+        game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        assert!(game.respec_and_load_study_preset(0));
+        // The old tree (incl. 22) was respecced away; the preset bought fresh.
+        assert_eq!(game.studies, vec![11, 21]);
+
+        // Without an available Eternity nothing happens.
+        let mut game = game_with_tt(10.0);
+        game.buy_time_study(11);
+        assert!(!game.respec_and_load_study_preset(0));
+        assert_eq!(game.studies, vec![11]);
     }
 
     #[test]

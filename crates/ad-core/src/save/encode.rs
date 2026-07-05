@@ -23,7 +23,7 @@
 use break_infinity::Decimal;
 use serde_json::{json, Value};
 
-use crate::autobuyers::AutobuyerMode;
+use crate::autobuyers::{AutoRealityMode, AutobuyerMode, PrestigeAutobuyerMode};
 use crate::break_infinity_upgrades::ALL_BREAK_INFINITY_UPGRADES;
 use crate::infinity_upgrades::ALL_INFINITY_UPGRADES;
 use crate::save::codec::encode_pipeline;
@@ -174,6 +174,11 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     ts["ipBought"] = json!(state.tt_ip_bought);
     ts["epBought"] = json!(state.tt_ep_bought);
     ts["studies"] = json!(state.studies);
+    ts["presets"] = json!(state
+        .study_presets
+        .iter()
+        .map(|p| json!({ "name": p.name, "studies": p.studies }))
+        .collect::<Vec<_>>());
     player["respec"] = json!(state.respec);
     player["infinitiesBanked"] = decimal(&state.infinities_banked);
     // EC state: the held study slot and the completion-count map.
@@ -285,6 +290,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     reality["achTimer"] = json!(state.reality.ach_timer);
     reality["autoAchieve"] = json!(state.reality.auto_achieve);
     reality["gainedAutoAchievements"] = json!(state.reality.gained_auto_achievements);
+    reality["automator"]["forceUnlock"] = json!(state.reality.automator_force_unlock);
     let records = &mut player["records"];
     records["thisReality"]["time"] = json!(state.records.this_reality.time_ms);
     records["thisReality"]["realTime"] = json!(state.records.this_reality.real_time_ms);
@@ -439,7 +445,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     tickspeed["interval"] = json!(state.autobuyers.tickspeed.interval_ms);
     tickspeed["cost"] = json!(state.autobuyers.tickspeed.cost);
     // Prestige autobuyers (Dim Boost / Galaxy / Big Crunch): active flag +
-    // interval-upgrade state. Their limit/mode config stays at the template default.
+    // interval-upgrade state. Dim Boost/Galaxy limit config stays at the
+    // template default.
     for (key, ab) in [
         ("dimBoost", &state.autobuyers.dim_boost),
         ("galaxy", &state.autobuyers.galaxy),
@@ -450,6 +457,37 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         entry["interval"] = json!(ab.interval_ms);
         entry["cost"] = json!(ab.cost);
     }
+    // Big Crunch goal settings (post-break modes).
+    let s = &state.autobuyers.big_crunch_settings;
+    let entry = &mut player["auto"]["bigCrunch"];
+    entry["mode"] = json!(prestige_goal_mode_to_raw(s.mode));
+    entry["amount"] = decimal(&s.amount);
+    entry["increaseWithMult"] = json!(s.increase_with_mult);
+    entry["time"] = json!(s.time);
+    entry["xHighest"] = decimal(&s.x_highest);
+    // Eternity autobuyer.
+    let ab = &state.autobuyers.eternity;
+    let entry = &mut player["auto"]["eternity"];
+    entry["isActive"] = json!(ab.is_active);
+    entry["mode"] = json!(prestige_goal_mode_to_raw(ab.settings.mode));
+    entry["amount"] = decimal(&ab.settings.amount);
+    entry["increaseWithMult"] = json!(ab.settings.increase_with_mult);
+    entry["time"] = json!(ab.settings.time);
+    entry["xHighest"] = decimal(&ab.settings.x_highest);
+    // Reality autobuyer (the Effarig `shard` target stays at the template's 0).
+    let ab = &state.autobuyers.reality;
+    let entry = &mut player["auto"]["reality"];
+    entry["isActive"] = json!(ab.is_active);
+    entry["mode"] = json!(match ab.mode {
+        AutoRealityMode::Rm => 0,
+        AutoRealityMode::Glyph => 1,
+        AutoRealityMode::Either => 2,
+        AutoRealityMode::Both => 3,
+        AutoRealityMode::Time => 4,
+    });
+    entry["rm"] = decimal(&ab.rm);
+    entry["glyph"] = json!(ab.glyph);
+    entry["time"] = json!(ab.time);
 }
 
 /// A `Decimal` as the JSON string the original stores (`Decimal::toJSON =
@@ -463,6 +501,16 @@ fn mode_to_raw(mode: AutobuyerMode) -> i64 {
     match mode {
         AutobuyerMode::BuyMax => AUTOBUYER_MODE_BUY_10,
         AutobuyerMode::BuySingle => AUTOBUYER_MODE_BUY_SINGLE,
+    }
+}
+
+/// Maps a [`PrestigeAutobuyerMode`] back to the original numeric
+/// `AUTO_CRUNCH_MODE` / `AUTO_ETERNITY_MODE`.
+fn prestige_goal_mode_to_raw(mode: PrestigeAutobuyerMode) -> i64 {
+    match mode {
+        PrestigeAutobuyerMode::Amount => 0,
+        PrestigeAutobuyerMode::Time => 1,
+        PrestigeAutobuyerMode::XHighest => 2,
     }
 }
 
@@ -555,6 +603,71 @@ mod tests {
             assert_eq!(reloaded.autobuyers.enabled, state.autobuyers.enabled);
             assert_eq!(reloaded.options, state.options);
         }
+    }
+
+    #[test]
+    fn prestige_autobuyers_and_presets_round_trip() {
+        use crate::autobuyers::{AutoRealityMode, PrestigeAutobuyerMode};
+
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.autobuyers.big_crunch_settings.mode = PrestigeAutobuyerMode::XHighest;
+        state.autobuyers.big_crunch_settings.amount = Decimal::new(2.5, 30);
+        state.autobuyers.big_crunch_settings.increase_with_mult = false;
+        state.autobuyers.big_crunch_settings.time = 12.5;
+        state.autobuyers.big_crunch_settings.x_highest = Decimal::from_float(3.0);
+        state.autobuyers.eternity.is_active = true;
+        state.autobuyers.eternity.settings.mode = PrestigeAutobuyerMode::Time;
+        state.autobuyers.eternity.settings.amount = Decimal::new(1.0, 100);
+        state.autobuyers.eternity.settings.time = 30.0;
+        state.autobuyers.reality.is_active = true;
+        state.autobuyers.reality.mode = AutoRealityMode::Both;
+        state.autobuyers.reality.rm = Decimal::from_float(1e6);
+        state.autobuyers.reality.glyph = 5000;
+        state.autobuyers.reality.time = 600.0;
+        state.study_presets[0] = crate::time_studies::StudyPreset {
+            name: "ANTI".into(),
+            studies: "11,21,22|0".into(),
+        };
+        state.study_presets[5] = crate::time_studies::StudyPreset {
+            name: String::new(),
+            studies: "11-62|4!".into(),
+        };
+        state.reality.automator_force_unlock = true;
+
+        let reloaded = decode_save(&encode_save(&state, 1_700_000_000_000)).unwrap();
+        assert_eq!(
+            reloaded.autobuyers.big_crunch_settings.mode,
+            PrestigeAutobuyerMode::XHighest
+        );
+        assert_eq!(
+            reloaded.autobuyers.big_crunch_settings.amount,
+            Decimal::new(2.5, 30)
+        );
+        assert!(!reloaded.autobuyers.big_crunch_settings.increase_with_mult);
+        assert_eq!(reloaded.autobuyers.big_crunch_settings.time, 12.5);
+        assert_eq!(
+            reloaded.autobuyers.big_crunch_settings.x_highest,
+            Decimal::from_float(3.0)
+        );
+        assert!(reloaded.autobuyers.eternity.is_active);
+        assert_eq!(
+            reloaded.autobuyers.eternity.settings.mode,
+            PrestigeAutobuyerMode::Time
+        );
+        assert_eq!(
+            reloaded.autobuyers.eternity.settings.amount,
+            Decimal::new(1.0, 100)
+        );
+        assert_eq!(reloaded.autobuyers.eternity.settings.time, 30.0);
+        assert!(reloaded.autobuyers.reality.is_active);
+        assert_eq!(reloaded.autobuyers.reality.mode, AutoRealityMode::Both);
+        assert_eq!(reloaded.autobuyers.reality.rm, Decimal::from_float(1e6));
+        assert_eq!(reloaded.autobuyers.reality.glyph, 5000);
+        assert_eq!(reloaded.autobuyers.reality.time, 600.0);
+        assert_eq!(reloaded.study_presets[0].name, "ANTI");
+        assert_eq!(reloaded.study_presets[0].studies, "11,21,22|0");
+        assert_eq!(reloaded.study_presets[5].studies, "11-62|4!");
+        assert!(reloaded.reality.automator_force_unlock);
     }
 
     #[test]

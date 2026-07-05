@@ -138,6 +138,9 @@ impl GameState {
         }
         self.eternity_points -= cost;
         self.epmult_upgrades += 1;
+        // "Dynamic amount": the Eternity autobuyer's EP threshold scales with
+        // the purchase (`Autobuyer.eternity.bumpAmount(5^bought)`).
+        self.bump_eternity_amount(Decimal::from_float(5.0));
         true
     }
 

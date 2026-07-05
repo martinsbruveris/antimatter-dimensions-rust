@@ -610,6 +610,39 @@ impl GameState {
         true
     }
 
+    /// An automatic Reality (`autoReality()` → `processAutoGlyph`): used by
+    /// the Reality autobuyer (and later the Automator's `reality` command).
+    /// Generates `choiceCount` glyphs and keeps the first — with the START
+    /// perk this matches the manual no-modal path; without it the original's
+    /// auto path generates a single glyph (unlike the manual 4-then-pick), and
+    /// we mirror that. The Effarig glyph-filter branch is out of frontier.
+    pub fn auto_reality(&mut self) -> bool {
+        if !self.is_reality_available() {
+            return false;
+        }
+        if self.reality.realities == 0 {
+            // Defensive: the autobuyer needs RU25, so a zeroth reality can't
+            // normally happen here; fall back to the standard first-reality
+            // grant (starting + companion glyphs).
+            return self.reality_with_glyph_choice(None, false);
+        }
+
+        let mut rng = GlyphRng::new(self.reality.seed, self.reality.second_gaussian);
+        let level = self.gained_glyph_level();
+        let glyphs = self.glyph_list(self.glyph_choice_count(), level, &mut rng);
+        self.reality.seed = rng.state as f64;
+        self.reality.second_gaussian = rng.second_gaussian;
+
+        let picked = glyphs[0].clone();
+        if self.glyph_free_inventory_space() == 0 {
+            self.sacrifice_or_delete(&picked);
+        } else {
+            self.add_glyph_to_inventory(picked);
+        }
+        self.finish_process_reality();
+        true
+    }
+
     /// The glyph half of `processManualReality`.
     pub(crate) fn grant_glyphs_on_reality(
         &mut self,

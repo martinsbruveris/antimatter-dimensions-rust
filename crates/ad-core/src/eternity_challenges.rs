@@ -288,6 +288,27 @@ impl GameState {
         false
     }
 
+    /// The total completions EC `id` would sit at if the player eternitied
+    /// right now (`gainedCompletionStatus.totalCompletions`): the banked count
+    /// plus what this eternity's IP peak reaches — one completion, or several
+    /// with the ECB perk (73). Mirrors [`Self::complete_running_ec`]'s loop
+    /// without mutating; used by the Eternity autobuyer's in-EC condition.
+    pub fn ec_pending_total_completions(&self, id: u8) -> u8 {
+        if id == 0 || id > ETERNITY_CHALLENGE_COUNT as u8 {
+            return 0;
+        }
+        let mut total = self.eternity_challenges[(id - 1) as usize];
+        while total < EC_MAX_COMPLETIONS
+            && self.records.this_eternity.max_ip >= self.ec_goal_at(id, total)
+        {
+            total += 1;
+            if !self.perk_bought(73) {
+                break;
+            }
+        }
+        total
+    }
+
     /// Bank a completion of the running EC on an Eternity
     /// (`giveEternityRewards`' challenge branch): +1 completion (capped),
     /// requirement bit cleared, tree auto-respecced.

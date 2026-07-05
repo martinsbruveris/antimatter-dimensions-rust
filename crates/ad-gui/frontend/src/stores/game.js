@@ -435,9 +435,46 @@ export const useGameStore = defineStore("game", {
     upgradeAutobuyerInterval(target) {
       return invoke("upgrade_autobuyer_interval", { target });
     },
-    // Toggle a prestige autobuyer (Dim Boost / Galaxy / Big Crunch) on/off.
+    // Toggle a prestige autobuyer (Dim Boost / Galaxy / Big Crunch / Eternity /
+    // Reality) on/off.
     toggleAutobuyer(target) {
       return invoke("toggle_autobuyer", { target });
+    },
+    // Big Crunch / Eternity autobuyer goal mode ("amount"/"time"/"xHighest").
+    setPrestigeAutobuyerMode(target, mode) {
+      return invoke("set_prestige_autobuyer_mode", { target, mode });
+    },
+    // Value input for the current goal mode; resolves false for bad input.
+    setPrestigeAutobuyerValue(target, value) {
+      return invoke("set_prestige_autobuyer_value", { target, value });
+    },
+    // The "Dynamic amount" checkbox (amount scales with prestige multipliers).
+    toggleAutobuyerDynamicAmount(target) {
+      return invoke("toggle_autobuyer_dynamic_amount", { target });
+    },
+    // Reality autobuyer mode ("rm"/"glyph"/"either"/"both"/"time").
+    setRealityAutobuyerMode(mode) {
+      return invoke("set_reality_autobuyer_mode", { mode });
+    },
+    // Reality autobuyer targets ("rm" decimal / "glyph" int / "time" float).
+    setRealityAutobuyerValue(property, value) {
+      return invoke("set_reality_autobuyer_value", { property, value });
+    },
+    // --- Time Study presets ---
+    studyPresetSave(slot) {
+      return invoke("study_preset_save", { slot });
+    },
+    // Load a preset into the current tree; `respec` = "Respec and Load".
+    studyPresetLoad(slot, respec = false) {
+      return invoke("study_preset_load", { slot, respec });
+    },
+    // Rename a preset (≤ 4 ASCII chars, unique); resolves false when rejected.
+    studyPresetRename(slot, name) {
+      return invoke("study_preset_rename", { slot, name });
+    },
+    // Overwrite a preset's study string; resolves false for a malformed string.
+    studyPresetEdit(slot, studies) {
+      return invoke("study_preset_edit", { slot, studies });
     },
     // --- Options ---
     // Enable/disable keyboard shortcuts (original `player.options.hotkeys`).

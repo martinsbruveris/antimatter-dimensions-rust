@@ -3,6 +3,7 @@ mod persistence;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use ad_core::autobuyers::{AutoRealityMode, PrestigeAutobuyerMode};
 use ad_core::data::constants::{
     BIG_CRUNCH_THRESHOLD, BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER,
 };
@@ -266,6 +267,47 @@ struct AutobuyersView {
     galaxy: AutobuyerView,
     /// The Big Crunch (Infinity) autobuyer (unlocked by completing NC12).
     big_crunch: AutobuyerView,
+    /// The Big Crunch autobuyer's post-break goal settings.
+    big_crunch_settings: PrestigeGoalView,
+    /// The Eternity autobuyer (100-Eternities milestone).
+    eternity: EternityAutobuyerView,
+    /// The Reality autobuyer (Reality Upgrade 25).
+    reality: RealityAutobuyerView,
+}
+
+/// The goal settings of the Big Crunch / Eternity autobuyers (mode dropdown +
+/// value input + "Dynamic amount" checkbox).
+#[derive(Serialize)]
+struct PrestigeGoalView {
+    /// Current mode: "amount" / "time" / "xHighest".
+    mode: String,
+    /// Whether the Time / X-highest modes are available (`hasAdditionalModes`:
+    /// the `bigCrunchModes` milestone, resp. Reality Upgrade 13).
+    has_modes: bool,
+    amount: Num,
+    time: f64,
+    x_highest: Num,
+    increase_with_mult: bool,
+}
+
+/// The Eternity autobuyer's row.
+#[derive(Serialize)]
+struct EternityAutobuyerView {
+    is_unlocked: bool,
+    is_active: bool,
+    settings: PrestigeGoalView,
+}
+
+/// The Reality autobuyer's row.
+#[derive(Serialize)]
+struct RealityAutobuyerView {
+    is_unlocked: bool,
+    is_active: bool,
+    /// "rm" / "glyph" / "either" / "both" / "time".
+    mode: String,
+    rm: Num,
+    glyph: u32,
+    time: f64,
 }
 
 /// Serializable game view sent to the frontend each frame.
@@ -465,6 +507,17 @@ struct TimeStudiesView {
     studies: Vec<TimeStudyView>,
     /// The EC whose unlock study is held (0 = none; Feature 4.5).
     ec_unlocked: u8,
+    /// The six study presets (save/load buttons above the TT shop).
+    presets: Vec<StudyPresetView>,
+    /// Whether an Eternity is available (enables "Respec and Load").
+    can_eternity: bool,
+}
+
+/// One study preset slot.
+#[derive(Serialize)]
+struct StudyPresetView {
+    name: String,
+    studies: String,
 }
 
 /// Serializable view of one time study node.
@@ -884,6 +937,53 @@ fn build_autobuyers_view(game: &GameState) -> AutobuyersView {
         dim_boost: prestige(AutobuyerTarget::DimBoost, "Dimension Boost Autobuyer"),
         galaxy: prestige(AutobuyerTarget::Galaxy, "Antimatter Galaxy Autobuyer"),
         big_crunch: prestige(AutobuyerTarget::BigCrunch, "Big Crunch Autobuyer"),
+        big_crunch_settings: prestige_goal_view(
+            &game.autobuyers.big_crunch_settings,
+            game.big_crunch_autobuyer_has_modes(),
+        ),
+        eternity: EternityAutobuyerView {
+            is_unlocked: game.eternity_autobuyer_unlocked(),
+            is_active: game.autobuyers.eternity.is_active,
+            settings: prestige_goal_view(
+                &game.autobuyers.eternity.settings,
+                game.eternity_autobuyer_has_modes(),
+            ),
+        },
+        reality: RealityAutobuyerView {
+            is_unlocked: game.reality_autobuyer_unlocked(),
+            is_active: game.autobuyers.reality.is_active,
+            mode: match game.autobuyers.reality.mode {
+                AutoRealityMode::Rm => "rm",
+                AutoRealityMode::Glyph => "glyph",
+                AutoRealityMode::Either => "either",
+                AutoRealityMode::Both => "both",
+                AutoRealityMode::Time => "time",
+            }
+            .to_string(),
+            rm: num(&game.autobuyers.reality.rm),
+            glyph: game.autobuyers.reality.glyph,
+            time: game.autobuyers.reality.time,
+        },
+    }
+}
+
+/// Build the mode/threshold view for a prestige-goal autobuyer.
+fn prestige_goal_view(
+    settings: &ad_core::autobuyers::PrestigeGoalSettings,
+    has_modes: bool,
+) -> PrestigeGoalView {
+    PrestigeGoalView {
+        mode: match settings.mode {
+            PrestigeAutobuyerMode::Amount => "amount",
+            PrestigeAutobuyerMode::Time => "time",
+            PrestigeAutobuyerMode::XHighest => "xHighest",
+        }
+        .to_string(),
+        has_modes,
+        amount: num(&settings.amount),
+        time: settings.time,
+        x_highest: num(&settings.x_highest),
+        increase_with_mult: settings.increase_with_mult,
     }
 }
 
@@ -1067,6 +1167,15 @@ fn build_time_studies_view(game: &GameState) -> TimeStudiesView {
             })
             .collect(),
         ec_unlocked: game.eternity_challenge_unlocked,
+        presets: game
+            .study_presets
+            .iter()
+            .map(|p| StudyPresetView {
+                name: p.name.clone(),
+                studies: p.studies.clone(),
+            })
+            .collect(),
+        can_eternity: game.can_eternity(),
     }
 }
 
@@ -2108,9 +2217,192 @@ fn upgrade_autobuyer_interval(target: String, state: State<'_, Mutex<GameState>>
 
 #[tauri::command]
 fn toggle_autobuyer(target: String, state: State<'_, Mutex<GameState>>) {
-    if let Some(target) = parse_autobuyer_target(&target) {
-        state.lock().unwrap().toggle_autobuyer_active(target);
+    // The Eternity / Reality autobuyers have no `AutobuyerTarget` (no
+    // interval-upgrade machinery); they get their own toggles.
+    match target.as_str() {
+        "eternity" => state.lock().unwrap().toggle_eternity_autobuyer(),
+        "reality" => state.lock().unwrap().toggle_reality_autobuyer(),
+        other => {
+            if let Some(target) = parse_autobuyer_target(other) {
+                state.lock().unwrap().toggle_autobuyer_active(target);
+            }
+        }
     }
+}
+
+/// Parse an autobuyer-input string the way the original `AutobuyerInput`'s
+/// decimal parser does: plain / scientific ("2.5e30"), logarithm ("e30"), and
+/// mixed-scientific ("2.33e41.2") forms, commas stripped.
+fn parse_decimal_input(input: &str) -> Option<Decimal> {
+    let s: String = input.chars().filter(|&c| c != ',').collect();
+    if s.is_empty() {
+        return None;
+    }
+    // Logarithm form: e<float>.
+    if let Some(exp) = s.strip_prefix('e') {
+        if !exp.is_empty() && exp.chars().all(|c| c.is_ascii_digit() || c == '.') {
+            return Some(Decimal::pow10(exp.parse::<f64>().ok()?));
+        }
+        return None;
+    }
+    let valid_num =
+        |t: &str| !t.is_empty() && t.chars().all(|c| c.is_ascii_digit() || c == '.');
+    match s.split_once(['e', 'E']) {
+        None => {
+            if !valid_num(&s) {
+                return None;
+            }
+            Some(Decimal::from_float(s.parse::<f64>().ok()?))
+        }
+        Some((mantissa, exponent)) => {
+            if !valid_num(mantissa) || !valid_num(exponent) {
+                return None;
+            }
+            let m = mantissa.parse::<f64>().ok()?;
+            if m <= 0.0 {
+                return None;
+            }
+            // Mixed-scientific exponents ("2.33e41.2") fold into pow10.
+            let e = exponent.parse::<f64>().ok()?;
+            Some(Decimal::pow10(m.log10() + e))
+        }
+    }
+}
+
+#[tauri::command]
+fn set_prestige_autobuyer_mode(
+    target: String,
+    mode: String,
+    state: State<'_, Mutex<GameState>>,
+) {
+    let mode = match mode.as_str() {
+        "amount" => PrestigeAutobuyerMode::Amount,
+        "time" => PrestigeAutobuyerMode::Time,
+        "xHighest" => PrestigeAutobuyerMode::XHighest,
+        _ => return,
+    };
+    let mut game = state.lock().unwrap();
+    match target.as_str() {
+        "bigCrunch" => {
+            game.set_big_crunch_autobuyer_mode(mode);
+        }
+        "eternity" => {
+            game.set_eternity_autobuyer_mode(mode);
+        }
+        _ => {}
+    }
+}
+
+/// Set the value input of the Big Crunch / Eternity autobuyer for its current
+/// mode. Returns false for unparseable input (the box shows invalid state).
+#[tauri::command]
+fn set_prestige_autobuyer_value(
+    target: String,
+    value: String,
+    state: State<'_, Mutex<GameState>>,
+) -> bool {
+    let Some(value) = parse_decimal_input(&value) else {
+        return false;
+    };
+    let mut game = state.lock().unwrap();
+    match target.as_str() {
+        "bigCrunch" => game.set_big_crunch_autobuyer_value(value),
+        "eternity" => game.set_eternity_autobuyer_value(value),
+        _ => return false,
+    }
+    true
+}
+
+#[tauri::command]
+fn toggle_autobuyer_dynamic_amount(target: String, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    match target.as_str() {
+        "bigCrunch" => game.toggle_big_crunch_dynamic_amount(),
+        "eternity" => game.toggle_eternity_dynamic_amount(),
+        _ => {}
+    }
+}
+
+#[tauri::command]
+fn set_reality_autobuyer_mode(mode: String, state: State<'_, Mutex<GameState>>) {
+    let mode = match mode.as_str() {
+        "rm" => AutoRealityMode::Rm,
+        "glyph" => AutoRealityMode::Glyph,
+        "either" => AutoRealityMode::Either,
+        "both" => AutoRealityMode::Both,
+        "time" => AutoRealityMode::Time,
+        _ => return,
+    };
+    state.lock().unwrap().set_reality_autobuyer_mode(mode);
+}
+
+/// Set one of the Reality autobuyer's targets ("rm" decimal, "glyph" int,
+/// "time" float). Returns false for unparseable input.
+#[tauri::command]
+fn set_reality_autobuyer_value(
+    property: String,
+    value: String,
+    state: State<'_, Mutex<GameState>>,
+) -> bool {
+    let mut game = state.lock().unwrap();
+    match property.as_str() {
+        "rm" => {
+            let Some(value) = parse_decimal_input(&value) else {
+                return false;
+            };
+            game.set_reality_autobuyer_rm(value);
+        }
+        "glyph" => {
+            let Ok(value) = value.trim().parse::<u32>() else {
+                return false;
+            };
+            game.set_reality_autobuyer_glyph(value);
+        }
+        "time" => {
+            let Ok(value) = value.trim().parse::<f64>() else {
+                return false;
+            };
+            game.set_reality_autobuyer_time(value);
+        }
+        _ => return false,
+    }
+    true
+}
+
+#[tauri::command]
+fn study_preset_save(slot: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().save_study_preset(slot);
+}
+
+#[tauri::command]
+fn study_preset_load(slot: usize, respec: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    if respec {
+        game.respec_and_load_study_preset(slot);
+    } else {
+        game.load_study_preset(slot);
+    }
+}
+
+#[tauri::command]
+fn study_preset_rename(
+    slot: usize,
+    name: String,
+    state: State<'_, Mutex<GameState>>,
+) -> bool {
+    state.lock().unwrap().set_study_preset_name(slot, &name)
+}
+
+#[tauri::command]
+fn study_preset_edit(
+    slot: usize,
+    studies: String,
+    state: State<'_, Mutex<GameState>>,
+) -> bool {
+    state
+        .lock()
+        .unwrap()
+        .set_study_preset_studies(slot, &studies)
 }
 
 #[tauri::command]
@@ -2677,6 +2969,15 @@ pub fn run() {
             export_save_to_file,
             import_save_from_file,
             save_game,
+            set_prestige_autobuyer_mode,
+            set_prestige_autobuyer_value,
+            toggle_autobuyer_dynamic_amount,
+            set_reality_autobuyer_mode,
+            set_reality_autobuyer_value,
+            study_preset_save,
+            study_preset_load,
+            study_preset_rename,
+            study_preset_edit,
             switch_save_slot,
             get_save_slots,
             trigger_backup,

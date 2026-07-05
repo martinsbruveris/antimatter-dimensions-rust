@@ -23,6 +23,140 @@ pub enum AutobuyerMode {
     BuyMax,
 }
 
+/// Goal mode for the post-break Big Crunch autobuyer and the Eternity
+/// autobuyer (the original's `AUTO_CRUNCH_MODE` / `AUTO_ETERNITY_MODE`:
+/// 0 = amount, 1 = time, 2 = X times highest).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum PrestigeAutobuyerMode {
+    /// Prestige once the pending gain reaches a fixed amount.
+    #[default]
+    Amount,
+    /// Prestige after a fixed number of real-time seconds in the run.
+    Time,
+    /// Prestige once the pending gain reaches X times the previous highest.
+    XHighest,
+}
+
+/// Trigger mode for the Reality autobuyer (`AUTO_REALITY_MODE`; the Effarig
+/// `RELIC_SHARD` mode is celestial content and out of frontier — a save
+/// carrying it loads as `Rm`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum AutoRealityMode {
+    /// Reality once the pending RM gain reaches the target.
+    #[default]
+    Rm,
+    /// Reality once the pending glyph level reaches the target.
+    Glyph,
+    /// RM or glyph level.
+    Either,
+    /// RM and glyph level.
+    Both,
+    /// Reality after a fixed number of real-time seconds.
+    Time,
+}
+
+/// The goal settings shared by the Big Crunch autobuyer (post-break) and the
+/// Eternity autobuyer (the original stores these on `player.auto.bigCrunch` /
+/// `player.auto.eternity` alongside the active flag).
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct PrestigeGoalSettings {
+    pub mode: PrestigeAutobuyerMode,
+    /// Fixed prestige-currency threshold (`amount`).
+    pub amount: Decimal,
+    /// "Dynamic amount": buying prestige-currency multipliers scales `amount`
+    /// along (`increaseWithMult`).
+    pub increase_with_mult: bool,
+    /// Seconds between prestiges (`time`).
+    pub time: f64,
+    /// Multiplier on the previous highest gain (`xHighest`).
+    pub x_highest: Decimal,
+}
+
+impl PrestigeGoalSettings {
+    pub fn new() -> Self {
+        Self {
+            mode: PrestigeAutobuyerMode::Amount,
+            amount: Decimal::ONE,
+            increase_with_mult: true,
+            time: 1.0,
+            x_highest: Decimal::ONE,
+        }
+    }
+}
+
+impl Default for PrestigeGoalSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The Eternity autobuyer (`player.auto.eternity`): no interval — its
+/// condition is checked every tick. Unlocked by the `autobuyerEternity`
+/// milestone (100 Eternities); non-`Amount` modes need Reality Upgrade 13.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EternityAutobuyer {
+    /// Off by default (the original's `eternity.isActive: false`).
+    pub is_active: bool,
+    pub settings: PrestigeGoalSettings,
+}
+
+impl EternityAutobuyer {
+    pub fn new() -> Self {
+        Self {
+            is_active: false,
+            settings: PrestigeGoalSettings::new(),
+        }
+    }
+}
+
+impl Default for EternityAutobuyer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The Reality autobuyer (`player.auto.reality`): no interval. Unlocked by
+/// Reality Upgrade 25.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RealityAutobuyer {
+    /// Off by default.
+    pub is_active: bool,
+    pub mode: AutoRealityMode,
+    /// Target Reality Machines (`rm`).
+    pub rm: Decimal,
+    /// Target glyph level (`glyph`; an integer in the original's input).
+    pub glyph: u32,
+    /// Target real-time seconds (`time`).
+    pub time: f64,
+}
+
+impl RealityAutobuyer {
+    pub fn new() -> Self {
+        Self {
+            is_active: false,
+            mode: AutoRealityMode::Rm,
+            rm: Decimal::ONE,
+            glyph: 0,
+            time: 0.0,
+        }
+    }
+}
+
+impl Default for RealityAutobuyer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The glyph level cap (`Glyphs.levelCap`, a constant pre-Ra) clamping the
+/// Reality autobuyer's glyph-level target.
+pub const GLYPH_LEVEL_CAP: u32 = 1_000_000;
+
 /// A handle to any single autobuyer, for a uniform toggle/upgrade API across the
 /// AD, Tickspeed (and later Dim Boost / Galaxy / Big Crunch) autobuyers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,6 +283,17 @@ pub struct AutobuyerState {
     /// gates Break Infinity.
     #[cfg_attr(feature = "serde", serde(default = "default_big_crunch_autobuyer"))]
     pub big_crunch: Autobuyer,
+    /// Post-break goal settings for the Big Crunch autobuyer (mode/amount/
+    /// time/xHighest). Modes beyond `Amount` need the `bigCrunchModes`
+    /// milestone (5 Eternities).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub big_crunch_settings: PrestigeGoalSettings,
+    /// The Eternity autobuyer (100-Eternities milestone).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub eternity: EternityAutobuyer,
+    /// The Reality autobuyer (Reality Upgrade 25).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub reality: RealityAutobuyer,
 }
 
 /// serde defaults for the three challenge-only autobuyers (so an older serialized
@@ -191,6 +336,9 @@ impl AutobuyerState {
                 BIG_CRUNCH_AUTOBUYER_INTERVAL_MS,
                 AutobuyerMode::BuySingle,
             ),
+            big_crunch_settings: PrestigeGoalSettings::new(),
+            eternity: EternityAutobuyer::new(),
+            reality: RealityAutobuyer::new(),
         }
     }
 }
@@ -444,11 +592,32 @@ impl GameState {
         }
 
         // Big Crunch: pre-break `willInfinity` is always true, so it crunches as
-        // soon as the goal is reached (`big_crunch` no-ops otherwise).
+        // soon as the goal is reached (`big_crunch` no-ops otherwise); post-break
+        // the configured goal mode gates the crunch.
         let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch);
         let eff = self.autobuyers.big_crunch.interval_ms * speedup;
-        if unlocked && self.autobuyers.big_crunch.advance(dt_ms, eff) {
+        if unlocked
+            && self.autobuyers.big_crunch.advance(dt_ms, eff)
+            && self.will_auto_crunch()
+        {
             self.big_crunch();
+        }
+
+        // Eternity and Reality autobuyers: no interval — their conditions are
+        // checked every tick (plain `AutobuyerState`s in the original). The
+        // prestige calls gate themselves on availability.
+        if self.eternity_autobuyer_unlocked()
+            && self.autobuyers.eternity.is_active
+            && self.will_auto_eternity()
+        {
+            self.eternity();
+        }
+
+        if self.reality_autobuyer_unlocked()
+            && self.autobuyers.reality.is_active
+            && self.will_auto_reality()
+        {
+            self.auto_reality();
         }
     }
 
@@ -459,6 +628,230 @@ impl GameState {
     /// NC12 completed, so no separate unlock check is necessary.
     pub fn break_infinity_unlockable(&self) -> bool {
         self.autobuyer_has_maxed_interval(AutobuyerTarget::BigCrunch)
+    }
+
+    // --- Prestige autobuyer goal modes (Big Crunch / Eternity / Reality) ---------
+
+    /// Whether the Big Crunch autobuyer offers the Time / X-highest modes
+    /// (`hasAdditionalModes`): the `bigCrunchModes` milestone, 5 Eternities.
+    pub fn big_crunch_autobuyer_has_modes(&self) -> bool {
+        self.eternity_milestone_reached(5)
+    }
+
+    /// Whether the Eternity autobuyer runs at all (`Autobuyer.eternity
+    /// .isUnlocked`): the `autobuyerEternity` milestone, 100 Eternities.
+    pub fn eternity_autobuyer_unlocked(&self) -> bool {
+        self.eternity_milestone_reached(100)
+    }
+
+    /// Whether the Eternity autobuyer offers the Time / X-highest modes:
+    /// Reality Upgrade 13.
+    pub fn eternity_autobuyer_has_modes(&self) -> bool {
+        self.reality_upgrade_bought(13)
+    }
+
+    /// Whether the Reality autobuyer runs at all: Reality Upgrade 25.
+    pub fn reality_autobuyer_unlocked(&self) -> bool {
+        self.reality_upgrade_bought(25)
+    }
+
+    /// `BigCrunchAutobuyerState.willInfinity`: pre-break (or inside an
+    /// antimatter challenge) the autobuyer always crunches at the goal;
+    /// post-break the configured mode decides.
+    pub(crate) fn will_auto_crunch(&self) -> bool {
+        let in_antimatter_challenge =
+            self.challenge.current != 0 || self.infinity_challenge.current != 0;
+        if !self.broke_infinity || in_antimatter_challenge {
+            return true;
+        }
+        let s = &self.autobuyers.big_crunch_settings;
+        match s.mode {
+            PrestigeAutobuyerMode::Amount => self.gained_infinity_points() >= s.amount,
+            PrestigeAutobuyerMode::Time => {
+                self.records.this_infinity.real_time_ms / 1000.0 > s.time
+            }
+            // `highestPrevPrestige` for a crunch is this eternity's IP peak.
+            PrestigeAutobuyerMode::XHighest => {
+                self.gained_infinity_points()
+                    >= self.records.this_eternity.max_ip * s.x_highest
+            }
+        }
+    }
+
+    /// `EternityAutobuyerState.willEternity`. Inside an Eternity Challenge the
+    /// autobuyer eternities as soon as no further completions are reachable
+    /// (without the ECB perk that is "as soon as the EC can be completed",
+    /// since `eternity()` itself gates on the goal).
+    pub(crate) fn will_auto_eternity(&self) -> bool {
+        if self.any_ec_running() {
+            if !self.perk_bought(73) {
+                return true;
+            }
+            let id = self.eternity_challenge_current;
+            return self.ec_pending_total_completions(id)
+                >= crate::eternity_challenges::EC_MAX_COMPLETIONS;
+        }
+        let s = &self.autobuyers.eternity.settings;
+        match s.mode {
+            PrestigeAutobuyerMode::Amount => self.gained_eternity_points() >= s.amount,
+            PrestigeAutobuyerMode::Time => {
+                self.records.this_eternity.real_time_ms / 1000.0 > s.time
+            }
+            // `highestPrevPrestige` for an eternity is this reality's EP peak.
+            PrestigeAutobuyerMode::XHighest => {
+                self.gained_eternity_points()
+                    >= self.records.this_reality.max_ep * s.x_highest
+            }
+        }
+    }
+
+    /// The Reality autobuyer's trigger (`RealityAutobuyerState.tick`, minus
+    /// the Effarig glyph-filter branch — celestial content). The amplification
+    /// factor is 1 at our frontier.
+    pub(crate) fn will_auto_reality(&self) -> bool {
+        if !self.is_reality_available() {
+            return false;
+        }
+        let ab = &self.autobuyers.reality;
+        let rm_proc = || self.gained_reality_machines() >= ab.rm;
+        let glyph_proc =
+            || self.gained_glyph_level().actual_level >= ab.glyph.min(GLYPH_LEVEL_CAP);
+        match ab.mode {
+            AutoRealityMode::Rm => rm_proc(),
+            AutoRealityMode::Glyph => glyph_proc(),
+            AutoRealityMode::Either => rm_proc() || glyph_proc(),
+            AutoRealityMode::Both => rm_proc() && glyph_proc(),
+            AutoRealityMode::Time => {
+                self.records.this_reality.real_time_ms / 1000.0 > ab.time
+            }
+        }
+    }
+
+    /// Toggle the Eternity autobuyer's active flag.
+    pub fn toggle_eternity_autobuyer(&mut self) {
+        self.autobuyers.eternity.is_active = !self.autobuyers.eternity.is_active;
+    }
+
+    /// Toggle the Reality autobuyer's active flag.
+    pub fn toggle_reality_autobuyer(&mut self) {
+        self.autobuyers.reality.is_active = !self.autobuyers.reality.is_active;
+    }
+
+    /// Set the Big Crunch autobuyer's goal mode. Non-`Amount` modes require
+    /// the `bigCrunchModes` milestone.
+    pub fn set_big_crunch_autobuyer_mode(
+        &mut self,
+        mode: PrestigeAutobuyerMode,
+    ) -> bool {
+        if mode != PrestigeAutobuyerMode::Amount
+            && !self.big_crunch_autobuyer_has_modes()
+        {
+            return false;
+        }
+        self.autobuyers.big_crunch_settings.mode = mode;
+        true
+    }
+
+    /// Set the Eternity autobuyer's goal mode. Non-`Amount` modes require
+    /// Reality Upgrade 13.
+    pub fn set_eternity_autobuyer_mode(&mut self, mode: PrestigeAutobuyerMode) -> bool {
+        if mode != PrestigeAutobuyerMode::Amount && !self.eternity_autobuyer_has_modes()
+        {
+            return false;
+        }
+        self.autobuyers.eternity.settings.mode = mode;
+        true
+    }
+
+    /// Set the Reality autobuyer's trigger mode.
+    pub fn set_reality_autobuyer_mode(&mut self, mode: AutoRealityMode) {
+        self.autobuyers.reality.mode = mode;
+    }
+
+    /// Toggle the Big Crunch autobuyer's "Dynamic amount" checkbox.
+    pub fn toggle_big_crunch_dynamic_amount(&mut self) {
+        let s = &mut self.autobuyers.big_crunch_settings;
+        s.increase_with_mult = !s.increase_with_mult;
+    }
+
+    /// Toggle the Eternity autobuyer's "Dynamic amount" checkbox.
+    pub fn toggle_eternity_dynamic_amount(&mut self) {
+        let s = &mut self.autobuyers.eternity.settings;
+        s.increase_with_mult = !s.increase_with_mult;
+    }
+
+    /// Set the value for the Big Crunch autobuyer's *current* mode (the single
+    /// input box under the mode selector).
+    pub fn set_big_crunch_autobuyer_value(&mut self, value: Decimal) {
+        let s = &mut self.autobuyers.big_crunch_settings;
+        match s.mode {
+            PrestigeAutobuyerMode::Amount => s.amount = value,
+            PrestigeAutobuyerMode::Time => s.time = value.to_f64(),
+            PrestigeAutobuyerMode::XHighest => s.x_highest = value,
+        }
+    }
+
+    /// Set the value for the Eternity autobuyer's current mode.
+    pub fn set_eternity_autobuyer_value(&mut self, value: Decimal) {
+        let s = &mut self.autobuyers.eternity.settings;
+        match s.mode {
+            PrestigeAutobuyerMode::Amount => s.amount = value,
+            PrestigeAutobuyerMode::Time => s.time = value.to_f64(),
+            PrestigeAutobuyerMode::XHighest => s.x_highest = value,
+        }
+    }
+
+    /// Set the Reality autobuyer's RM target.
+    pub fn set_reality_autobuyer_rm(&mut self, rm: Decimal) {
+        self.autobuyers.reality.rm = rm;
+    }
+
+    /// Set the Reality autobuyer's glyph-level target.
+    pub fn set_reality_autobuyer_glyph(&mut self, glyph: u32) {
+        self.autobuyers.reality.glyph = glyph;
+    }
+
+    /// Set the Reality autobuyer's time target (seconds).
+    pub fn set_reality_autobuyer_time(&mut self, time: f64) {
+        self.autobuyers.reality.time = time;
+    }
+
+    /// "Dynamic amount" (`bumpAmount`): prestige-currency multiplier purchases
+    /// scale the fixed-amount goal along. The Big Crunch bump fires from
+    /// Achievements 85/93 (×4 IP) — the `ipMult` rebuyable is a deferred
+    /// Break-Infinity feature; the Eternity bump fires from the `epMult`
+    /// Eternity Upgrade (×5 each).
+    pub(crate) fn bump_big_crunch_amount(&mut self, mult: Decimal) {
+        if self.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch)
+            && self.autobuyers.big_crunch_settings.increase_with_mult
+        {
+            let amount = self.autobuyers.big_crunch_settings.amount * mult;
+            self.autobuyers.big_crunch_settings.amount = amount;
+        }
+    }
+
+    /// See [`Self::bump_big_crunch_amount`].
+    pub(crate) fn bump_eternity_amount(&mut self, mult: Decimal) {
+        if self.eternity_autobuyer_unlocked()
+            && self.autobuyers.eternity.settings.increase_with_mult
+        {
+            let amount = self.autobuyers.eternity.settings.amount * mult;
+            self.autobuyers.eternity.settings.amount = amount;
+        }
+    }
+
+    /// The prestige autobuyers' config half of `Autobuyers.reset()` (runs on
+    /// every Eternity and Reality reset, *after* rewards/eternities settle):
+    /// the Big Crunch mode reverts to `Amount` without the `bigCrunchModes`
+    /// milestone, and the Eternity autobuyer deactivates without its
+    /// milestone. The Reality autobuyer has no reset (RU25 persists).
+    pub(crate) fn reset_prestige_autobuyer_configs(&mut self) {
+        if !self.big_crunch_autobuyer_has_modes() {
+            self.autobuyers.big_crunch_settings.mode = PrestigeAutobuyerMode::Amount;
+        }
+        if !self.eternity_autobuyer_unlocked() {
+            self.autobuyers.eternity.is_active = false;
+        }
     }
 }
 
@@ -594,6 +987,236 @@ mod tests {
 
         assert!(game.infinities > inf_before);
         assert!(game.antimatter < BIG_CRUNCH_THRESHOLD); // reset by the crunch
+    }
+
+    /// A post-break state where a crunch is available and gains a known IP.
+    fn game_post_break_at_goal() -> GameState {
+        let mut game = GameState::new();
+        game.complete_challenge(12);
+        game.autobuyers.big_crunch.interval_ms = 100.0;
+        game.infinity_unlocked = true;
+        game.broke_infinity = true;
+        game.antimatter = Decimal::new(1.0, 400);
+        game.records.this_infinity.max_am = game.antimatter;
+        game
+    }
+
+    #[test]
+    fn crunch_amount_mode_waits_for_threshold() {
+        let mut game = game_post_break_at_goal();
+        assert!(game.eternity_milestone_reached(0)); // sanity: 0 eternities
+        game.eternities = Decimal::from_float(5.0); // bigCrunchModes milestone
+        assert!(game.big_crunch_autobuyer_has_modes());
+        let pending = game.gained_infinity_points();
+        assert!(pending > Decimal::ONE);
+
+        // Threshold above the pending gain: no crunch.
+        game.autobuyers.big_crunch_settings.amount = pending * Decimal::from_float(10.0);
+        let inf_before = game.infinities;
+        game.tick_autobuyers(150.0);
+        assert_eq!(game.infinities, inf_before);
+
+        // Threshold at/below the pending gain: crunches.
+        game.autobuyers.big_crunch_settings.amount = pending;
+        game.tick_autobuyers(150.0);
+        assert!(game.infinities > inf_before);
+    }
+
+    #[test]
+    fn crunch_time_mode_waits_for_infinity_age() {
+        let mut game = game_post_break_at_goal();
+        game.eternities = Decimal::from_float(5.0);
+        game.autobuyers.big_crunch_settings.mode = PrestigeAutobuyerMode::Time;
+        game.autobuyers.big_crunch_settings.time = 10.0;
+
+        game.records.this_infinity.real_time_ms = 5_000.0;
+        let inf_before = game.infinities;
+        game.tick_autobuyers(150.0);
+        assert_eq!(game.infinities, inf_before);
+
+        game.records.this_infinity.real_time_ms = 11_000.0;
+        game.tick_autobuyers(150.0);
+        assert!(game.infinities > inf_before);
+    }
+
+    #[test]
+    fn crunch_x_highest_mode_compares_against_eternity_peak() {
+        let mut game = game_post_break_at_goal();
+        game.eternities = Decimal::from_float(5.0);
+        game.autobuyers.big_crunch_settings.mode = PrestigeAutobuyerMode::XHighest;
+        game.autobuyers.big_crunch_settings.x_highest = Decimal::from_float(2.0);
+        let pending = game.gained_infinity_points();
+
+        // Peak too high: pending < 2 × peak.
+        game.records.this_eternity.max_ip = pending;
+        let inf_before = game.infinities;
+        game.tick_autobuyers(150.0);
+        assert_eq!(game.infinities, inf_before);
+
+        // Low peak: pending ≥ 2 × peak → crunch.
+        game.records.this_eternity.max_ip = pending / Decimal::from_float(4.0);
+        game.tick_autobuyers(150.0);
+        assert!(game.infinities > inf_before);
+    }
+
+    #[test]
+    fn crunch_mode_resets_without_milestone_on_eternity() {
+        let mut game = game_post_break_at_goal();
+        game.eternities = Decimal::from_float(5.0);
+        game.autobuyers.big_crunch_settings.mode = PrestigeAutobuyerMode::Time;
+
+        // An Eternity keeps the mode while the milestone holds (5 + 1 ≥ 5)...
+        game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        assert!(game.eternity());
+        assert_eq!(
+            game.autobuyers.big_crunch_settings.mode,
+            PrestigeAutobuyerMode::Time
+        );
+
+        // ...but reverts to Amount when eternities fall below it.
+        game.autobuyers.big_crunch_settings.mode = PrestigeAutobuyerMode::XHighest;
+        game.eternities = Decimal::from_float(3.0);
+        game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        assert!(game.eternity());
+        assert_eq!(
+            game.autobuyers.big_crunch_settings.mode,
+            PrestigeAutobuyerMode::Amount
+        );
+    }
+
+    #[test]
+    fn eternity_autobuyer_needs_milestone_and_goal() {
+        let mut game = GameState::new();
+        game.eternity_unlocked = true;
+        game.autobuyers.eternity.is_active = true;
+        game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        game.autobuyers.eternity.settings.amount = Decimal::ZERO;
+
+        // Below 100 eternities the autobuyer is locked.
+        game.eternities = Decimal::from_float(99.0);
+        let before = game.eternities;
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.eternities, before);
+
+        // At the milestone it fires (amount 0 ≤ pending EP).
+        game.eternities = Decimal::from_float(100.0);
+        game.tick_autobuyers(50.0);
+        // The eternity reset takes eternities to 100 + gained (1).
+        assert_eq!(game.eternities, Decimal::from_float(101.0));
+    }
+
+    #[test]
+    fn eternity_autobuyer_amount_mode_waits_for_ep() {
+        let mut game = GameState::new();
+        game.eternity_unlocked = true;
+        game.eternities = Decimal::from_float(100.0);
+        game.autobuyers.eternity.is_active = true;
+        game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        let pending = game.gained_eternity_points();
+
+        game.autobuyers.eternity.settings.amount = pending * Decimal::from_float(100.0);
+        let before = game.eternities;
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.eternities, before);
+
+        game.autobuyers.eternity.settings.amount = pending;
+        game.tick_autobuyers(50.0);
+        assert!(game.eternities > before);
+    }
+
+    #[test]
+    fn eternity_autobuyer_deactivates_on_reset_without_milestone() {
+        let mut game = GameState::new();
+        game.eternity_unlocked = true;
+        game.eternities = Decimal::from_float(50.0);
+        game.autobuyers.eternity.is_active = true;
+        game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        assert!(game.eternity());
+        assert!(!game.autobuyers.eternity.is_active);
+    }
+
+    #[test]
+    fn ep_mult_purchase_bumps_dynamic_eternity_amount() {
+        let mut game = GameState::new();
+        game.eternities = Decimal::from_float(100.0); // autobuyer unlocked
+        game.eternity_points = Decimal::from_float(1e10);
+        assert!(game.autobuyers.eternity.settings.increase_with_mult);
+        assert!(game.buy_ep_mult());
+        assert_eq!(
+            game.autobuyers.eternity.settings.amount,
+            Decimal::from_float(5.0)
+        );
+
+        // With the checkbox off the amount stays put.
+        game.autobuyers.eternity.settings.increase_with_mult = false;
+        assert!(game.buy_ep_mult());
+        assert_eq!(
+            game.autobuyers.eternity.settings.amount,
+            Decimal::from_float(5.0)
+        );
+    }
+
+    #[test]
+    fn mode_setters_gate_on_unlocks() {
+        let mut game = GameState::new();
+        // No milestone / RU13: only Amount is settable.
+        assert!(!game.set_big_crunch_autobuyer_mode(PrestigeAutobuyerMode::Time));
+        assert!(!game.set_eternity_autobuyer_mode(PrestigeAutobuyerMode::XHighest));
+        assert!(game.set_big_crunch_autobuyer_mode(PrestigeAutobuyerMode::Amount));
+
+        game.eternities = Decimal::from_float(5.0);
+        assert!(game.set_big_crunch_autobuyer_mode(PrestigeAutobuyerMode::Time));
+        game.reality.upgrade_bits |= 1 << 13;
+        assert!(game.set_eternity_autobuyer_mode(PrestigeAutobuyerMode::XHighest));
+    }
+
+    #[test]
+    fn reality_autobuyer_rm_mode_triggers_at_target() {
+        let mut game = crate::reality::tests::game_at_reality_goal();
+        game.reality.realities = 1; // past the first-reality special case
+        game.reality.upgrade_bits |= 1 << 25; // RU25 unlocks the autobuyer
+        game.autobuyers.reality.is_active = true;
+        let pending_rm = game.gained_reality_machines();
+        assert!(pending_rm >= Decimal::ONE);
+
+        // Target above the pending gain: nothing happens.
+        game.autobuyers.reality.rm = pending_rm * Decimal::from_float(10.0);
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.reality.realities, 1);
+
+        // Target at the pending gain: an automatic Reality fires.
+        game.autobuyers.reality.rm = pending_rm;
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.reality.realities, 2);
+        assert!(game.reality.machines >= pending_rm);
+    }
+
+    #[test]
+    fn reality_autobuyer_needs_ru25() {
+        let mut game = crate::reality::tests::game_at_reality_goal();
+        game.reality.realities = 1;
+        game.autobuyers.reality.is_active = true;
+        game.autobuyers.reality.rm = Decimal::ONE;
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.reality.realities, 1); // locked without RU25
+    }
+
+    #[test]
+    fn reality_autobuyer_time_mode() {
+        let mut game = crate::reality::tests::game_at_reality_goal();
+        game.reality.realities = 1;
+        game.reality.upgrade_bits |= 1 << 25;
+        game.autobuyers.reality.is_active = true;
+        game.autobuyers.reality.mode = AutoRealityMode::Time;
+        game.autobuyers.reality.time = 60.0;
+
+        game.records.this_reality.real_time_ms = 30_000.0;
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.reality.realities, 1);
+
+        game.records.this_reality.real_time_ms = 61_000.0;
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.reality.realities, 2);
     }
 
     #[test]

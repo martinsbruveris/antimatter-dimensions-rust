@@ -69,7 +69,14 @@ frontend/
         AutobuyersTab.vue
         autobuyers/          # AutobuyerBox (shared row/purchase box),
                              #   DimensionAutobuyerBox, TickspeedAutobuyerBox,
+                             #   PrestigeAutobuyerBox (Dim Boost / Galaxy),
+                             #   BigCrunchAutobuyerBox, EternityAutobuyerBox,
+                             #   RealityAutobuyerBox (goal modes; Stage A of
+                             #   Feature 6.6), AutobuyerModeDropdown,
+                             #   AutobuyerInput, AutobuyerToggleFooter,
                              #   AutobuyerToggles
+        time-studies/        # TimeStudyPresetButton + HoverMenu (preset
+                             #   save/load row in the Time Studies tab)
 ```
 
 ## How it works

@@ -1,6 +1,6 @@
 # Feature 6.6: Automator
 
-**Status: analysis / staging proposal.** No implementation yet. This doc
+**Status: Stage A implemented** (see §12); Stages B–E pending. This doc
 records the original's mechanics, the frontier cuts, the Rust design, and —
 the headline question — how to decompose the feature. **Answer up front: the
 Automator should not be ported in one go.** It decomposes cleanly into five
@@ -432,3 +432,59 @@ with the controls bar stubbed; not planned, just an option.
 5. The decomposition doc's 6.6 command list is inaccurate (`define`, `buy`
    don't exist). Corrected here; decomposition doc updated to point at this
    doc.
+
+## 12. Stage A implementation notes (2026-07-05)
+
+Everything in §10 Stage A is implemented (engine + save + UI + tests):
+
+- **Study presets** — `time_studies.rs`: `StudyPreset` (6 slots on
+  `GameState.study_presets`), the full import-string machinery
+  (`is_valid_study_import` / `parse_study_import` with set names, ranges,
+  `|EC` and `!` — mirroring `TimeStudyTree`), `study_tree_export_string`,
+  save/load/respec-and-load/rename/edit. UI: `TimeStudyPresetButton.vue` +
+  `HoverMenu.vue` (Vue 3 port with local menu state) in the Time Studies tab,
+  with edit/delete modals. The preset row sits on its own centered row below
+  the TT buy buttons (our simplified header; the original embeds it in the
+  ttshop bar).
+- **Big Crunch autobuyer modes** — `PrestigeAutobuyerMode` +
+  `PrestigeGoalSettings` on `AutobuyerState.big_crunch_settings`;
+  `will_auto_crunch()` gates the tick post-break (pre-break/in-challenge it
+  always crunches at the goal, as before). Mode reset on Eternity/Reality
+  without the milestone; `bump_big_crunch_amount` fires from Achievements
+  85/93 (the `ipMult` rebuyable is still an unported Break-Infinity feature,
+  so it can't bump yet).
+- **Eternity autobuyer** — `EternityAutobuyer` (no interval; checked per
+  tick), `will_auto_eternity()` incl. the in-EC behavior
+  (`ec_pending_total_completions`, the ECB-perk bulk wait); deactivates on
+  reset without the 100-Eternities milestone; `bump_eternity_amount(×5)` from
+  `buy_ep_mult`.
+- **Reality autobuyer** — `RealityAutobuyer` with RM/Glyph/Either/Both/Time
+  modes (`RELIC_SHARD` is Effarig content: a save carrying mode 5 loads as
+  RM, the `shard` field is ignored). Fires `auto_reality()`
+  (`processAutoGlyph` semantics: `glyph_list(choiceCount)[0]`, sacrifice on
+  full inventory).
+- **AP** — `automator_points.rs`: perk values on `PerkDef.automator_points`
+  (21 perks, sum 150), the six upgrade grants, +2/reality (cap 50), +10 BH;
+  `automator_unlocked()` at 100 AP or `reality.automator_force_unlock`
+  (round-trips `player.reality.automator.forceUnlock`).
+- **Save** — `player.auto.bigCrunch` goal fields, `auto.eternity`,
+  `auto.reality`, `timestudy.presets` all round-trip (strict mode parsing,
+  like the rest of the DTO layer).
+- **UI** — `BigCrunchAutobuyerBox` / `EternityAutobuyerBox` /
+  `RealityAutobuyerBox` with `AutobuyerModeDropdown` (simplified
+  ExpandingControlBox, per the SelectNotationDropdown precedent) and
+  `AutobuyerInput` (scientific-formatted display; the original's
+  plain/scientific/log/mixed input grammar, validated locally and parsed
+  engine-side in `parse_decimal_input`).
+
+Known deviations, each judged sub-interval or out-of-frontier:
+
+- The original's `resetTick` (autobuyer timer-phase reset on prestige events)
+  isn't modeled — our timers are elapsed-time accumulators; the effect is at
+  most one interval (100 ms when maxed) of extra latency after a prestige.
+- `EC pending completions` ignores `maxValidCompletions` (the EC4/EC12
+  restriction cap), consistent with the existing `complete_running_ec`.
+- The original suppresses the reality autobuyer while the glyph-choice modal
+  is open (`GlyphSelection.active`); our engine has no modal state. The modal
+  confirm no-ops afterwards (reality no longer available), so the effect is
+  the modal closing on its own.

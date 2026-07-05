@@ -251,6 +251,10 @@ pub struct GameState {
     /// Whether the next Eternity respecs the study tree (`player.respec`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub respec: bool,
+    /// The six Time Study presets (`timestudy.presets`): name + study import
+    /// string. See `time_studies.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub study_presets: [crate::time_studies::StudyPreset; 6],
     /// Banked Infinities (`Currency.infinitiesBanked`): kept across Eternities
     /// once TS191 grants them; part of `infinities_total()`.
     #[cfg_attr(feature = "serde", serde(default))]
@@ -472,6 +476,7 @@ impl GameState {
             tt_ep_bought: 0,
             studies: Vec::new(),
             respec: false,
+            study_presets: Default::default(),
             infinities_banked: Decimal::ZERO,
             eternity_challenge_unlocked: 0,
             eternity_challenges: [0; 12],

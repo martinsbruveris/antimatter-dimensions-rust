@@ -3,14 +3,19 @@ import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
 import AutobuyerToggles from "./autobuyers/AutobuyerToggles.vue";
+import BigCrunchAutobuyerBox from "./autobuyers/BigCrunchAutobuyerBox.vue";
 import DimensionAutobuyerBox from "./autobuyers/DimensionAutobuyerBox.vue";
+import EternityAutobuyerBox from "./autobuyers/EternityAutobuyerBox.vue";
 import PrestigeAutobuyerBox from "./autobuyers/PrestigeAutobuyerBox.vue";
+import RealityAutobuyerBox from "./autobuyers/RealityAutobuyerBox.vue";
 import TickspeedAutobuyerBox from "./autobuyers/TickspeedAutobuyerBox.vue";
 
-// Pre-Infinity Autobuyers tab. The antimatter dimension and tickspeed autobuyers
-// unlock with antimatter; the Dim Boost / Galaxy / Big Crunch autobuyers unlock
-// by completing Normal Challenges 10/11/12. Interval upgrades (Infinity Points)
-// become available once each autobuyer's challenge is completed.
+// Autobuyers tab. The antimatter dimension and tickspeed autobuyers unlock with
+// antimatter; the Dim Boost / Galaxy / Big Crunch autobuyers unlock by
+// completing Normal Challenges 10/11/12 (interval upgrades with Infinity
+// Points once each challenge is completed). The Eternity / Reality autobuyers
+// (100-Eternities milestone / Reality Upgrade 25) appear once unlocked, in the
+// original's prestige order: Crunch, Eternity, Reality.
 const game = useGameStore();
 const auto = computed(() => game.snapshot.autobuyers);
 </script>
@@ -41,9 +46,8 @@ const auto = computed(() => game.snapshot.autobuyers);
       :entry="auto.galaxy"
       target="galaxy"
     />
-    <PrestigeAutobuyerBox
-      :entry="auto.big_crunch"
-      target="bigCrunch"
-    />
+    <BigCrunchAutobuyerBox />
+    <EternityAutobuyerBox />
+    <RealityAutobuyerBox />
   </div>
 </template>

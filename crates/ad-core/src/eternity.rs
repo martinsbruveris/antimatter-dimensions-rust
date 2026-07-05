@@ -206,6 +206,9 @@ impl GameState {
             self.broke_infinity = false;
         }
         self.reset_autobuyers_on_eternity();
+        // The prestige autobuyers' config resets are unconditional parts of
+        // `Autobuyers.reset()` (their milestone checks live inside).
+        self.reset_prestige_autobuyer_configs();
 
         self.eternity_reset_core();
 

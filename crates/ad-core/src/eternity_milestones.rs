@@ -8,11 +8,12 @@
 //! 10 unlockReplicanti) are applied in `eternity.rs::eternity_reset`; the
 //! per-tick effects (7 autoIC, 25 autoUnlockID) hook into `tick`; 30
 //! unlockAllND and 40 replicantiNoReset are read at their sites (dimension
-//! availability / tickspeed unlock / Replicanti-Galaxy purchase). The
-//! milestones that unlock autobuyer types we haven't built yet (1, 3, 5, 9,
-//! 11–18, 50, 60, 80, 100) and the offline generators (6, 200, 1000) display
-//! as reached but have no engine effect until those systems exist. See
-//! `design-docs/2026-07-04-eternity.md` §2.
+//! availability / tickspeed unlock / Replicanti-Galaxy purchase). Milestones
+//! 5 (`bigCrunchModes`) and 100 (`autobuyerEternity`) are wired in
+//! `autobuyers.rs` (Automator Stage A). The milestones that unlock autobuyer
+//! types we haven't built yet (1, 3, 9, 11–18, 50, 60, 80) and the offline
+//! generators (6, 200, 1000) display as reached but have no engine effect
+//! until those systems exist. See `design-docs/2026-07-04-eternity.md` §2.
 
 use crate::state::GameState;
 
