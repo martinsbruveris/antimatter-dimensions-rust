@@ -204,6 +204,24 @@ export const useGameStore = defineStore("game", {
       await invoke("buy_perk", { id });
       this.snapshot = await this.getState();
     },
+    buyRealityRebuyable(id) {
+      return invoke("buy_reality_rebuyable", { id });
+    },
+    async buyRealityUpgrade(id) {
+      await invoke("buy_reality_upgrade", { id });
+      this.snapshot = await this.getState();
+    },
+    async unlockBlackHole() {
+      await invoke("unlock_black_hole");
+      this.snapshot = await this.getState();
+    },
+    buyBlackHoleUpgrade(hole, kind) {
+      return invoke("buy_black_hole_upgrade", { hole, kind });
+    },
+    async toggleBlackHolePause() {
+      await invoke("toggle_black_hole_pause");
+      this.snapshot = await this.getState();
+    },
     buyDilationUpgrade(id) {
       return invoke("buy_dilation_upgrade", { id });
     },

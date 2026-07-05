@@ -14,6 +14,8 @@ import TimeStudiesTab from "../components/tabs/TimeStudiesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
 import GlyphsTab from "../components/tabs/reality/GlyphsTab.vue";
 import PerksTab from "../components/tabs/reality/PerksTab.vue";
+import RealityUpgradesTab from "../components/tabs/reality/RealityUpgradesTab.vue";
+import BlackHoleTab from "../components/tabs/reality/BlackHoleTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
 import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
@@ -162,13 +164,13 @@ export const TABS = [
     uiClass: "o-tab-btn--reality",
     subtabs: [
       { key: "glyphs", name: "Glyphs", symbol: "<i class='fas fa-clone'></i>", component: GlyphsTab, hideId: [8, 0] },
-      { key: "upgrades", name: "Reality Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: null, hideId: [8, 1] },
+      { key: "upgrades", name: "Reality Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: RealityUpgradesTab, hideId: [8, 1] },
       { key: "perks", name: "Perks", symbol: "<i class='fas fa-project-diagram'></i>", component: PerksTab, hideId: [8, 3] },
       {
         key: "hole",
         name: "Black Hole",
         symbol: "<i class='fas fa-circle'></i>",
-        component: null,
+        component: BlackHoleTab,
         condition: (s) => Boolean(s?.reality?.unlocked),
         hideId: [8, 4],
       },

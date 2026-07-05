@@ -605,6 +605,55 @@ struct RealityView {
     /// Bought perk ids + the currently purchasable ones (Feature 6.3).
     perks_bought: Vec<u8>,
     perks_buyable: Vec<u8>,
+    /// The 5 rebuyable + 20 one-time Reality Upgrades (Feature 6.4).
+    rebuyables: Vec<RealityRebuyableView>,
+    upgrades: Vec<RealityUpgradeView>,
+    /// The Black Holes (Feature 6.5).
+    black_holes: BlackHolesView,
+}
+
+#[derive(Serialize)]
+struct RealityRebuyableView {
+    id: u8,
+    count: u32,
+    cost: Num,
+    can_buy: bool,
+}
+
+#[derive(Serialize)]
+struct RealityUpgradeView {
+    id: u8,
+    cost: Num,
+    is_bought: bool,
+    /// Whether the unlock requirement has been met (`upgReqs`).
+    req_met: bool,
+    can_buy: bool,
+}
+
+#[derive(Serialize)]
+struct BlackHolesView {
+    unlocked: bool,
+    can_unlock: bool,
+    paused: bool,
+    holes: Vec<BlackHoleView>,
+}
+
+#[derive(Serialize)]
+struct BlackHoleView {
+    unlocked: bool,
+    /// Effectively active right now (charge + lower holes + pause).
+    is_active: bool,
+    /// This hole's own charged flag.
+    charged: bool,
+    is_permanent: bool,
+    phase: f64,
+    interval: f64,
+    power: f64,
+    duration: f64,
+    activations: u32,
+    /// Upgrade costs: [interval, power, duration] + affordability.
+    upgrade_costs: Vec<Num>,
+    can_buy_upgrades: Vec<bool>,
 }
 
 /// Serializable view of the Eternity Upgrades tab.
@@ -1194,6 +1243,49 @@ fn build_reality_view(game: &GameState) -> RealityView {
             game.glyph_sac_dilation_effect(),
         ],
         active_effects,
+        rebuyables: (1u8..=5)
+            .map(|id| RealityRebuyableView {
+                id,
+                count: game.reality_rebuyable_count(id),
+                cost: num(&game.reality_rebuyable_cost(id)),
+                can_buy: game.reality.machines >= game.reality_rebuyable_cost(id),
+            })
+            .collect(),
+        upgrades: (6u8..=25)
+            .map(|id| RealityUpgradeView {
+                id,
+                cost: num(&GameState::reality_upgrade_cost(id)),
+                is_bought: game.reality_upgrade_bought(id),
+                req_met: game.reality_upgrade_req_met(id),
+                can_buy: game.can_buy_reality_upgrade(id),
+            })
+            .collect(),
+        black_holes: BlackHolesView {
+            unlocked: game.black_holes.holes[0].unlocked,
+            can_unlock: game.can_unlock_black_hole(),
+            paused: game.black_holes.paused,
+            holes: (0..2usize)
+                .map(|i| BlackHoleView {
+                    unlocked: game.black_holes.holes[i].unlocked,
+                    is_active: game.black_hole_is_active(i),
+                    charged: game.black_holes.holes[i].active,
+                    is_permanent: game.black_hole_is_permanent(i),
+                    phase: game.black_holes.holes[i].phase,
+                    interval: game.black_hole_interval(i),
+                    power: game.black_hole_power(i),
+                    duration: game.black_hole_duration(i),
+                    activations: game.black_holes.holes[i].activations,
+                    upgrade_costs: (0u8..3)
+                        .map(|k| num(&game.black_hole_upgrade_cost(i, k)))
+                        .collect(),
+                    can_buy_upgrades: (0u8..3)
+                        .map(|k| {
+                            game.reality.machines >= game.black_hole_upgrade_cost(i, k)
+                        })
+                        .collect(),
+                })
+                .collect(),
+        },
         perks_bought: game.reality.perks.iter().copied().collect(),
         perks_buyable: ad_core::PERKS
             .iter()
@@ -1795,6 +1887,31 @@ fn set_glyph_respec(respec: bool, state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn buy_perk(id: u8, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().buy_perk(id);
+}
+
+#[tauri::command]
+fn buy_reality_rebuyable(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_reality_rebuyable(id);
+}
+
+#[tauri::command]
+fn buy_reality_upgrade(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_reality_upgrade(id);
+}
+
+#[tauri::command]
+fn unlock_black_hole(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().unlock_black_hole();
+}
+
+#[tauri::command]
+fn buy_black_hole_upgrade(hole: usize, kind: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_black_hole_upgrade(hole, kind);
+}
+
+#[tauri::command]
+fn toggle_black_hole_pause(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().toggle_black_hole_pause();
 }
 
 /// Buy a one-time Break Infinity Upgrade by its original save id (e.g.
@@ -2507,6 +2624,11 @@ pub fn run() {
             move_glyph,
             set_glyph_respec,
             buy_perk,
+            buy_reality_rebuyable,
+            buy_reality_upgrade,
+            unlock_black_hole,
+            buy_black_hole_upgrade,
+            toggle_black_hole_pause,
             buy_break_infinity_upgrade,
             buy_break_infinity_rebuyable,
             buy_infinity_dimension,
