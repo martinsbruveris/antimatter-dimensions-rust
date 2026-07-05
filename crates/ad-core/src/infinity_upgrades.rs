@@ -218,6 +218,8 @@ impl GameState {
         if self.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult) {
             mult *= Decimal::from_float(1.1);
         }
+        // The `powerbuy10` glyph effect multiplies the base.
+        mult *= Decimal::from_float(self.glyph_effect_powerbuy10());
         mult
     }
 
@@ -256,6 +258,8 @@ impl GameState {
                 .pow(&Decimal::from_float(0.3))
                 .max(&Decimal::ONE);
         }
+        // The `powerdimboost` glyph effect (`GlyphEffect.dimBoostPower`).
+        boost *= Decimal::from_float(self.glyph_effect_powerdimboost());
         boost
     }
 

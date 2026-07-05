@@ -239,11 +239,14 @@ impl GameState {
     /// features.
     pub fn td_multiplier(&self, tier: usize) -> Decimal {
         let mut bought = self.time_dimensions[tier].bought;
+        // TD8's per-purchase multiplier is boosted by time-glyph sacrifice.
+        let mut power_mult = TD_POWER_MULT;
         if tier == TIME_DIMENSION_COUNT - 1 {
             bought = bought.min(TD8_MULT_BOUGHT_CAP);
+            power_mult *= self.glyph_sac_time_effect();
         }
         let mut mult = self.td_common_multiplier()
-            * Decimal::from_float(TD_POWER_MULT).pow(&Decimal::from(bought));
+            * Decimal::from_float(power_mult).pow(&Decimal::from(bought));
         // Per-tier studies: TS11 (tier 1, tickspeed-based), TS73 (tier 3,
         // sacrifice^0.005 cap 1e1300), TS227 (tier 4, sacrifice-log^10).
         if tier == 0 && self.time_study_bought(11) {
@@ -260,7 +263,12 @@ impl GameState {
             let log = self.sacrifice_multiplier().pos_log10();
             mult *= Decimal::from_float(log.powi(10).max(1.0));
         }
-        // Time Dilation compresses the final multiplier.
+        // The `timepow` glyph power, then Time Dilation compresses the final
+        // multiplier.
+        let timepow = self.glyph_effect_timepow();
+        if timepow != 1.0 {
+            mult = mult.pow(&Decimal::from_float(timepow));
+        }
         if self.dilation.active {
             mult = self.dilated_value_of(mult);
         }

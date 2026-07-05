@@ -65,6 +65,8 @@ impl GameState {
             let secs = self.records.this_eternity.time_ms / 1000.0;
             mult *= Decimal::from_float((1.39 * secs).sqrt());
         }
+        // The `timeEP` glyph effect (`GlyphEffect.epMult`).
+        mult *= Decimal::from_float(self.glyph_effect_time_ep());
         mult
     }
 
@@ -79,11 +81,16 @@ impl GameState {
         (base * self.total_ep_mult()).floor()
     }
 
-    /// Eternities an Eternity would grant (`gainedEternities`): every
-    /// multiplying source (Reality Upgrade 3, Achievement 113, glyphs) is
-    /// post-Reality, so 1 here.
+    /// Eternities an Eternity would grant (`gainedEternities`): the
+    /// `timeetermult` glyph effect times Reality Upgrade 3 (Achievement 113
+    /// is out of frontier).
     pub fn gained_eternities(&self) -> Decimal {
-        Decimal::ONE
+        let mut gain = Decimal::from_float(self.glyph_effect_timeetermult());
+        if self.reality.rebuyables[2] > 0 {
+            gain *= Decimal::from_float(3.0f64)
+                .pow(&Decimal::from(self.reality.rebuyables[2] as u64));
+        }
+        gain
     }
 
     /// Perform an Eternity: award EP / an Eternity, then reset the whole

@@ -70,6 +70,8 @@ impl GameState {
                 .pow(&Decimal::from_float(1000.0))
                 .max(&Decimal::ONE);
         }
+        // The `infinityIP` glyph effect (`GlyphEffect.ipMult`).
+        mult *= Decimal::from_float(self.glyph_effect_infinity_ip());
         mult
     }
 
@@ -101,6 +103,8 @@ impl GameState {
         if self.time_study_bought(32) {
             gain *= Decimal::from((self.dim_boosts as u64).max(1));
         }
+        // The `infinityinfmult` glyph effect multiplies Infinity gain.
+        gain *= self.glyph_effect_infinityinfmult();
         gain
     }
 

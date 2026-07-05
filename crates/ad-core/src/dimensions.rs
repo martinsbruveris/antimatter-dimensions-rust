@@ -275,6 +275,9 @@ impl GameState {
         // matter divide).
         mult *= self.infinity_challenge_common_mult();
 
+        // The `powermult` glyph effect (`applyNDMultipliers`).
+        mult *= self.glyph_effect_powermult();
+
         // Infinity Power (from the Infinity Dimensions) gives an `^7` all-tier
         // multiplier (`infinityPower.pow(powerConversionRate).max(1)`) — except
         // under EC9, where it multiplies Time Dimensions instead.
@@ -291,17 +294,27 @@ impl GameState {
         let mult = mult.max(&Decimal::ONE);
 
         // ...then `applyNDPowers` raises it to the IC4 power (`^0.25` for the
-        // non-latest dimensions while IC4 runs, `^1.05` all-tier once completed).
+        // non-latest dimensions while IC4 runs, `^1.05` all-tier once completed)
+        // and the `powerpow` glyph power.
         let power = self.infinity_challenge_mult_power(tier);
         let mut mult = if power == 1.0 {
             mult
         } else {
             mult.pow(&Decimal::from_float(power))
         };
+        let glyph_pow = self.glyph_effect_powerpow();
+        if glyph_pow != 1.0 {
+            mult = mult.pow(&Decimal::from_float(glyph_pow));
+        }
 
-        // Time Dilation compresses the final multiplier; the `ndMultDT`
-        // Dilation Upgrade applies *after* (unaffected by dilation).
+        // Time Dilation compresses the final multiplier (raised to the
+        // `dilationpow` glyph power first); the `ndMultDT` Dilation Upgrade
+        // applies *after* (unaffected by dilation).
         if self.dilation.active {
+            let dilation_pow = self.glyph_effect_dilationpow();
+            if dilation_pow != 1.0 {
+                mult = mult.pow(&Decimal::from_float(dilation_pow));
+            }
             mult = self.dilated_value_of(mult);
         }
         if self.dilation_upgrade_bought(6) {

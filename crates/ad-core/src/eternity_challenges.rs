@@ -301,13 +301,17 @@ impl GameState {
 
     // --- Effect readers used at the engine sites --------------------------------
 
-    /// The game-speed factor (`getGameSpeedupFactor`): ×0.001 while EC12 runs.
+    /// The game-speed factor (`getGameSpeedupFactor`): the EC12 fixed 1/1000
+    /// takes priority; otherwise the Black Hole and `timespeed` glyph
+    /// multipliers stack, clamped like the original.
     pub fn game_speed_factor(&self) -> f64 {
         if self.ec_running(12) {
-            0.001
-        } else {
-            1.0
+            return 0.001;
         }
+        let mut factor = 1.0;
+        factor *= self.black_hole_speed_factor();
+        factor *= self.glyph_effect_timespeed();
+        factor.clamp(1e-300, 1e300)
     }
 
     /// EC3's reward: `+0.72` to the buy-10 multiplier per completion.

@@ -102,6 +102,10 @@ pub struct RealityState {
     /// requirement). Fresh saves start `true`.
     #[cfg_attr(feature = "serde", serde(default = "default_true"))]
     pub gained_auto_achievements: bool,
+    /// Glyphs (`player.reality.glyphs`): equipped + inventory + sacrifice
+    /// totals. See `glyphs.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub glyphs: crate::glyphs::GlyphState,
 }
 
 impl RealityState {
@@ -126,6 +130,7 @@ impl RealityState {
             ach_timer: 0.0,
             auto_achieve: true,
             gained_auto_achievements: true,
+            glyphs: crate::glyphs::GlyphState::new(),
         }
     }
 }
@@ -613,29 +618,38 @@ impl GameState {
     }
 }
 
-/// Temporary seams filled in by the following features. Feature 6.2 (glyphs)
-/// replaces the glyph hooks; Feature 6.4 (Reality Upgrades) replaces the RU10
-/// package.
+/// Seams into the glyph module (Feature 6.2) and the Reality Upgrades
+/// (Feature 6.4).
 impl GameState {
-    /// The `replicationglyphlevel` glyph effect (Feature 6.2); 0 until then.
+    /// The `replicationglyphlevel` glyph effect.
     pub(crate) fn glyph_effect_replicationglyphlevel(&self) -> f64 {
-        0.0
+        self.glyph_effect_replicationglyphlevel_impl()
     }
 
-    /// Unequip every equipped glyph into the inventory (Feature 6.2).
-    pub(crate) fn unequip_all_glyphs(&mut self) {}
+    /// Unequip every equipped glyph into the inventory (the respec path).
+    pub(crate) fn unequip_all_glyphs(&mut self) {
+        self.unequip_all_glyphs_impl();
+    }
 
-    /// Currently equipped glyph count (Feature 6.2).
+    /// Currently equipped glyph count (excluding the companion).
     pub(crate) fn equipped_glyph_count(&self) -> i32 {
-        0
+        self.active_glyphs_without_companion().len() as i32
     }
 
-    /// The glyph grant on Reality (Feature 6.2).
-    pub(crate) fn grant_reality_glyphs_impl(&mut self) {}
+    /// The glyph grant on a plain `reality()` call (no explicit choice: the
+    /// first/deterministic option, kept).
+    pub(crate) fn grant_reality_glyphs_impl(&mut self) {
+        self.grant_glyphs_on_reality(None, false);
+    }
 
     /// RU10's start-of-reality package (Feature 6.4). Unreachable until the
     /// upgrade can be bought.
     pub(crate) fn apply_rupg10(&mut self) {}
+
+    /// The Black Holes' game-speed multiplier (Feature 6.5); ×1 until then.
+    pub(crate) fn black_hole_speed_factor(&self) -> f64 {
+        1.0
+    }
 }
 
 #[cfg(test)]

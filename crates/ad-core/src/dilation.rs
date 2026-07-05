@@ -211,10 +211,30 @@ impl GameState {
         base * self.tachyon_gain_multiplier()
     }
 
-    /// `tachyonGainMultiplier`: ×3 per `tachyonGain` purchase (the glyph /
-    /// reality terms are out of frontier).
+    /// `tachyonGainMultiplier`: ×3 per `tachyonGain` purchase, times the
+    /// dilation-glyph sacrifice effect and Reality Upgrades 4/8/15.
     pub fn tachyon_gain_multiplier(&self) -> Decimal {
-        Decimal::from_float(3.0).pow(&Decimal::from(self.dilation.rebuyables[2] as u64))
+        let mut mult = Decimal::from_float(3.0)
+            .pow(&Decimal::from(self.dilation.rebuyables[2] as u64));
+        mult *= Decimal::from_float(self.glyph_sac_dilation_effect());
+        // RU4 (Superluminal Amplifier): ×3 per purchase.
+        if self.reality.rebuyables[3] > 0 {
+            mult *= Decimal::from_float(3.0)
+                .pow(&Decimal::from(self.reality.rebuyables[3] as u64));
+        }
+        // RU8: ×√(achievement power).
+        if self.reality_upgrade_bought(8) {
+            mult *= self
+                .achievement_power()
+                .pow(&Decimal::from_float(0.5))
+                .max(&Decimal::ONE);
+        }
+        // RU15: ×max(√log10(epMult)/9, 1).
+        if self.reality_upgrade_bought(15) {
+            let factor = (self.ep_mult_effect().pos_log10().sqrt() / 9.0).max(1.0);
+            mult *= Decimal::from_float(factor);
+        }
+        mult
     }
 
     /// TP a dilated Eternity would grant now, over the current amount
@@ -241,16 +261,30 @@ impl GameState {
 
     // --- Dilated Time & Tachyon Galaxies ----------------------------------------
 
-    /// `getDilationGainPerSecond` (pre-Reality slice): `TP × 2^dtGain`.
+    /// `getDilationGainPerSecond`: `TP × 2^dtGain × RU1 × dilationDT glyph ×
+    /// the replicanti-count glyph term`.
     pub fn dilation_gain_per_second(&self) -> Decimal {
-        self.dilation.tachyon_particles
+        let mut rate = self.dilation.tachyon_particles
             * Decimal::from_float(2.0)
-                .pow(&Decimal::from(self.dilation.rebuyables[0] as u64))
+                .pow(&Decimal::from(self.dilation.rebuyables[0] as u64));
+        // RU1 (Temporal Amplifier): ×3 per purchase.
+        if self.reality.rebuyables[0] > 0 {
+            rate *= Decimal::from_float(3.0)
+                .pow(&Decimal::from(self.reality.rebuyables[0] as u64));
+        }
+        rate *= self.glyph_effect_dilation_dt();
+        // replicationdtgain: ×max(log10(replicanti) · effect, 1).
+        let dtgain = self.glyph_effect_replicationdtgain();
+        if dtgain > 0.0 {
+            let factor = (self.replicanti.amount.pos_log10() * dtgain).max(1.0);
+            rate *= Decimal::from_float(factor);
+        }
+        rate
     }
 
     /// The Tachyon-Galaxy threshold multiplier (`getTachyonGalaxyMult`):
-    /// `1 + 3.65 · 0.8^galaxyThreshold-purchases + 0.35` (factor floors to 0
-    /// at the 38th purchase).
+    /// `1 + (3.65 · 0.8^galaxyThreshold-purchases + 0.35) × glyph reduction`
+    /// (factor floors to 0 at the 38th purchase).
     pub fn tachyon_galaxy_threshold_mult(&self) -> f64 {
         let bought = self.dilation.rebuyables[1];
         let factor = if bought < GALAXY_THRESHOLD_CAP {
@@ -258,7 +292,8 @@ impl GameState {
         } else {
             0.0
         };
-        1.0 + 3.65 * factor + 0.35
+        let glyph_reduction = self.glyph_effect_dilation_galaxy_threshold();
+        1.0 + (3.65 * factor + 0.35) * glyph_reduction
     }
 
     /// Advance Dilated Time, Tachyon Galaxies, and the `ttGenerator` upgrade's
@@ -279,6 +314,11 @@ impl GameState {
             let gain = self.dilation.tachyon_particles / Decimal::from_float(20_000.0)
                 * Decimal::from_float(dt_s);
             self.add_time_theorems_decimal(gain);
+        }
+        // The `dilationTTgen` glyph effect streams TT too.
+        let glyph_ttgen = self.glyph_effect_dilation_ttgen();
+        if glyph_ttgen > 0.0 {
+            self.add_time_theorems_decimal(Decimal::from_float(glyph_ttgen * dt_s));
         }
     }
 

@@ -245,8 +245,13 @@ impl GameState {
     /// (plus TS72's sacrifice term on the 4th dimension).
     pub fn id_multiplier(&self, tier: usize) -> Decimal {
         let purchases = self.infinity_dimensions[tier].purchases();
+        // ID8's per-purchase multiplier is boosted by infinity-glyph sacrifice.
+        let mut power_mult = ID_POWER_MULT[tier];
+        if tier == INFINITY_DIMENSION_COUNT - 1 {
+            power_mult *= self.glyph_sac_infinity_effect();
+        }
         let mut mult = self.id_common_multiplier()
-            * Decimal::from_float(ID_POWER_MULT[tier]).pow(&Decimal::from(purchases));
+            * Decimal::from_float(power_mult).pow(&Decimal::from(purchases));
         // EC2's reward: 1st-ID multiplier from Infinity Power.
         if tier == 0 && self.ec_completed(2) {
             let completions = self.eternity_challenge_completions(2) as f64;
@@ -264,7 +269,12 @@ impl GameState {
                 .max(&Decimal::ONE)
                 .min(&Decimal::new_unchecked(1.0, 30_000));
         }
-        // Time Dilation compresses the final multiplier.
+        // The `infinitypow` glyph power, then Time Dilation compresses the
+        // final multiplier.
+        let infinitypow = self.glyph_effect_infinitypow();
+        if infinitypow != 1.0 {
+            mult = mult.pow(&Decimal::from_float(infinitypow));
+        }
         if self.dilation.active {
             mult = self.dilated_value_of(mult);
         }
@@ -294,10 +304,12 @@ impl GameState {
     }
 
     /// The Antimatter-Dimension multiplier from Infinity Power:
-    /// `infinity_power ^ 7`, clamped to ≥ 1. Read in `dimension_multiplier`.
+    /// `infinity_power ^ (7 + infinityrate glyph effect)`, clamped to ≥ 1.
+    /// Read in `dimension_multiplier`.
     pub fn infinity_power_ad_multiplier(&self) -> Decimal {
+        let rate = POWER_CONVERSION_RATE + self.glyph_effect_infinityrate();
         self.infinity_power
-            .pow(&Decimal::from_float(POWER_CONVERSION_RATE))
+            .pow(&Decimal::from_float(rate))
             .max(&Decimal::ONE)
     }
 

@@ -128,6 +128,9 @@ impl GameState {
         if self.time_study_bought(132) {
             mult *= 1.5;
         }
+        // The `replicationspeed` glyph effect (a Decimal in the original;
+        // frontier magnitudes fit f64).
+        mult *= self.glyph_effect_replicationspeed().to_f64();
         mult
     }
 
@@ -273,7 +276,13 @@ impl GameState {
             mult *= Decimal::from_float(5.0)
                 .pow(&Decimal::from(self.replicanti.galaxies as u64));
         }
-        mult.max(&Decimal::ONE)
+        // The `replicationpow` glyph power on the clamped total.
+        let mut mult = mult.max(&Decimal::ONE);
+        let pow = self.glyph_effect_replicationpow();
+        if pow != 1.0 {
+            mult = mult.pow(&Decimal::from_float(pow));
+        }
+        mult
     }
 
     // --- Replicanti Galaxies -------------------------------------------------

@@ -249,6 +249,35 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     for (i, count) in state.reality.rebuyables.iter().enumerate() {
         reality["rebuyables"][(i + 1).to_string()] = json!(count);
     }
+    let glyph_json = |g: &crate::glyphs::Glyph| {
+        json!({
+            "id": g.id,
+            "idx": g.idx,
+            "type": g.kind.save_id(),
+            "strength": g.strength,
+            "level": g.level,
+            "rawLevel": g.raw_level,
+            "effects": g.effects,
+        })
+    };
+    reality["glyphs"]["active"] = json!(state
+        .reality
+        .glyphs
+        .active
+        .iter()
+        .map(glyph_json)
+        .collect::<Vec<_>>());
+    reality["glyphs"]["inventory"] = json!(state
+        .reality
+        .glyphs
+        .inventory
+        .iter()
+        .map(glyph_json)
+        .collect::<Vec<_>>());
+    for (i, kind) in crate::glyphs::BASIC_GLYPH_TYPES.iter().enumerate() {
+        reality["glyphs"]["sac"][kind.save_id()] = json!(state.reality.glyphs.sac[i]);
+    }
+    reality["glyphs"]["protectedRows"] = json!(state.reality.glyphs.protected_rows);
     reality["upgradeBits"] = json!(state.reality.upgrade_bits);
     reality["upgReqs"] = json!(state.reality.upg_reqs);
     reality["reqLock"]["reality"] = json!(state.reality.req_lock);
@@ -793,6 +822,50 @@ mod tests {
         assert!(!reloaded.requirement_checks.reality_no_infinities);
         assert!(!reloaded.requirement_checks.reality_no_eternities);
         assert_eq!(reloaded.requirement_checks.reality_max_glyphs, 4);
+    }
+
+    #[test]
+    fn glyphs_round_trip() {
+        use crate::glyphs::{Glyph, GlyphType};
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.reality.glyphs.active.push(Glyph {
+            id: 3,
+            idx: 1,
+            kind: GlyphType::Time,
+            strength: 2.25,
+            level: 123,
+            raw_level: 130,
+            effects: 0b1011,
+        });
+        state.reality.glyphs.inventory.push(Glyph {
+            id: 7,
+            idx: 25,
+            kind: GlyphType::Companion,
+            strength: 1.01,
+            level: 1,
+            raw_level: 1,
+            effects: (1 << 8) | (1 << 9),
+        });
+        state.reality.glyphs.sac = [1.0, 2.0, 3.0, 4.0, 5.0];
+        state.reality.glyphs.protected_rows = 3;
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.reality.glyphs.active.len(), 1);
+        let g = &reloaded.reality.glyphs.active[0];
+        assert_eq!(g.id, 3);
+        assert_eq!(g.idx, 1);
+        assert_eq!(g.kind, GlyphType::Time);
+        assert_eq!(g.strength, 2.25);
+        assert_eq!(g.level, 123);
+        assert_eq!(g.raw_level, 130);
+        assert_eq!(g.effects, 0b1011);
+        assert_eq!(reloaded.reality.glyphs.inventory.len(), 1);
+        assert_eq!(
+            reloaded.reality.glyphs.inventory[0].kind,
+            GlyphType::Companion
+        );
+        assert_eq!(reloaded.reality.glyphs.sac, [1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(reloaded.reality.glyphs.protected_rows, 3);
     }
 
     #[test]

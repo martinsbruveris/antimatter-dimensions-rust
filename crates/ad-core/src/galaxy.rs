@@ -31,6 +31,8 @@ impl GameState {
         }
         // EC5's reward pushes Distant scaling 5 galaxies later per completion.
         start += 5 * self.eternity_challenge_completions(5) as u64;
+        // Power-glyph sacrifice pushes it later still (up to +750).
+        start += self.glyph_sac_power_effect() as u64;
         start
     }
 

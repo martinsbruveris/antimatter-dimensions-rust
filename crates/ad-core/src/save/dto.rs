@@ -185,6 +185,38 @@ pub struct RealityDTO {
     pub ach_timer: f64,
     pub auto_achieve: bool,
     pub gained_auto_achievements: bool,
+    pub glyphs: GlyphsDTO,
+}
+
+/// `player.reality.glyphs` (modelled subset: no undo/sets/filter/cosmetics).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlyphsDTO {
+    pub active: Vec<GlyphDTO>,
+    pub inventory: Vec<GlyphDTO>,
+    /// Cumulative sacrifice per type, keyed by type name.
+    pub sac: std::collections::HashMap<String, f64>,
+    pub protected_rows: u32,
+}
+
+/// One glyph. Types we don't model (effarig/reality/cursed) are skipped on
+/// load rather than failing it.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlyphDTO {
+    /// May be absent on freshly generated originals (`id: undefined`).
+    #[serde(default)]
+    pub id: Option<f64>,
+    #[serde(default)]
+    pub idx: Option<f64>,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub strength: f64,
+    pub level: f64,
+    /// Absent from very old saves; recomputed as `level` then.
+    #[serde(default)]
+    pub raw_level: Option<f64>,
+    pub effects: u32,
 }
 
 /// `player.reality.reqLock` — player-armed requirement locks.
@@ -865,6 +897,39 @@ impl GameState {
             recent_realities,
         };
 
+        // Glyphs: unknown (celestial) types are skipped; ids/idx are
+        // normalized to integers.
+        let parse_glyphs = |list: &[GlyphDTO]| -> Vec<crate::glyphs::Glyph> {
+            list.iter()
+                .filter_map(|g| {
+                    let kind = crate::glyphs::GlyphType::from_save_id(&g.kind)?;
+                    Some(crate::glyphs::Glyph {
+                        id: g.id.unwrap_or(0.0).max(0.0) as u32,
+                        idx: g.idx.unwrap_or(0.0).max(0.0) as u32,
+                        kind,
+                        strength: g.strength,
+                        level: g.level.max(1.0) as u32,
+                        raw_level: g.raw_level.unwrap_or(g.level).max(0.0) as u32,
+                        effects: g.effects,
+                    })
+                })
+                .collect()
+        };
+        let glyphs = crate::glyphs::GlyphState {
+            active: parse_glyphs(&dto.reality.glyphs.active),
+            inventory: parse_glyphs(&dto.reality.glyphs.inventory),
+            sac: {
+                let mut sac = [0.0f64; 5];
+                for (i, kind) in crate::glyphs::BASIC_GLYPH_TYPES.iter().enumerate() {
+                    if let Some(v) = dto.reality.glyphs.sac.get(kind.save_id()) {
+                        sac[i] = *v;
+                    }
+                }
+                sac
+            },
+            protected_rows: dto.reality.glyphs.protected_rows,
+        };
+
         // Reality-layer state (`player.reality` + the root `realities`).
         let reality = {
             let mut rebuyables = [0u32; 5];
@@ -892,6 +957,7 @@ impl GameState {
                 ach_timer: dto.reality.ach_timer,
                 auto_achieve: dto.reality.auto_achieve,
                 gained_auto_achievements: dto.reality.gained_auto_achievements,
+                glyphs,
             }
         };
         let requirement_checks = crate::reality::RequirementChecks {
