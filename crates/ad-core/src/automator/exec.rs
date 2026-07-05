@@ -186,19 +186,49 @@ impl GameState {
         self.automator.state.mode = AutomatorMode::Pause;
     }
 
+    /// Resume a paused run (the play button's "on but paused" branch:
+    /// `AutomatorBackend.mode = RUN`).
+    pub fn automator_resume(&mut self) {
+        if self.automator_is_on() {
+            self.automator.state.mode = AutomatorMode::Run;
+        }
+    }
+
+    /// The play button (`AutomatorControls.play`): pause when running, resume
+    /// when paused, else start the given script.
+    pub fn automator_play(&mut self, script_id: u32) {
+        if self.automator_is_running() {
+            self.automator_pause();
+        } else if self.automator_is_on() {
+            self.automator_resume();
+        } else {
+            self.automator_start(Some(script_id));
+        }
+    }
+
+    /// Select which script the editor shows (`state.editorScript`).
+    pub fn automator_select_editor_script(&mut self, id: u32) -> bool {
+        if !self.automator.scripts.contains_key(&id) {
+            return false;
+        }
+        self.automator.state.editor_script = id;
+        true
+    }
+
     /// Restart the running script from the top (`AutomatorBackend.restart`).
     pub fn automator_restart(&mut self) {
         self.automator_start_mode(None, AutomatorMode::Run, true);
     }
 
-    /// The single-step button: run one command on the next update. Starts the
-    /// script paused-at-step when the Automator is off.
-    pub fn automator_step_once(&mut self) -> bool {
+    /// The single-step button: run one command on the next update. Starts
+    /// `script_id` (default: the last-run script) paused-at-step when the
+    /// Automator is off (`AutomatorControls.step`).
+    pub fn automator_step_once(&mut self, script_id: Option<u32>) -> bool {
         if self.automator_is_on() {
             self.automator.state.mode = AutomatorMode::SingleStep;
             true
         } else {
-            self.automator_start_mode(None, AutomatorMode::SingleStep, true)
+            self.automator_start_mode(script_id, AutomatorMode::SingleStep, true)
         }
     }
 
@@ -1586,7 +1616,7 @@ mod tests {
     fn single_step_runs_one_command() {
         let mut game = game_running("notify \"a\"\nnotify \"b\"");
         game.automator_pause();
-        assert!(game.automator_step_once());
+        assert!(game.automator_step_once(None));
         run_commands(&mut game, 3); // only one command runs regardless
         assert_eq!(game.automator.runtime.pending_notifications.len(), 1);
         assert_eq!(game.automator.state.mode, AutomatorMode::Pause);

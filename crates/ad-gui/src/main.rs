@@ -449,6 +449,117 @@ struct GameView {
     /// Whether the current tutorial step's highlight is active
     /// (`player.tutorialActive`).
     tutorial_active: bool,
+    /// Automator tab state (Feature 6.6 Stage D).
+    automator: AutomatorTabView,
+}
+
+/// Serializable view of the Automator tab.
+#[derive(Serialize)]
+struct AutomatorTabView {
+    /// 100 AP reached (or force-unlocked).
+    unlocked: bool,
+    /// The stack is non-empty (a paused Automator is still on).
+    is_on: bool,
+    is_running: bool,
+    /// "pause" / "run" / "singleStep".
+    mode: String,
+    /// 1-based line of the current command (0 when off).
+    current_line: u32,
+    /// The running (or last-run) script id and the editor's script id.
+    top_level_script: u32,
+    editor_script: u32,
+    repeat: bool,
+    force_restart: bool,
+    follow_execution: bool,
+    /// The previous run finished on its own (`hasJustCompleted`).
+    just_completed: bool,
+    /// Milliseconds per command.
+    interval_ms: f64,
+    /// All scripts (id order) for the dropdown.
+    scripts: Vec<AutomatorScriptEntry>,
+    running_script_name: String,
+    /// Stored character counts (the live editor buffer refines the current
+    /// count frontend-side between saves).
+    current_script_chars: usize,
+    total_script_chars: usize,
+    /// Constants in display order, for the define panel.
+    constants: Vec<AutomatorConstantView>,
+    /// Which docs pane is open (`currentInfoPane`, 0–7).
+    current_info_pane: u8,
+    /// `notify` toasts queued since the last tick (drained by the frontend).
+    notifications: Vec<String>,
+    /// Event-log length (the log itself is fetched on demand).
+    event_count: usize,
+    /// Event-log display options (`options.automatorEvents`).
+    event_options: AutomatorEventOptionsView,
+    /// AP progress breakdown; only populated while locked (the points page).
+    points: Option<AutomatorPointsView>,
+}
+
+#[derive(Serialize)]
+struct AutomatorScriptEntry {
+    id: u32,
+    name: String,
+}
+
+#[derive(Serialize)]
+struct AutomatorConstantView {
+    name: String,
+    value: String,
+}
+
+#[derive(Serialize)]
+struct AutomatorEventOptionsView {
+    newest_first: bool,
+    timestamp_type: u8,
+    max_entries: u32,
+    clear_on_reality: bool,
+    clear_on_restart: bool,
+}
+
+/// The locked-tab AP page (`AutomatorPointsList`): totals plus each source.
+/// Perk/upgrade display text lives frontend-side, keyed by id.
+#[derive(Serialize)]
+struct AutomatorPointsView {
+    total: u32,
+    threshold: u32,
+    from_perks: u32,
+    from_upgrades: u32,
+    perks: Vec<ApSourceView>,
+    upgrades: Vec<ApSourceView>,
+    /// "Reality Count" and "Black Hole" (`otherAutomatorPoints`).
+    other: Vec<ApOtherSourceView>,
+}
+
+#[derive(Serialize)]
+struct ApSourceView {
+    id: u8,
+    ap: u32,
+    bought: bool,
+}
+
+#[derive(Serialize)]
+struct ApOtherSourceView {
+    name: &'static str,
+    ap: u32,
+}
+
+/// One event-log entry, shipped by `get_automator_events`.
+#[derive(Serialize)]
+struct AutomatorEventView {
+    message: String,
+    line: u32,
+    this_reality_ms: f64,
+    play_time_ms: f64,
+    timegap_ms: f64,
+}
+
+/// A compile error for the editor gutter / error panel.
+#[derive(Serialize)]
+struct AutomatorErrorView {
+    line: u32,
+    info: String,
+    tip: String,
 }
 
 /// Serializable view of the Time Dimensions tab.
@@ -1640,6 +1751,7 @@ fn build_game_view(game: &GameState) -> GameView {
         tab_notifications: game.tab_notifications.iter().cloned().collect(),
         tutorial_state: game.tutorial_state,
         tutorial_active: game.tutorial_active,
+        automator: build_automator_view(game),
         options: OptionsView {
             hotkeys: game.options.hotkeys,
             update_rate: game.options.update_rate,
@@ -1709,7 +1821,133 @@ fn tick_and_get_state(
 ) -> GameView {
     let mut game = state.lock().unwrap();
     game.ticks(dt_ms, repeats);
-    build_game_view(&game)
+    // Drain the Automator's queued `notify` toasts into this frame's view.
+    let notifications =
+        std::mem::take(&mut game.automator.runtime.pending_notifications);
+    let mut view = build_game_view(&game);
+    view.automator.notifications = notifications;
+    view
+}
+
+/// Build the Automator tab view (`notifications` is filled by the tick
+/// command, which drains the queue).
+fn build_automator_view(game: &GameState) -> AutomatorTabView {
+    use ad_core::automator::AutomatorMode;
+    let unlocked = game.automator_unlocked();
+    let state = &game.automator.state;
+    let editor_script = state.editor_script;
+    let current_chars = game
+        .automator
+        .scripts
+        .get(&editor_script)
+        .map(|s| s.content.len())
+        .unwrap_or(0);
+    AutomatorTabView {
+        unlocked,
+        is_on: game.automator_is_on(),
+        is_running: game.automator_is_running(),
+        mode: match state.mode {
+            AutomatorMode::Pause => "pause",
+            AutomatorMode::Run => "run",
+            AutomatorMode::SingleStep => "singleStep",
+        }
+        .to_string(),
+        current_line: game.automator_current_line().unwrap_or(0),
+        top_level_script: state.top_level_script,
+        editor_script,
+        repeat: state.repeat,
+        force_restart: state.force_restart,
+        follow_execution: state.follow_execution,
+        just_completed: game.automator.runtime.has_just_completed,
+        interval_ms: game.automator_current_interval(),
+        scripts: game
+            .automator
+            .scripts
+            .iter()
+            .map(|(id, s)| AutomatorScriptEntry {
+                id: *id,
+                name: s.name.clone(),
+            })
+            .collect(),
+        running_script_name: game
+            .automator
+            .scripts
+            .get(&state.top_level_script)
+            .map(|s| s.name.clone())
+            .unwrap_or_default(),
+        current_script_chars: current_chars,
+        total_script_chars: game.automator.total_script_chars(),
+        constants: game
+            .automator
+            .constant_sort_order
+            .iter()
+            .map(|name| AutomatorConstantView {
+                name: name.clone(),
+                value: game
+                    .automator
+                    .constants
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_default(),
+            })
+            .collect(),
+        current_info_pane: game.automator.current_info_pane,
+        notifications: Vec::new(),
+        event_count: game.automator.runtime.events.len(),
+        event_options: AutomatorEventOptionsView {
+            newest_first: game.options.automator_events.newest_first,
+            timestamp_type: game.options.automator_events.timestamp_type,
+            max_entries: game.options.automator_events.max_entries,
+            clear_on_reality: game.options.automator_events.clear_on_reality,
+            clear_on_restart: game.options.automator_events.clear_on_restart,
+        },
+        points: if unlocked {
+            None
+        } else {
+            Some(build_automator_points_view(game))
+        },
+    }
+}
+
+fn build_automator_points_view(game: &GameState) -> AutomatorPointsView {
+    use ad_core::automator_points::{AUTOMATOR_UNLOCK_POINTS, UPGRADE_AUTOMATOR_POINTS};
+    AutomatorPointsView {
+        total: game.automator_points(),
+        threshold: AUTOMATOR_UNLOCK_POINTS,
+        from_perks: game.automator_points_from_perks(),
+        from_upgrades: game.automator_points_from_upgrades(),
+        perks: ad_core::perks::PERKS
+            .iter()
+            .filter(|p| p.automator_points > 0)
+            .map(|p| ApSourceView {
+                id: p.id,
+                ap: p.automator_points,
+                bought: game.perk_bought(p.id),
+            })
+            .collect(),
+        upgrades: UPGRADE_AUTOMATOR_POINTS
+            .iter()
+            .map(|&(id, ap)| ApSourceView {
+                id,
+                ap,
+                bought: game.reality_upgrade_bought(id),
+            })
+            .collect(),
+        other: vec![
+            ApOtherSourceView {
+                name: "Reality Count",
+                ap: 2 * (game.reality.realities).min(50),
+            },
+            ApOtherSourceView {
+                name: "Black Hole",
+                ap: if game.black_holes.holes[0].unlocked {
+                    10
+                } else {
+                    0
+                },
+            },
+        ],
+    }
 }
 
 /// Replays `game_ms` of accumulated offline game-time (already speed-scaled by
@@ -2369,6 +2607,217 @@ fn set_reality_autobuyer_value(
     true
 }
 
+// --- Automator (Feature 6.6 Stage D) ------------------------------------------
+
+/// The play button: pause / resume / start the editor's script.
+#[tauri::command]
+fn automator_play(script_id: u32, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_play(script_id);
+}
+
+#[tauri::command]
+fn automator_stop(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_stop();
+}
+
+/// Rewind: restart the running script from the top.
+#[tauri::command]
+fn automator_rewind(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_restart();
+}
+
+/// Single-step one command (starting the editor's script when off).
+#[tauri::command]
+fn automator_step(script_id: u32, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_step_once(Some(script_id));
+}
+
+/// Toggle one of the controls-bar settings: "repeat" / "forceRestart" /
+/// "followExecution".
+#[tauri::command]
+fn automator_toggle_setting(setting: String, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    match setting.as_str() {
+        "repeat" => game.automator_toggle_repeat(),
+        "forceRestart" => game.automator_toggle_force_restart(),
+        "followExecution" => game.automator_toggle_follow_execution(),
+        _ => {}
+    }
+}
+
+#[tauri::command]
+fn automator_select_script(id: u32, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_select_editor_script(id);
+}
+
+/// Create a fresh script and open it in the editor. Returns its id (None at
+/// the 20-script cap).
+#[tauri::command]
+fn automator_new_script(state: State<'_, Mutex<GameState>>) -> Option<u32> {
+    let mut game = state.lock().unwrap();
+    let id = game.automator_new_script()?;
+    game.automator_select_editor_script(id);
+    Some(id)
+}
+
+#[tauri::command]
+fn automator_rename_script(id: u32, name: String, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_rename_script(id, &name);
+}
+
+#[tauri::command]
+fn automator_delete_script(id: u32, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_delete_script(id);
+}
+
+/// The stored content of one script (the editor loads it when switching).
+#[tauri::command]
+fn get_automator_script(id: u32, state: State<'_, Mutex<GameState>>) -> String {
+    state
+        .lock()
+        .unwrap()
+        .automator
+        .scripts
+        .get(&id)
+        .map(|s| s.content.clone())
+        .unwrap_or_default()
+}
+
+/// Result of saving script content: whether it persisted (character limits)
+/// and the compile errors of the *typed* content either way.
+#[derive(Serialize)]
+struct AutomatorSaveResult {
+    saved: bool,
+    errors: Vec<AutomatorErrorView>,
+}
+
+/// Save the editor's content (stops the script when it is the running one)
+/// and recompile for the error panel/gutter.
+#[tauri::command]
+fn save_automator_script(
+    id: u32,
+    content: String,
+    state: State<'_, Mutex<GameState>>,
+) -> AutomatorSaveResult {
+    let mut game = state.lock().unwrap();
+    let saved = game.automator_save_script(id, &content);
+    AutomatorSaveResult {
+        saved,
+        errors: compile_errors(&game, &content),
+    }
+}
+
+/// Compile errors for a script's stored content (initial editor mount).
+#[tauri::command]
+fn get_automator_errors(
+    id: u32,
+    state: State<'_, Mutex<GameState>>,
+) -> Vec<AutomatorErrorView> {
+    let game = state.lock().unwrap();
+    let content = game
+        .automator
+        .scripts
+        .get(&id)
+        .map(|s| s.content.clone())
+        .unwrap_or_default();
+    compile_errors(&game, &content)
+}
+
+fn compile_errors(game: &GameState, content: &str) -> Vec<AutomatorErrorView> {
+    game.compile_automator_script(content)
+        .errors
+        .into_iter()
+        .map(|e| AutomatorErrorView {
+            line: e.line,
+            info: e.info,
+            tip: e.tip,
+        })
+        .collect()
+}
+
+#[tauri::command]
+fn automator_set_constant(
+    name: String,
+    value: String,
+    state: State<'_, Mutex<GameState>>,
+) -> bool {
+    state.lock().unwrap().automator_set_constant(&name, &value)
+}
+
+#[tauri::command]
+fn automator_rename_constant(
+    old_name: String,
+    new_name: String,
+    state: State<'_, Mutex<GameState>>,
+) -> bool {
+    state
+        .lock()
+        .unwrap()
+        .automator_rename_constant(&old_name, &new_name)
+}
+
+#[tauri::command]
+fn automator_delete_constant(name: String, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_delete_constant(&name);
+}
+
+#[tauri::command]
+fn automator_set_info_pane(pane: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator.current_info_pane = pane.min(7);
+}
+
+/// The event log plus the current play-time clock (for relative timestamps).
+#[derive(Serialize)]
+struct AutomatorEventLogView {
+    now_play_time_ms: f64,
+    events: Vec<AutomatorEventView>,
+}
+
+#[tauri::command]
+fn get_automator_events(state: State<'_, Mutex<GameState>>) -> AutomatorEventLogView {
+    let game = state.lock().unwrap();
+    AutomatorEventLogView {
+        now_play_time_ms: game.records.real_time_played_ms,
+        events: game
+            .automator
+            .runtime
+            .events
+            .iter()
+            .map(|e| AutomatorEventView {
+                message: e.message.clone(),
+                line: e.line,
+                this_reality_ms: e.this_reality_ms,
+                play_time_ms: e.play_time_ms,
+                timegap_ms: e.timegap_ms,
+            })
+            .collect(),
+    }
+}
+
+#[tauri::command]
+fn automator_clear_log(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_clear_event_log();
+}
+
+/// Event-log display options ("newestFirst" / "clearOnReality" /
+/// "clearOnRestart" booleans; "timestampType" 0–4).
+#[tauri::command]
+fn set_automator_event_option(
+    option: String,
+    value: i64,
+    state: State<'_, Mutex<GameState>>,
+) {
+    let mut game = state.lock().unwrap();
+    let opts = &mut game.options.automator_events;
+    match option.as_str() {
+        "newestFirst" => opts.newest_first = value != 0,
+        "timestampType" => opts.timestamp_type = value.clamp(0, 4) as u8,
+        "clearOnReality" => opts.clear_on_reality = value != 0,
+        "clearOnRestart" => opts.clear_on_restart = value != 0,
+        _ => {}
+    }
+}
+
 #[tauri::command]
 fn study_preset_save(slot: usize, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().save_study_preset(slot);
@@ -2978,6 +3427,25 @@ pub fn run() {
             study_preset_load,
             study_preset_rename,
             study_preset_edit,
+            automator_play,
+            automator_stop,
+            automator_rewind,
+            automator_step,
+            automator_toggle_setting,
+            automator_select_script,
+            automator_new_script,
+            automator_rename_script,
+            automator_delete_script,
+            get_automator_script,
+            save_automator_script,
+            get_automator_errors,
+            automator_set_constant,
+            automator_rename_constant,
+            automator_delete_constant,
+            automator_set_info_pane,
+            get_automator_events,
+            automator_clear_log,
+            set_automator_event_option,
             switch_save_slot,
             get_save_slots,
             trigger_backup,
@@ -3010,6 +3478,30 @@ mod tests {
         let z = num(&Decimal::ZERO);
         assert_eq!(z.m, 0.0);
         assert_eq!(z.e, 0.0);
+    }
+
+    #[test]
+    fn automator_view_reflects_lock_state() {
+        let mut game = GameState::new();
+        // Locked: the AP page payload is included.
+        let view = build_automator_view(&game);
+        assert!(!view.unlocked);
+        let points = view.points.expect("locked tab ships AP breakdown");
+        assert_eq!(points.threshold, 100);
+        assert_eq!(points.perks.len(), 21);
+        assert_eq!(points.upgrades.len(), 6);
+
+        // Unlocked: run state + scripts, no AP payload.
+        game.reality.automator_force_unlock = true;
+        game.automator_save_script(1, "pause 10s");
+        game.automator_start(Some(1));
+        let view = build_automator_view(&game);
+        assert!(view.unlocked);
+        assert!(view.points.is_none());
+        assert!(view.is_running);
+        assert_eq!(view.scripts.len(), 1);
+        assert_eq!(view.current_script_chars, "pause 10s".len());
+        assert_eq!(view.interval_ms, 500.0);
     }
 
     #[test]

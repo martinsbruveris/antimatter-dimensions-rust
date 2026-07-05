@@ -12,9 +12,11 @@
 const DIM_KEY = /^(?:Digit|Numpad)([1-8])$/;
 
 export function handleShortcut(e, game, ui) {
-  // Never hijack typing in a text field (import/export inputs land later).
+  // Never hijack typing in a text field (import/export inputs land later)
+  // or inside the Automator's CodeMirror editor.
   const tag = e.target?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (e.target?.closest?.(".CodeMirror")) return;
 
   // Ctrl/Cmd+S saves the game (original "Save game" bind = mod+s). Handle it
   // before the general Ctrl/Cmd guard below, and stop the browser's own Save.
@@ -156,6 +158,14 @@ export function handleShortcut(e, game, ui) {
     case "KeyE":
       // Eternity; no-ops unless the Eternity goal is met.
       game.requestEternity();
+      break;
+    case "KeyU":
+      // U starts/pauses the Automator; Shift+U restarts it (hotkeys.js,
+      // visible only once the Automator is unlocked).
+      if (game.snapshot?.automator?.unlocked) {
+        if (e.shiftKey) game.automatorRewind();
+        else game.automatorPlay(game.snapshot.automator.editor_script);
+      }
       break;
     default:
       break;

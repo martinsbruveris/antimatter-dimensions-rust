@@ -1310,7 +1310,7 @@ impl GameState {
             std::array::from_fn(|i| dto.options.hidden_subtab_bits[i]);
         options.automator_events = crate::options::AutomatorEventsOptions {
             newest_first: dto.options.automator_events.newest_first,
-            timestamp_type: dto.options.automator_events.timestamp_type.clamp(0, 3)
+            timestamp_type: dto.options.automator_events.timestamp_type.clamp(0, 4)
                 as u8,
             max_entries: dto.options.automator_events.max_entries.max(1),
             clear_on_reality: dto.options.automator_events.clear_on_reality,

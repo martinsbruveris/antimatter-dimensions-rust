@@ -12,6 +12,7 @@ import EternityMilestonesTab from "../components/tabs/EternityMilestonesTab.vue"
 import TimeDimensionsTab from "../components/tabs/TimeDimensionsTab.vue";
 import TimeStudiesTab from "../components/tabs/TimeStudiesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
+import AutomatorTab from "../components/tabs/AutomatorTab.vue";
 import GlyphsTab from "../components/tabs/reality/GlyphsTab.vue";
 import PerksTab from "../components/tabs/reality/PerksTab.vue";
 import RealityUpgradesTab from "../components/tabs/reality/RealityUpgradesTab.vue";
@@ -165,6 +166,7 @@ export const TABS = [
     subtabs: [
       { key: "glyphs", name: "Glyphs", symbol: "<i class='fas fa-clone'></i>", component: GlyphsTab, hideId: [8, 0] },
       { key: "upgrades", name: "Reality Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: RealityUpgradesTab, hideId: [8, 1] },
+      { key: "automator", name: "Automator", symbol: "<i class='fas fa-cog'></i>", component: AutomatorTab, hideId: [8, 2] },
       { key: "perks", name: "Perks", symbol: "<i class='fas fa-project-diagram'></i>", component: PerksTab, hideId: [8, 3] },
       {
         key: "hole",

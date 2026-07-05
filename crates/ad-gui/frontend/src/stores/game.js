@@ -55,9 +55,15 @@ export const useGameStore = defineStore("game", {
     async tick(dtMs, repeats = 1) {
       this.snapshot = await invoke("tick_and_get_state", { dtMs, repeats });
       this.notifyNewAchievements();
+      // Automator `notify` commands queue toasts engine-side; the tick
+      // response drains them (`GameUI.notify.automator` is the purple toast).
+      const ui = useUiStore();
+      for (const text of this.snapshot?.automator?.notifications ?? []) {
+        ui.notify(text, "automator", 3000);
+      }
       // A badge that landed on the subtab the player is looking at is
       // acknowledged immediately (never displayed).
-      useUiStore().ackTabNotification();
+      ui.ackTabNotification();
     },
     // Replay `gameMs` of offline game-time (already speed-scaled) at the
     // resolution set by `offlineTicks`, all at once. Used for sub-threshold
@@ -459,6 +465,76 @@ export const useGameStore = defineStore("game", {
     // Reality autobuyer targets ("rm" decimal / "glyph" int / "time" float).
     setRealityAutobuyerValue(property, value) {
       return invoke("set_reality_autobuyer_value", { property, value });
+    },
+    // --- Automator ---
+    // Play button: pause when running, resume when paused, else start the
+    // editor's script.
+    automatorPlay(scriptId) {
+      return invoke("automator_play", { scriptId });
+    },
+    automatorStop() {
+      return invoke("automator_stop");
+    },
+    // Rewind: restart the running script from the top.
+    automatorRewind() {
+      return invoke("automator_rewind");
+    },
+    // Single-step one command (starts the editor's script when off).
+    automatorStep(scriptId) {
+      return invoke("automator_step", { scriptId });
+    },
+    // "repeat" / "forceRestart" / "followExecution".
+    automatorToggleSetting(setting) {
+      return invoke("automator_toggle_setting", { setting });
+    },
+    automatorSelectScript(id) {
+      return invoke("automator_select_script", { id });
+    },
+    // Resolves to the new script's id (null at the 20-script cap).
+    automatorNewScript() {
+      return invoke("automator_new_script");
+    },
+    automatorRenameScript(id, name) {
+      return invoke("automator_rename_script", { id, name });
+    },
+    automatorDeleteScript(id) {
+      return invoke("automator_delete_script", { id });
+    },
+    // Resolves to the stored script content.
+    getAutomatorScript(id) {
+      return invoke("get_automator_script", { id });
+    },
+    // Persist editor content; resolves to { saved, errors } (compile errors
+    // of the typed content either way).
+    saveAutomatorScript(id, content) {
+      return invoke("save_automator_script", { id, content });
+    },
+    getAutomatorErrors(id) {
+      return invoke("get_automator_errors", { id });
+    },
+    automatorSetConstant(name, value) {
+      return invoke("automator_set_constant", { name, value });
+    },
+    automatorRenameConstant(oldName, newName) {
+      return invoke("automator_rename_constant", { oldName, newName });
+    },
+    automatorDeleteConstant(name) {
+      return invoke("automator_delete_constant", { name });
+    },
+    automatorSetInfoPane(pane) {
+      return invoke("automator_set_info_pane", { pane });
+    },
+    // Resolves to { now_play_time_ms, events }.
+    getAutomatorEvents() {
+      return invoke("get_automator_events");
+    },
+    automatorClearLog() {
+      return invoke("automator_clear_log");
+    },
+    // "newestFirst"/"clearOnReality"/"clearOnRestart" (0/1) and
+    // "timestampType" (0-4).
+    setAutomatorEventOption(option, value) {
+      return invoke("set_automator_event_option", { option, value });
     },
     // --- Time Study presets ---
     studyPresetSave(slot) {

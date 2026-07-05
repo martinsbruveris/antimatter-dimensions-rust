@@ -1,6 +1,6 @@
 # Feature 6.6: Automator
 
-**Status: Stages A–C implemented** (see §12–§14); Stages D–E pending. This doc
+**Status: Stages A–D implemented** (see §12–§15); Stage E pending. This doc
 records the original's mechanics, the frontier cuts, the Rust design, and —
 the headline question — how to decompose the feature. **Answer up front: the
 Automator should not be ported in one go.** It decomposes cleanly into five
@@ -607,3 +607,52 @@ from `tick()` on real time:
 semantics, loops, prestige commands, repeat, the no-op guard, single-step,
 save-resume both matched and mismatched, force-restart Realities, and an
 end-to-end run through `tick()`).
+
+## 15. Stage D implementation notes (2026-07-05)
+
+The Automator UI (text editor + docs pane), registered as the Reality tab's
+`automator` subtab (hideId [8, 2]):
+
+- **Backend surface** (`main.rs`): `GameView.automator` ships run state,
+  scripts list, constants, char counts, interval, event-log options, and —
+  while locked — the AP breakdown (descriptions live frontend-side, keyed by
+  id). `notify` toasts queue engine-side and are drained by the tick
+  command. Script content, compile errors, and the event log are on-demand
+  queries (`get_automator_script/_errors/_events`); `save_automator_script`
+  persists and returns the typed content's errors in one round trip. 22 new
+  commands cover controls, script CRUD, constants, panes, and event-log
+  options.
+- **Editor**: CodeMirror 5 (npm) with the original's "automato" simple-mode
+  state machine vendored verbatim (`util/automatorMode.js`) and the
+  original's own CSS files copied unmodified (`automator.css` +
+  `codemirror/{codemirror,liquibyte,lint,show-hint}.css`). A session-long
+  singleton (`util/automatorEditor.js`, mirroring `AutomatorTextUI` +
+  `AutomatorHighlighter` + `AutomatorScroller`) keeps per-script documents,
+  undo history, and scroll across tab switches; edits save on a 170 ms
+  debounce; errors mark their lines and feed the reactive error list the
+  controls/docs share. Active-line highlight follows the running script with
+  the follow-execution toggle.
+- **Controls bar**: rewind / play-pause(-eject) / stop / step, the three
+  toggles, undo/redo, the duplicate-name and editing-different-script
+  warnings, and the padded status line.
+- **Docs pane**: intro, command reference (man pages vendored to
+  `data/automatorDocs.js`, 20 entries with static unlock keys; the Currency
+  List's celestial lines are omitted at our frontier), error page, event log
+  (polls twice a second while open; all five timestamp styles, with
+  DATE_TIME reconstructed from the play-time clock), and the constants
+  define panel. The script dropdown/rename/delete live in the docs header
+  like the original.
+- **Hotkeys**: U play/pause, Shift+U restart; typing inside CodeMirror is
+  guarded. The AP page renders when locked.
+
+Stage D deviations (each cosmetic/QoL, revisit with Stage E):
+
+- The draggable SplitPane is a fixed 50/50 split; full-screen mode is
+  deferred with it.
+- Undo/redo is CodeMirror's native per-document history rather than the
+  original's custom cross-editor buffer (no block editor yet), so it doesn't
+  persist across script switches.
+- Autocomplete filters a static word list instead of chevrotain's
+  parser-state content assist.
+- The import/export and data-transfer buttons, templates pane, block-mode
+  switch, and blocks pane arrive with Stage E.

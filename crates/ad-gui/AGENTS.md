@@ -77,6 +77,13 @@ frontend/
                              #   AutobuyerToggles
         time-studies/        # TimeStudyPresetButton + HoverMenu (preset
                              #   save/load row in the Time Studies tab)
+        AutomatorTab.vue     # split-pane Automator (Feature 6.6 Stage D)
+        automator/           # AutomatorEditor + Controls + TextEditor
+                             #   (CodeMirror 5, mode in util/automatorMode.js,
+                             #   session singleton in util/automatorEditor.js),
+                             #   AutomatorDocs + Intro/CommandList/Error/
+                             #   EventLog/Define pages, ScriptDropdown,
+                             #   PointsList (locked AP page), AutomatorButton
 ```
 
 ## How it works
