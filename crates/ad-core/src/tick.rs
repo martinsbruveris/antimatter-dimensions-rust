@@ -17,6 +17,9 @@ impl GameState {
         // slower. Production, currencies, and game-time records use the scaled
         // interval; autobuyer timers and real-time records stay on real time.
         let real_dt_ms = dt_ms;
+        // Black-hole phases advance on real time, before the speed factor is
+        // read (`BlackHoles.updatePhases`).
+        self.tick_black_holes(real_dt_ms);
         let dt_ms = dt_ms * self.game_speed_factor();
 
         // Advance the per-run challenge accumulators first, matching the original
@@ -161,6 +164,11 @@ impl GameState {
         // Perk automation: EU auto-grants + the dilation/TD/Reality-study
         // auto-unlock perks.
         self.tick_perk_effects();
+
+        // Reality Upgrades: per-tick requirement checks (RU11/14/20/21/22)
+        // and the continuous RU11/RU14 generation.
+        self.check_reality_upgrade_reqs_on_tick();
+        self.tick_reality_upgrade_generation(dt_ms);
 
         // `updatePrestigeRates`: peak IP/min / EP/min for the header buttons.
         self.update_prestige_rates();

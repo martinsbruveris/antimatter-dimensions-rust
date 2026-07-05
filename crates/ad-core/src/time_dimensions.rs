@@ -231,6 +231,12 @@ impl GameState {
         {
             mult *= self.dilation_td_mult_replicanti();
         }
+        // RU22: TD multiplier from days spent in this Reality.
+        if self.reality_upgrade_bought(22) {
+            let days = self.records.this_reality.time_ms / 86_400_000.0;
+            let exponent = (1.0 + 2.0 * (days + 1.0).log10()).powf(1.6);
+            mult *= Decimal::pow10(exponent);
+        }
         mult
     }
 

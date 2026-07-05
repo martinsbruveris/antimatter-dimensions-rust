@@ -74,10 +74,15 @@ impl GameState {
                 amount += before_distant * before_distant + before_distant;
             }
         }
-        // Remote scaling: exponential growth past galaxy 800.
-        const REMOTE_START: u64 = 800;
-        if galaxies >= REMOTE_START {
-            amount *= 1.002f64.powi((galaxies - (REMOTE_START - 1)) as i32);
+        // Remote scaling: exponential growth past galaxy 800 (moved to
+        // 100,000 by Reality Upgrade 21).
+        let remote_start: u64 = if self.reality_upgrade_bought(21) {
+            100_000
+        } else {
+            800
+        };
+        if galaxies >= remote_start {
+            amount *= 1.002f64.powi((galaxies - (remote_start - 1)) as i32);
         }
 
         // The `resetBoost` Infinity Upgrade reduces the requirement by 9, and a

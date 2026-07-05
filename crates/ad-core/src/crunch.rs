@@ -118,6 +118,11 @@ impl GameState {
         }
         // The `infinityinfmult` glyph effect multiplies Infinity gain.
         gain *= self.glyph_effect_infinityinfmult();
+        // RU5 (Boundless Amplifier, ×5 each) and RU7 (galaxy-count boost).
+        gain *= self.reality_rebuyable_effect(5);
+        if self.reality_upgrade_bought(7) {
+            gain *= Decimal::from_float(1.0 + self.galaxies as f64 / 30.0);
+        }
         gain
     }
 
@@ -175,6 +180,10 @@ impl GameState {
         }
 
         if at_goal {
+            // BIG_CRUNCH_BEFORE requirement check (RU7), before the reward
+            // path clears `noInfinities`.
+            self.check_reality_upgrade_reqs_on_crunch();
+
             // The first-ever Infinity badges the tabs it opens up (the original's
             // BIG_CRUNCH_BEFORE event, dispatched only when at the goal; the
             // trigger's condition is "Infinity not yet unlocked").

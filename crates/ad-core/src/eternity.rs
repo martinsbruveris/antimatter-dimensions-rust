@@ -70,6 +70,17 @@ impl GameState {
         }
         // The `timeEP` glyph effect (`GlyphEffect.epMult`).
         mult *= Decimal::from_float(self.glyph_effect_time_ep());
+        // RU12: EP multiplier from TT and Reality count.
+        if self.reality_upgrade_bought(12) {
+            let realities = (self.reality.realities as f64).min(1e4);
+            if realities >= 1.0 {
+                let base = (self.time_theorems - Decimal::from_float(1000.0))
+                    .max(&Decimal::from_float(2.0));
+                mult *= base
+                    .pow(&Decimal::from_float(realities.log2()))
+                    .max(&Decimal::ONE);
+            }
+        }
         mult
     }
 
@@ -89,10 +100,8 @@ impl GameState {
     /// is out of frontier).
     pub fn gained_eternities(&self) -> Decimal {
         let mut gain = Decimal::from_float(self.glyph_effect_timeetermult());
-        if self.reality.rebuyables[2] > 0 {
-            gain *= Decimal::from_float(3.0f64)
-                .pow(&Decimal::from(self.reality.rebuyables[2] as u64));
-        }
+        // RU3 (Eternal Amplifier): ×3 per purchase.
+        gain *= self.reality_rebuyable_effect(3);
         gain
     }
 
@@ -108,6 +117,10 @@ impl GameState {
         if !self.can_eternity() {
             return false;
         }
+
+        // ETERNITY_RESET_BEFORE requirement checks (RU6/8/10), before the
+        // rewards clear the `noEternities` flag.
+        self.check_reality_upgrade_reqs_on_eternity_before();
 
         // Rewards (`giveEternityRewards`), read from the pre-reset state.
         self.records.best_eternity.time_ms = self
@@ -159,6 +172,10 @@ impl GameState {
         );
 
         self.eternity_full_reset(entering_ec);
+
+        // ETERNITY_RESET_AFTER requirement checks (RU9/12/13/15/25) — the
+        // awarded EP persists through the reset.
+        self.check_reality_upgrade_reqs_on_eternity_after();
         true
     }
 

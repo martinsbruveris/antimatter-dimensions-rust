@@ -132,6 +132,17 @@ impl GameState {
         // The `replicationspeed` glyph effect (a Decimal in the original;
         // frontier magnitudes fit f64).
         mult *= self.glyph_effect_replicationspeed().to_f64();
+        // RU2 (Replicative Amplifier): ×3 per purchase.
+        mult *= self.reality_rebuyable_effect(2).to_f64();
+        // RU6: ×(1 + RG/50); RU23: fastest-reality boost (cap ×180).
+        if self.reality_upgrade_bought(6) {
+            mult *= 1.0 + self.replicanti.galaxies as f64 / 50.0;
+        }
+        if self.reality_upgrade_bought(23) {
+            let best_minutes =
+                (self.records.best_reality.time_ms / 60_000.0).clamp(1.0 / 12.0, 15.0);
+            mult *= (15.0 / best_minutes).min(180.0);
+        }
         mult
     }
 

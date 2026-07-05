@@ -242,10 +242,7 @@ impl GameState {
             .pow(&Decimal::from(self.dilation.rebuyables[2] as u64));
         mult *= Decimal::from_float(self.glyph_sac_dilation_effect());
         // RU4 (Superluminal Amplifier): ×3 per purchase.
-        if self.reality.rebuyables[3] > 0 {
-            mult *= Decimal::from_float(3.0)
-                .pow(&Decimal::from(self.reality.rebuyables[3] as u64));
-        }
+        mult *= self.reality_rebuyable_effect(4);
         // RU8: ×√(achievement power).
         if self.reality_upgrade_bought(8) {
             mult *= self
@@ -292,10 +289,7 @@ impl GameState {
             * Decimal::from_float(2.0)
                 .pow(&Decimal::from(self.dilation.rebuyables[0] as u64));
         // RU1 (Temporal Amplifier): ×3 per purchase.
-        if self.reality.rebuyables[0] > 0 {
-            rate *= Decimal::from_float(3.0)
-                .pow(&Decimal::from(self.reality.rebuyables[0] as u64));
-        }
+        rate *= self.reality_rebuyable_effect(1);
         rate *= self.glyph_effect_dilation_dt();
         // replicationdtgain: ×max(log10(replicanti) · effect, 1).
         let dtgain = self.glyph_effect_replicationdtgain();

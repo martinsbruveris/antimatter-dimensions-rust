@@ -390,6 +390,9 @@ impl GameState {
     /// a Perk Point, update the reality records, then reset everything from
     /// the Eternity layer down.
     pub(crate) fn finish_process_reality(&mut self) {
+        // REALITY_RESET_BEFORE requirement checks (RU16–19/23/24).
+        self.check_reality_upgrade_reqs_on_reality();
+
         // -- Rewards (read from pre-reset state) --
         let final_ep = self.eternity_points + self.gained_eternity_points();
         if self.records.best_reality.best_ep < final_ep {
@@ -677,13 +680,14 @@ impl GameState {
         self.grant_glyphs_on_reality(None, false);
     }
 
-    /// RU10's start-of-reality package (Feature 6.4). Unreachable until the
-    /// upgrade can be bought.
-    pub(crate) fn apply_rupg10(&mut self) {}
+    /// RU10's start-of-reality package (Feature 6.4).
+    pub(crate) fn apply_rupg10(&mut self) {
+        self.apply_rupg10_impl();
+    }
 
-    /// The Black Holes' game-speed multiplier (Feature 6.5); ×1 until then.
+    /// The Black Holes' game-speed multiplier (Feature 6.5).
     pub(crate) fn black_hole_speed_factor(&self) -> f64 {
-        1.0
+        self.black_hole_speed_factor_impl()
     }
 }
 

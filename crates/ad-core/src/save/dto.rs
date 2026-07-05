@@ -151,6 +151,11 @@ pub struct PlayerDTO {
     pub triggered_tab_notification_bits: u32,
     /// `player.realities` — Realities performed (a plain number at the root).
     pub realities: f64,
+    /// `player.blackHole` — the two Black Holes.
+    pub black_hole: Vec<BlackHoleDTO>,
+    /// `player.blackHolePause` / `blackHolePauseTime`.
+    pub black_hole_pause: bool,
+    pub black_hole_pause_time: f64,
     /// `player.reality` — the Reality-layer state (modelled subset).
     pub reality: RealityDTO,
     /// `player.requirementChecks` — the "avoided X" run flags (modelled subset).
@@ -186,6 +191,19 @@ pub struct RealityDTO {
     pub auto_achieve: bool,
     pub gained_auto_achievements: bool,
     pub glyphs: GlyphsDTO,
+}
+
+/// One entry of `player.blackHole[]`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlackHoleDTO {
+    pub unlocked: bool,
+    pub active: bool,
+    pub phase: f64,
+    pub activations: f64,
+    pub interval_upgrades: f64,
+    pub power_upgrades: f64,
+    pub duration_upgrades: f64,
 }
 
 /// `player.reality.glyphs` (modelled subset: no undo/sets/filter/cosmetics).
@@ -416,6 +434,9 @@ pub struct RecordsDTO {
     pub total_time_played: f64,
     /// `player.records.realTimePlayed` — real time (ms), monotonic.
     pub real_time_played: f64,
+    /// `records.timePlayedAtBHUnlock` (`Number.MAX_VALUE` = not yet).
+    #[serde(rename = "timePlayedAtBHUnlock")]
+    pub time_played_at_bh_unlock: f64,
     pub this_infinity: ThisInfinityDTO,
     pub best_infinity: BestInfinityDTO,
     pub this_eternity: ThisEternityDTO,
@@ -852,6 +873,7 @@ impl GameState {
         let records = Records {
             total_time_played_ms: dto.records.total_time_played,
             real_time_played_ms: dto.records.real_time_played,
+            time_played_at_bh_unlock_ms: dto.records.time_played_at_bh_unlock,
             this_infinity: ThisInfinity {
                 time_ms: dto.records.this_infinity.time,
                 real_time_ms: dto.records.this_infinity.real_time,
@@ -1143,6 +1165,23 @@ impl GameState {
             eterc8_repl: dto.eterc8repl,
             reality,
             requirement_checks,
+            black_holes: {
+                let mut state = crate::black_holes::BlackHolesState::new();
+                for (i, hole) in dto.black_hole.iter().take(2).enumerate() {
+                    state.holes[i] = crate::black_holes::BlackHole {
+                        unlocked: hole.unlocked,
+                        active: hole.active,
+                        phase: hole.phase,
+                        activations: hole.activations.max(0.0) as u32,
+                        interval_upgrades: hole.interval_upgrades.max(0.0) as u32,
+                        power_upgrades: hole.power_upgrades.max(0.0) as u32,
+                        duration_upgrades: hole.duration_upgrades.max(0.0) as u32,
+                    };
+                }
+                state.paused = dto.black_hole_pause;
+                state.pause_time_ms = dto.black_hole_pause_time;
+                state
+            },
             dilation: {
                 let mut rebuyables = [0u32; 3];
                 for (key, count) in &dto.dilation.rebuyables {

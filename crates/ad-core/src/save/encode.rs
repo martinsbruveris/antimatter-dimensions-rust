@@ -323,6 +323,30 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     player["requirementChecks"]["reality"]["maxGlyphs"] =
         json!(state.requirement_checks.reality_max_glyphs);
 
+    // Black Holes.
+    player["blackHole"] = json!(state
+        .black_holes
+        .holes
+        .iter()
+        .enumerate()
+        .map(|(id, h)| {
+            json!({
+                "id": id,
+                "unlocked": h.unlocked,
+                "active": h.active,
+                "phase": h.phase,
+                "activations": h.activations,
+                "intervalUpgrades": h.interval_upgrades,
+                "powerUpgrades": h.power_upgrades,
+                "durationUpgrades": h.duration_upgrades,
+            })
+        })
+        .collect::<Vec<_>>());
+    player["blackHolePause"] = json!(state.black_holes.paused);
+    player["blackHolePauseTime"] = json!(state.black_holes.pause_time_ms);
+    player["records"]["timePlayedAtBHUnlock"] =
+        json!(state.records.time_played_at_bh_unlock_ms);
+
     // Time Dimensions + Time Shards + free tickspeed upgrades.
     player["timeShards"] = decimal(&state.time_shards);
     player["totalTickGained"] = json!(state.total_tick_gained);
@@ -866,6 +890,36 @@ mod tests {
         );
         assert_eq!(reloaded.reality.glyphs.sac, [1.0, 2.0, 3.0, 4.0, 5.0]);
         assert_eq!(reloaded.reality.glyphs.protected_rows, 3);
+    }
+
+    #[test]
+    fn black_holes_round_trip() {
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.black_holes.holes[0].unlocked = true;
+        state.black_holes.holes[0].active = true;
+        state.black_holes.holes[0].phase = 123.5;
+        state.black_holes.holes[0].activations = 7;
+        state.black_holes.holes[0].interval_upgrades = 3;
+        state.black_holes.holes[0].power_upgrades = 2;
+        state.black_holes.holes[0].duration_upgrades = 1;
+        state.black_holes.holes[1].unlocked = true;
+        state.black_holes.paused = true;
+        state.black_holes.pause_time_ms = 456.0;
+        state.records.time_played_at_bh_unlock_ms = 789.0;
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        let h = &reloaded.black_holes.holes[0];
+        assert!(h.unlocked && h.active);
+        assert_eq!(h.phase, 123.5);
+        assert_eq!(h.activations, 7);
+        assert_eq!(
+            (h.interval_upgrades, h.power_upgrades, h.duration_upgrades),
+            (3, 2, 1)
+        );
+        assert!(reloaded.black_holes.holes[1].unlocked);
+        assert!(reloaded.black_holes.paused);
+        assert_eq!(reloaded.black_holes.pause_time_ms, 456.0);
+        assert_eq!(reloaded.records.time_played_at_bh_unlock_ms, 789.0);
     }
 
     #[test]

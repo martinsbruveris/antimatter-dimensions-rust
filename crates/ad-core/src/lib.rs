@@ -1,6 +1,7 @@
 pub mod achievements;
 pub mod action;
 pub mod autobuyers;
+pub mod black_holes;
 pub mod break_infinity_upgrades;
 pub mod challenges;
 pub mod crunch;
@@ -20,6 +21,7 @@ pub mod observed;
 pub mod options;
 pub mod perks;
 pub mod reality;
+pub mod reality_upgrades;
 pub mod records;
 pub mod replicanti;
 pub mod sacrifice;
@@ -35,6 +37,7 @@ pub mod tutorial;
 
 pub use action::{Action, ActionOutcome};
 pub use autobuyers::{Autobuyer, AutobuyerMode, AutobuyerState, AutobuyerTarget};
+pub use black_holes::{BlackHole, BlackHolesState, BH1_UNLOCK_COST};
 pub use break_infinity::Decimal;
 pub use break_infinity_upgrades::{
     BreakInfinityRebuyable, BreakInfinityUpgrade, ALL_BREAK_INFINITY_REBUYABLES,

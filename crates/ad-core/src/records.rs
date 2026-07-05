@@ -282,6 +282,12 @@ fn default_recent_realities() -> Vec<RecentReality> {
     vec![RecentReality::placeholder(); 10]
 }
 
+/// serde default for "not yet" time sentinels (`Number.MAX_VALUE`).
+#[cfg(feature = "serde")]
+fn default_f64_max() -> f64 {
+    f64::MAX
+}
+
 /// Records for the fastest infinity performed. Persists across a Big Crunch.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -318,6 +324,11 @@ pub struct Records {
     /// Total real time ever played (ms), monotonic. Mirrors
     /// `player.records.realTimePlayed`.
     pub real_time_played_ms: f64,
+    /// Total game time played when the Black Hole was unlocked
+    /// (`records.timePlayedAtBHUnlock`; `f64::MAX` = not yet). Feeds Reality
+    /// Upgrade 20's requirement.
+    #[cfg_attr(feature = "serde", serde(default = "default_f64_max"))]
+    pub time_played_at_bh_unlock_ms: f64,
     /// The current infinity's records (reset on crunch).
     pub this_infinity: ThisInfinity,
     /// The fastest infinity's records (kept on crunch).
@@ -349,6 +360,7 @@ impl Records {
         Self {
             total_time_played_ms: 0.0,
             real_time_played_ms: 0.0,
+            time_played_at_bh_unlock_ms: f64::MAX,
             this_infinity: ThisInfinity::new(),
             best_infinity: BestInfinity::new(),
             this_eternity: ThisEternity::new(),

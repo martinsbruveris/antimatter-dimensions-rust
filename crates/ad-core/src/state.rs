@@ -303,6 +303,10 @@ pub struct GameState {
     /// X" flags consumed by Reality Upgrade requirements. See `reality.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub requirement_checks: RequirementChecks,
+    /// The two Black Holes + pause state (`player.blackHole[]`,
+    /// `blackHolePause`). See `black_holes.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub black_holes: crate::black_holes::BlackHolesState,
     /// Owned Infinity Upgrades, one bit per [`InfinityUpgrade`](crate::InfinityUpgrade)
     /// (the original's `player.infinityUpgrades` string set as a bitmask).
     /// Persists across a Big Crunch. See `infinity_upgrades.rs`.
@@ -481,6 +485,7 @@ impl GameState {
             dilation: DilationState::new(),
             reality: RealityState::new(),
             requirement_checks: RequirementChecks::new(),
+            black_holes: crate::black_holes::BlackHolesState::new(),
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),
