@@ -1,3 +1,8 @@
+---
+status: Partial
+feature: "2.4"
+---
+
 # Normal Achievements: state, unlocks, effects & tab
 
 Date: 2026-06-30

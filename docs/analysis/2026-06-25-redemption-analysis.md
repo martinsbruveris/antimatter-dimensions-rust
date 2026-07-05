@@ -1,3 +1,7 @@
+---
+status: Reference
+---
+
 # Antimatter Dimensions Redemption — Codebase Analysis
 
 ## Table of Contents

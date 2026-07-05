@@ -4,7 +4,7 @@
 //! This module owns the run state machine ([`InfinityChallengeState`] on
 //! [`GameState`]) and the unlock/start/exit/complete logic; the per-challenge rule
 //! modifiers live at their engine sites. See
-//! `design-docs/2026-07-03-infinity-challenges.md`.
+//! `docs/design/2026-07-03-infinity-challenges.md`.
 
 use break_infinity::Decimal;
 

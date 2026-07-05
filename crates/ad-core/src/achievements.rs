@@ -19,7 +19,7 @@
 //! event bus — our centralized action methods *are* the events. Effects are read
 //! back in [`GameState::dimension_multiplier`] (per-dimension boosts + the global
 //! power) and [`GameState::starting_antimatter`] (achievement 21). See
-//! `design-docs/2026-06-30-achievements.md`.
+//! `docs/design/2026-06-30-achievements.md`.
 
 use break_infinity::Decimal;
 
@@ -38,7 +38,7 @@ pub const ACHIEVEMENTS_PER_ROW: u16 = 8;
 /// The achievements the engine can currently award (an inline unlock hook
 /// exists at the relevant seam). The Reality study's "all pre-Reality
 /// achievements" requirement is checked against this set until achievement
-/// coverage reaches rows 1–13 (see `design-docs/2026-07-05-reality.md`).
+/// coverage reaches rows 1–13 (see `docs/design/2026-07-05-reality.md`).
 pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] =
     &[11, 12, 18, 21, 23, 24, 25, 26, 27, 28, 136];
 

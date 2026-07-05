@@ -3,7 +3,7 @@
 //! These are the per-frame inputs that drive a single `format` call: the per-call
 //! digit counts plus the exponent-display and "Infinite"-cutoff settings.
 //!
-//! See `design-docs/2026-06-25-number-formatting.md` ("What `FormatOptions` must
+//! See `docs/design/2026-06-25-number-formatting.md` ("What `FormatOptions` must
 //! carry") for the full rationale.
 
 use break_infinity::Decimal;

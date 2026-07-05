@@ -7,7 +7,7 @@
 //! `finishProcessReality`), `src/core/machines.js` (the RM formula), and the
 //! glyph-level half of `src/core/glyphs/auto-glyph-processor.js`
 //! (`getGlyphLevelInputs`). Glyphs themselves are Feature 6.2 (`glyphs.rs`).
-//! See `design-docs/2026-07-05-reality.md`.
+//! See `docs/design/2026-07-05-reality.md`.
 
 use break_infinity::Decimal;
 

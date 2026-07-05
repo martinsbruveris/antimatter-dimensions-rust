@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # Antimatter Dimensions Rust — Architecture Design
 
 ## 1. Goals & Constraints

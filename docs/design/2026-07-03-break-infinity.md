@@ -1,3 +1,8 @@
+---
+status: Implemented
+feature: "2.3"
+---
+
 # Break Infinity — Feature 2.3
 
 The upgrade that lets antimatter exceed `1e308`, after which Infinity Points scale

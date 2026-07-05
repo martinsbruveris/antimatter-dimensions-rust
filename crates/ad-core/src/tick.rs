@@ -4,7 +4,7 @@ use crate::data::constants::BIG_CRUNCH_THRESHOLD;
 use crate::GameState;
 
 /// Native offline tick resolution in ms (the original simulates offline at a
-/// 50 ms base tick). See `design-docs/2026-06-30-offline-progress.md`.
+/// 50 ms base tick). See `docs/design/2026-06-30-offline-progress.md`.
 const OFFLINE_BASE_TICK_MS: f64 = 50.0;
 
 #[allow(clippy::needless_range_loop)]
@@ -278,7 +278,7 @@ impl GameState {
     /// `offline_ticks` is the player's resolution setting (default 100_000,
     /// reproducing the original game's offline tick budget). A non-positive
     /// `game_ms` is a no-op. See
-    /// `design-docs/2026-06-30-offline-progress.md`.
+    /// `docs/design/2026-06-30-offline-progress.md`.
     pub fn simulate_offline(&mut self, game_ms: f64, offline_ticks: u32) {
         let (ticks, tick_size) = offline_plan(game_ms, offline_ticks);
         if ticks == 0 {
@@ -296,7 +296,7 @@ impl GameState {
 /// catch-up modal): it splits `ticks` into batches and runs `tick_size`-sized
 /// ticks itself, so the budget policy stays in the engine while the pacing/UI
 /// lives above it. [`GameState::simulate_offline`] is the all-at-once path over
-/// the same plan. See `design-docs/2026-06-30-offline-progress.md`.
+/// the same plan. See `docs/design/2026-06-30-offline-progress.md`.
 pub fn offline_plan(game_ms: f64, offline_ticks: u32) -> (u32, f64) {
     if game_ms <= 0.0 {
         return (0, 0.0);

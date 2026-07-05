@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # Frontend Architecture: `ad-gui` (Vue 3 + Tauri)
 
 Status: active. This crate was originally created as `ad-gui-3` and later renamed

@@ -1,3 +1,7 @@
+---
+status: Reference
+---
+
 # Antimatter Dimensions — Feature Decomposition
 
 This document decomposes the original Antimatter Dimensions game (excluding the endgame
@@ -242,7 +246,7 @@ purchased), achievements.
 Infinity; `Records` tracks total time played, this/best-infinity time, and
 this-infinity maxAM; IP/infinities/records persist across a crunch and
 round-trip through the save; Infinity tab + IP header in the GUI). See
-`design-docs/2026-07-02-infinity-points-and-records.md`. Best-IP/min and the
+`docs/design/2026-07-02-infinity-points-and-records.md`. Best-IP/min and the
 Statistics view are deferred until a consumer exists.
 
 ---
@@ -285,7 +289,7 @@ buy-10 base, dim-boost power, boost/galaxy requirement reduction, galaxy strengt
 skip-reset starting boosts, passive `ipGen`; save/load; the vendored 4×4 grid UI).
 The **bottom row** (`ipMult` rebuyable + `ipOffline`, unlocked by Achievement 41)
 is deferred to land with Break Infinity (§2.3), where `totalIPMult` also grows. See
-`design-docs/2026-07-03-infinity-upgrades.md`.
+`docs/design/2026-07-03-infinity-upgrades.md`.
 
 ---
 
@@ -440,7 +444,7 @@ Completion provides permanent rewards that significantly boost progression.
 
 **Status:** ✅ Implemented (run state machine, all 8 restrictions + rewards, forced
 crunch on start/exit, save/load, UI subtab). See
-`design-docs/2026-07-03-infinity-challenges.md`.
+`docs/design/2026-07-03-infinity-challenges.md`.
 
 ---
 
@@ -485,7 +489,7 @@ eternity milestones eventually preserve them).
 
 **Status:** ✅ Implemented (8 tiers, production chain → Infinity Power → `^7` AD
 multiplier, unlock/buy/buy-max, per-crunch amount reset with purchases kept,
-save/load, UI subtab). See `design-docs/2026-07-03-infinity-dimensions.md`.
+save/load, UI subtab). See `docs/design/2026-07-03-infinity-dimensions.md`.
 
 ---
 
@@ -526,7 +530,7 @@ replicanti_mult = max(log2(max(replicanti_amount, 1))^2, 1)
 **Status:** ✅ Implemented (unlock at 1e140 IP, capped continuous growth,
 Replicanti Galaxies feeding tickspeed via `effective_galaxies`, the 3 IP upgrades,
 `replicanti_mult` into Infinity Dimensions, persistence across Big Crunch, save/load,
-UI subtab). See `design-docs/2026-07-03-replicanti.md`.
+UI subtab). See `docs/design/2026-07-03-replicanti.md`.
 
 ---
 
@@ -559,7 +563,7 @@ eternity milestones, eternity challenges.
 Eternity reset, ThisEternity/BestEternity records + bestIP/EPmin rates, save
 round-trip, header EP readout + Eternity button + confirmation modal + E
 hotkey, post-break header Big Crunch button). See
-`design-docs/2026-07-04-eternity.md` §1.
+`docs/design/2026-07-04-eternity.md` §1.
 
 ---
 
@@ -597,7 +601,7 @@ by auto-keeping resources across resets.
 2/4/8/10, per-tick autoIC + autoUnlockID, unlockAllND, replicantiNoReset,
 milestone grid UI). The milestones unlocking not-yet-built autobuyer types and
 the offline generators display as reached but gain their effects with the
-automation/offline systems. See `design-docs/2026-07-04-eternity.md` §2.
+automation/offline systems. See `docs/design/2026-07-04-eternity.md` §2.
 (Note: the table above is approximate; the exact catalogue is in the design
 doc / `eternity_milestones.rs`.)
 
@@ -635,7 +639,7 @@ Tickspeed upgrades incl. the 300 000 softcap + Newton inversion, the full
 threshold/e6000 cost curve, Decimal tickspeed refactor, save round-trip, tab
 UI). **Correction:** TD5–8 are unlocked by *Dilation* studies 2–5 (Phase 5),
 not time studies 71–74 as stated above; they are modelled but stay locked. See
-`design-docs/2026-07-04-eternity.md` §3.
+`docs/design/2026-07-04-eternity.md` §3.
 
 ---
 
@@ -686,7 +690,7 @@ banked Infinities (TS191), uncapped Replicanti (TS192), the crunch-time RG keeps
 original — distant/remote galaxy scaling (needed by TS223/224), and the last-10-
 eternities record ring (TS121); save round-trip; the vendored tree UI with SVG
 connections + vendored time-studies.css). EC study slots render as placeholders
-until Feature 4.5. See `design-docs/2026-07-04-eternity.md` §4.
+until Feature 4.5. See `docs/design/2026-07-04-eternity.md` §4.
 
 ---
 
@@ -737,7 +741,7 @@ sites — the EC6/EC11 cost-growth rewards await the Break-Infinity cost-scaling
 knobs; EC8's eterc8 budgets; save round-trip; the EC subtab UI + live EC nodes
 in the study tree). **Note:** the table above is approximate — the actual
 restrictions/goals in `eternity_challenges.rs` follow the real game data,
-which differs for several entries. See `design-docs/2026-07-04-eternity.md` §5.
+which differs for several entries. See `docs/design/2026-07-04-eternity.md` §5.
 
 ---
 
@@ -760,7 +764,7 @@ with new per-IC best-time tracking — and 3 TD multipliers — achievement powe
 unspent TT / days played; plus the rebuyable ×5 `epMult` with the
 50/100/500/1000-step cost thresholds and super-exponential tail, feeding
 `totalEPMult`. Save round-trip; the vendored 2×3 grid + EP-multiplier box UI).
-See `design-docs/2026-07-04-eternity.md` §6.
+See `docs/design/2026-07-04-eternity.md` §6.
 
 ---
 
@@ -803,7 +807,7 @@ Eternity goal; passive DT generation and threshold-crossing Tachyon Galaxies
 feeding the galaxy count; save round-trip; the Dilation subtab + dilate
 button/confirmation + tree nodes + TP display on the Eternity button). Note:
 TGs are earned by *crossing DT thresholds*, not "bought"; DT/s is
-`TP × 2^dtGain`, not `TP^0.5`. See `design-docs/2026-07-04-dilation.md`.
+`TP × 2^dtGain`, not `TP^0.5`. See `docs/design/2026-07-04-dilation.md`.
 
 ---
 
@@ -829,7 +833,7 @@ upgrades: doubleGalaxies, tdMultReplicanti, ndMultDT (post-dilation),
 ipMultDT, timeStudySplit (3 dimension paths), dilationPenalty (×1.05
 exponent), ttGenerator (TP/20000 TT/s); all effects at their engine sites;
 save round-trip; the vendored upgrade-grid UI). The Pelle-only upgrades
-(11–15) are out of frontier. See `design-docs/2026-07-04-dilation.md`.
+(11–15) are out of frontier. See `docs/design/2026-07-04-dilation.md`.
 
 ---
 

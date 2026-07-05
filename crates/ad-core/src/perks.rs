@@ -5,7 +5,7 @@
 //! (catalogue + connection graph). Effects apply at their engine sites (each
 //! site names its perk); the perks whose target system doesn't exist yet
 //! (EC auto-completion, TT/dilation/ID/replicanti autobuyer improvements)
-//! are tracked but deferred — see `design-docs/2026-07-05-reality.md`.
+//! are tracked but deferred — see `docs/design/2026-07-05-reality.md`.
 
 use break_infinity::Decimal;
 

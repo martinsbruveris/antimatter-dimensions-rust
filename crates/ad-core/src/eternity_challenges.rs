@@ -10,7 +10,7 @@
 //! completion (which auto-respecs the tree). EC4/EC12 carry restrictions that
 //! throw the player out when violated. Restriction/reward effects are applied
 //! at their engine sites (each names its EC). See
-//! `design-docs/2026-07-04-eternity.md` §5.
+//! `docs/design/2026-07-04-eternity.md` §5.
 
 use break_infinity::Decimal;
 

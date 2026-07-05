@@ -1,3 +1,8 @@
+---
+status: Implemented
+feature: "3.2"
+---
+
 # Replicanti — Feature 3.2
 
 Self-replicating entities unlocked with Infinity Points. They multiply all Infinity

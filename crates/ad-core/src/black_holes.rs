@@ -7,7 +7,7 @@
 //! `BlackHoles.updatePhases`, the game-speed factor) with the celestial
 //! extras (inversion, auto-pause modes, Enslaved interactions) out of
 //! frontier. Costs use the same hybrid scaling as the Reality Upgrades. See
-//! `design-docs/2026-07-05-reality.md`.
+//! `docs/design/2026-07-05-reality.md`.
 
 use break_infinity::Decimal;
 

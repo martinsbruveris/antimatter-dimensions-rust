@@ -3,7 +3,7 @@
 // The snapshot ships raw numbers ({ m, e } = mantissa × 10^exponent); these
 // helpers render them in-process using the player's current notation, so no
 // formatting crosses the Tauri IPC boundary. See
-// design-docs/2026-06-25-number-formatting.md (Option C).
+// docs/design/2026-06-25-number-formatting.md (Option C).
 //
 // `init` (in main.js) must finish before any of these run; component renders
 // happen after the app mounts, so that ordering holds.

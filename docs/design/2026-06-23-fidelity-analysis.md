@@ -1,3 +1,7 @@
+---
+status: Reference
+---
+
 # Fidelity Analysis: Rust Implementation vs Original JavaScript
 
 This document compares the current Rust implementation in `ad-core` against the original

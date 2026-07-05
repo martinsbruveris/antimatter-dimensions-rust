@@ -13,7 +13,7 @@
 //! `autobuyers.rs` (Automator Stage A). The milestones that unlock autobuyer
 //! types we haven't built yet (1, 3, 9, 11–18, 50, 60, 80) and the offline
 //! generators (6, 200, 1000) display as reached but have no engine effect
-//! until those systems exist. See `design-docs/2026-07-04-eternity.md` §2.
+//! until those systems exist. See `docs/design/2026-07-04-eternity.md` §2.
 
 use crate::state::GameState;
 

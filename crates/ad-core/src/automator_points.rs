@@ -3,7 +3,7 @@
 //! Automator unlocks at 100 AP; points come from perks with an
 //! `automator_points` value, six Reality Upgrades, Reality count, and the
 //! Black Hole unlock. Stage A of Feature 6.6 — see
-//! `design-docs/2026-07-05-automator.md`.
+//! `docs/design/2026-07-05-automator.md`.
 
 use crate::perks::PERKS;
 use crate::state::GameState;

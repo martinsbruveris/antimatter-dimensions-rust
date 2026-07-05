@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # How To Play (H2P) Modal — Design Notes
 
 **Date:** 2026-06-27

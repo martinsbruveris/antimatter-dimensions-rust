@@ -44,7 +44,7 @@ export const useUiStore = defineStore("ui", {
     // Offline mode: while on, the live loop stops ticking the engine and instead
     // accumulates speed-scaled game-time (`accumulatedGameMs`), replayed as one
     // offline batch when switched off. See
-    // design-docs/2026-06-30-offline-progress.md.
+    // docs/design/2026-06-30-offline-progress.md.
     offlineMode: false,
     accumulatedGameMs: 0,
     // Live progress of a running offline catch-up: { current, max, startTime }
@@ -253,7 +253,7 @@ export const useUiStore = defineStore("ui", {
     // fills visibly (near-instant for short away-times, meaningful for large tick
     // budgets), then the "While you were away…" summary is shown. The 10 s
     // summary threshold is a deliberate divergence from the original's 600 s
-    // AwayProgressModal gate — see design-docs/2026-06-30-offline-progress.md.
+    // AwayProgressModal gate — see docs/design/2026-06-30-offline-progress.md.
     async runOfflineReplay(gameMs, offlineTicks) {
       if (!(gameMs > 0)) return;
       const game = useGameStore();

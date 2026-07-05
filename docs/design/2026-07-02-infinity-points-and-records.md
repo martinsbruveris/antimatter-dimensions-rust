@@ -1,3 +1,8 @@
+---
+status: Implemented
+feature: "2.1"
+---
+
 # Infinity Points, Infinities & Records — completing Feature 2.1
 
 This document covers finishing **Feature 2.1 (Big Crunch / Infinity Prestige)** from

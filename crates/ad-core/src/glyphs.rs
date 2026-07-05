@@ -9,7 +9,7 @@
 //! `glyph-sacrifices.js`. The frontier covers the 5 basic types plus the
 //! companion glyph; Effarig/reality/cursed glyphs, cosmetics, alteration, the
 //! glyph filter, and alchemy are celestial content. See
-//! `design-docs/2026-07-05-reality.md`.
+//! `docs/design/2026-07-05-reality.md`.
 
 use break_infinity::Decimal;
 

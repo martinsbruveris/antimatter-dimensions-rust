@@ -1,3 +1,8 @@
+---
+status: Implemented
+feature: "6.6"
+---
+
 # Feature 6.6: Automator
 
 **Status: complete — all five stages implemented** (see §12–§16). This doc

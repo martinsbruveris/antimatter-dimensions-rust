@@ -1,3 +1,7 @@
+---
+status: Partial
+---
+
 # Test Plan: `ad-format`
 
 A comprehensive test plan for the `ad-format` crate (`format()` plus the Scientific,

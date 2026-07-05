@@ -7,7 +7,7 @@
 //! Pre-Eternity the mechanic simplifies sharply: `isUncapped` (TS192/Pelle) is
 //! always false, so Replicanti stay capped at `Number.MAX_VALUE`, the over-cap
 //! interval scaling never runs, and the speed multiplier / `extra` terms are ×1/×0.
-//! See `design-docs/2026-07-03-replicanti.md`.
+//! See `docs/design/2026-07-03-replicanti.md`.
 
 use break_infinity::Decimal;
 

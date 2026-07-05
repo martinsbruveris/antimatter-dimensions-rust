@@ -36,7 +36,7 @@ pub const DEFAULT_NOTATION_DIGITS_NOTATION: u32 = 9;
 /// replayed (the resolution dial). Default matches the original (`offlineTicks:
 /// 1e5`). Our slider range diverges from the original's (500..1e6): we run
 /// 10K..=10M, exploiting the faster engine. See
-/// `design-docs/2026-06-30-offline-progress.md`.
+/// `docs/design/2026-06-30-offline-progress.md`.
 pub const DEFAULT_OFFLINE_TICKS: u32 = 100_000;
 pub const MIN_OFFLINE_TICKS: u32 = 10_000;
 pub const MAX_OFFLINE_TICKS: u32 = 10_000_000;

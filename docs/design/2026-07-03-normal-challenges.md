@@ -1,3 +1,8 @@
+---
+status: Implemented
+feature: "2.5"
+---
+
 # Normal Challenges — Feature 2.5
 
 The 12 Normal Challenges: constrained pre-Infinity runs that each modify the

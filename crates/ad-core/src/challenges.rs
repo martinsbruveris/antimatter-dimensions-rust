@@ -7,7 +7,7 @@
 //! exit/complete logic, and the reward wiring; the per-challenge *rule modifiers*
 //! (NC2–12) are added incrementally at their engine sites. NC1 (the tutorial, no
 //! restriction) is the first vertical slice. See
-//! `design-docs/2026-07-03-normal-challenges.md`.
+//! `docs/design/2026-07-03-normal-challenges.md`.
 
 use break_infinity::Decimal;
 

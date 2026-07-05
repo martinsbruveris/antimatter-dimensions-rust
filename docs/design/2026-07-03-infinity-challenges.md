@@ -1,3 +1,8 @@
+---
+status: Implemented
+feature: "2.7"
+---
+
 # Infinity Challenges — Feature 2.7
 
 8 harder challenges unlocked by reaching antimatter thresholds that all exceed

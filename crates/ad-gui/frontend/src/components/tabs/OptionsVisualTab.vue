@@ -7,7 +7,7 @@
 // Sidebar resource picker. Remaining slots (Classic-UI toggle — intentionally
 // dropped, Modern UI only; News; Theme) are invisible placeholders so the
 // implemented controls keep their original positions (see
-// design-docs/2026-06-27-options-tabs.md).
+// docs/design/2026-06-27-options-tabs.md).
 import { ref } from "vue";
 
 import { useGameStore } from "../../stores/game";

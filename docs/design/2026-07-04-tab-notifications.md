@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # Tab notification badges (yellow `!` on tabs)
 
 2026-07-04

@@ -1,3 +1,7 @@
+---
+status: Proposed
+---
+
 # Break Eternity Number Representation
 
 **Date:** 2026-06-21 **Focus:** Rust type design for break_eternity numbers

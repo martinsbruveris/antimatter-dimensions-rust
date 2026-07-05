@@ -8,7 +8,7 @@
 //! `secret-formula/eternity/time-studies/dilation-time-studies.js`, and the
 //! `updateTachyonGalaxies` / `getTTPerSecond` blocks of `game.js`. The Pelle
 //! upgrades (ids 11–15) are out of frontier. See
-//! `design-docs/2026-07-04-dilation.md`.
+//! `docs/design/2026-07-04-dilation.md`.
 
 use break_infinity::Decimal;
 

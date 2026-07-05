@@ -1,3 +1,7 @@
+---
+status: Reference
+---
+
 # Antimatter Dimensions — Codebase Analysis
 
 ## Table of Contents

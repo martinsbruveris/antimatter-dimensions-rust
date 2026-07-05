@@ -30,7 +30,7 @@ const DIMENSION_ORDINALS: [&str; 8] =
 ///
 /// Formatting moved to the webview (the `ad-format` WASM module), so the snapshot
 /// ships raw numbers instead of pre-baked strings — see
-/// `design-docs/2026-06-25-number-formatting.md` (Option C). The exponent is the
+/// `docs/design/2026-06-25-number-formatting.md` (Option C). The exponent is the
 /// `Decimal`'s `i64` widened to `f64`, which is exact for every in-game magnitude.
 #[derive(Serialize)]
 struct Num {
@@ -1962,7 +1962,7 @@ fn build_automator_points_view(game: &GameState) -> AutomatorPointsView {
 /// Replays `game_ms` of accumulated offline game-time (already speed-scaled by
 /// the caller) at the resolution set by `offline_ticks`, returning the new view.
 /// The all-at-once path, used for sub-threshold catch-ups where no progress modal
-/// is shown. See `design-docs/2026-06-30-offline-progress.md`.
+/// is shown. See `docs/design/2026-06-30-offline-progress.md`.
 #[tauri::command]
 fn simulate_offline(
     game_ms: f64,

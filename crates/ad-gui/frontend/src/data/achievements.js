@@ -1,6 +1,6 @@
 // Display data for the Achievements tab (id, name, description, optional
 // reward). Strings live frontend-side by design (see
-// design-docs/2026-06-30-achievements.md); the engine owns only unlock state
+// docs/design/2026-06-30-achievements.md); the engine owns only unlock state
 // (snapshot `unlocked_achievements`) and the effect numbers. Rows 1-2 are
 // implemented and verified against the original; later rows are display-only
 // placeholders (some descriptions still rough) until their mechanics land.

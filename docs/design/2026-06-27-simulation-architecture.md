@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # Simulation Architecture: Driving the Game Without Polluting It
 
 ## 1. Problem Statement

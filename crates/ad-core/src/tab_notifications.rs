@@ -18,7 +18,7 @@
 //! exclude the currently open tab (the engine doesn't know it — the frontend
 //! hides the badge on the open subtab instead, which is observationally
 //! equivalent), and we skip the force-unhide step (we don't model hidden tabs).
-//! See `design-docs/2026-07-04-tab-notifications.md`.
+//! See `docs/design/2026-07-04-tab-notifications.md`.
 
 use break_infinity::Decimal;
 

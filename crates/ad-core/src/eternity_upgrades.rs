@@ -8,7 +8,7 @@
 //! (`5^purchases`) feeds `totalEPMult`; its cost walks `500 × stepMult^count`
 //! with the step multiplier jumping at 1e100 / 1.8e308 / 1e1300 EP and a
 //! super-exponential branch past 1e4000. See
-//! `design-docs/2026-07-04-eternity.md` §6.
+//! `docs/design/2026-07-04-eternity.md` §6.
 
 use break_infinity::Decimal;
 

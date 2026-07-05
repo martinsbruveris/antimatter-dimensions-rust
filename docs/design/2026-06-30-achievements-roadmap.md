@@ -1,3 +1,7 @@
+---
+status: Partial
+---
+
 # Achievements: feature correlation & secret-achievement analysis
 
 Date: 2026-06-30

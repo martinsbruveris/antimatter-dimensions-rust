@@ -1,3 +1,7 @@
+---
+status: Reference
+---
+
 # UI Framework Analysis
 
 **Date:** 2026-06-24 **Status:** Analysis / Decision Pending

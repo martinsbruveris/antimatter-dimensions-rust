@@ -1,3 +1,7 @@
+---
+status: Reference
+---
+
 # Break Infinity Code Review
 
 **Date:** 2026-06-19 **Focus:** Function naming, code style, visible API

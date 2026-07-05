@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # Progressive UI Reveal, First-Time Confirmations & Tutorial Highlights
 
 Date: 2026-06-30
@@ -157,7 +161,7 @@ floor(id/10)`, `column = id%10`). Achievement 18 → row 1, column 8 →
   sacrificed. (Observed in testing — this is what surfaced the bug.) This is a
   general save-fidelity gap: any achievement-gated visibility/effect is lost on
   round-trip. **(No longer true as of 2026-06-30 — achievements are now modelled
-  and round-tripped; see `design-docs/2026-06-30-achievements.md`. Achievement 18
+  and round-tripped; see `docs/design/2026-06-30-achievements.md`. Achievement 18
   unlocks and persists, so the remaining step for this feature is to point
   sacrifice visibility at `achievement_unlocked(18)`.)**
 - The snapshot (`ObservedDimensionState`) exposes per-tier `unlocked`; the tab
@@ -226,7 +230,7 @@ fields.
 ### Note: a general achievement model
 
 > **Update (2026-06-30): this has since been built** — see
-> `design-docs/2026-06-30-achievements.md`. `GameState` now has
+> `docs/design/2026-06-30-achievements.md`. `GameState` now has
 > `achievement_bits: [u32; 17]`, round-tripped verbatim through `achievementBits`,
 > with `achievement_unlocked(id)` and inline unlocks (including 18 on buying an
 > 8th AD). So **drop `bought_8th_dimension`**: Feature 1's sacrifice *visibility*
@@ -521,7 +525,7 @@ Ordered cheapest-first; the three features are independent.
 
 1. **Achievements: minimal substrate first, or stopgap?** *(Resolved: built the
    substrate — option (a).)* The full achievement model (substrate + tab +
-   rewards) landed; see `design-docs/2026-06-30-achievements.md`. So Feature 1
+   rewards) landed; see `docs/design/2026-06-30-achievements.md`. So Feature 1
    drops `bought_8th_dimension` and reads `achievement_unlocked(18)` directly.
    Original framing kept below for context. Feature 1's sacrifice *visibility*
    needs achievement 18, which is persisted state we don't model. Two paths: (a)

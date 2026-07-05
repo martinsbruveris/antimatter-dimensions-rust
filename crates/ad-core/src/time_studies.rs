@@ -13,7 +13,7 @@
 //! Study *effects* are applied at the original's sites across the engine
 //! (dimension/ID/TD multipliers, IP/EP formulas, replicanti, galaxy costs,
 //! sacrifice, free tickspeed); each site names its study. See
-//! `design-docs/2026-07-04-eternity.md` §4.
+//! `docs/design/2026-07-04-eternity.md` §4.
 
 use break_infinity::Decimal;
 

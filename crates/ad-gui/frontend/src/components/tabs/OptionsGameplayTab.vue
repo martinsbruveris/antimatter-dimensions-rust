@@ -3,7 +3,7 @@
 // `OptionsGameplayTab.vue`; the Hotkeys toggle and the Offline-ticks slider are
 // implemented, the remaining slots are invisible placeholders so the live
 // controls keep their original positions. More land iteratively (see
-// design-docs/2026-06-27-options-tabs.md).
+// docs/design/2026-06-27-options-tabs.md).
 import { ref } from "vue";
 
 import { useGameStore } from "../../stores/game";
@@ -23,7 +23,7 @@ function setHotkeys(value) {
 // Offline-ticks slider. Values follow the original's per-decade spacing
 // `(1 + v%9) × 10^floor(v/9)`, but over slider indices 36..=63 → 10K, 20K, …,
 // 100K, …, 1M, …, 10M (the original runs 22..=54 → 500..1M). See
-// design-docs/2026-06-30-offline-progress.md.
+// docs/design/2026-06-30-offline-progress.md.
 const SLIDER_MIN = 36;
 const SLIDER_MAX = 63;
 

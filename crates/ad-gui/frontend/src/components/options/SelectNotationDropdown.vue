@@ -6,7 +6,7 @@
 // the global CSS) are replicated in the scoped block below.
 //
 // Only the notations `ad-format` implements are listed (no dead entries) — see
-// design-docs/2026-06-27-options-tabs.md §8.
+// docs/design/2026-06-27-options-tabs.md §8.
 import { ref } from "vue";
 
 import { useGameStore } from "../../stores/game";

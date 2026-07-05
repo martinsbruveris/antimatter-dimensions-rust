@@ -1,7 +1,7 @@
 //! The Automator (Feature 6.6). Stage B: the language core — lexer, parser,
 //! validator/compiler — plus script & constant storage with the original's
 //! limits. Execution (the stack machine) is Stage C. See
-//! `design-docs/2026-07-05-automator.md`.
+//! `docs/design/2026-07-05-automator.md`.
 //!
 //! Mirrors `src/core/automator/{lexer,parser,compiler,automator-commands}.js`
 //! and the storage half of `automator-backend.js`.

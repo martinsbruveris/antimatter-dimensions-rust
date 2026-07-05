@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # Experiment Architecture: Strategy-Based Simulation
 
 ## 1. Problem Statement

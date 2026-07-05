@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # Save / Load: Analysis
 
 Status: in progress (§9 phases 1–5 done; phase 6 **done** — on-disk

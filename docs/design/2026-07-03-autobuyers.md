@@ -1,3 +1,8 @@
+---
+status: Implemented
+feature: "2.6"
+---
+
 # Autobuyers — Feature 2.6
 
 The pre-Infinity autobuyers and, crucially, their **interval-upgrade** system: the

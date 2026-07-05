@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # Offline Progress & Manual Offline Mode
 
 Date: 2026-06-30

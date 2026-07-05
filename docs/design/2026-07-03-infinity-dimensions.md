@@ -1,3 +1,8 @@
+---
+status: Implemented
+feature: "3.1"
+---
+
 # Infinity Dimensions — Feature 3.1
 
 8 tiers of dimensions bought with Infinity Points. They produce **Infinity Power**,

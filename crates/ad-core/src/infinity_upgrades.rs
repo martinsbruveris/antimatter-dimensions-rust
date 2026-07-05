@@ -13,7 +13,7 @@
 //! `reset_boost_reduction`, the AD-multiplier contributions, `skip_resets_if_possible`).
 //! The effect *application* lives at the original's sites — dimension multiplier,
 //! tickspeed, dim-boost/galaxy requirements — see
-//! `design-docs/2026-07-03-infinity-upgrades.md`.
+//! `docs/design/2026-07-03-infinity-upgrades.md`.
 //!
 //! The bottom row (`ipMult` rebuyable + `ipOffline`, gated by Achievement 41) is a
 //! scoped follow-up and is not modelled here.

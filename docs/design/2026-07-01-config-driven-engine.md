@@ -1,3 +1,7 @@
+---
+status: Proposed
+---
+
 # A Config-Driven Game Engine for Antimatter Dimensions — Design Exploration
 
 *Blue-sky design study. No implementation is planned.* The current codebase hard-wires

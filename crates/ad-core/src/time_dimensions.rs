@@ -10,7 +10,7 @@
 //! **Frontier note:** tiers 5–8 are unlocked by *Dilation* studies 2–5 (Phase
 //! 5), not Phase-4 time studies — the feature-decomposition doc is wrong there.
 //! They are modelled and saved but not yet unlockable. See
-//! `design-docs/2026-07-04-eternity.md` §3.
+//! `docs/design/2026-07-04-eternity.md` §3.
 
 use break_infinity::Decimal;
 

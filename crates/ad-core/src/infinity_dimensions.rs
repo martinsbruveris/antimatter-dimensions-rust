@@ -1,7 +1,7 @@
 //! Infinity Dimensions (Feature 3.1): 8 tiers bought with Infinity Points that
 //! produce Infinity Power — an `^7` multiplier to every Antimatter Dimension. IDs
 //! persist across a Big Crunch (only their `amount` and the Infinity Power reset);
-//! a full reset waits for Eternity. See `design-docs/2026-07-03-infinity-dimensions.md`.
+//! a full reset waits for Eternity. See `docs/design/2026-07-03-infinity-dimensions.md`.
 
 use break_infinity::Decimal;
 

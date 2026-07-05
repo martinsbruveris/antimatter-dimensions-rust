@@ -9,7 +9,7 @@
 //! These assertions lock the current Rust behaviour as a regression guard; the
 //! trailing comment on each line records what JS would print instead. (Unlike
 //! `format_edge_cases.rs`, these are NOT checked against JS ground truth.) See the
-//! `TODO(fidelity)` in `mantissa.rs` and `design-docs/2026-06-28-ad-format-test-plan.md`.
+//! `TODO(fidelity)` in `mantissa.rs` and `docs/design/2026-06-28-ad-format-test-plan.md`.
 
 use ad_format::{format, FormatOptions, Notation};
 use break_infinity::Decimal;

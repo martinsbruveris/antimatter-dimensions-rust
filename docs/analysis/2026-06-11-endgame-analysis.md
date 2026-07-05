@@ -1,3 +1,7 @@
+---
+status: Reference
+---
+
 # Antimatter Dimensions Endgame — Codebase Analysis
 
 ## Table of Contents

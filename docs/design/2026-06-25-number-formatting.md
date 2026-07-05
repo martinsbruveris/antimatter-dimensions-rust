@@ -1,3 +1,7 @@
+---
+status: Implemented
+---
+
 # Number Formatting: Where It Lives
 
 Status: decided. Milestone 1 ships **Option A**; we migrate to **Option C** in a

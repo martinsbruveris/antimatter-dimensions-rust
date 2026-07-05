@@ -6,7 +6,7 @@
 // "Remaining" estimate, and the black/blue bar. We deliberately omit the
 // original's "Speed up" / "SKIP" buttons — the Rust engine replays even a large
 // tick budget near-instantly, so there is nothing to skip. See
-// design-docs/2026-06-30-offline-progress.md.
+// docs/design/2026-06-30-offline-progress.md.
 import { computed } from "vue";
 
 import { useUiStore } from "../stores/ui";

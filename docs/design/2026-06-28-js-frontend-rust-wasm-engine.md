@@ -1,3 +1,7 @@
+---
+status: Rejected
+---
+
 # Feasibility: Original JS Frontend + Rust/WASM Engine
 
 Status: analysis. This document evaluates an **alternative** to the current

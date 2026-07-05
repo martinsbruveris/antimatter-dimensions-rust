@@ -1,3 +1,7 @@
+---
+status: Reference
+---
+
 # Port Audit — Rust reimplementation vs. original Antimatter Dimensions
 
 *Generated: 2026-07-05.* An independent, code-level audit of what has been ported

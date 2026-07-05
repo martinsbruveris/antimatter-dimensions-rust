@@ -11,7 +11,7 @@
 //! Times are milliseconds. Pre-Infinity the game-speed multiplier is 1, so game
 //! time and real time advance together; they are kept as separate fields anyway to
 //! match the original and to stay correct once game-speed effects (Black Holes,
-//! dilation) land. See `design-docs/2026-07-02-infinity-points-and-records.md`.
+//! dilation) land. See `docs/design/2026-07-02-infinity-points-and-records.md`.
 //!
 //! Note: the all-time `total_antimatter` record lives directly on [`GameState`]
 //! (it predates this module and is wired through many call sites); only the

@@ -1,3 +1,7 @@
+---
+status: Partial
+---
+
 # Options Tabs — Visual & Gameplay (analysis + implementation plan)
 
 Date: 2026-06-27

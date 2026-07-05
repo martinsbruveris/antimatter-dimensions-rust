@@ -4,8 +4,8 @@ The playable frontend. A Tauri **Rust backend** exposes the `ad-core` engine to
 a **Vue 3 + Vite + Pinia** web frontend. The Rust engine is authoritative; the
 frontend renders a per-tick snapshot and dispatches actions over Tauri IPC.
 
-Background and rationale: `design-docs/2026-06-25-frontend-architecture.md` and
-`design-docs/2026-06-25-number-formatting.md`. (Earlier prototypes — an
+Background and rationale: `docs/design/2026-06-25-frontend-architecture.md` and
+`docs/design/2026-06-25-number-formatting.md`. (Earlier prototypes — an
 egui frontend and a vanilla-JS Tauri frontend — have been removed.)
 
 ## Run
@@ -127,7 +127,7 @@ frontend/
   command at the player's `offline_ticks` resolution and, above 10 s, opens the
   `OfflineSummaryModal` catch-up (before→after, original `AwayProgressModal`
   formatting). *Absolute pause* freezes both live ticks and offline accumulation.
-  See `design-docs/2026-06-30-offline-progress.md`.
+  See `docs/design/2026-06-30-offline-progress.md`.
 
 ## Multi-page navigation
 
@@ -188,7 +188,7 @@ frontend/
   **Gameplay → Hotkeys** (enable/disable toggle) and **Gameplay → Offline
   ticks** (slider). The Classic-UI toggle is intentionally dropped (Modern UI
   only); themes will be a reduced set. Full plan + per-option checklist:
-  `design-docs/2026-06-27-options-tabs.md`.
+  `docs/design/2026-06-27-options-tabs.md`.
 - **Options modals (V7–V9).** `AnimationOptionsModal` (only the Big Crunch
   toggle so far, shown once Infinity is unlocked; the crunch animation itself
   is a separate todo item — the flag is stored for it), `InfoDisplayOptionsModal`
@@ -285,7 +285,7 @@ frontend/
   deterministic, no IO. The codec implements the original's `AAB` format
   (zlib + base64 + character-safe cleanup + magic markers). Saves are
   wire-compatible with the real game. See
-  `design-docs/2026-06-28-save-load-analysis.md`.
+  `docs/design/2026-06-28-save-load-analysis.md`.
 - **Commands:** `export_save` (returns the save string for clipboard copy),
   `import_save(text)` (decodes + swaps `Mutex<GameState>` + returns
   `GameView`), `export_save_to_file(save_file_name)` (native Save As dialog
@@ -417,8 +417,8 @@ frontend/
   Upgrades grid** (Feature 2.2). `GameView` surfaces `infinity_points`; the
   post-break "IP/infinities gained" modal + disable checkbox and the Statistics
   `infinities` display come later. See
-  `design-docs/2026-07-02-infinity-points-and-records.md` and
-  `design-docs/2026-07-03-infinity-upgrades.md`.
+  `docs/design/2026-07-02-infinity-points-and-records.md` and
+  `docs/design/2026-07-03-infinity-upgrades.md`.
 - **Infinity Upgrades grid** (`InfinityUpgradesTab.vue` + `data/infinityUpgrades.js`):
   the vendored `o-infinity-upgrade-btn` tiles in four column chains, with the
   per-column lit-band background. Layout + descriptions live frontend-side
@@ -450,13 +450,13 @@ frontend/
   start-confirmation modal, and best-time records are follow-ups. Completing NC1–9
   unlocks the AD/Tickspeed autobuyers; the Dim-Boost/Galaxy/Big-Crunch autobuyers
   (NC10–12) don't exist yet (Feature 2.6). See
-  `design-docs/2026-07-03-normal-challenges.md`.
+  `docs/design/2026-07-03-normal-challenges.md`.
 
 ## Progressive reveal, tutorial highlights & confirmations
 
 Four attention/presentation features, all engine-driven; the frontend only
-renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md` and
-`design-docs/2026-07-04-tab-notifications.md`.
+renders the result. See `docs/design/2026-06-30-ui-reveal-and-tutorial.md` and
+`docs/design/2026-07-04-tab-notifications.md`.
 
 - **Progressive reveal.** The engine derives per-dimension `available_for_purchase`
   (band + "own the tier below") and `shown` (reveal/lookahead) flags, shipped in
@@ -631,7 +631,7 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md` and
 
 - Formatting WASM done (snapshot sends raw `Num { m, e }`, webview formats via
   `ad-format`); **PyO3** exposure of `format` is the remaining part of Option C
-  (see `design-docs/2026-06-25-number-formatting.md`).
+  (see `docs/design/2026-06-25-number-formatting.md`).
 - Notation options: only the four implemented notations are listed; the
   remaining ~18 notations are not ported yet (the `notationDigits` thresholds
   modal is done — see Options tabs above). `inf_threshold` is left at its default
@@ -642,7 +642,7 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md` and
   tiles (sprite + grey/green) from the snapshot `unlocked_achievements` list, and
   the `game` store fires an unlock toast by diffing that list between snapshots
   (seeded silently on load/import/reset). Rows 1–2 are implemented; later rows
-  show as locked placeholders. See `design-docs/2026-06-30-achievements.md`.
+  show as locked placeholders. See `docs/design/2026-06-30-achievements.md`.
 - Responsive dimension rows use the "narrow" stacked layout unconditionally
   below 1573px (matches the original at the default window size).
 - Big Crunch awards Infinity Points + an Infinity and opens the Infinity tab on
@@ -655,4 +655,4 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md` and
   persistence, 3 save slots, autosave, 8 backup slots/slot (+ bundle
   export/import), "time since last save", and `Ctrl/Cmd+S`. The one gap is real
   offline *progress* on startup (only the offline *backup* fires). See
-  `design-docs/2026-06-28-save-load-analysis.md` §9/§12.
+  `docs/design/2026-06-28-save-load-analysis.md` §9/§12.

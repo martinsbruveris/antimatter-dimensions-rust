@@ -1,3 +1,7 @@
+---
+status: Proposed
+---
+
 # Fidelity Test Plan: Pre-Infinity & Infinity Stages
 
 This document defines test scenarios for the `ad-fidelity` crate to verify that the Rust

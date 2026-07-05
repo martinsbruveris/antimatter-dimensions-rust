@@ -1,3 +1,8 @@
+---
+status: Partial
+feature: "2.2"
+---
+
 # Infinity Upgrades — Feature 2.2
 
 Implements the Infinity Upgrades grid: 16 one-shot upgrades bought with Infinity

@@ -6,7 +6,7 @@
 //! `initializeChallengeCompletions`, `initializeResourcesAfterEternity`) and
 //! `game.js` (`gainedEternityPoints`, `playerInfinityUpgradesOnReset`). The
 //! Eternity-Milestone keeps are in `eternity_milestones.rs`. See
-//! `design-docs/2026-07-04-eternity.md`.
+//! `docs/design/2026-07-04-eternity.md`.
 
 use break_infinity::Decimal;
 

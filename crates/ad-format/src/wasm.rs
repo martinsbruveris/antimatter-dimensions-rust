@@ -3,7 +3,7 @@
 //! Compiled only under the `wasm` feature (via `wasm-pack`), this exposes a
 //! single synchronous [`format`] the Vue components call in-process — no IPC.
 //! The snapshot ships raw `mantissa × 10^exponent` pairs and JS formats them,
-//! per `design-docs/2026-06-25-number-formatting.md` (Option C).
+//! per `docs/design/2026-06-25-number-formatting.md` (Option C).
 
 use break_infinity::Decimal;
 use wasm_bindgen::prelude::*;

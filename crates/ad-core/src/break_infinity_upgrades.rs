@@ -12,7 +12,7 @@
 //! `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`). Several
 //! effects depend on inputs we don't model yet (challenge best-times, IP/min, the
 //! cost-scaling knobs); those upgrades are purchasable/persisted but their effect is
-//! neutral until their inputs exist. See `design-docs/2026-07-03-break-infinity.md`.
+//! neutral until their inputs exist. See `docs/design/2026-07-03-break-infinity.md`.
 
 use break_infinity::Decimal;
 
