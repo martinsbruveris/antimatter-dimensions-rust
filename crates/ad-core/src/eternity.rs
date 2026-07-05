@@ -147,9 +147,15 @@ impl GameState {
         self.requirement_checks.reality_no_eternities = false;
 
         // A running Eternity Challenge banks a completion (which auto-respecs
-        // the study tree and consumes the study slot).
+        // the study tree and consumes the study slot). The banked count feeds
+        // the Automator's event log (`AutomatorData.lastECCompletionCount`).
+        self.automator.runtime.last_ec_completions = 0;
         if self.any_ec_running() {
+            let ec = self.eternity_challenge_current;
+            let before = self.eternity_challenge_completions(ec);
             self.complete_running_ec();
+            self.automator.runtime.last_ec_completions =
+                self.eternity_challenge_completions(ec) - before;
         }
 
         // TS191: bank 5% of the Infinities on each Eternity (Achievement 131's
@@ -176,6 +182,12 @@ impl GameState {
         // ETERNITY_RESET_AFTER requirement checks (RU9/12/13/15/25) — the
         // awarded EP persists through the reset.
         self.check_reality_upgrade_reqs_on_eternity_after();
+
+        // The Automator's ETERNITY_RESET_AFTER notification (`prestigeNotify`).
+        self.automator_notify_prestige(
+            crate::automator::PrestigeLayer::Eternity,
+            gained_ep,
+        );
         true
     }
 

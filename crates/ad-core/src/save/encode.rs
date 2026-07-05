@@ -426,6 +426,12 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     options["sidebarResourceID"] = json!(state.options.sidebar_resource_id);
     options["hiddenTabBits"] = json!(state.options.hidden_tab_bits);
     options["hiddenSubtabBits"] = json!(state.options.hidden_subtab_bits);
+    let ae = &mut options["automatorEvents"];
+    ae["newestFirst"] = json!(state.options.automator_events.newest_first);
+    ae["timestampType"] = json!(state.options.automator_events.timestamp_type);
+    ae["maxEntries"] = json!(state.options.automator_events.max_entries);
+    ae["clearOnReality"] = json!(state.options.automator_events.clear_on_reality);
+    ae["clearOnRestart"] = json!(state.options.automator_events.clear_on_restart);
 
     // Autobuyers. `lastTick`/`bulk` stay the template's derived state; we write the
     // flags/modes plus the interval-upgrade state (interval + IP cost, Feature 2.6).
@@ -770,7 +776,10 @@ mod tests {
             },
         ];
 
-        let reloaded = decode_save(&encode_save(&state, 1_700_000_000_000)).unwrap();
+        let mut reloaded = decode_save(&encode_save(&state, 1_700_000_000_000)).unwrap();
+        // The runtime is transient (never saved); compare persistent data.
+        reloaded.automator.runtime = Default::default();
+        state.automator.runtime = Default::default();
         assert_eq!(reloaded.automator, state.automator);
 
         // The encoded JSON keeps the original's schema (scripts keyed by id

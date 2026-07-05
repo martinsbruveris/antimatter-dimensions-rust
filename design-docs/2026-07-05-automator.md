@@ -1,6 +1,6 @@
 # Feature 6.6: Automator
 
-**Status: Stages A + B implemented** (see §12–§13); Stages C–E pending. This doc
+**Status: Stages A–C implemented** (see §12–§14); Stages D–E pending. This doc
 records the original's mechanics, the frontier cuts, the Rust design, and —
 the headline question — how to decompose the feature. **Answer up front: the
 Automator should not be ported in one go.** It decomposes cleanly into five
@@ -549,3 +549,61 @@ recovery messages is approximated by the post-`modifyErrorMessages` forms
 (the panel-visible strings match for the common cases); errors carry line
 numbers only (the original also tracks offsets, but its editor decorations
 are line-based).
+
+## 14. Stage C implementation notes (2026-07-05)
+
+The execution engine lives in `crates/ad-core/src/automator/exec.rs`, driven
+from `tick()` on real time:
+
+- **Stack machine.** The runtime stack is a path of indices
+  (`runtime.indices[d]` = current command within the block at depth `d`),
+  kept in lockstep with the persistent `state.stack` (line numbers +
+  command state). All seven command statuses are ported, including
+  `SAME_INSTRUCTION` block entry, the skip chain with the 100-consecutive-
+  no-ops halt guard, the `advanceOnPop` if-exit, and repeat-on-completion
+  (which resets the exec timer, ending the update's budget like the
+  original's `start`).
+- **Tick integration.** `automator_update(realDiff)` accumulates
+  `execTimer`, runs `min(floor(timer/interval), 100)` commands per tick at
+  `max(0.994^realities × 500, 1)` ms per command, and handles
+  PAUSE/RUN/SINGLE_STEP. Controls: start (recompiles; error scripts don't
+  start), stop, pause, restart, step-once, and the three toggles.
+- **Commands.** All frontier behaviors with the original's event-log
+  messages: `auto` (writes the Stage A autobuyer settings), the prestige
+  commands (wait-for-availability, NOWAIT, respec, RESTART status after a
+  force-restart Reality), `pause` (real-tick accumulation, min one
+  interval), `studies purchase/load/respec` (incl. the partial-purchase
+  wait logs), `unlock`/`start` for dilation and ECs (incl. the original's
+  quirk that `unlock nowait ecN` never attempts the purchase), `if`/
+  `while`/`until` (condition loops log the literal comparison result),
+  `wait` (comparison / prestige event / black hole, with the
+  started/continuing/skipped log dedup via `isWaiting`), `black hole
+  on/off`, `notify` (queued for the frontend to toast), `stop`.
+- **Prestige notifications.** The crunch/eternity/reality resets call
+  `automator_notify_prestige(layer, gained)`, which records the gain for
+  `findLastPrestigeRecord` log text (plus banked-EC-completion counts) and
+  bumps the **top** stack frame's seen-prestige level — top-only is a
+  faithful quirk: only `wait <event>` (whose frame is top while waiting)
+  reliably observes prestiges; `until <event>` catches them only while its
+  header sits on top between passes.
+- **Reality integration.** Any Reality with the force-restart toggle
+  restarts the running script from inside the reset (like `reality.js`
+  calling `AutomatorBackend.restart()`); the event log optionally clears on
+  Reality/restart per `options.automatorEvents` (now modelled + saved).
+- **Save-resume.** The persisted stack (line + command state) is re-matched
+  against the recompiled script lazily on the first update after load;
+  a mismatch (edited script) restarts from the top, a script that no longer
+  compiles stops. Editing or deleting the running script stops it and drops
+  the cached program.
+- **Event log.** A transient ring buffer capped at
+  `automatorEvents.maxEntries`, stamped with this-reality time and the
+  engine's play-time clock (the engine has no wall clock; the original's
+  `Date.now()` timestamps are approximated by `realTimePlayed` — noted
+  deviation). Number formatting in log text is plain scientific rather than
+  the player's notation (cosmetic; Stage D may route display formatting
+  through `ad-format`).
+
+24 executor tests cover the machine (per-interval budgeting, pause/wait
+semantics, loops, prestige commands, repeat, the no-op guard, single-step,
+save-resume both matched and mismatched, force-restart Realities, and an
+end-to-end run through `tick()`).

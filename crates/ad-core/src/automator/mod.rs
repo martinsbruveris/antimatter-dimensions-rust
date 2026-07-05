@@ -7,6 +7,7 @@
 //! and the storage half of `automator-backend.js`.
 
 pub mod compile;
+pub mod exec;
 pub mod lexer;
 pub mod parser;
 pub mod program;
@@ -151,6 +152,62 @@ pub struct AutomatorData {
     /// Accumulated execution time toward the next command (`execTimer`).
     pub exec_timer: f64,
     pub state: AutomatorStateData,
+    /// Transient execution scaffolding (compiled program, frame indices, the
+    /// event log) — rebuilt after load, never saved.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub runtime: AutomatorRuntime,
+}
+
+/// One event-log entry (`AutomatorData.eventLog[i]`). The original stamps
+/// wall-clock times; the engine has no wall clock, so entries carry the
+/// engine's play-time clock instead (the Stage D log formats either).
+#[derive(Debug, Clone, PartialEq)]
+pub struct AutomatorEvent {
+    pub message: String,
+    /// 1-based script line the command sat on.
+    pub line: u32,
+    /// `Time.thisRealityRealTime` at log time (ms).
+    pub this_reality_ms: f64,
+    /// `records.realTimePlayed` at log time (replaces `Date.now()`).
+    pub play_time_ms: f64,
+    /// Time since the previous entry (ms).
+    pub timegap_ms: f64,
+}
+
+/// The transient (never saved) execution scaffolding: the compiled top-level
+/// script, the runtime half of the stack, and the log/wait bookkeeping the
+/// original keeps on the non-persistent `AutomatorData` object.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct AutomatorRuntime {
+    /// The compiled running script (`AutomatorScript._compiled` of the
+    /// top-level script). None = not compiled yet or compile failed.
+    pub program: Option<Vec<CompiledCommand>>,
+    /// The runtime stack: `indices[d]` is the current command index inside
+    /// the block at depth `d` (the persistent halves — line numbers and
+    /// command state — live in `state.stack`, kept in lockstep).
+    pub indices: Vec<usize>,
+    /// Whether the post-load resume (`initializeFromSave`) has run.
+    pub initialized: bool,
+    /// Guards the end-of-script no-op handling (`hasJustCompleted`).
+    pub has_just_completed: bool,
+    /// A `wait` is in progress (dedupes its log entries; `isWaiting`).
+    pub is_waiting: bool,
+    /// Play-time when the current wait started (`waitStart`).
+    pub wait_start_ms: f64,
+    /// The real duration of the current engine tick, feeding `pause` timers
+    /// (`Time.unscaledDeltaTime`).
+    pub tick_dt_ms: f64,
+    /// The event log (transient, like the original's `eventLog`).
+    pub events: Vec<AutomatorEvent>,
+    /// Play-time of the last log entry (`lastEvent`).
+    pub last_event_ms: f64,
+    /// Toasts queued by `notify` commands; the frontend drains these.
+    pub pending_notifications: Vec<String>,
+    /// The last prestige's gain per layer (IP/EP/RM), for
+    /// `findLastPrestigeRecord` log text.
+    pub last_prestige_gain: [Decimal; 3],
+    /// EC completions banked by the last Eternity (`lastECCompletionCount`).
+    pub last_ec_completions: u8,
 }
 
 impl AutomatorData {
@@ -172,6 +229,7 @@ impl AutomatorData {
             current_info_pane: 0,
             exec_timer: 0.0,
             state: AutomatorStateData::default(),
+            runtime: AutomatorRuntime::default(),
         }
     }
 
@@ -255,6 +313,12 @@ impl GameState {
             .get_mut(&id)
             .expect("checked")
             .content = content.to_string();
+        // Editing the running script stops it and drops the stale compiled
+        // form (`saveScript`: `if (id === state.topLevelScript) this.stop()`).
+        if id == self.automator.state.top_level_script {
+            self.automator_stop();
+            self.automator.runtime.program = None;
+        }
         true
     }
 
@@ -273,6 +337,11 @@ impl GameState {
     pub fn automator_delete_script(&mut self, id: u32) -> bool {
         if self.automator.scripts.remove(&id).is_none() {
             return false;
+        }
+        // Deleting the running script stops it (`deleteScript`).
+        if id == self.automator.state.top_level_script {
+            self.automator_stop();
+            self.automator.runtime.program = None;
         }
         if self.automator.scripts.is_empty() {
             self.automator.scripts.insert(

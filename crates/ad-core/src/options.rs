@@ -247,6 +247,45 @@ pub struct Options {
     /// Per-tab bitmasks of hidden subtabs (original `hiddenSubtabBits`), indexed
     /// by the original tab id, then the original subtab id within that tab.
     pub hidden_subtab_bits: [u32; TAB_COUNT],
+    /// Automator event-log settings (original `automatorEvents`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub automator_events: AutomatorEventsOptions,
+}
+
+/// `player.options.automatorEvents`: how the Automator's event log displays
+/// and retains entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct AutomatorEventsOptions {
+    /// Show the newest entries at the top.
+    pub newest_first: bool,
+    /// Which timestamp the log shows (0 none / 1 in-reality time / 2 real
+    /// time / 3 since-last-event gap — consumed by the Stage D UI).
+    pub timestamp_type: u8,
+    /// Ring-buffer size for retained entries.
+    pub max_entries: u32,
+    /// Clear the log on a Reality reset.
+    pub clear_on_reality: bool,
+    /// Clear the log when a script (re)starts.
+    pub clear_on_restart: bool,
+}
+
+impl AutomatorEventsOptions {
+    pub fn new() -> Self {
+        Self {
+            newest_first: false,
+            timestamp_type: 0,
+            max_entries: 200,
+            clear_on_reality: true,
+            clear_on_restart: true,
+        }
+    }
+}
+
+impl Default for AutomatorEventsOptions {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Options {
@@ -269,6 +308,7 @@ impl Options {
             sidebar_resource_id: 0,
             hidden_tab_bits: 0,
             hidden_subtab_bits: [0; TAB_COUNT],
+            automator_events: AutomatorEventsOptions::new(),
         }
     }
 

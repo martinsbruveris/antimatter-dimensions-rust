@@ -170,6 +170,11 @@ impl GameState {
         self.check_reality_upgrade_reqs_on_tick();
         self.tick_reality_upgrade_generation(dt_ms);
 
+        // The Automator executes on real time, after production and
+        // automation like the original game loop (`AutomatorBackend
+        // .update(realDiff)`).
+        self.automator_update(real_dt_ms);
+
         // `updatePrestigeRates`: peak IP/min / EP/min for the header buttons.
         self.update_prestige_rates();
 

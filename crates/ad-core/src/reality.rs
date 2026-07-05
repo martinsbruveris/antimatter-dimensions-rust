@@ -450,6 +450,22 @@ impl GameState {
         self.reality.perk_points += 1.0;
 
         self.reality_reset_internal();
+
+        // The Automator's REALITY_RESET_AFTER handling: the prestige
+        // notification, the optional event-log clear, and the force-restart
+        // (any Reality — manual or automatic — restarts the running script
+        // from the top when the toggle is on; `reality.js` calls
+        // `AutomatorBackend.restart()` from inside the reset).
+        self.automator_notify_prestige(
+            crate::automator::PrestigeLayer::Reality,
+            gained_rm,
+        );
+        if self.options.automator_events.clear_on_reality {
+            self.automator_clear_event_log();
+        }
+        if self.automator_unlocked() && self.automator.state.force_restart {
+            self.automator_restart();
+        }
     }
 
     /// The reset half of `finishProcessReality`, shared by a rewarded Reality

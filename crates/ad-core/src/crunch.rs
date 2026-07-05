@@ -196,8 +196,15 @@ impl GameState {
 
             // Award rewards from the pre-reset state (IP reads `thisInfinity.maxAM`
             // once Break Infinity lands; both persist across the crunch).
-            self.infinity_points += self.gained_infinity_points();
+            let gained_ip = self.gained_infinity_points();
+            self.infinity_points += gained_ip;
             self.infinities += self.gained_infinities();
+            // The Automator's BIG_CRUNCH_AFTER notification (`prestigeNotify`)
+            // plus the gain for its event-log text.
+            self.automator_notify_prestige(
+                crate::automator::PrestigeLayer::Infinity,
+                gained_ip,
+            );
             // The IP setter tracks the eternity's IP peak (drives the Eternity
             // goal and the EP formula).
             self.records.this_eternity.max_ip =

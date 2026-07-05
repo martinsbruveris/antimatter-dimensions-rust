@@ -751,6 +751,19 @@ pub struct OptionsDTO {
     pub hidden_tab_bits: u32,
     /// `player.options.hiddenSubtabBits` — 11 per-tab hidden-subtab bitmasks.
     pub hidden_subtab_bits: Vec<u32>,
+    /// `player.options.automatorEvents` — the Automator event-log settings.
+    pub automator_events: AutomatorEventsDTO,
+}
+
+/// `player.options.automatorEvents`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomatorEventsDTO {
+    pub newest_first: bool,
+    pub timestamp_type: i64,
+    pub max_entries: u32,
+    pub clear_on_reality: bool,
+    pub clear_on_restart: bool,
 }
 
 /// `player.options.animations` — the animation toggles we model.
@@ -1295,6 +1308,14 @@ impl GameState {
         options.hidden_tab_bits = dto.options.hidden_tab_bits;
         options.hidden_subtab_bits =
             std::array::from_fn(|i| dto.options.hidden_subtab_bits[i]);
+        options.automator_events = crate::options::AutomatorEventsOptions {
+            newest_first: dto.options.automator_events.newest_first,
+            timestamp_type: dto.options.automator_events.timestamp_type.clamp(0, 3)
+                as u8,
+            max_entries: dto.options.automator_events.max_entries.max(1),
+            clear_on_reality: dto.options.automator_events.clear_on_reality,
+            clear_on_restart: dto.options.automator_events.clear_on_restart,
+        };
 
         Ok(GameState {
             antimatter: dto.antimatter,
@@ -1553,6 +1574,7 @@ fn automator_from_dto(dto: &RealityAutomatorDTO) -> crate::automator::AutomatorD
     };
 
     crate::automator::AutomatorData {
+        runtime: Default::default(),
         state: AutomatorStateData {
             mode: match dto.state.mode {
                 Some(2) => AutomatorMode::Run,
