@@ -385,6 +385,37 @@ impl GameState {
         self.tt_am_bought + self.tt_ip_bought + self.tt_ep_bought
     }
 
+    /// TT spent in the current study tree (`currentStudyTree.spentTheorems[0]`):
+    /// bought normal studies plus the held EC study. Feeds the Automator's
+    /// `spent tt` currency.
+    pub fn tree_spent_tt(&self) -> f64 {
+        let studies: f64 = self
+            .studies
+            .iter()
+            .filter_map(|&id| time_study_def(id))
+            .map(|d| d.cost)
+            .sum();
+        let ec = if self.eternity_challenge_unlocked != 0 {
+            crate::eternity_challenges::ec_study_cost(self.eternity_challenge_unlocked)
+        } else {
+            0.0
+        };
+        studies + ec
+    }
+
+    /// All TT invested in studies (`TimeTheorems.calculateTimeStudiesCost`):
+    /// the tree plus the bought dilation studies. `total tt` = unspent +
+    /// this.
+    pub fn invested_study_tt(&self) -> f64 {
+        let dilation: f64 = self
+            .dilation
+            .studies
+            .iter()
+            .map(|&id| Self::dilation_study_cost(id))
+            .sum();
+        self.tree_spent_tt() + dilation
+    }
+
     // --- Studies -------------------------------------------------------------
 
     /// Whether study `id` is bought.

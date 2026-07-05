@@ -194,16 +194,58 @@ pub struct RealityDTO {
     pub auto_achieve: bool,
     pub gained_auto_achievements: bool,
     pub glyphs: GlyphsDTO,
-    /// `player.reality.automator` (Stage A subset: only the force-unlock
-    /// flag; scripts/constants/state land with Feature 6.6 Stage B).
+    /// `player.reality.automator`: scripts, constants, editor + run state
+    /// (Feature 6.6 Stage B), and the force-unlock flag.
     pub automator: RealityAutomatorDTO,
 }
 
-/// `player.reality.automator` (modelled subset).
+/// `player.reality.automator`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RealityAutomatorDTO {
     pub force_unlock: bool,
+    /// Scripts keyed by id string (`{ "1": { id, name, content } }`).
+    pub scripts: std::collections::HashMap<String, AutomatorScriptDTO>,
+    /// Constants; values are strings in practice, but we accept any scalar
+    /// (imported data may carry numbers) and stringify.
+    pub constants: std::collections::HashMap<String, serde_json::Value>,
+    pub constant_sort_order: Vec<String>,
+    /// `AUTOMATOR_TYPE`: 0 text, 1 block.
+    #[serde(rename = "type")]
+    pub editor_type: i64,
+    /// `AutomatorPanels` (0–7).
+    pub current_info_pane: i64,
+    pub exec_timer: f64,
+    pub state: AutomatorStateDTO,
+}
+
+/// One `player.reality.automator.scripts[id]` (the duplicated `id` prop
+/// inside the object is ignored; the map key is authoritative).
+#[derive(Debug, Clone, Deserialize)]
+pub struct AutomatorScriptDTO {
+    pub name: String,
+    pub content: String,
+}
+
+/// `player.reality.automator.state`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomatorStateDTO {
+    /// `AUTOMATOR_MODE` (1 pause / 2 run / 3 single-step). Fresh saves lack
+    /// the key entirely (the original initializes it to an undefined enum
+    /// member), which reads as paused.
+    #[serde(default)]
+    pub mode: Option<i64>,
+    pub top_level_script: i64,
+    pub editor_script: i64,
+    pub repeat: bool,
+    pub force_restart: bool,
+    pub follow_execution: bool,
+    /// Stack entries (`{ lineNumber, commandState }`); parsed leniently — the
+    /// original resets the run when the stack can't be matched to the script
+    /// anyway, so an unrecognized shape clears the stack rather than failing
+    /// the load.
+    pub stack: Vec<serde_json::Value>,
 }
 
 /// One entry of `player.blackHole[]`.
@@ -1279,6 +1321,7 @@ impl GameState {
             tt_ip_bought: dto.timestudy.ip_bought,
             tt_ep_bought: dto.timestudy.ep_bought,
             studies: dto.timestudy.studies.clone(),
+            automator: automator_from_dto(&dto.reality.automator),
             study_presets: {
                 let mut presets: [crate::time_studies::StudyPreset; 6] =
                     Default::default();
@@ -1422,6 +1465,142 @@ fn prestige_goal_mode_from_raw(mode: i64) -> Result<PrestigeAutobuyerMode, SaveE
         2 => Ok(PrestigeAutobuyerMode::XHighest),
         other => Err(SaveError::InvalidAutobuyerMode(other)),
     }
+}
+
+/// Map `player.reality.automator` into engine state. Ids/scripts and
+/// constants load strictly by shape; the run-state stack is parsed leniently
+/// (an unrecognized `commandState` clears the stack — the original resets a
+/// run it can't resume anyway).
+fn automator_from_dto(dto: &RealityAutomatorDTO) -> crate::automator::AutomatorData {
+    use crate::automator::{
+        AutomatorEditorType, AutomatorMode, AutomatorScript, AutomatorStateData,
+        StackEntryData,
+    };
+
+    let mut scripts = std::collections::BTreeMap::new();
+    for (key, script) in &dto.scripts {
+        if let Ok(id) = key.parse::<u32>() {
+            scripts.insert(
+                id,
+                AutomatorScript {
+                    name: script.name.clone(),
+                    content: script.content.clone(),
+                },
+            );
+        }
+    }
+    if scripts.is_empty() {
+        scripts.insert(
+            1,
+            AutomatorScript {
+                name: "New Script".to_string(),
+                content: String::new(),
+            },
+        );
+    }
+
+    let constants: std::collections::HashMap<String, String> = dto
+        .constants
+        .iter()
+        .map(|(k, v)| {
+            let value = match v {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            (k.clone(), value)
+        })
+        .collect();
+    // Keep only ordering entries that name real constants, then append any
+    // constants the order list missed (defensive; the original keeps the two
+    // in lockstep).
+    let mut constant_sort_order: Vec<String> = dto
+        .constant_sort_order
+        .iter()
+        .filter(|n| constants.contains_key(*n))
+        .cloned()
+        .collect();
+    for name in constants.keys() {
+        if !constant_sort_order.contains(name) {
+            constant_sort_order.push(name.clone());
+        }
+    }
+
+    let stack: Option<Vec<StackEntryData>> = dto
+        .state
+        .stack
+        .iter()
+        .map(|entry| {
+            let line_number = entry.get("lineNumber")?.as_f64()? as u32;
+            let command_state = match entry.get("commandState") {
+                None | Some(serde_json::Value::Null) => None,
+                Some(state) => Some(parse_command_state(state)?),
+            };
+            Some(StackEntryData {
+                line_number,
+                command_state,
+            })
+        })
+        .collect();
+
+    let first_script = *scripts.keys().next().expect("non-empty");
+    let clamp_script = |id: i64| {
+        let id = id.max(0) as u32;
+        if scripts.contains_key(&id) {
+            id
+        } else {
+            first_script
+        }
+    };
+
+    crate::automator::AutomatorData {
+        state: AutomatorStateData {
+            mode: match dto.state.mode {
+                Some(2) => AutomatorMode::Run,
+                Some(3) => AutomatorMode::SingleStep,
+                // 1, unknown values, and the fresh save's missing key are
+                // all paused.
+                _ => AutomatorMode::Pause,
+            },
+            top_level_script: clamp_script(dto.state.top_level_script),
+            editor_script: clamp_script(dto.state.editor_script),
+            repeat: dto.state.repeat,
+            force_restart: dto.state.force_restart,
+            follow_execution: dto.state.follow_execution,
+            stack: stack.unwrap_or_default(),
+        },
+        scripts,
+        constants,
+        constant_sort_order,
+        editor_type: if dto.editor_type == 1 {
+            AutomatorEditorType::Block
+        } else {
+            AutomatorEditorType::Text
+        },
+        current_info_pane: dto.current_info_pane.clamp(0, 7) as u8,
+        exec_timer: dto.exec_timer,
+    }
+}
+
+/// One persisted `commandState` (`{timeMs}` / `{prestigeLevel}` /
+/// `{advanceOnPop, ifEndLine}`).
+fn parse_command_state(
+    state: &serde_json::Value,
+) -> Option<crate::automator::CommandStateData> {
+    use crate::automator::CommandStateData;
+    if let Some(time_ms) = state.get("timeMs").and_then(|v| v.as_f64()) {
+        return Some(CommandStateData::Pause { time_ms });
+    }
+    if let Some(level) = state.get("prestigeLevel").and_then(|v| v.as_f64()) {
+        return Some(CommandStateData::PrestigeLevel { level: level as u8 });
+    }
+    if let Some(advance_on_pop) = state.get("advanceOnPop").and_then(|v| v.as_bool()) {
+        let if_end_line = state.get("ifEndLine").and_then(|v| v.as_f64())? as u32;
+        return Some(CommandStateData::IfEntered {
+            advance_on_pop,
+            if_end_line,
+        });
+    }
+    None
 }
 
 /// Validates that a modelled numeric option lies within its accepted range,

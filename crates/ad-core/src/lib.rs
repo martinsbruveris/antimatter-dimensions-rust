@@ -1,6 +1,7 @@
 pub mod achievements;
 pub mod action;
 pub mod autobuyers;
+pub mod automator;
 pub mod automator_points;
 pub mod black_holes;
 pub mod break_infinity_upgrades;

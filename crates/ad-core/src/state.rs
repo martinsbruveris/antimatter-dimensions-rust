@@ -255,6 +255,10 @@ pub struct GameState {
     /// string. See `time_studies.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub study_presets: [crate::time_studies::StudyPreset; 6],
+    /// The Automator's scripts, constants, and run state
+    /// (`player.reality.automator`). See `automator/`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub automator: crate::automator::AutomatorData,
     /// Banked Infinities (`Currency.infinitiesBanked`): kept across Eternities
     /// once TS191 grants them; part of `infinities_total()`.
     #[cfg_attr(feature = "serde", serde(default))]
@@ -477,6 +481,7 @@ impl GameState {
             studies: Vec::new(),
             respec: false,
             study_presets: Default::default(),
+            automator: crate::automator::AutomatorData::new(),
             infinities_banked: Decimal::ZERO,
             eternity_challenge_unlocked: 0,
             eternity_challenges: [0; 12],

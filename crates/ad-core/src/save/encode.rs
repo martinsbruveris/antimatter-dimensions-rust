@@ -290,7 +290,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     reality["achTimer"] = json!(state.reality.ach_timer);
     reality["autoAchieve"] = json!(state.reality.auto_achieve);
     reality["gainedAutoAchievements"] = json!(state.reality.gained_auto_achievements);
-    reality["automator"]["forceUnlock"] = json!(state.reality.automator_force_unlock);
+    write_automator(&mut reality["automator"], state);
     let records = &mut player["records"];
     records["thisReality"]["time"] = json!(state.records.this_reality.time_ms);
     records["thisReality"]["realTime"] = json!(state.records.this_reality.real_time_ms);
@@ -496,6 +496,74 @@ fn decimal(value: &Decimal) -> Value {
     Value::String(value.to_string())
 }
 
+/// `player.reality.automator`: scripts, constants, editor + run state
+/// (Feature 6.6 Stage B).
+fn write_automator(automator: &mut Value, state: &GameState) {
+    use crate::automator::{AutomatorEditorType, AutomatorMode, CommandStateData};
+
+    let auto = &state.automator;
+    automator["forceUnlock"] = json!(state.reality.automator_force_unlock);
+    automator["scripts"] = Value::Object(
+        auto.scripts
+            .iter()
+            .map(|(id, script)| {
+                (
+                    id.to_string(),
+                    json!({ "id": id, "name": script.name, "content": script.content }),
+                )
+            })
+            .collect(),
+    );
+    automator["constants"] = Value::Object(
+        auto.constants
+            .iter()
+            .map(|(name, value)| (name.clone(), json!(value)))
+            .collect(),
+    );
+    automator["constantSortOrder"] = json!(auto.constant_sort_order);
+    automator["type"] = json!(match auto.editor_type {
+        AutomatorEditorType::Text => 0,
+        AutomatorEditorType::Block => 1,
+    });
+    automator["currentInfoPane"] = json!(auto.current_info_pane);
+    automator["execTimer"] = json!(auto.exec_timer);
+    let s = &mut automator["state"];
+    s["mode"] = json!(match auto.state.mode {
+        AutomatorMode::Pause => 1,
+        AutomatorMode::Run => 2,
+        AutomatorMode::SingleStep => 3,
+    });
+    s["topLevelScript"] = json!(auto.state.top_level_script);
+    s["editorScript"] = json!(auto.state.editor_script);
+    s["repeat"] = json!(auto.state.repeat);
+    s["forceRestart"] = json!(auto.state.force_restart);
+    s["followExecution"] = json!(auto.state.follow_execution);
+    s["stack"] = json!(auto
+        .state
+        .stack
+        .iter()
+        .map(|entry| {
+            let command_state = match &entry.command_state {
+                None => Value::Null,
+                Some(CommandStateData::Pause { time_ms }) => {
+                    json!({ "timeMs": time_ms })
+                }
+                Some(CommandStateData::PrestigeLevel { level }) => {
+                    json!({ "prestigeLevel": level })
+                }
+                Some(CommandStateData::IfEntered {
+                    advance_on_pop,
+                    if_end_line,
+                }) => json!({
+                    "advanceOnPop": advance_on_pop,
+                    "ifEndLine": if_end_line,
+                }),
+            };
+            json!({ "lineNumber": entry.line_number, "commandState": command_state })
+        })
+        .collect::<Vec<_>>());
+}
+
 /// Maps our [`AutobuyerMode`] back to the original numeric `AUTOBUYER_MODE`.
 fn mode_to_raw(mode: AutobuyerMode) -> i64 {
     match mode {
@@ -668,6 +736,58 @@ mod tests {
         assert_eq!(reloaded.study_presets[0].studies, "11,21,22|0");
         assert_eq!(reloaded.study_presets[5].studies, "11-62|4!");
         assert!(reloaded.reality.automator_force_unlock);
+    }
+
+    #[test]
+    fn automator_data_round_trips() {
+        use crate::automator::{
+            AutomatorEditorType, AutomatorMode, CommandStateData, StackEntryData,
+        };
+
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.automator_save_script(1, "pause 10s\neternity");
+        state.automator_rename_script(1, "Main");
+        let second = state
+            .automator_create_script("EC grind", "unlock ec1")
+            .unwrap();
+        state.automator_set_constant("goal", "1e300");
+        state.automator_set_constant("tree", "11,21,22|0");
+        state.automator.editor_type = AutomatorEditorType::Block;
+        state.automator.current_info_pane = 3;
+        state.automator.exec_timer = 123.5;
+        state.automator.state.mode = AutomatorMode::Run;
+        state.automator.state.top_level_script = second;
+        state.automator.state.editor_script = 1;
+        state.automator.state.repeat = false;
+        state.automator.state.stack = vec![
+            StackEntryData {
+                line_number: 4,
+                command_state: Some(CommandStateData::PrestigeLevel { level: 2 }),
+            },
+            StackEntryData {
+                line_number: 2,
+                command_state: Some(CommandStateData::Pause { time_ms: 500.0 }),
+            },
+        ];
+
+        let reloaded = decode_save(&encode_save(&state, 1_700_000_000_000)).unwrap();
+        assert_eq!(reloaded.automator, state.automator);
+
+        // The encoded JSON keeps the original's schema (scripts keyed by id
+        // string, duplicated id prop, numeric type/mode).
+        let json = decode_pipeline(&encode_save(&state, 1_700_000_000_000)).unwrap();
+        let player: Value = serde_json::from_str(&json).unwrap();
+        let automator = &player["reality"]["automator"];
+        assert_eq!(automator["scripts"]["1"]["id"], 1);
+        assert_eq!(automator["scripts"]["1"]["name"], "Main");
+        assert_eq!(automator["type"], 1);
+        assert_eq!(automator["state"]["mode"], 2);
+        assert_eq!(automator["state"]["stack"][0]["lineNumber"], 4);
+        assert_eq!(
+            automator["state"]["stack"][0]["commandState"]["prestigeLevel"],
+            2
+        );
+        assert_eq!(automator["constants"]["goal"], "1e300");
     }
 
     #[test]

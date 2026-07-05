@@ -1,6 +1,6 @@
 # Feature 6.6: Automator
 
-**Status: Stage A implemented** (see §12); Stages B–E pending. This doc
+**Status: Stages A + B implemented** (see §12–§13); Stages C–E pending. This doc
 records the original's mechanics, the frontier cuts, the Rust design, and —
 the headline question — how to decompose the feature. **Answer up front: the
 Automator should not be ported in one go.** It decomposes cleanly into five
@@ -488,3 +488,64 @@ Known deviations, each judged sub-interval or out-of-frontier:
   is open (`GlyphSelection.active`); our engine has no modal state. The modal
   confirm no-ops afterwards (reality no longer available), so the effect is
   the modal closing on its own.
+
+## 13. Stage B implementation notes (2026-07-05)
+
+The language core lives in `crates/ad-core/src/automator/` (no UI yet —
+Stage D):
+
+- **`lexer.rs`** — hand-written line-oriented scanner. Words are scanned as
+  maximal identifier chunks and classified case-insensitively, which
+  reproduces chevrotain's `longer_alt: Identifier` semantics for free
+  ("ecological" ≠ `ec`). Multi-word tokens are matched longest-phrase-first
+  ("pending glyph level", "total space theorems", "ec5 completions", "store
+  game time", "x highest"). The special originals are kept: `name` swallows
+  its argument at lex time, `id` takes one optional digit, `blob` needs two
+  trailing spaces, `-` always lexes as Dash (so number literals are
+  unsigned, as in the original's token order), a leading `0` ends its
+  integer part. Unexpected characters become recoverable lex errors.
+- **`parser.rs`** — recursive descent per line; `{` blocks recurse until a
+  lone `}` line. Per-line error recovery with the original's message shapes:
+  "Unrecognized command \"X\"" for identifier-initial lines, "Unexpected
+  input X"/"Remove X" for extra tokens, "Unexpected end of command" for
+  truncated ones, `checkBlock`'s messages for brace mismatches.
+- **`compile.rs`** — validation + compilation in one pass over the AST;
+  instructions are produced only when there are zero errors, and errors are
+  deduped one-per-line and sorted (`modifyErrorMessages`). All the
+  game-state-dependent checks are ported with original text: autobuyer
+  unlock gates for `auto`/`eternity`/`reality` (wired to Stage A's
+  autobuyers), EC ids 1–12, study-id existence, preset id/name resolution
+  (baked to a slot at compile time, `$presetIndex`), constant format checks
+  per var type (number/studies/duration), equality-comparison rejection, and
+  the always-failing `store game time` (Enslaved is out of frontier).
+  Constant *comparisons* resolve at runtime (live `constants` lookup);
+  constant pause durations and study strings bake at compile time — both as
+  in the original.
+- **`program.rs`** — `CompiledCommand { line, op: Instruction }` with nested
+  blocks, `Comparison::evaluate(&GameState)` (locked currencies →
+  constant-false) and the full currency table: `am ip ep rm dt tp rg rep tt
+  total/spent tt, (banked) infinities, eternities, realities, pending
+  ip/ep/tp/rm/glyph level/completions, total completions, ecN completions`,
+  plus the frontier-locked `filter score` and `space theorems`. `total tt` /
+  `spent tt` needed two new engine helpers (`invested_study_tt`,
+  `tree_spent_tt`).
+- **`mod.rs`** — storage: `AutomatorData` on `GameState` (scripts keyed by
+  id with gap-filling creation, constants + `constantSortOrder`, editor
+  type, docs pane, exec timer, and the passive run state incl. the typed
+  stack entries). CRUD with the original's limits (20 scripts / 10k / 60k
+  chars, 15-char names, 30 constants / 20-char names / 250-char values) and
+  reserved-word constant-name validation (`forbiddenConstantPatterns`).
+- **Save** — the full `player.reality.automator` subtree round-trips:
+  scripts (id-keyed with the duplicated `id` prop), constants (non-string
+  scalars stringified), sort order, `type`, `currentInfoPane`, `execTimer`,
+  and `state` including the stack (`{lineNumber, commandState}` with the
+  three commandState shapes). A fresh save's *missing* `mode` key (the
+  original's `AUTOMATOR_MODE.STOP` is `undefined`) loads as paused; an
+  unrecognized stack shape clears the stack rather than failing the load
+  (the original resets unresumable runs anyway).
+
+Deviations, all judged cosmetic: error text for chevrotain's internal
+recovery messages is approximated by the post-`modifyErrorMessages` forms
+(the panel-visible strings match for the common cases); errors carry line
+numbers only (the original also tracks offsets, but its editor decorations
+are line-based).
