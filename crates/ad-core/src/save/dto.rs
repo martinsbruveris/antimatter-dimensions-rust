@@ -815,6 +815,7 @@ pub struct ConfirmationsDTO {
     pub big_crunch: bool,
     pub eternity: bool,
     pub dilation: bool,
+    pub switch_automator_mode: bool,
 }
 
 impl GameState {
@@ -1274,6 +1275,7 @@ impl GameState {
             big_crunch: dto.options.confirmations.big_crunch,
             eternity: dto.options.confirmations.eternity,
             dilation: dto.options.confirmations.dilation,
+            switch_automator_mode: dto.options.confirmations.switch_automator_mode,
         };
         options.animations.big_crunch = dto.options.animations.big_crunch;
         options.show_hint_text = ShowHintText {

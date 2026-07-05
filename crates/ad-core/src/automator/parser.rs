@@ -120,7 +120,10 @@ pub enum CommandAst {
         on: bool,
     },
     Blob,
-    Comment,
+    Comment {
+        /// The text after the `#`/`//` marker (for the block editor).
+        text: String,
+    },
     If {
         cmp: ComparisonAst,
         block: Vec<ParsedCommand>,
@@ -325,7 +328,14 @@ fn parse_command(
     let first = c.next().expect("caller checked non-empty");
 
     let parsed = match &first.kind {
-        TokenKind::Comment => Some(CommandAst::Comment),
+        TokenKind::Comment => {
+            let text = first
+                .image
+                .trim_start_matches(['#', '/'])
+                .trim_start()
+                .to_string();
+            Some(CommandAst::Comment { text })
+        }
         TokenKind::Blob => Some(CommandAst::Blob),
         TokenKind::Kw(Kw::Auto) => parse_auto(&mut c, errors),
         TokenKind::Kw(Kw::BlackHole) => {

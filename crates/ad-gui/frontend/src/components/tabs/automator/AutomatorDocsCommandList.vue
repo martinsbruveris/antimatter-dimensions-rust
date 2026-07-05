@@ -18,7 +18,7 @@ const unlockedCommands = computed(() =>
   AUTOMATOR_COMMAND_DOCS.filter((c) => {
     if (c.unlock === null) return true;
     if (c.unlock === "blackHole") {
-      return Boolean(game.snapshot.black_holes?.unlocked);
+      return game.snapshot.reality.black_holes.unlocked;
     }
     return false;
   }),

@@ -407,6 +407,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     confirmations["bigCrunch"] = json!(state.options.confirmations.big_crunch);
     confirmations["eternity"] = json!(state.options.confirmations.eternity);
     confirmations["dilation"] = json!(state.options.confirmations.dilation);
+    confirmations["switchAutomatorMode"] =
+        json!(state.options.confirmations.switch_automator_mode);
     options["animations"]["bigCrunch"] = json!(state.options.animations.big_crunch);
     let hints = &mut options["showHintText"];
     hints["showPercentage"] = json!(state.options.show_hint_text.show_percentage);

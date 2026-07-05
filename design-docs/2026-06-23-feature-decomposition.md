@@ -1004,6 +1004,10 @@ comments.
 line-oriented lexer + recursive-descent parser (chosen over `nom`/`pest` for
 error-recovery and error-message fidelity; see the design doc).
 
+**Status:** ✅ Implemented (all five stages: AP unlock + engine prerequisites,
+lexer/parser/compiler, execution engine, text editor + docs UI, block editor +
+templates + import/export; see `2026-07-05-automator.md` §12–§16).
+
 ---
 
 ## Phase 7: Celestials

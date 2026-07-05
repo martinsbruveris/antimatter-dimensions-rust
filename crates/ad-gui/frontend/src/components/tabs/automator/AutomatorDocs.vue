@@ -1,19 +1,25 @@
 <script setup>
 // The right-hand docs pane (vendored from AutomatorDocs.vue): pane buttons on
-// top, the script dropdown / rename / delete row, and the selected page.
-// Stage E adds the data-transfer, templates, and blocks panes plus the
-// import/export buttons; their pane ids are reserved.
-import { computed, nextTick, ref } from "vue";
+// top, the export/import + script dropdown / rename / delete row, and the
+// selected page. Full-screen mode is deferred with the fixed split (Stage D
+// deviation).
+import { computed, nextTick, ref, watch } from "vue";
 
 import { useGameStore } from "../../../stores/game";
+import { useUiStore } from "../../../stores/ui";
 import { automatorErrors } from "../../../util/automatorEditor";
 import AutomatorButton from "./AutomatorButton.vue";
+import AutomatorBlocksPage from "./AutomatorBlocksPage.vue";
+import AutomatorDataTransferPage from "./AutomatorDataTransferPage.vue";
 import AutomatorDefinePage from "./AutomatorDefinePage.vue";
 import AutomatorDocsCommandList from "./AutomatorDocsCommandList.vue";
 import AutomatorDocsIntroPage from "./AutomatorDocsIntroPage.vue";
+import AutomatorDocsTemplateList from "./AutomatorDocsTemplateList.vue";
 import AutomatorErrorPage from "./AutomatorErrorPage.vue";
 import AutomatorEventLog from "./AutomatorEventLog.vue";
 import AutomatorScriptDropdown from "./AutomatorScriptDropdown.vue";
+import AutomatorScriptTemplateModal from "./AutomatorScriptTemplateModal.vue";
+import ImportAutomatorDataModal from "./ImportAutomatorDataModal.vue";
 
 // `AutomatorPanels` (saved as `currentInfoPane`).
 const PANELS = {
@@ -27,19 +33,61 @@ const PANELS = {
   BLOCKS: 7,
 };
 
+const MAX_SCRIPT_COUNT = 20;
+
 const emit = defineEmits(["delete-script"]);
 
 const game = useGameStore();
+const ui = useUiStore();
 const auto = computed(() => game.snapshot.automator);
 const pane = computed(() => auto.value.current_info_pane);
 const errorCount = computed(() => automatorErrors.value.length);
+const isBlock = computed(() => auto.value.editor_type === "block");
 
 const editingName = ref(false);
 const renameInput = ref(null);
 const isNameTooLong = ref(false);
+const shownTemplate = ref(null);
+const importModalOpen = ref(false);
+
+const canMakeNewScript = computed(
+  () => auto.value.scripts.length < MAX_SCRIPT_COUNT,
+);
+const importTooltip = computed(() =>
+  canMakeNewScript.value
+    ? "Import single automator script or data"
+    : "You have too many scripts to import another!",
+);
 
 function setPane(id) {
   game.automatorSetInfoPane(id);
+}
+
+// `openMatchingAutomatorTypeDocs` + `fixAutomatorTypeDocs`: the mode-specific
+// reference pane follows the editor type.
+watch(isBlock, (block) => {
+  setPane(block ? PANELS.BLOCKS : PANELS.COMMANDS);
+});
+if (
+  (pane.value === PANELS.COMMANDS && isBlock.value) ||
+  (pane.value === PANELS.BLOCKS && !isBlock.value)
+) {
+  setPane(isBlock.value ? PANELS.BLOCKS : PANELS.COMMANDS);
+}
+
+async function exportScript() {
+  const toExport = await game.automatorExportScript(auto.value.editor_script);
+  if (toExport) {
+    await navigator.clipboard.writeText(toExport);
+    ui.notify("Exported current Automator script to your clipboard", "automator", 3000);
+  } else {
+    ui.notify("Could not export blank Automator script!", "error");
+  }
+}
+
+function importScript() {
+  if (!canMakeNewScript.value) return;
+  importModalOpen.value = true;
 }
 
 function activePanelClass(id) {
@@ -98,6 +146,12 @@ async function nameEdited() {
           @click="setPane(PANELS.ERRORS)"
         />
         <AutomatorButton
+          title="Extended Data Transfer"
+          class="fa-window-restore"
+          :class="activePanelClass(PANELS.DATA_TRANSFER)"
+          @click="setPane(PANELS.DATA_TRANSFER)"
+        />
+        <AutomatorButton
           title="View recently executed commands"
           class="fa-eye"
           :class="activePanelClass(PANELS.EVENTS)"
@@ -109,8 +163,32 @@ async function nameEdited() {
           :class="activePanelClass(PANELS.CONSTANTS)"
           @click="setPane(PANELS.CONSTANTS)"
         />
+        <AutomatorButton
+          title="Template Creator List"
+          class="fa-file-code"
+          :class="activePanelClass(PANELS.TEMPLATES)"
+          @click="setPane(PANELS.TEMPLATES)"
+        />
+        <AutomatorButton
+          v-if="isBlock"
+          title="Command menu for Block editor mode"
+          class="fa-cubes"
+          :class="activePanelClass(PANELS.BLOCKS)"
+          @click="setPane(PANELS.BLOCKS)"
+        />
       </div>
       <div class="l-automator-button-row">
+        <AutomatorButton
+          title="Export single automator script"
+          class="fa-file-export"
+          @click="exportScript"
+        />
+        <AutomatorButton
+          :title="importTooltip"
+          class="fa-file-import"
+          :class="{ 'c-automator__status-text--error': !canMakeNewScript }"
+          @click="importScript"
+        />
         <div class="l-automator__script-names">
           <template v-if="!editingName">
             <AutomatorScriptDropdown @rename="rename" />
@@ -142,10 +220,24 @@ async function nameEdited() {
       <AutomatorDocsCommandList v-else-if="pane === PANELS.COMMANDS" />
       <AutomatorErrorPage v-else-if="pane === PANELS.ERRORS" />
       <AutomatorEventLog v-else-if="pane === PANELS.EVENTS" />
+      <AutomatorDataTransferPage v-else-if="pane === PANELS.DATA_TRANSFER" />
       <AutomatorDefinePage v-else-if="pane === PANELS.CONSTANTS" />
-      <!-- Data transfer / templates / blocks panes are Stage E. -->
+      <AutomatorDocsTemplateList
+        v-else-if="pane === PANELS.TEMPLATES"
+        @show-template="shownTemplate = $event"
+      />
+      <AutomatorBlocksPage v-else-if="pane === PANELS.BLOCKS" />
       <AutomatorDocsIntroPage v-else />
     </div>
+    <AutomatorScriptTemplateModal
+      v-if="shownTemplate"
+      :template="shownTemplate"
+      @close="shownTemplate = null"
+    />
+    <ImportAutomatorDataModal
+      v-if="importModalOpen"
+      @close="importModalOpen = false"
+    />
   </div>
 </template>
 

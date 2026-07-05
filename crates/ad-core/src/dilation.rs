@@ -27,7 +27,7 @@ const DILATION_STUDY_COSTS: [f64; 6] = [5000.0, 1e6, 1e7, 1e8, 1e9, 1.0];
 
 /// The all-time TT requirement to unlock Dilation
 /// (`TimeStudy.dilation.totalTimeTheoremRequirement`).
-const DILATION_TT_REQUIREMENT: f64 = 12_900.0;
+pub(crate) const DILATION_TT_REQUIREMENT: f64 = 12_900.0;
 
 /// Rebuyable Dilation Upgrades (ids 1–3): base DT cost and per-purchase step.
 const DIL_REBUYABLE_BASE_COST: [f64; 3] = [1e4, 1e6, 1e7];

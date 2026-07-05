@@ -6,9 +6,15 @@
 // deferred with it.
 import { computed, ref } from "vue";
 
+import ConfirmModal from "../ConfirmModal.vue";
 import Modal from "../Modal.vue";
 import { useGameStore } from "../../stores/game";
 import { AutomatorTextUI } from "../../util/automatorEditor";
+import {
+  blockSwitchMessage,
+  pendingModeSwitch,
+  performModeSwitch,
+} from "../../util/blockAutomator";
 import AutomatorDocs from "./automator/AutomatorDocs.vue";
 import AutomatorEditor from "./automator/AutomatorEditor.vue";
 import AutomatorPointsList from "./automator/AutomatorPointsList.vue";
@@ -30,9 +36,14 @@ const intervalText = computed(() => {
     "Each Reality makes it run 0.6% faster, up to a maximum of 1000 per second.";
 });
 
-// The live editor buffer refines the stored current-script count.
+// The live editor buffer refines the stored current-script count (text mode
+// only; in block mode every change saves immediately, so the stored count is
+// current and the CodeMirror document may be stale).
 const currentChars = computed(() => {
-  const live = AutomatorTextUI.editor?.getDoc().getValue().length;
+  const live =
+    auto.value.editor_type === "text"
+      ? AutomatorTextUI.editor?.getDoc().getValue().length
+      : undefined;
   return live ?? auto.value.current_script_chars;
 });
 const totalChars = computed(
@@ -54,6 +65,16 @@ const deleteScriptName = computed(
 async function confirmDelete() {
   await game.automatorDeleteScript(deleteScriptId.value);
   deleteScriptId.value = null;
+}
+
+// The mode the switch confirmation would change to.
+const otherMode = computed(() =>
+  auto.value.editor_type === "text" ? "Block" : "Text",
+);
+
+async function confirmModeSwitch() {
+  pendingModeSwitch.value = null;
+  await performModeSwitch(game);
 }
 </script>
 
@@ -109,6 +130,61 @@ async function confirmDelete() {
           </button>
         </div>
       </Modal>
+      <!-- Vendored from SwitchAutomatorEditorModal.vue. -->
+      <ConfirmModal
+        v-if="pendingModeSwitch"
+        :title="`Change Automator to ${otherMode} editor`"
+        option="switchAutomatorMode"
+        @close="pendingModeSwitch = null"
+        @confirm="confirmModeSwitch"
+      >
+        This will stop your current script if it is running!
+        <div v-if="pendingModeSwitch.errorCount">
+          <br>
+          Your script has some errors which may not get converted properly to {{ otherMode }} mode. Continuing on will
+          make the Automator attempt to parse these lines anyway, although some information may get lost or not be
+          converted properly.
+        </div>
+        <!-- Note: this can only ever appear on text-to-block -->
+        <b v-if="pendingModeSwitch.lostBlocks">
+          <br>
+          Warning: Your script also currently has some lines which cannot interpreted as particular commands. These
+          lines will end up being deleted since there is no block they can be converted into.
+          If an error occurs at the start of a loop or IF, this may end up deleting large portions of your script!
+          <span class="l-lost-text">
+            Changing editor modes right now will cause
+            {{ pendingModeSwitch.lostBlocks }} {{ pendingModeSwitch.lostBlocks === 1 ? "line" : "lines" }} of code to
+            be irreversibly lost!
+          </span>
+        </b>
+        <br>
+        <span class="l-lost-text">
+          Hiding this confirmation is not recommended, as it may cause parts of scripts to be immediately and
+          irreversibly lost if your script has errors when attempting to switch modes.
+        </span>
+        <br>
+        <br>
+        Are you sure you want to change to the {{ otherMode }} editor?
+      </ConfirmModal>
+      <Modal
+        v-if="blockSwitchMessage"
+        title="Automator"
+        compact
+        centered
+        @close="blockSwitchMessage = null"
+      >
+        <div class="c-modal-message__text">
+          {{ blockSwitchMessage }}
+        </div>
+        <div class="l-modal-buttons">
+          <button
+            class="o-primary-btn o-primary-btn--width-medium c-modal-message__okay-btn"
+            @click="blockSwitchMessage = null"
+          >
+            Okay
+          </button>
+        </div>
+      </Modal>
     </div>
     <AutomatorPointsList v-else />
   </div>
@@ -119,6 +195,10 @@ async function confirmDelete() {
    library is replaced by a fixed 50/50 flex split. */
 .c-overlimit {
   font-weight: bold;
+  color: var(--color-bad);
+}
+
+.l-lost-text {
   color: var(--color-bad);
 }
 

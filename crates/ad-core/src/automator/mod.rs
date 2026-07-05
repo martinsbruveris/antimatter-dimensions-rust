@@ -6,11 +6,15 @@
 //! Mirrors `src/core/automator/{lexer,parser,compiler,automator-commands}.js`
 //! and the storage half of `automator-backend.js`.
 
+pub mod blocks;
 pub mod compile;
 pub mod exec;
 pub mod lexer;
 pub mod parser;
 pub mod program;
+pub mod templates;
+#[cfg(feature = "serde")]
+pub mod transfer;
 
 use std::collections::{BTreeMap, HashMap};
 

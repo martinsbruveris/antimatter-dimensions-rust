@@ -90,7 +90,7 @@ impl Compiler<'_> {
     fn compile_command(&mut self, cmd: &ParsedCommand) -> Option<Instruction> {
         let line = cmd.line;
         match &cmd.kind {
-            CommandAst::Comment | CommandAst::Blob => Some(Instruction::NoOp),
+            CommandAst::Comment { .. } | CommandAst::Blob => Some(Instruction::NoOp),
             CommandAst::Auto { layer, arg } => self.compile_auto(line, *layer, arg),
             CommandAst::BlackHole { on } => Some(Instruction::BlackHole { on: *on }),
             CommandAst::Notify { text } => {

@@ -486,6 +486,8 @@ struct AutomatorTabView {
     constants: Vec<AutomatorConstantView>,
     /// Which docs pane is open (`currentInfoPane`, 0–7).
     current_info_pane: u8,
+    /// The editor flavor: "text" or "block".
+    editor_type: String,
     /// `notify` toasts queued since the last tick (drained by the frontend).
     notifications: Vec<String>,
     /// Event-log length (the log itself is fetched on demand).
@@ -928,6 +930,7 @@ struct ConfirmationsView {
     sacrifice: bool,
     big_crunch: bool,
     eternity: bool,
+    switch_automator_mode: bool,
     dilation: bool,
 }
 
@@ -1766,6 +1769,7 @@ fn build_game_view(game: &GameState) -> GameView {
                 dimension_boost: game.options.confirmations.dimension_boost,
                 antimatter_galaxy: game.options.confirmations.antimatter_galaxy,
                 sacrifice: game.options.confirmations.sacrifice,
+                switch_automator_mode: game.options.confirmations.switch_automator_mode,
                 big_crunch: game.options.confirmations.big_crunch,
                 eternity: game.options.confirmations.eternity,
                 dilation: game.options.confirmations.dilation,
@@ -1892,6 +1896,11 @@ fn build_automator_view(game: &GameState) -> AutomatorTabView {
             })
             .collect(),
         current_info_pane: game.automator.current_info_pane,
+        editor_type: match game.automator.editor_type {
+            ad_core::automator::AutomatorEditorType::Text => "text",
+            ad_core::automator::AutomatorEditorType::Block => "block",
+        }
+        .to_string(),
         notifications: Vec::new(),
         event_count: game.automator.runtime.events.len(),
         event_options: AutomatorEventOptionsView {
@@ -2818,6 +2827,235 @@ fn set_automator_event_option(
     }
 }
 
+/// Blockify a script's stored content for the block editor.
+#[derive(Serialize)]
+struct BlockifyView {
+    blocks: Vec<ad_core::automator::blocks::BlockData>,
+    lost_lines: usize,
+}
+
+#[tauri::command]
+fn automator_blockify(id: u32, state: State<'_, Mutex<GameState>>) -> BlockifyView {
+    let game = state.lock().unwrap();
+    let content = game
+        .automator
+        .scripts
+        .get(&id)
+        .map(|s| s.content.clone())
+        .unwrap_or_default();
+    let result = game.automator_blockify(&content);
+    BlockifyView {
+        blocks: result.blocks,
+        lost_lines: result.lost_lines,
+    }
+}
+
+/// Blockify arbitrary script text (block-mode template creation).
+#[tauri::command]
+fn automator_blockify_text(
+    content: String,
+    state: State<'_, Mutex<GameState>>,
+) -> BlockifyView {
+    let result = state.lock().unwrap().automator_blockify(&content);
+    BlockifyView {
+        blocks: result.blocks,
+        lost_lines: result.lost_lines,
+    }
+}
+
+/// Switch the editor flavor ("text"/"block"); content conversion happens
+/// frontend-side before the call.
+#[tauri::command]
+fn automator_set_editor_type(block: bool, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().automator_set_editor_type(block);
+}
+
+/// Template generation inputs, as typed in the modal (numbers arrive as
+/// strings and are parsed like the autobuyer inputs).
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+struct TemplateParamsIn {
+    tree_studies: String,
+    tree_nowait: bool,
+    final_ep: String,
+    crunches_per_eternity: String,
+    eternities: String,
+    infinities: String,
+    is_banked: bool,
+    ec: String,
+    completions: String,
+    auto_inf_mode: String,
+    auto_inf_value: String,
+    auto_eter_mode: String,
+    auto_eter_value: String,
+}
+
+impl Default for TemplateParamsIn {
+    fn default() -> Self {
+        Self {
+            tree_studies: String::new(),
+            tree_nowait: false,
+            final_ep: "0".into(),
+            crunches_per_eternity: "1".into(),
+            eternities: "0".into(),
+            infinities: "0".into(),
+            is_banked: false,
+            ec: "1".into(),
+            completions: "1".into(),
+            auto_inf_mode: "mult".into(),
+            auto_inf_value: "1".into(),
+            auto_eter_mode: "mult".into(),
+            auto_eter_value: "1".into(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct TemplateView {
+    script: String,
+    warnings: Vec<String>,
+}
+
+#[tauri::command]
+fn automator_template(
+    name: String,
+    params: TemplateParamsIn,
+    state: State<'_, Mutex<GameState>>,
+) -> Option<TemplateView> {
+    let dec = |s: &str| parse_decimal_input(s).unwrap_or(Decimal::ZERO);
+    let int = |s: &str| s.trim().parse::<u32>().unwrap_or(0);
+    let engine_params = ad_core::automator::templates::TemplateParams {
+        tree_studies: params.tree_studies.clone(),
+        tree_nowait: params.tree_nowait,
+        final_ep: dec(&params.final_ep),
+        crunches_per_eternity: int(&params.crunches_per_eternity).max(1),
+        eternities: dec(&params.eternities),
+        infinities: dec(&params.infinities),
+        is_banked: params.is_banked,
+        ec: int(&params.ec).min(255) as u8,
+        completions: int(&params.completions),
+        auto_inf_mode: params.auto_inf_mode.clone(),
+        auto_inf_value: dec(&params.auto_inf_value),
+        auto_eter_mode: params.auto_eter_mode.clone(),
+        auto_eter_value: dec(&params.auto_eter_value),
+    };
+    let game = state.lock().unwrap();
+    let t = game.automator_template(&name, &engine_params)?;
+    Some(TemplateView {
+        script: t.script,
+        warnings: t.warnings,
+    })
+}
+
+/// Export one script as encoded text (None for a blank script).
+#[tauri::command]
+fn automator_export_script(
+    id: u32,
+    state: State<'_, Mutex<GameState>>,
+) -> Option<String> {
+    state.lock().unwrap().automator_export_script(id)
+}
+
+/// Export one script plus the presets/constants it references.
+#[tauri::command]
+fn automator_export_full(id: u32, state: State<'_, Mutex<GameState>>) -> Option<String> {
+    state.lock().unwrap().automator_export_full_data(id)
+}
+
+/// What an import string contains, for the modal preview.
+#[derive(Serialize)]
+struct ImportPreview {
+    name: String,
+    content: String,
+    /// (1-based slot, name, studies) for a full-data import.
+    presets: Vec<(usize, String, String)>,
+    constants: Vec<(String, String)>,
+    is_full_data: bool,
+    /// Whether the script has compilation errors (`hasCompilationErrors`).
+    has_errors: bool,
+}
+
+#[tauri::command]
+fn automator_import_preview(
+    raw: String,
+    state: State<'_, Mutex<GameState>>,
+) -> Option<ImportPreview> {
+    use ad_core::automator::transfer;
+    let game = state.lock().unwrap();
+    if let Some(parsed) = transfer::parse_script_contents(&raw) {
+        let has_errors = !compile_errors(&game, &parsed.content).is_empty();
+        return Some(ImportPreview {
+            name: parsed.name,
+            content: parsed.content,
+            presets: Vec::new(),
+            constants: Vec::new(),
+            is_full_data: false,
+            has_errors,
+        });
+    }
+    let parsed = transfer::parse_full_script_data(&raw)?;
+    let has_errors = !compile_errors(&game, &parsed.content).is_empty();
+    Some(ImportPreview {
+        name: parsed.name,
+        content: parsed.content,
+        presets: parsed
+            .presets
+            .into_iter()
+            .map(|(slot, name, studies)| (slot + 1, name, studies))
+            .collect(),
+        constants: parsed.constants,
+        is_full_data: true,
+        has_errors,
+    })
+}
+
+#[tauri::command]
+fn automator_import(
+    raw: String,
+    ignore_presets: bool,
+    ignore_constants: bool,
+    state: State<'_, Mutex<GameState>>,
+) -> Option<u32> {
+    state
+        .lock()
+        .unwrap()
+        .automator_import(&raw, ignore_presets, ignore_constants)
+}
+
+/// The presets/constants a script references (the data-transfer page).
+#[derive(Serialize)]
+struct ScriptDataInfo {
+    /// (1-based slot, name, studies).
+    presets: Vec<(usize, String, String)>,
+    constants: Vec<(String, String)>,
+}
+
+#[tauri::command]
+fn automator_script_data_info(
+    id: u32,
+    state: State<'_, Mutex<GameState>>,
+) -> ScriptDataInfo {
+    let game = state.lock().unwrap();
+    ScriptDataInfo {
+        presets: game
+            .automator_used_presets(id)
+            .into_iter()
+            .map(|slot| {
+                let p = &game.study_presets[slot];
+                (slot + 1, p.name.clone(), p.studies.clone())
+            })
+            .collect(),
+        constants: game
+            .automator_used_constants(id)
+            .into_iter()
+            .map(|name| {
+                let value = game.automator.constants[&name].clone();
+                (name, value)
+            })
+            .collect(),
+    }
+}
+
 #[tauri::command]
 fn study_preset_save(slot: usize, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().save_study_preset(slot);
@@ -2852,6 +3090,18 @@ fn study_preset_edit(
         .lock()
         .unwrap()
         .set_study_preset_studies(slot, &studies)
+}
+
+/// The current tree as an import string (template modal "Current Tree").
+#[tauri::command]
+fn study_tree_export(state: State<'_, Mutex<GameState>>) -> String {
+    state.lock().unwrap().study_tree_export_string()
+}
+
+/// `TimeStudyTree.isValidImportString` for template-input validation.
+#[tauri::command]
+fn study_tree_is_valid(text: String) -> bool {
+    ad_core::time_studies::is_valid_study_import(&text)
 }
 
 #[tauri::command]
@@ -3427,6 +3677,8 @@ pub fn run() {
             study_preset_load,
             study_preset_rename,
             study_preset_edit,
+            study_tree_export,
+            study_tree_is_valid,
             automator_play,
             automator_stop,
             automator_rewind,
@@ -3446,6 +3698,15 @@ pub fn run() {
             get_automator_events,
             automator_clear_log,
             set_automator_event_option,
+            automator_blockify,
+            automator_blockify_text,
+            automator_set_editor_type,
+            automator_template,
+            automator_export_script,
+            automator_export_full,
+            automator_import_preview,
+            automator_import,
+            automator_script_data_info,
             switch_save_slot,
             get_save_slots,
             trigger_backup,

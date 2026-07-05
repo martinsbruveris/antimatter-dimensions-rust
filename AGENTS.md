@@ -164,6 +164,17 @@ antimatter-dimensions-rust/
   (BH2's phase advances only while BH1 is active), interval/power/duration
   upgrades, pause + the 5 s unpause power ramp, and the game-speed factor
   consumed by `game_speed_factor` (stacked with the `timespeed` glyph).
+- `src/automator/` — The Automator (Feature 6.6, all five stages): `mod.rs`
+  (script/constant storage + limits, AP unlock at 100), `lexer.rs` +
+  `parser.rs` + `compile.rs` (hand-written line-oriented scanner,
+  recursive-descent parser with per-line error recovery, game-state-aware
+  validation with the original's error text), `program.rs` + `exec.rs` (the
+  instruction set and the stack machine: interval
+  `max(0.994^realities × 500, 1)` ms, ≤100 commands/update, save-resume by
+  line re-matching), `blocks.rs` (text → block-editor structures),
+  `templates.rs` (the five script generators + warnings), `transfer.rs`
+  (serde-gated import/export text codec). See
+  `design-docs/2026-07-05-automator.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
@@ -381,6 +392,7 @@ Located in `design-docs/`:
 | `2026-07-04-dilation.md` | Phase 5 (Time Dilation): design for Features 5.1–5.2 — dilation studies, the dilated run + TP/DT/Tachyon-Galaxy mechanics, and the Dilation Upgrades |
 | `2026-07-04-eternity.md` | Phase 4 (Eternity): design for Features 4.1–4.6 — EP formula + reset semantics, milestones, Time Dimensions/free tickspeed, the Time Studies tree + effect map, Eternity Challenges, Eternity Upgrades; frontier corrections (TD5–8 are Dilation-gated; Big Crunch resets Replicanti) |
 | `2026-07-05-reality.md` | Phase 6 (Reality): design for Features 6.1–6.5 — RM formula + reality reset, the seeded glyph generator/effects/sacrifice, the perk tree, Reality Upgrades, Black Holes; frontier cuts (celestial content, automator) and the save mapping |
+| `2026-07-05-automator.md` | Feature 6.6 (Automator): mechanics, frontier cuts, the five-stage porting plan (engine prerequisites / language core / execution engine / text-editor UI / block editor + templates + import-export) and per-stage implementation notes (§12–§16) |
 | `2026-07-04-tab-notifications.md` | Tab notification badges (the yellow `!` on tabs): the original's two-field state + trigger/clear semantics, the 5 in-frontier notifications, and the engine-owned port (trigger hooks, save round-trip, sidebar rendering + seen-acknowledgement) |
 
 The table lists key documents; see the `design-docs/` folder for the full,

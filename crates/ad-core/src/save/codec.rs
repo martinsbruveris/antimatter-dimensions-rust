@@ -40,8 +40,19 @@ const SUFFIX: &str = "EndOfSavefile";
 ///
 /// Infallible: every step is an in-memory transform over a valid `&str`.
 pub fn encode_pipeline(json: &str) -> String {
+    encode_text_with_markers(json, PREFIX, SUFFIX)
+}
+
+/// The shared encode pipeline with caller-supplied magic markers
+/// (`GameSaveSerializer.encodeText` — the same steps serve savefiles and the
+/// Automator's script/data exports, which differ only in their markers).
+pub(crate) fn encode_text_with_markers(
+    text: &str,
+    prefix: &str,
+    suffix: &str,
+) -> String {
     // 1–2: UTF-8 bytes → zlib deflate.
-    let deflated = deflate(json.as_bytes());
+    let deflated = deflate(text.as_bytes());
 
     // 3: base64 (padded, matching `btoa`).
     let b64 = BASE64.encode(deflated);
@@ -56,7 +67,7 @@ pub fn encode_pipeline(json: &str) -> String {
         .replace('/', "0c");
 
     // 5–6: ending marker, then the prefix + version.
-    format!("{PREFIX}{VERSION}{cleaned}{SUFFIX}")
+    format!("{prefix}{VERSION}{cleaned}{suffix}")
 }
 
 /// Decodes an AD save string back into the raw JSON text.
@@ -66,9 +77,19 @@ pub fn encode_pipeline(json: &str) -> String {
 /// anything whose version marker is not the supported [`VERSION`] (`AAB`) with
 /// [`SaveError::UnsupportedVersion`].
 pub fn decode_pipeline(save: &str) -> Result<String, SaveError> {
+    decode_text_with_markers(save, PREFIX, SUFFIX)
+}
+
+/// The shared decode pipeline with caller-supplied magic markers
+/// (`GameSaveSerializer.decodeText`).
+pub(crate) fn decode_text_with_markers(
+    save: &str,
+    prefix: &str,
+    suffix: &str,
+) -> Result<String, SaveError> {
     // 6: strip the magic prefix. Its absence means this isn't an AAB-era save.
     let body = save
-        .strip_prefix(PREFIX)
+        .strip_prefix(prefix)
         .ok_or(SaveError::UnrecognizedFormat)?;
 
     // The 3-char version marker follows the prefix. We only support the current
@@ -82,7 +103,7 @@ pub fn decode_pipeline(save: &str) -> Result<String, SaveError> {
     // 5: strip the `EndOfSavefile` marker. It is always present for a valid
     // `AAB` save, so its absence means the string is truncated or corrupt.
     let payload = payload
-        .strip_suffix(SUFFIX)
+        .strip_suffix(suffix)
         .ok_or(SaveError::MissingEndMarker)?;
 
     // 4 (reversed): undo the cleanup. `0b`/`0c` before `0a` so e.g. `0c` becomes

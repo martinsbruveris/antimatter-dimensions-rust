@@ -13,7 +13,7 @@
 //!   template + overlay (write path), which sit on top of [`codec`].
 
 mod bundle;
-mod codec;
+pub(crate) mod codec;
 mod dto;
 mod encode;
 

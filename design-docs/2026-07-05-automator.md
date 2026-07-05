@@ -1,6 +1,6 @@
 # Feature 6.6: Automator
 
-**Status: Stages A–D implemented** (see §12–§15); Stage E pending. This doc
+**Status: complete — all five stages implemented** (see §12–§16). This doc
 records the original's mechanics, the frontier cuts, the Rust design, and —
 the headline question — how to decompose the feature. **Answer up front: the
 Automator should not be ported in one go.** It decomposes cleanly into five
@@ -656,3 +656,83 @@ Stage D deviations (each cosmetic/QoL, revisit with Stage E):
   parser-state content assist.
 - The import/export and data-transfer buttons, templates pane, block-mode
   switch, and blocks pane arrive with Stage E.
+
+## 16. Stage E implementation notes (2026-07-05)
+
+Block editor, script templates, and import/export — the remaining UI-heavy
+slice. Engine first, all serde-gated pieces round-trip through the save.
+
+**Engine** (`ad-core/src/automator/`):
+
+- `blocks.rs` — the Blockifier: parsed AST → `BlockData` (serde camelCase:
+  `cmd`, `singleSelectionInput`, `singleTextInput`, `genericInput1`,
+  `compOperator`, `genericInput2`, `nowait`, `respec`, `nest`). The engine
+  ships only per-block *values*; the frontend merges palette config
+  (targets/patterns) and assigns UI ids. `lost_lines` = parse-error count
+  (`validatedBlocks - visitedBlocks`); commands that fail *validation* but
+  parse still blockify, like the original. `automator_set_editor_type`
+  flips the flavor and stops a running script (`changeModes`).
+- `templates.rs` — the five `ScriptTemplate` generators (Climb EP, Grind
+  Eternities, Grind Infinities, Complete Eternity Challenge, Unlock
+  Dilation) with `tfmt` formatting (≤1000 → two decimals, else `m.mm`e`exp`),
+  a structural tree-purchase simulation for the reachability warnings, and
+  the metadata `warnings()` closures ported as game-state checks (original
+  "purchsing" typo kept). Deviation: `startingIP` is clamped to ≥1 for the
+  Grind Eternities gap (the original divides by raw 0 and prints garbage).
+- `transfer.rs` (serde-gated) — `GameSaveSerializer` text codec with the
+  Automator's magic markers, 5-digit length-prefixed segments, single-script
+  and full-data (script + used presets + used constants) export/import,
+  `used_presets`/`used_constants` scans (comments count, as in the
+  original), and import with ignore-presets/-constants options.
+
+**Backend commands** (`main.rs`): `automator_blockify(id)` /
+`automator_blockify_text(content)`, `automator_set_editor_type`,
+`automator_template(name, params)` (string-typed numerics parsed like
+autobuyer inputs; note serde camelCase makes the original's `finalEP` key
+`finalEp`), `automator_export_script/_full`, `automator_import_preview`
+(returns name/content/presets/constants/`has_errors`) and
+`automator_import`, `automator_script_data_info`, plus `study_tree_export`
+and `study_tree_is_valid` for the template modal. The snapshot gains
+`automator.editor_type` ("text"/"block").
+
+**Frontend**:
+
+- `data/automatorBlocks.js` — the palette (AUTOMATOR_BLOCKS with
+  aliases/allowedPatterns/targets/unlock keys; BLOB excluded from the
+  palette), `hydrateBlock`, `generateText`/`parseLines` (block → script
+  text), `numberOfLinesInBlock`. `data/automatorTemplates.js` — template
+  prompts + param types (client-side int/decimal validators mirroring
+  `AutobuyerInputFunctions`; tree strings validate through the engine).
+- `util/blockAutomator.js` — session block state (`blockLines`), text↔block
+  conversion via the engine, `lineNumberOfBlock`/`blockIdAtLine` for
+  error/active-line highlights, `performModeSwitch`, and the shared
+  `pendingModeSwitch`/`blockSwitchMessage`/`blockTemplates` refs.
+- Components: `AutomatorBlockEditor` (gutter + vuedraggable rows, saves on
+  every change), `AutomatorBlockSingleRow` (recursive; nested drop zones for
+  IF/WHILE/UNTIL), `AutomatorBlockSingleInput` (pattern-driven
+  dropdown↔textbox chain), `AutomatorBlocksPage` (palette pane),
+  `AutomatorModeSwitch` (slider toggle; confirmation modal in AutomatorTab
+  via ConfirmModal with the `switchAutomatorMode` disable checkbox),
+  `AutomatorDocsTemplateList` + `AutomatorScriptTemplateModal` (preset
+  buttons, current-tree export, live validation, engine-generated script +
+  warnings; block mode creates a draggable custom template block that
+  unpacks on drop), `AutomatorDataTransferPage`/`-SingleEntry` (full-data
+  export + used presets/constants), `ImportAutomatorDataModal` (preview,
+  overwrite warnings, ignore toggles). AutomatorDocs gains the
+  DATA_TRANSFER/TEMPLATES/BLOCKS panes, the export/import buttons, and the
+  mode-following reference pane (`fixAutomatorTypeDocs`). The intro page's
+  Stage E paragraphs are restored. Editor unparsable-script fallback (block
+  → text with a message, content untouched) is ported in AutomatorEditor.
+- Fixed en route: the docs command list read `snapshot.black_holes` (the
+  field lives at `snapshot.reality.black_holes`), which had hidden the
+  BLACK HOLE man page.
+
+Stage E deviations:
+
+- Template modal warnings appear only once all inputs are valid (the engine
+  returns warnings together with the generated script; the original shows
+  the game-state subset earlier).
+- Undo/redo buttons show only in text mode (CodeMirror-native history has
+  no block-editor counterpart; the original's shared undo buffer covers
+  both).
+- Custom template blocks are session-transient, as in the original.

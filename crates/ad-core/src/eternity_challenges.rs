@@ -79,6 +79,16 @@ const EC_GOAL_INCREASES: [Decimal; ETERNITY_CHALLENGE_COUNT] = [
     Decimal::new_unchecked(1.0, 12_000),
 ];
 
+/// The prerequisite studies of EC `id`'s unlock study (any one suffices;
+/// empty for an invalid id).
+pub(crate) fn ec_study_prerequisites(id: u8) -> &'static [u16] {
+    if (1..=ETERNITY_CHALLENGE_COUNT as u8).contains(&id) {
+        EC_STUDY_REQUIREMENTS[(id - 1) as usize]
+    } else {
+        &[]
+    }
+}
+
 /// The TT cost of EC `id`'s unlock study (0 for an invalid id).
 pub fn ec_study_cost(id: u8) -> f64 {
     if (1..=ETERNITY_CHALLENGE_COUNT as u8).contains(&id) {

@@ -1,14 +1,15 @@
 <script setup>
 // The editor pane's controls bar (vendored from AutomatorControls.vue):
 // rewind / play-pause / stop / step, the repeat / force-restart / follow
-// toggles, and the status line. The undo/redo pair is served by CodeMirror's
-// native history (mod+z / mod+y in the editor); the block-mode switch is
-// Stage E.
+// toggles, the mode switch, and the status line. The undo/redo pair is served
+// by CodeMirror's native history (mod+z / mod+y in the editor), so unlike the
+// original's cross-editor undo buffer it only appears in text mode.
 import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
 import { AutomatorTextUI, automatorErrors } from "../../../util/automatorEditor";
 import AutomatorButton from "./AutomatorButton.vue";
+import AutomatorModeSwitch from "./AutomatorModeSwitch.vue";
 
 const game = useGameStore();
 const auto = computed(() => game.snapshot.automator);
@@ -110,16 +111,19 @@ function play() {
         />
       </div>
       <div class="c-button-group">
-        <AutomatorButton
-          title="Undo (also Ctrl+Z in the editor)"
-          class="fa-arrow-rotate-left"
-          @click="AutomatorTextUI.editor?.undo()"
-        />
-        <AutomatorButton
-          title="Redo (also Ctrl+Y in the editor)"
-          class="fa-arrow-rotate-right"
-          @click="AutomatorTextUI.editor?.redo()"
-        />
+        <template v-if="auto.editor_type === 'text'">
+          <AutomatorButton
+            title="Undo (also Ctrl+Z in the editor)"
+            class="fa-arrow-rotate-left"
+            @click="AutomatorTextUI.editor?.undo()"
+          />
+          <AutomatorButton
+            title="Redo (also Ctrl+Y in the editor)"
+            class="fa-arrow-rotate-right"
+            @click="AutomatorTextUI.editor?.redo()"
+          />
+        </template>
+        <AutomatorModeSwitch />
       </div>
     </div>
     <div class="l-automator-button-row">

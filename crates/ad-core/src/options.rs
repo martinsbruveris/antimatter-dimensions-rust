@@ -75,6 +75,10 @@ pub struct Confirmations {
     /// Dilation enter/exit confirmation (original `confirmations.dilation`).
     #[cfg_attr(feature = "serde", serde(default = "confirmation_default"))]
     pub dilation: bool,
+    /// Automator editor-mode switch confirmation
+    /// (original `confirmations.switchAutomatorMode`).
+    #[cfg_attr(feature = "serde", serde(default = "confirmation_default"))]
+    pub switch_automator_mode: bool,
 }
 
 /// serde default for newer confirmation toggles (on, like the originals).
@@ -92,6 +96,7 @@ impl Confirmations {
             big_crunch: true,
             eternity: true,
             dilation: true,
+            switch_automator_mode: true,
         }
     }
 }
@@ -323,6 +328,7 @@ impl Options {
             "bigCrunch" => self.confirmations.big_crunch = enabled,
             "eternity" => self.confirmations.eternity = enabled,
             "dilation" => self.confirmations.dilation = enabled,
+            "switchAutomatorMode" => self.confirmations.switch_automator_mode = enabled,
             _ => {}
         }
     }

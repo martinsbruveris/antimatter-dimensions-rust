@@ -536,9 +536,49 @@ export const useGameStore = defineStore("game", {
     setAutomatorEventOption(option, value) {
       return invoke("set_automator_event_option", { option, value });
     },
+    // Resolves to { blocks, lost_lines } for the block editor.
+    automatorBlockify(id) {
+      return invoke("automator_blockify", { id });
+    },
+    automatorBlockifyText(content) {
+      return invoke("automator_blockify_text", { content });
+    },
+    automatorSetEditorType(block) {
+      return invoke("automator_set_editor_type", { block });
+    },
+    // Resolves to { script, warnings } or null on invalid params.
+    automatorTemplate(name, params) {
+      return invoke("automator_template", { name, params });
+    },
+    // Resolve to the encoded text blob for the clipboard.
+    automatorExportScript(id) {
+      return invoke("automator_export_script", { id });
+    },
+    automatorExportFull(id) {
+      return invoke("automator_export_full", { id });
+    },
+    // Resolves to { name, content, presets, constants, is_full_data } or null.
+    automatorImportPreview(raw) {
+      return invoke("automator_import_preview", { raw });
+    },
+    // Resolves to the new script's id, or null if the data is invalid.
+    automatorImport(raw, ignorePresets, ignoreConstants) {
+      return invoke("automator_import", { raw, ignorePresets, ignoreConstants });
+    },
+    // Resolves to { presets, constants } used by a stored script.
+    automatorScriptDataInfo(id) {
+      return invoke("automator_script_data_info", { id });
+    },
     // --- Time Study presets ---
     studyPresetSave(slot) {
       return invoke("study_preset_save", { slot });
+    },
+    // The current tree as an import string (template modal "Current Tree").
+    studyTreeExport() {
+      return invoke("study_tree_export");
+    },
+    studyTreeIsValid(text) {
+      return invoke("study_tree_is_valid", { text });
     },
     // Load a preset into the current tree; `respec` = "Respec and Load".
     studyPresetLoad(slot, respec = false) {
