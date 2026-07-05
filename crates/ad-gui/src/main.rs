@@ -602,6 +602,9 @@ struct RealityView {
     sac_effects: Vec<f64>,
     /// Combined active glyph effects, in the panel's display order.
     active_effects: Vec<ActiveGlyphEffectView>,
+    /// Bought perk ids + the currently purchasable ones (Feature 6.3).
+    perks_bought: Vec<u8>,
+    perks_buyable: Vec<u8>,
 }
 
 /// Serializable view of the Eternity Upgrades tab.
@@ -1191,6 +1194,12 @@ fn build_reality_view(game: &GameState) -> RealityView {
             game.glyph_sac_dilation_effect(),
         ],
         active_effects,
+        perks_bought: game.reality.perks.iter().copied().collect(),
+        perks_buyable: ad_core::PERKS
+            .iter()
+            .map(|p| p.id)
+            .filter(|&id| game.can_buy_perk(id))
+            .collect(),
     }
 }
 
@@ -1781,6 +1790,11 @@ fn move_glyph(id: u32, slot: u32, state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn set_glyph_respec(respec: bool, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().reality.respec = respec;
+}
+
+#[tauri::command]
+fn buy_perk(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_perk(id);
 }
 
 /// Buy a one-time Break Infinity Upgrade by its original save id (e.g.
@@ -2492,6 +2506,7 @@ pub fn run() {
             sacrifice_glyph,
             move_glyph,
             set_glyph_respec,
+            buy_perk,
             buy_break_infinity_upgrade,
             buy_break_infinity_rebuyable,
             buy_infinity_dimension,

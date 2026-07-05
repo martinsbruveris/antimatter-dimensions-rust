@@ -191,7 +191,11 @@ impl GameState {
             11 => !EC11_FORBIDDEN.iter().any(|&s| self.time_study_bought(s)),
             12 => !EC12_FORBIDDEN.iter().any(|&s| self.time_study_bought(s)),
             _ => {
-                // Waived once the requirement was previously met.
+                // The ECR perk (72) waives non-TT requirements outright;
+                // otherwise they are waived once previously met.
+                if self.perk_bought(72) {
+                    return true;
+                }
                 if self.ec_requirement_bits & (1 << id) != 0 {
                     return true;
                 }
@@ -295,6 +299,15 @@ impl GameState {
         let i = (id - 1) as usize;
         self.eternity_challenges[i] =
             (self.eternity_challenges[i] + 1).min(EC_MAX_COMPLETIONS);
+        // The ECB perk (73): keep banking completions while the higher
+        // tiers' scaled goals are already met.
+        if self.perk_bought(73) {
+            while self.eternity_challenges[i] < EC_MAX_COMPLETIONS
+                && self.records.this_eternity.max_ip >= self.ec_current_goal(id)
+            {
+                self.eternity_challenges[i] += 1;
+            }
+        }
         self.ec_requirement_bits &= !(1 << id);
         self.respec_time_studies_now();
     }

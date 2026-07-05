@@ -472,13 +472,17 @@ impl GameState {
         self.galaxies = 0;
         self.part_infinity_point = 0.0;
         self.broke_infinity = false;
+        // `Currency.infinityPoints.reset()` (to the START-perk value).
+        self.infinity_points = self.starting_ip();
+        self.records.this_eternity.max_ip = self.infinity_points;
         self.infinity_power = Decimal::ZERO;
         self.time_shards = Decimal::ZERO;
         self.replicanti = ReplicantiState::new();
 
-        // EP reset (the currency reset also zeroes this reality's EP peak).
-        self.eternity_points = Decimal::ZERO;
-        self.records.this_reality.max_ep = Decimal::ZERO;
+        // EP reset to its starting value — the START perks — which also sets
+        // this reality's EP peak (`Currency.eternityPoints.reset()`).
+        self.eternity_points = self.starting_ep();
+        self.records.this_reality.max_ep = self.eternity_points;
 
         self.epmult_upgrades = 0;
         self.eternities = Decimal::ZERO;
@@ -501,6 +505,10 @@ impl GameState {
         self.requirement_checks.reality_max_glyphs = self.equipped_glyph_count();
 
         self.records.this_reality = ThisReality::new();
+        // Re-seed the peaks from the START-perk starting currencies (the
+        // original's currency `reset()`s run after the records resets).
+        self.records.this_eternity.max_ip = self.infinity_points;
+        self.records.this_reality.max_ep = self.eternity_points;
 
         // `Currency.timeTheorems.reset()`: respec + TT/max/purchases cleared.
         self.studies = Vec::new();

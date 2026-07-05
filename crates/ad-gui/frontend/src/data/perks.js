@@ -1,0 +1,113 @@
+// Perk display data, vendored from secret-formula/reality/perks.js (labels,
+// families, descriptions, the "Default Untangled" fixed layout positions) and
+// PerksTab.vue (family colors). The engine owns purchase state/effects.
+
+// positionNumToVector (PerksTab.vue): grid number → {x, y}.
+function pos(num) {
+  return { x: 5 * ((num % 400) - 200), y: 5 * (Math.floor(num / 400) - 200) };
+}
+
+export const PERK_COLORS = {
+  ANTIMATTER: { primary: "#22aa48", secondary: "#156a2d" },
+  INFINITY: { primary: "#b67f33", secondary: "#7b5623" },
+  ETERNITY: { primary: "#b241e3", secondary: "#8b1cba" },
+  DILATION: { primary: "#64dd17", secondary: "#449810" },
+  REALITY: { primary: "#0b600e", secondary: "#063207" },
+  AUTOMATION: { primary: "#ff0000", secondary: "#b30000" },
+  ACHIEVEMENT: { primary: "#fdd835", secondary: "#e3ba02" },
+};
+
+// id, label, family, description, layoutPosList[0].
+const raw = [
+  [0, "START", "REALITY", "Remove the achievement requirement from the Reality Study and allow you to choose from 4 different Glyphs on Reality.", 76596],
+  [10, "SAM", "ANTIMATTER", "Start every reset with 5e130 antimatter.", 76559],
+  [12, "SIP1", "INFINITY", "Start every Eternity and Reality with 5e15 Infinity Points.", 74523],
+  [13, "SIP2", "INFINITY", "Start every Eternity and Reality with 5e130 Infinity Points.", 62111],
+  [14, "SEP1", "ETERNITY", "Start every Reality with 10 Eternity Points.", 88915],
+  [15, "SEP2", "ETERNITY", "Start every Reality with 5,000 Eternity Points.", 92484],
+  [16, "SEP3", "ETERNITY", "Start every Reality with 5e9 Eternity Points.", 96459],
+  [17, "STP", "DILATION", "After unlocking Dilation, gain 10 Tachyon Particles.", 102120],
+  [30, "ANR", "ANTIMATTER", "Dimension Boosts and Antimatter Galaxies no longer reset Antimatter, Antimatter Dimensions, Tickspeed, or Dimensional Sacrifice.", 85343],
+  [31, "PASS", "ETERNITY", "Improve Time Study 122 to ×50 Eternity Points and Time Study 142 to ×1e50 Infinity Points. In addition, Time Study 132 also makes Replicanti 3 times faster.", 67054],
+  [40, "EU1", "ETERNITY", "Automatically unlock the first row of Eternity Upgrades for free once you have Eternities.", 89407],
+  [41, "EU2", "ETERNITY", "The second row of Eternity Upgrades is automatically purchased at 1e10 times less than their original price.", 103008],
+  [42, "DU1", "DILATION", "After unlocking Dilation, automatically unlock the second row of Dilation Upgrades for free.", 119833],
+  [43, "DU2", "DILATION", "After unlocking Dilation, automatically unlock the third row of Dilation Upgrades for free.", 124260],
+  [44, "ATT", "DILATION", "Automatically purchase the passive Time Theorem generation Dilation Upgrade once you can afford it.", 124289],
+  [45, "ATD", "DILATION", "Auto-unlock Time Dimensions 5-8 once you can afford them.", 127117],
+  [46, "REAL", "REALITY", "Auto-unlocks Reality once you have 1e4000 Eternity Points and have unlocked Time Dimension 8.", 124343],
+  [51, "IDR", "INFINITY", "Infinity Dimensions no longer have antimatter requirements.", 51317],
+  [52, "TGR", "DILATION", "The 2nd rebuyable Dilation Upgrade no longer resets your Dilated Time.", 116568],
+  [53, "DILR", "DILATION", "Remove the Eternity Challenge 11, Eternity Challenge 12, and total Time Theorem requirements from Time Dilation unlock.", 129011],
+  [54, "EC1R", "ETERNITY", "Remove the Eternity Challenge 1 requirement from Time Study 181.", 64284],
+  [55, "EC2R", "ETERNITY", "Remove the Eternity Challenge 2 requirement from Time Study 181.", 55463],
+  [56, "EC3R", "ETERNITY", "Remove the Eternity Challenge 3 requirement from Time Study 181.", 75475],
+  [57, "EC5R", "ETERNITY", "Remove the Eternity Challenge 5 requirement from Time Study 62.", 70626],
+  [60, "PEC1", "AUTOMATION", "Auto-complete one Eternity Challenge every 60 minutes (real-time). (Not yet implemented.)", 90660],
+  [61, "PEC2", "AUTOMATION", "Auto-complete one Eternity Challenge every 40 minutes (real-time). (Not yet implemented.)", 95485],
+  [62, "PEC3", "AUTOMATION", "Auto-complete one Eternity Challenge every 20 minutes (real-time). (Not yet implemented.)", 96311],
+  [70, "ACT", "ETERNITY", "Active path multipliers are always maximized.", 56633],
+  [71, "IDL", "ETERNITY", "Idle path multipliers start as if you have spent 15 minutes in this Infinity/Eternity.", 80248],
+  [72, "ECR", "ETERNITY", "Remove non-Time Theorem requirements for unlocking Eternity Challenges.", 62714],
+  [73, "ECB", "ETERNITY", "You can complete multiple tiers of Eternity Challenges at once if you reach the goal for a higher completion of that challenge.", 62741],
+  [80, "TP1", "DILATION", "When buying the 3rd rebuyable Dilation Upgrade, multiply your current Tachyon Particle amount by 1.5.", 111739],
+  [81, "TP2", "DILATION", "When buying the 3rd rebuyable Dilation Upgrade, multiply your current Tachyon Particle amount by 2.", 103757],
+  [82, "TP3", "DILATION", "When buying the 3rd rebuyable Dilation Upgrade, multiply your current Tachyon Particle amount by 2.5.", 96175],
+  [83, "TP4", "DILATION", "When buying the 3rd rebuyable Dilation Upgrade, multiply your current Tachyon Particle amount by 3.", 86984],
+  [100, "DAU", "AUTOMATION", "Unlock autobuyers for the repeatable Dilation Upgrades. (Not yet implemented.)", 117401],
+  [101, "IDAS", "AUTOMATION", "Infinity Dimension autobuyers work 3 times faster. (Not yet implemented.)", 74095],
+  [102, "REPAS", "AUTOMATION", "Replicanti autobuyers work 3 times faster. (Not yet implemented.)", 57685],
+  [103, "DAS", "AUTOMATION", "Dilation Upgrade autobuyers work 3 times faster. (Not yet implemented.)", 113895],
+  [104, "TTS", "AUTOMATION", "Unlock a Time Theorem Autobuyer which buys single Time Theorems every tick. (Not yet implemented.)", 44631],
+  [105, "TTF", "AUTOMATION", "Purchasing Time Theorems no longer spends your Antimatter, Infinity Points, or Eternity Points.", 33840],
+  [106, "TTM", "AUTOMATION", "Upgrade the Time Theorem Autobuyer to buy max Time Theorems. (Not yet implemented.)", 25055],
+  [107, "DAB", "AUTOMATION", "Dilation Upgrade autobuyers buy three times as many Dilation Upgrades at once. (Not yet implemented.)", 127384],
+  [201, "ACH1", "ACHIEVEMENT", "Reduce the Achievement timer to 20 minutes per Achievement (10 minute decrease).", 65386],
+  [202, "ACH2", "ACHIEVEMENT", "Reduce the Achievement timer to 12 minutes per Achievement (8 minute decrease).", 54976],
+  [203, "ACH3", "ACHIEVEMENT", "Reduce the Achievement timer to 6 minutes per Achievement (6 minute decrease).", 44168],
+  [204, "ACH4", "ACHIEVEMENT", "Reduce the Achievement timer to 2 minutes per Achievement (4 minute decrease).", 33760],
+  [205, "ACHNR", "ACHIEVEMENT", "Immediately unlock the first 13 rows of Achievements and Reality no longer resets them.", 23353],
+];
+
+export const PERKS = raw.map(([id, label, family, description, posNum]) => ({
+  id,
+  label,
+  family,
+  description,
+  ...pos(posNum),
+}));
+
+// Undirected edges (perkConnections).
+export const PERK_EDGES = [
+  [0, 201], [0, 10], [0, 40], [0, 57],
+  [10, 30], [10, 12],
+  [30, 14],
+  [12, 13], [12, 14], [12, 101],
+  [13, 51], [13, 102],
+  [14, 15], [14, 17],
+  [15, 16],
+  [17, 80],
+  [40, 41],
+  [41, 100],
+  [42, 43],
+  [43, 44],
+  [44, 103], [44, 45],
+  [45, 46],
+  [52, 100], [52, 80],
+  [54, 55], [54, 56], [54, 72], [54, 31],
+  [55, 70],
+  [56, 71],
+  [57, 70], [57, 71], [57, 31],
+  [60, 61],
+  [61, 62],
+  [70, 104],
+  [71, 60],
+  [72, 73],
+  [80, 81],
+  [81, 82],
+  [82, 83],
+  [100, 42], [100, 53], [100, 107],
+  [104, 105],
+  [105, 106],
+  [201, 202], [202, 203], [203, 204], [204, 205],
+];

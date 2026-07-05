@@ -158,6 +158,10 @@ impl GameState {
         // Auto-achievements regrant over real time after the first Reality.
         self.tick_auto_achievements(real_dt_ms);
 
+        // Perk automation: EU auto-grants + the dilation/TD/Reality-study
+        // auto-unlock perks.
+        self.tick_perk_effects();
+
         // `updatePrestigeRates`: peak IP/min / EP/min for the header buttons.
         self.update_prestige_rates();
 
@@ -200,8 +204,9 @@ impl GameState {
             }
             if self.matter > self.antimatter && !self.can_big_crunch() {
                 // Annihilation: a Dimension-Boost-style soft reset that grants no
-                // boost (`softReset(0, true, true)`), keeping boosts and galaxies.
-                self.dim_boost_reset();
+                // boost (`softReset(0, true, true)` — forced, so the ANR perk
+                // does not soften it), keeping boosts and galaxies.
+                self.dim_boost_reset_forced();
             }
         }
 

@@ -126,7 +126,8 @@ impl GameState {
             mult *= 20.0;
         }
         if self.time_study_bought(132) {
-            mult *= 1.5;
+            // The PASS perk (31): TS132 also makes Replicanti ×3 faster.
+            mult *= if self.perk_bought(31) { 3.0 } else { 1.5 };
         }
         // The `replicationspeed` glyph effect (a Decimal in the original;
         // frontier magnitudes fit f64).
@@ -312,7 +313,8 @@ impl GameState {
         // Dimension Boosts / dimensions / antimatter (`addReplicantiGalaxies`).
         if !self.eternity_milestone_reached(40) {
             self.dim_boosts = 0;
-            self.dim_boost_reset();
+            // `softReset(0, true, true)` — forced (ANR does not apply).
+            self.dim_boost_reset_forced();
         }
         true
     }

@@ -53,14 +53,27 @@ impl GameState {
         // (Idle) over the current infinity.
         let infinity_secs = self.records.this_infinity.time_ms / 1000.0;
         if self.time_study_bought(141) {
-            let decay = Self::this_infinity_mult(infinity_secs);
-            mult *= (Decimal::new_unchecked(1.0, 45) / decay).max(&Decimal::ONE);
+            // The ACT perk (70) maximizes the Active path (no decay).
+            let value = if self.perk_bought(70) {
+                Decimal::new_unchecked(1.0, 45)
+            } else {
+                let decay = Self::this_infinity_mult(infinity_secs);
+                (Decimal::new_unchecked(1.0, 45) / decay).max(&Decimal::ONE)
+            };
+            mult *= value;
         }
         if self.time_study_bought(142) {
-            mult *= Decimal::new_unchecked(1.0, 25);
+            // The PASS perk (31) improves TS142 to ×1e50.
+            mult *= if self.perk_bought(31) {
+                Decimal::new_unchecked(1.0, 50)
+            } else {
+                Decimal::new_unchecked(1.0, 25)
+            };
         }
         if self.time_study_bought(143) {
-            mult *= Self::this_infinity_mult(infinity_secs);
+            // The IDL perk (71): the Idle path starts 15 minutes in.
+            let secs = infinity_secs + if self.perk_bought(71) { 900.0 } else { 0.0 };
+            mult *= Self::this_infinity_mult(secs);
         }
         // The `ipMultDT` Dilation Upgrade: ×DT^1000.
         if self.dilation_upgrade_bought(7) {

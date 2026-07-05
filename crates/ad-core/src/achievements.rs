@@ -105,6 +105,10 @@ impl GameState {
     /// Mirrors `Currency.antimatter.startingValue` = `Effects.max(10,
     /// Achievement(21) = 100, …)`; pre-Infinity only achievement 21 applies.
     pub fn starting_antimatter(&self) -> Decimal {
+        // The SAM perk (`Perk.startAM`): start every reset with 5e130.
+        if self.perk_bought(10) {
+            return Decimal::new(5.0, 130);
+        }
         if self.achievement_unlocked(21) {
             Decimal::from_float(100.0)
         } else {

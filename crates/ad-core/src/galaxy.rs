@@ -127,23 +127,12 @@ impl GameState {
         true
     }
 
-    /// Perform a galaxy reset: reset all dimensions,
-    /// tickspeed, and dim boosts. Antimatter is reset to its starting value.
+    /// Perform a galaxy reset (`galaxyReset`): clear Dimension Boosts, then
+    /// the shared soft reset (which the ANR perk can soften — antimatter /
+    /// dimensions / tickspeed / sacrifice kept).
     fn galaxy_reset(&mut self) {
-        self.antimatter = self.starting_antimatter();
         self.dim_boosts = 0;
-        self.sacrificed = Decimal::ZERO;
-
-        for i in 0..8 {
-            self.dimensions[i] = DimensionTier::new();
-        }
-
-        self.tickspeed = TickspeedState::new();
-        // Reset the per-run challenge accumulators (`softReset` → `resetChallengeStuff`).
-        self.reset_challenge_stuff();
-        // Re-apply skip-reset Infinity Upgrades (original `softReset` calls
-        // `skipResetsIfPossible`), so e.g. skipResetGalaxy restores 4 boosts.
-        self.skip_resets_if_possible();
+        self.soft_reset(false);
     }
 
     /// Get the dimension boost requirement for the next boost.
@@ -233,25 +222,39 @@ impl GameState {
         true
     }
 
-    /// Perform a dimension boost reset: reset antimatter and
-    /// all dimensions. Tickspeed and galaxies are kept.
-    ///
-    /// This is the shared "soft reset that keeps boosts and galaxies"
-    /// (`softReset(0, true, true)`); NC11's matter annihilation reuses it (a
-    /// Dimension Boost that grants no boost level).
+    /// Perform a dimension boost reset: reset antimatter and all dimensions
+    /// (unless the ANR perk keeps them). Tickspeed and galaxies are kept.
     pub(crate) fn dim_boost_reset(&mut self) {
-        self.antimatter = self.starting_antimatter();
-        self.sacrificed = Decimal::ZERO;
+        self.soft_reset(false);
+    }
 
-        for i in 0..8 {
-            self.dimensions[i] = DimensionTier::new();
-        }
+    /// The forced variant (`softReset(0, true, true)`): NC11's matter
+    /// annihilation and the Replicanti Galaxy reset ignore the ANR perk.
+    pub(crate) fn dim_boost_reset_forced(&mut self) {
+        self.soft_reset(true);
+    }
 
-        self.tickspeed = TickspeedState::new();
-        // Reset the per-run challenge accumulators (`softReset` → `resetChallengeStuff`).
+    /// The shared `softReset` body. With the `antimatterNoReset` perk (30)
+    /// and no force, antimatter / dimensions / tickspeed / sacrifice are all
+    /// kept (antimatter still bumps up to its starting value).
+    fn soft_reset(&mut self, forced: bool) {
+        let keep = !forced && self.perk_bought(30);
+        // `resetChallengeStuff` runs regardless.
         self.reset_challenge_stuff();
+        if !keep {
+            self.sacrificed = Decimal::ZERO;
+            for i in 0..8 {
+                self.dimensions[i] = DimensionTier::new();
+            }
+            self.tickspeed = TickspeedState::new();
+        }
         // Original `softReset` also runs `skipResetsIfPossible`; a no-op unless a
         // skip level exceeds the just-incremented boost count.
         self.skip_resets_if_possible();
+        if keep {
+            self.antimatter = self.antimatter.max(&self.starting_antimatter());
+        } else {
+            self.antimatter = self.starting_antimatter();
+        }
     }
 }

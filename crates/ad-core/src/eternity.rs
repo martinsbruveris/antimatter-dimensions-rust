@@ -59,10 +59,13 @@ impl GameState {
             mult *= Decimal::from_float(self.ts121_effect());
         }
         if self.time_study_bought(122) {
-            mult *= Decimal::from_float(35.0);
+            // The PASS perk (31) improves TS122 to ×50.
+            mult *= Decimal::from_float(if self.perk_bought(31) { 50.0 } else { 35.0 });
         }
         if self.time_study_bought(123) {
-            let secs = self.records.this_eternity.time_ms / 1000.0;
+            // The IDL perk (71): the Idle path starts 15 minutes in.
+            let secs = self.records.this_eternity.time_ms / 1000.0
+                + if self.perk_bought(71) { 900.0 } else { 0.0 };
             mult *= Decimal::from_float((1.39 * secs).sqrt());
         }
         // The `timeEP` glyph effect (`GlyphEffect.epMult`).
@@ -260,10 +263,11 @@ impl GameState {
         // (`resetTimeDimensions`).
         self.reset_time_dimension_amounts();
 
-        // IP reset — which also zeroes the eternity's IP peak (the original
-        // `Currency.infinityPoints.reset()` writes `thisEternity.maxIP`).
-        self.infinity_points = Decimal::ZERO;
-        self.records.this_eternity.max_ip = Decimal::ZERO;
+        // IP reset — to the starting value (the START perks), which also sets
+        // the eternity's IP peak (the original `Currency.infinityPoints
+        // .reset()` writes `thisEternity.maxIP = startingValue`).
+        self.infinity_points = self.starting_ip();
+        self.records.this_eternity.max_ip = self.infinity_points;
 
         // `playerInfinityUpgradesOnReset` (milestone-aware).
         self.reset_infinity_upgrades_on_eternity();

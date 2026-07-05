@@ -18,6 +18,7 @@ pub mod infinity_dimensions;
 pub mod infinity_upgrades;
 pub mod observed;
 pub mod options;
+pub mod perks;
 pub mod reality;
 pub mod records;
 pub mod replicanti;
@@ -56,6 +57,7 @@ pub use infinity_upgrades::{
 };
 pub use observed::{ObservedDimensionTier, ObservedState, ObservedTickspeedState};
 pub use options::Options;
+pub use perks::{PerkDef, PerkFamily, PERKS, PERK_CONNECTIONS};
 pub use reality::{GlyphLevel, RealityState, RequirementChecks, RM_HARDCAP};
 pub use records::{
     BestEternity, BestInfinity, BestReality, RecentReality, Records, ThisEternity,

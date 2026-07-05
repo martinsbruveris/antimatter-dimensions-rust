@@ -129,6 +129,10 @@ impl GameState {
                 let ts = [231u16, 232, 233, 234]
                     .iter()
                     .any(|&s| self.time_study_bought(s));
+                // The DILR perk (53) waives the EC and total-TT requirements.
+                if self.perk_bought(53) {
+                    return ts;
+                }
                 let ecs = self.eternity_challenge_completions(11)
                     >= crate::eternity_challenges::EC_MAX_COMPLETIONS
                     && self.eternity_challenge_completions(12)
@@ -154,6 +158,26 @@ impl GameState {
         }
         self.time_theorems -= Decimal::from_float(Self::dilation_study_cost(id));
         self.dilation.studies.push(id);
+        if id == 1 {
+            // The DU1/DU2 perks auto-unlock Dilation Upgrade rows 2/3, and
+            // STP grants 10 starting Tachyon Particles.
+            if self.perk_bought(42) {
+                for upgrade in [4u8, 5, 6] {
+                    self.dilation.upgrades |= 1 << upgrade;
+                }
+            }
+            if self.perk_bought(43) {
+                for upgrade in [7u8, 8, 9] {
+                    self.dilation.upgrades |= 1 << upgrade;
+                }
+            }
+            if self.perk_bought(17) {
+                self.dilation.tachyon_particles = self
+                    .dilation
+                    .tachyon_particles
+                    .max(&Decimal::from_float(10.0));
+            }
+        }
         true
     }
 
@@ -413,11 +437,24 @@ impl GameState {
             1..=3 => {
                 self.dilation.rebuyables[(id - 1) as usize] += 1;
                 if id == 2 {
-                    self.dilation.dilated_time = Decimal::ZERO;
+                    // The TGR perk (52) keeps Dilated Time on the reset.
+                    if !self.perk_bought(52) {
+                        self.dilation.dilated_time = Decimal::ZERO;
+                    }
                     self.dilation.next_threshold =
                         Decimal::from_float(TG_BASE_THRESHOLD);
                     self.dilation.base_tachyon_galaxies = 0;
                     self.dilation.total_tachyon_galaxies = 0.0;
+                }
+                if id == 3 {
+                    // The TP1–TP4 perks retroactively multiply TP on each
+                    // ×3-TP purchase (`Effects.max` of the owned perks).
+                    let factor = [(83u8, 3.0), (82, 2.5), (81, 2.0), (80, 1.5)]
+                        .iter()
+                        .find(|&&(perk, _)| self.perk_bought(perk))
+                        .map(|&(_, f)| f)
+                        .unwrap_or(1.0);
+                    self.dilation.tachyon_particles *= Decimal::from_float(factor);
                 }
             }
             _ => {

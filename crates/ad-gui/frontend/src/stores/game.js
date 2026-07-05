@@ -200,6 +200,10 @@ export const useGameStore = defineStore("game", {
       await invoke("set_glyph_respec", { respec });
       this.snapshot = await this.getState();
     },
+    async buyPerk(id) {
+      await invoke("buy_perk", { id });
+      this.snapshot = await this.getState();
+    },
     buyDilationUpgrade(id) {
       return invoke("buy_dilation_upgrade", { id });
     },

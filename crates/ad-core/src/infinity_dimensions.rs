@@ -105,7 +105,9 @@ impl GameState {
         if self.infinity_dimensions[tier].is_unlocked {
             return false;
         }
-        let am_ok = self.records.this_eternity.max_am >= ID_UNLOCK_AM[tier];
+        // The IDR perk (51) removes the antimatter requirement.
+        let am_ok = self.perk_bought(51)
+            || self.records.this_eternity.max_am >= ID_UNLOCK_AM[tier];
         let ip_ok = tier != 0 || self.infinity_points >= ID1_IP_REQUIREMENT;
         am_ok && ip_ok
     }
