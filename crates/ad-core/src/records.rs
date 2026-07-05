@@ -168,6 +168,120 @@ fn default_recent_eternities() -> Vec<RecentEternity> {
     vec![RecentEternity::placeholder(); 10]
 }
 
+/// Records for the current (in-progress) reality. Reset by a Reality; the
+/// modelled slice of `player.records.thisReality`.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ThisReality {
+    /// Game time elapsed in this reality (ms).
+    pub time_ms: f64,
+    /// Real time elapsed in this reality (ms).
+    pub real_time_ms: f64,
+    /// Peak Eternity Points reached this reality (`thisReality.maxEP`).
+    /// Maintained by the EP setter in the original; advanced in `tick` and on
+    /// EP awards here. Gates the Reality study/availability and feeds the RM
+    /// formula and glyph level.
+    pub max_ep: Decimal,
+    /// Peak Replicanti amount this reality (`thisReality.maxReplicanti`);
+    /// feeds glyph level.
+    pub max_replicanti: Decimal,
+    /// Peak Dilated Time this reality (`thisReality.maxDT`); feeds glyph
+    /// level.
+    pub max_dt: Decimal,
+}
+
+impl ThisReality {
+    pub fn new() -> Self {
+        Self {
+            time_ms: 0.0,
+            real_time_ms: 0.0,
+            max_ep: Decimal::ZERO,
+            max_replicanti: Decimal::ZERO,
+            max_dt: Decimal::ZERO,
+        }
+    }
+}
+
+impl Default for ThisReality {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Records of the best realities (`player.records.bestReality`, the modelled
+/// slice — the equipped-glyph-loadout snapshots are display-only and out of
+/// frontier). Persists across a Reality.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BestReality {
+    /// Fastest reality by game time (ms). `f64::MAX` = "no reality yet".
+    pub time_ms: f64,
+    /// Fastest reality by real time (ms). Same sentinel.
+    pub real_time_ms: f64,
+    /// Best RM-per-real-minute rate over any reality (`bestReality.RMmin`).
+    pub rm_min: Decimal,
+    /// Highest glyph level attained at a reality (`bestReality.glyphLevel`).
+    pub glyph_level: u32,
+    /// Highest EP ever held (`bestReality.bestEP`; maintained by the EP
+    /// setter). Backs Reality Upgrade 25's requirement.
+    pub best_ep: Decimal,
+    /// Best glyph strength (rarity) ever picked up
+    /// (`bestReality.glyphStrength`).
+    pub glyph_strength: f64,
+}
+
+impl BestReality {
+    pub fn new() -> Self {
+        Self {
+            time_ms: f64::MAX,
+            real_time_ms: f64::MAX,
+            rm_min: Decimal::ZERO,
+            glyph_level: 0,
+            best_ep: Decimal::ZERO,
+            glyph_strength: 1.0,
+        }
+    }
+}
+
+impl Default for BestReality {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// One entry of the last-10-realities ring (`player.records.recentRealities`
+/// tuples `[time, realTime, RM, realityCount, challenge, projIM]`; the
+/// challenge/iM slots are out of frontier). `f64::MAX` = "no run yet".
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RecentReality {
+    /// Game time of the run (ms).
+    pub time_ms: f64,
+    /// Real time of the run (ms).
+    pub real_time_ms: f64,
+    /// RM gained by the run.
+    pub rm: Decimal,
+    /// Realities gained by the run.
+    pub reality_count: f64,
+}
+
+impl RecentReality {
+    pub fn placeholder() -> Self {
+        Self {
+            time_ms: f64::MAX,
+            real_time_ms: f64::MAX,
+            rm: Decimal::ONE,
+            reality_count: 1.0,
+        }
+    }
+}
+
+/// serde default for the recent-realities ring (10 placeholders).
+#[cfg(feature = "serde")]
+fn default_recent_realities() -> Vec<RecentReality> {
+    vec![RecentReality::placeholder(); 10]
+}
+
 /// Records for the fastest infinity performed. Persists across a Big Crunch.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -219,6 +333,15 @@ pub struct Records {
     /// The last 10 eternities, newest first (`records.recentEternities`).
     #[cfg_attr(feature = "serde", serde(default = "default_recent_eternities"))]
     pub recent_eternities: Vec<RecentEternity>,
+    /// The current reality's records (reset on Reality).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub this_reality: ThisReality,
+    /// The best realities' records (kept on Reality).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_reality: BestReality,
+    /// The last 10 realities, newest first (`records.recentRealities`).
+    #[cfg_attr(feature = "serde", serde(default = "default_recent_realities"))]
+    pub recent_realities: Vec<RecentReality>,
 }
 
 impl Records {
@@ -231,6 +354,9 @@ impl Records {
             this_eternity: ThisEternity::new(),
             best_eternity: BestEternity::new(),
             recent_eternities: vec![RecentEternity::placeholder(); 10],
+            this_reality: ThisReality::new(),
+            best_reality: BestReality::new(),
+            recent_realities: vec![RecentReality::placeholder(); 10],
         }
     }
 }

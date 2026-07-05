@@ -113,8 +113,15 @@ impl GameState {
         let gained_ep = self.gained_eternity_points();
         let gained_eternities = self.gained_eternities();
         self.eternity_points += gained_ep;
+        self.records.this_reality.max_ep =
+            self.records.this_reality.max_ep.max(&self.eternity_points);
+        self.records.best_reality.best_ep =
+            self.records.best_reality.best_ep.max(&self.eternity_points);
         self.eternities += gained_eternities;
         self.eternity_unlocked = true;
+        // `player.requirementChecks.reality.noEternities = false` (any
+        // rewarded Eternity spoils Reality Upgrade 6/10's requirement).
+        self.requirement_checks.reality_no_eternities = false;
 
         // A running Eternity Challenge banks a completion (which auto-respecs
         // the study tree and consumes the study slot).
@@ -254,6 +261,9 @@ impl GameState {
         // `playerInfinityUpgradesOnReset` (milestone-aware).
         self.reset_infinity_upgrades_on_eternity();
 
+        // `Player.resetRequirements("eternity")`.
+        self.requirement_checks.eternity_no_rg = true;
+
         self.antimatter = self.starting_antimatter();
     }
 
@@ -291,6 +301,12 @@ impl GameState {
         if self.eternity_milestone_reached(2) {
             return;
         }
+        self.reset_autobuyers_for_prestige();
+    }
+
+    /// The unconditional autobuyer reset shared by the Eternity path (behind
+    /// the keepAutobuyers milestone) and the Reality reset (always).
+    pub(crate) fn reset_autobuyers_for_prestige(&mut self) {
         for (tier, ab) in self.autobuyers.dimensions.iter_mut().enumerate() {
             ab.is_bought = false;
             ab.interval_ms = AD_AUTOBUYER_INTERVALS_MS[tier];

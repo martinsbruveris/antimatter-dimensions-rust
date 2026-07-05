@@ -22,8 +22,8 @@ const DILATION_PENALTY: f64 = 0.75;
 /// base (`getTachyonGalaxyMult` at factor 1: `1 + 3.65·f + 0.35`).
 const TG_BASE_THRESHOLD: f64 = 1000.0;
 
-/// TT cost of the dilation studies 1–5 (study 6, Reality, is out of frontier).
-const DILATION_STUDY_COSTS: [f64; 5] = [5000.0, 1e6, 1e7, 1e8, 1e9];
+/// TT cost of the dilation studies 1–6 (study 6 is "Unlock Reality").
+const DILATION_STUDY_COSTS: [f64; 6] = [5000.0, 1e6, 1e7, 1e8, 1e9, 1.0];
 
 /// The all-time TT requirement to unlock Dilation
 /// (`TimeStudy.dilation.totalTimeTheoremRequirement`).
@@ -98,14 +98,14 @@ impl GameState {
         self.dilation.studies.contains(&1)
     }
 
-    /// Whether dilation study `id` (1–5) is bought.
+    /// Whether dilation study `id` (1–6) is bought.
     pub fn dilation_study_bought(&self, id: u8) -> bool {
         self.dilation.studies.contains(&id)
     }
 
     /// The TT cost of dilation study `id`.
     pub fn dilation_study_cost(id: u8) -> f64 {
-        if (1..=5).contains(&id) {
+        if (1..=6).contains(&id) {
             DILATION_STUDY_COSTS[(id - 1) as usize]
         } else {
             0.0
@@ -114,9 +114,11 @@ impl GameState {
 
     /// Whether dilation study `id` can be bought (`DilationTimeStudyState
     /// .canBeBought`): study 1 needs any of TS231–234, EC11+EC12 fully
-    /// completed, and ≥ 12900 all-time TT; studies 2–5 (TD5–8) chain off it.
+    /// completed, and ≥ 12900 all-time TT; studies 2–5 (TD5–8) chain off it;
+    /// study 6 (Unlock Reality) needs the TD8 study, `1e4000` peak EP this
+    /// reality, and the achievement/first-perk requirement.
     pub fn can_buy_dilation_study(&self, id: u8) -> bool {
-        if !(1..=5).contains(&id) || self.dilation_study_bought(id) {
+        if !(1..=6).contains(&id) || self.dilation_study_bought(id) {
             return false;
         }
         if self.time_theorems < Decimal::from_float(Self::dilation_study_cost(id)) {
@@ -136,6 +138,11 @@ impl GameState {
                 ts && ecs && tt
             }
             2 => self.dilation_unlocked(),
+            6 => {
+                self.dilation_study_bought(5)
+                    && self.records.this_reality.max_ep.exponent() >= 4000
+                    && self.reality_study_achievements_ok()
+            }
             _ => self.dilation_study_bought(id - 1),
         }
     }

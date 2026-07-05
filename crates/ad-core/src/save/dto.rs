@@ -149,6 +149,74 @@ pub struct PlayerDTO {
     /// `player.triggeredTabNotificationBits` — which tab notifications have ever
     /// fired. Bits beyond our modelled ids round-trip verbatim.
     pub triggered_tab_notification_bits: u32,
+    /// `player.realities` — Realities performed (a plain number at the root).
+    pub realities: f64,
+    /// `player.reality` — the Reality-layer state (modelled subset).
+    pub reality: RealityDTO,
+    /// `player.requirementChecks` — the "avoided X" run flags (modelled subset).
+    pub requirement_checks: RequirementChecksDTO,
+}
+
+/// `player.reality` (modelled subset). The glyph inventory lives under
+/// `reality.glyphs` (Feature 6.2); the automator subtree is ignored.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RealityDTO {
+    #[serde(with = "break_infinity::serde_string")]
+    pub reality_machines: Decimal,
+    #[serde(rename = "maxRM", with = "break_infinity::serde_string")]
+    pub max_rm: Decimal,
+    /// Unspent Perk Points (a plain number).
+    pub perk_points: f64,
+    /// Bought perk ids (a Set serialized as an array).
+    pub perks: Vec<u8>,
+    /// The live glyph RNG seed (a plain number; a 32-bit xorshift state once
+    /// rolling, the raw initial seed right after the first Reality).
+    pub seed: f64,
+    pub initial_seed: f64,
+    /// The cached Marsaglia spare deviate (`1e6` = none).
+    pub second_gaussian: f64,
+    /// Rebuyable Reality Upgrade counts, keyed by id string ("1".."5").
+    pub rebuyables: std::collections::HashMap<String, u32>,
+    pub upgrade_bits: u32,
+    pub upg_reqs: u32,
+    pub req_lock: ReqLockDTO,
+    pub respec: bool,
+    pub ach_timer: f64,
+    pub auto_achieve: bool,
+    pub gained_auto_achievements: bool,
+}
+
+/// `player.reality.reqLock` — player-armed requirement locks.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReqLockDTO {
+    pub reality: u32,
+}
+
+/// `player.requirementChecks` (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RequirementChecksDTO {
+    pub eternity: EternityChecksDTO,
+    pub reality: RealityChecksDTO,
+}
+
+/// `player.requirementChecks.eternity` (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EternityChecksDTO {
+    #[serde(rename = "noRG")]
+    pub no_rg: bool,
+}
+
+/// `player.requirementChecks.reality` (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RealityChecksDTO {
+    pub no_infinities: bool,
+    pub no_eternities: bool,
+    pub max_glyphs: i32,
 }
 
 /// `player.replicanti` (modelled subset). The sub-interval `timer` is transient and
@@ -324,6 +392,41 @@ pub struct RecordsDTO {
     /// `[time, realTime, EP, eternities, challenge, TT]`; parsed leniently
     /// (unrecognized shapes fall back to the placeholder entry).
     pub recent_eternities: Vec<serde_json::Value>,
+    pub this_reality: ThisRealityDTO,
+    pub best_reality: BestRealityDTO,
+    /// `records.recentRealities` — 10 mixed-type tuples
+    /// `[time, realTime, RM, realityCount, challenge, projIM]`; parsed
+    /// leniently like the eternity ring.
+    pub recent_realities: Vec<serde_json::Value>,
+}
+
+/// `player.records.thisReality` (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThisRealityDTO {
+    pub time: f64,
+    pub real_time: f64,
+    #[serde(rename = "maxEP", with = "break_infinity::serde_string")]
+    pub max_ep: Decimal,
+    #[serde(with = "break_infinity::serde_string")]
+    pub max_replicanti: Decimal,
+    #[serde(rename = "maxDT", with = "break_infinity::serde_string")]
+    pub max_dt: Decimal,
+}
+
+/// `player.records.bestReality` (modelled subset; the glyph-loadout snapshot
+/// fields are ignored).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BestRealityDTO {
+    pub time: f64,
+    pub real_time: f64,
+    #[serde(rename = "RMmin", with = "break_infinity::serde_string")]
+    pub rm_min: Decimal,
+    pub glyph_level: u32,
+    #[serde(rename = "bestEP", with = "break_infinity::serde_string")]
+    pub best_ep: Decimal,
+    pub glyph_strength: f64,
 }
 
 /// `player.records.thisEternity` (modelled subset): timing plus the peak
@@ -695,6 +798,25 @@ impl GameState {
             }
         }
 
+        // Parse the recent-realities tuples: `[time, realTime, RM-string,
+        // realityCount, ...]`.
+        let mut recent_realities = Vec::with_capacity(10);
+        for entry in dto.records.recent_realities.iter().take(10) {
+            let parsed = entry.as_array().and_then(|t| {
+                Some(crate::records::RecentReality {
+                    time_ms: t.first()?.as_f64()?,
+                    real_time_ms: t.get(1)?.as_f64()?,
+                    rm: parse_decimal(t.get(2)?)?,
+                    reality_count: t.get(3)?.as_f64()?,
+                })
+            });
+            recent_realities
+                .push(parsed.unwrap_or_else(crate::records::RecentReality::placeholder));
+        }
+        while recent_realities.len() < 10 {
+            recent_realities.push(crate::records::RecentReality::placeholder());
+        }
+
         let records = Records {
             total_time_played_ms: dto.records.total_time_played,
             real_time_played_ms: dto.records.real_time_played,
@@ -725,6 +847,58 @@ impl GameState {
                 real_time_ms: dto.records.best_eternity.real_time,
             },
             recent_eternities,
+            this_reality: crate::records::ThisReality {
+                time_ms: dto.records.this_reality.time,
+                real_time_ms: dto.records.this_reality.real_time,
+                max_ep: dto.records.this_reality.max_ep,
+                max_replicanti: dto.records.this_reality.max_replicanti,
+                max_dt: dto.records.this_reality.max_dt,
+            },
+            best_reality: crate::records::BestReality {
+                time_ms: dto.records.best_reality.time,
+                real_time_ms: dto.records.best_reality.real_time,
+                rm_min: dto.records.best_reality.rm_min,
+                glyph_level: dto.records.best_reality.glyph_level,
+                best_ep: dto.records.best_reality.best_ep,
+                glyph_strength: dto.records.best_reality.glyph_strength,
+            },
+            recent_realities,
+        };
+
+        // Reality-layer state (`player.reality` + the root `realities`).
+        let reality = {
+            let mut rebuyables = [0u32; 5];
+            for (key, count) in &dto.reality.rebuyables {
+                if let Ok(id) = key.parse::<usize>() {
+                    if (1..=5).contains(&id) {
+                        rebuyables[id - 1] = *count;
+                    }
+                }
+            }
+            crate::reality::RealityState {
+                machines: dto.reality.reality_machines,
+                max_rm: dto.reality.max_rm,
+                realities: dto.realities.max(0.0) as u32,
+                perk_points: dto.reality.perk_points,
+                perks: dto.reality.perks.iter().copied().collect(),
+                seed: dto.reality.seed,
+                initial_seed: dto.reality.initial_seed,
+                second_gaussian: dto.reality.second_gaussian,
+                upgrade_bits: dto.reality.upgrade_bits,
+                upg_reqs: dto.reality.upg_reqs,
+                req_lock: dto.reality.req_lock.reality,
+                rebuyables,
+                respec: dto.reality.respec,
+                ach_timer: dto.reality.ach_timer,
+                auto_achieve: dto.reality.auto_achieve,
+                gained_auto_achievements: dto.reality.gained_auto_achievements,
+            }
+        };
+        let requirement_checks = crate::reality::RequirementChecks {
+            eternity_no_rg: dto.requirement_checks.eternity.no_rg,
+            reality_no_infinities: dto.requirement_checks.reality.no_infinities,
+            reality_no_eternities: dto.requirement_checks.reality.no_eternities,
+            reality_max_glyphs: dto.requirement_checks.reality.max_glyphs,
         };
 
         // Achievement bitmask. The original's `achievementBits` is 17 rows in a
@@ -901,6 +1075,8 @@ impl GameState {
             ec_requirement_bits: dto.challenge.eternity.requirement_bits,
             eterc8_ids: dto.eterc8ids,
             eterc8_repl: dto.eterc8repl,
+            reality,
+            requirement_checks,
             dilation: {
                 let mut rebuyables = [0u32; 3];
                 for (key, count) in &dto.dilation.rebuyables {

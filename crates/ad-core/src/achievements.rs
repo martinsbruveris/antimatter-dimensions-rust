@@ -33,7 +33,14 @@ use crate::state::GameState;
 pub const ACHIEVEMENT_ROW_COUNT: usize = 18;
 
 /// Number of columns (achievements) per row.
-const ACHIEVEMENTS_PER_ROW: u16 = 8;
+pub const ACHIEVEMENTS_PER_ROW: u16 = 8;
+
+/// The achievements the engine can currently award (an inline unlock hook
+/// exists at the relevant seam). The Reality study's "all pre-Reality
+/// achievements" requirement is checked against this set until achievement
+/// coverage reaches rows 1–13 (see `design-docs/2026-07-05-reality.md`).
+pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] =
+    &[11, 12, 18, 21, 23, 24, 25, 26, 27, 28, 136];
 
 impl GameState {
     /// `(row_index, column_bitmask)` for an achievement id, where

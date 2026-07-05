@@ -235,6 +235,65 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         })
         .collect::<Vec<_>>());
 
+    // Reality: the root realities count, `player.reality`, the reality
+    // records, and the requirement-check flags.
+    player["realities"] = json!(state.reality.realities);
+    let reality = &mut player["reality"];
+    reality["realityMachines"] = decimal(&state.reality.machines);
+    reality["maxRM"] = decimal(&state.reality.max_rm);
+    reality["perkPoints"] = json!(state.reality.perk_points);
+    reality["perks"] = json!(state.reality.perks.iter().collect::<Vec<_>>());
+    reality["seed"] = json!(state.reality.seed);
+    reality["initialSeed"] = json!(state.reality.initial_seed);
+    reality["secondGaussian"] = json!(state.reality.second_gaussian);
+    for (i, count) in state.reality.rebuyables.iter().enumerate() {
+        reality["rebuyables"][(i + 1).to_string()] = json!(count);
+    }
+    reality["upgradeBits"] = json!(state.reality.upgrade_bits);
+    reality["upgReqs"] = json!(state.reality.upg_reqs);
+    reality["reqLock"]["reality"] = json!(state.reality.req_lock);
+    reality["respec"] = json!(state.reality.respec);
+    reality["achTimer"] = json!(state.reality.ach_timer);
+    reality["autoAchieve"] = json!(state.reality.auto_achieve);
+    reality["gainedAutoAchievements"] = json!(state.reality.gained_auto_achievements);
+    let records = &mut player["records"];
+    records["thisReality"]["time"] = json!(state.records.this_reality.time_ms);
+    records["thisReality"]["realTime"] = json!(state.records.this_reality.real_time_ms);
+    records["thisReality"]["maxEP"] = decimal(&state.records.this_reality.max_ep);
+    records["thisReality"]["maxReplicanti"] =
+        decimal(&state.records.this_reality.max_replicanti);
+    records["thisReality"]["maxDT"] = decimal(&state.records.this_reality.max_dt);
+    records["bestReality"]["time"] = json!(state.records.best_reality.time_ms);
+    records["bestReality"]["realTime"] = json!(state.records.best_reality.real_time_ms);
+    records["bestReality"]["RMmin"] = decimal(&state.records.best_reality.rm_min);
+    records["bestReality"]["glyphLevel"] = json!(state.records.best_reality.glyph_level);
+    records["bestReality"]["bestEP"] = decimal(&state.records.best_reality.best_ep);
+    records["bestReality"]["glyphStrength"] =
+        json!(state.records.best_reality.glyph_strength);
+    records["recentRealities"] = json!(state
+        .records
+        .recent_realities
+        .iter()
+        .map(|r| {
+            json!([
+                r.time_ms,
+                r.real_time_ms,
+                r.rm.to_string(),
+                r.reality_count,
+                "",
+                0
+            ])
+        })
+        .collect::<Vec<_>>());
+    player["requirementChecks"]["eternity"]["noRG"] =
+        json!(state.requirement_checks.eternity_no_rg);
+    player["requirementChecks"]["reality"]["noInfinities"] =
+        json!(state.requirement_checks.reality_no_infinities);
+    player["requirementChecks"]["reality"]["noEternities"] =
+        json!(state.requirement_checks.reality_no_eternities);
+    player["requirementChecks"]["reality"]["maxGlyphs"] =
+        json!(state.requirement_checks.reality_max_glyphs);
+
     // Time Dimensions + Time Shards + free tickspeed upgrades.
     player["timeShards"] = decimal(&state.time_shards);
     player["totalTickGained"] = json!(state.total_tick_gained);
@@ -645,6 +704,95 @@ mod tests {
         assert_eq!(reloaded.dilation.rebuyables, [3, 1, 2]);
         assert_eq!(reloaded.dilation.last_ep, Decimal::new(1.0, 60));
         assert!(!reloaded.options.confirmations.dilation);
+    }
+
+    #[test]
+    fn reality_state_round_trips() {
+        let mut state = decode_save(INITIAL_SAVE.trim()).unwrap();
+        state.reality.machines = Decimal::from_float(1234.0);
+        state.reality.max_rm = Decimal::from_float(2000.0);
+        state.reality.realities = 3;
+        state.reality.perk_points = 2.0;
+        state.reality.perks = [0u8, 10, 205].into_iter().collect();
+        state.reality.seed = -1_234_567.0;
+        state.reality.initial_seed = 987_654_321_012.0;
+        state.reality.second_gaussian = 0.25;
+        state.reality.rebuyables = [1, 0, 2, 0, 3];
+        state.reality.upgrade_bits = (1 << 6) | (1 << 19);
+        state.reality.upg_reqs = 1 << 6;
+        state.reality.req_lock = 1 << 9;
+        state.reality.respec = true;
+        state.reality.ach_timer = 60_000.0;
+        state.reality.auto_achieve = false;
+        state.reality.gained_auto_achievements = false;
+        state.records.this_reality.time_ms = 5_000.0;
+        state.records.this_reality.max_ep = Decimal::new(1.0, 4321);
+        state.records.this_reality.max_replicanti = Decimal::new(1.0, 30_000);
+        state.records.this_reality.max_dt = Decimal::new(1.0, 12);
+        state.records.best_reality.time_ms = 4_000.0;
+        state.records.best_reality.rm_min = Decimal::from_float(10.0);
+        state.records.best_reality.glyph_level = 42;
+        state.records.best_reality.best_ep = Decimal::new(1.0, 4500);
+        state.records.best_reality.glyph_strength = 2.5;
+        state.records.recent_realities[0] = crate::records::RecentReality {
+            time_ms: 5_000.0,
+            real_time_ms: 6_000.0,
+            rm: Decimal::from_float(100.0),
+            reality_count: 1.0,
+        };
+        state.requirement_checks.eternity_no_rg = false;
+        state.requirement_checks.reality_no_infinities = false;
+        state.requirement_checks.reality_no_eternities = false;
+        state.requirement_checks.reality_max_glyphs = 4;
+
+        let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
+        assert_eq!(reloaded.reality.machines, Decimal::from_float(1234.0));
+        assert_eq!(reloaded.reality.max_rm, Decimal::from_float(2000.0));
+        assert_eq!(reloaded.reality.realities, 3);
+        assert_eq!(reloaded.reality.perk_points, 2.0);
+        assert!(reloaded.perk_bought(0));
+        assert!(reloaded.perk_bought(205));
+        assert!(!reloaded.perk_bought(11));
+        assert_eq!(reloaded.reality.seed, -1_234_567.0);
+        assert_eq!(reloaded.reality.initial_seed, 987_654_321_012.0);
+        assert_eq!(reloaded.reality.second_gaussian, 0.25);
+        assert_eq!(reloaded.reality.rebuyables, [1, 0, 2, 0, 3]);
+        assert_eq!(reloaded.reality.upgrade_bits, (1 << 6) | (1 << 19));
+        assert_eq!(reloaded.reality.upg_reqs, 1 << 6);
+        assert_eq!(reloaded.reality.req_lock, 1 << 9);
+        assert!(reloaded.reality.respec);
+        assert_eq!(reloaded.reality.ach_timer, 60_000.0);
+        assert!(!reloaded.reality.auto_achieve);
+        assert!(!reloaded.reality.gained_auto_achievements);
+        assert_eq!(reloaded.records.this_reality.time_ms, 5_000.0);
+        assert_eq!(
+            reloaded.records.this_reality.max_ep,
+            Decimal::new(1.0, 4321)
+        );
+        assert_eq!(
+            reloaded.records.this_reality.max_replicanti,
+            Decimal::new(1.0, 30_000)
+        );
+        assert_eq!(reloaded.records.this_reality.max_dt, Decimal::new(1.0, 12));
+        assert_eq!(reloaded.records.best_reality.time_ms, 4_000.0);
+        assert_eq!(
+            reloaded.records.best_reality.rm_min,
+            Decimal::from_float(10.0)
+        );
+        assert_eq!(reloaded.records.best_reality.glyph_level, 42);
+        assert_eq!(
+            reloaded.records.best_reality.best_ep,
+            Decimal::new(1.0, 4500)
+        );
+        assert_eq!(reloaded.records.best_reality.glyph_strength, 2.5);
+        assert_eq!(
+            reloaded.records.recent_realities[0].rm,
+            Decimal::from_float(100.0)
+        );
+        assert!(!reloaded.requirement_checks.eternity_no_rg);
+        assert!(!reloaded.requirement_checks.reality_no_infinities);
+        assert!(!reloaded.requirement_checks.reality_no_eternities);
+        assert_eq!(reloaded.requirement_checks.reality_max_glyphs, 4);
     }
 
     #[test]

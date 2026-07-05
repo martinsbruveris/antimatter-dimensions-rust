@@ -17,6 +17,7 @@ pub mod infinity_dimensions;
 pub mod infinity_upgrades;
 pub mod observed;
 pub mod options;
+pub mod reality;
 pub mod records;
 pub mod replicanti;
 pub mod sacrifice;
@@ -50,7 +51,11 @@ pub use infinity_upgrades::{
 };
 pub use observed::{ObservedDimensionTier, ObservedState, ObservedTickspeedState};
 pub use options::Options;
-pub use records::{BestEternity, BestInfinity, Records, ThisEternity, ThisInfinity};
+pub use reality::{GlyphLevel, RealityState, RequirementChecks, RM_HARDCAP};
+pub use records::{
+    BestEternity, BestInfinity, BestReality, RecentReality, Records, ThisEternity,
+    ThisInfinity, ThisReality,
+};
 pub use replicanti::{ReplicantiState, REPLICANTI_CAP, REPLICANTI_UNLOCK_COST};
 pub use state::{DimensionTier, GameState, TickspeedState};
 pub use tab_notifications::TabNotificationId;

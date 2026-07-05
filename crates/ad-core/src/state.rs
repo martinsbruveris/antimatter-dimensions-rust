@@ -10,6 +10,7 @@ use crate::dilation::DilationState;
 use crate::infinity_challenges::InfinityChallengeState;
 use crate::infinity_dimensions::InfinityDimension;
 use crate::options::Options;
+use crate::reality::{RealityState, RequirementChecks};
 use crate::records::Records;
 use crate::replicanti::ReplicantiState;
 use crate::time_dimensions::TimeDimension;
@@ -293,6 +294,15 @@ pub struct GameState {
     /// Upgrades. Persists across Eternities. See `dilation.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub dilation: DilationState,
+    /// Reality (`player.reality` + `player.realities`): Reality Machines,
+    /// realities, Perk Points, the glyph RNG seed, Reality Upgrade bits, and
+    /// the auto-achievement machinery. Persists forever. See `reality.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub reality: RealityState,
+    /// The modelled slice of `player.requirementChecks`: run-scoped "avoided
+    /// X" flags consumed by Reality Upgrade requirements. See `reality.rs`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub requirement_checks: RequirementChecks,
     /// Owned Infinity Upgrades, one bit per [`InfinityUpgrade`](crate::InfinityUpgrade)
     /// (the original's `player.infinityUpgrades` string set as a bitmask).
     /// Persists across a Big Crunch. See `infinity_upgrades.rs`.
@@ -469,6 +479,8 @@ impl GameState {
             epmult_upgrades: 0,
             ic_best_times_ms: [f64::MAX; 8],
             dilation: DilationState::new(),
+            reality: RealityState::new(),
+            requirement_checks: RequirementChecks::new(),
             infinity_upgrades: 0,
             part_infinity_point: 0.0,
             challenge: NormalChallengeState::default(),

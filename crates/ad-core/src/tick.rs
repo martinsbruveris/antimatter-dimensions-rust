@@ -122,6 +122,8 @@ impl GameState {
         self.records.this_infinity.real_time_ms += real_dt_ms;
         self.records.this_eternity.time_ms += dt_ms;
         self.records.this_eternity.real_time_ms += real_dt_ms;
+        self.records.this_reality.time_ms += dt_ms;
+        self.records.this_reality.real_time_ms += real_dt_ms;
         // Track the peak Infinity Points this eternity (the original updates
         // `thisEternity.maxIP` in the `Currency.infinityPoints` setter; the
         // in-tick IP source is the passive `ipGen` upgrade).
@@ -136,6 +138,25 @@ impl GameState {
         let prev_peak = self.records.this_eternity.max_am;
         self.records.this_eternity.max_am =
             self.records.this_eternity.max_am.max(&self.antimatter);
+
+        // Reality-record peaks (the original tracks these in the EP / DT /
+        // replicanti currency setters): peak EP, replicanti, and DT this
+        // reality feed the RM formula and glyph level.
+        self.records.this_reality.max_ep =
+            self.records.this_reality.max_ep.max(&self.eternity_points);
+        self.records.this_reality.max_replicanti = self
+            .records
+            .this_reality
+            .max_replicanti
+            .max(&self.replicanti.amount);
+        self.records.this_reality.max_dt = self
+            .records
+            .this_reality
+            .max_dt
+            .max(&self.dilation.dilated_time);
+
+        // Auto-achievements regrant over real time after the first Reality.
+        self.tick_auto_achievements(real_dt_ms);
 
         // `updatePrestigeRates`: peak IP/min / EP/min for the header buttons.
         self.update_prestige_rates();

@@ -296,6 +296,9 @@ impl GameState {
         self.replicanti.timer_ms = 0.0;
         self.replicanti.amount = Decimal::ONE;
         self.replicanti.galaxies += 1;
+        // `player.requirementChecks.eternity.noRG = false` (spoils Reality
+        // Upgrade 6's requirement for this eternity).
+        self.requirement_checks.eternity_no_rg = false;
         // replicantiNoReset milestone (40 eternities): the RG no longer wipes
         // Dimension Boosts / dimensions / antimatter (`addReplicantiGalaxies`).
         if !self.eternity_milestone_reached(40) {

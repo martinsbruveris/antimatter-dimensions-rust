@@ -202,6 +202,10 @@ impl GameState {
                 .min(self.records.this_infinity.real_time_ms);
 
             self.infinity_unlocked = true;
+
+            // `player.requirementChecks.reality.noInfinities = false` (any
+            // rewarded crunch spoils Reality Upgrade 7/10's requirement).
+            self.requirement_checks.reality_no_infinities = false;
         }
 
         self.antimatter = self.starting_antimatter();
