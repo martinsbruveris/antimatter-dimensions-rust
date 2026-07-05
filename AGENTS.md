@@ -17,220 +17,52 @@ The original JS source code is available at `../antimatter-dimensions` and `../a
 ```
 antimatter-dimensions-rust/
 ├── Cargo.toml              # Workspace manifest
-├── design-docs/            # Architecture & analysis documents
+├── AGENTS.md               # This file — stable agent instructions
+├── CLAUDE.md               # Imports AGENTS.md so Claude Code picks it up
+├── docs/
+│   ├── README.md           # Documentation index + conventions
+│   ├── ARCHITECTURE.md     # Living architecture reference (crates, principles)
+│   ├── PORTING.md          # Porting method + referencing the original game
+│   ├── design/             # Design docs / RFCs — historical, written before coding
+│   └── worklog/            # Append-only session logs — historical, after coding
 ├── python/                 # Python source for the PyO3 bindings
 ├── crates/
 │   ├── break_infinity/     # Vendored big-number library (Decimal type)
-│   ├── ad-core/            # Game engine (rules) + static config
-│   ├── ad-sim/             # Simulation driver: Controller + run_simulation (depends on ad-core)
+│   ├── ad-core/            # Game engine (rules) + static config; see its ARCHITECTURE.md
+│   ├── ad-sim/             # Simulation driver (depends on ad-core); see its ARCHITECTURE.md
 │   ├── ad-format/          # Number formatting (notations): format(value, &FormatOptions)
 │   ├── ad-fidelity/        # Rust-vs-JS fidelity test harness
 │   ├── ad-python/          # PyO3 bindings (antimatter_dimensions._native)
 │   └── ad-gui/             # Tauri + Vue 3 frontend (playable; see its AGENTS.md)
 ```
 
-### Crate Responsibilities
+For crate responsibilities, the dependency graph, and design principles, see
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-| Crate | Type | Purpose |
-|-------|------|---------|
-| `break_infinity` | lib | Decimal type: `mantissa × 10^exponent` arithmetic for numbers up to ~1e9e15 |
-| `ad-core` | lib | Game engine (the rules). Pure logic, no IO. Owns `GameState`, the `Action` IR + `apply_action` seam, and the `data` module for static config. Never depends on `ad-sim`. |
-| `ad-sim` | lib | Simulation driver (decides *what a player does*). One-way dependency on `ad-core`; mutates the game only by emitting `Action`s. Hosts the `Controller` trait, `StrategyController`, and `run_simulation`/`simulate`. See `design-docs/2026-06-27-simulation-architecture.md`. |
-| `ad-format` | lib (+cdylib) | Pure, presentation-only number formatting: `format(&Decimal, &FormatOptions) -> String` + notation strategies. Never reads `GameState`. Ships WASM bindings (`wasm` feature, built via `wasm-pack`) used by `ad-gui`'s webview. See `design-docs/2026-06-25-number-formatting.md`. |
-| `ad-fidelity` | lib/bin | Scenario-based harness comparing Rust engine outputs against the JS game. |
-| `ad-python` | lib (cdylib) | PyO3 bindings exposing the engine to Python (`antimatter_dimensions._native`). |
-| `ad-gui` | bin | **Playable frontend.** Tauri backend + Vue 3/Vite/Pinia. Rust-authoritative; see `crates/ad-gui/AGENTS.md`. |
+## Documentation Map
 
-### Key Source Files (ad-core)
+Read the relevant deep docs before working; keep the living ones current.
 
-- `src/state.rs` — `GameState` struct (all mutable game state)
-- `src/action.rs` — `Action` IR + `GameState::apply_action`: the single mutation
-  seam every action producer (GUI, autobuyers, simulation) routes through
-- `src/tick.rs` — Main game loop (`tick()` and `simulate()`)
-- `src/dimensions.rs` — Dimension purchasing, production, multipliers
-- `src/tickspeed.rs` — Tickspeed upgrades and effects
-- `src/galaxy.rs` — Antimatter galaxy purchases
-- `src/sacrifice.rs` — Dimension sacrifice
-- `src/crunch.rs` — Big Crunch (Infinity): `can_big_crunch`, `big_crunch`, and the
-  shared `big_crunch_reset(forced, entering_challenge)` that both the manual crunch
-  and the challenge enter/exit route through. Awards Infinity Points
-  (`gained_infinity_points`, pre-break = 1), Infinities (`gained_infinities`), and
-  challenge completion only when at the goal; updates the fastest-infinity record; IP
-  / infinities / total-time-played persist across the reset. See
-  `design-docs/2026-07-02-infinity-points-and-records.md`.
-- `src/challenges.rs` — Normal Challenges (Feature 2.5): `NormalChallengeState` on
-  `GameState` (`current` + `completed` bitmask), unlock/start/exit/complete logic,
-  the reward wiring (completing NC1–9 unlocks the AD/Tickspeed autobuyers), the
-  per-run accumulator reset (`reset_challenge_stuff`), and the NC-specific helpers
-  (`max_dimensions_unlockable`, `max_boosts`, the NC9 same-cost bumps). **All 12
-  modifiers are implemented**, each applied inline at its engine site via
-  `challenge_running(N)` (so normal play is untouched): NC2/NC3/NC11 tick-state in
-  `tick.rs::update_challenges` (`chall2_pow`/`chall3_pow`/`matter`); NC5/NC6/NC9 in
-  the cost/tickspeed paths; NC4/NC12 in the dimension buy/production paths; NC7/NC8
-  in `infinity_upgrades.rs` (buy-10 / dim-boost power) and `sacrifice.rs`; NC8/NC10
-  in `galaxy.rs` and `sacrifice.rs`. See
-  `design-docs/2026-07-03-normal-challenges.md`.
-- `src/records.rs` — `Records`: the modelled slice of `player.records` (total time
-  played, this-infinity time/`maxAM`, best-infinity time). Advanced in `tick`; the
-  current-infinity records reset on a Big Crunch.
-- `src/infinity_upgrades.rs` — Infinity Upgrades (Feature 2.2): the `InfinityUpgrade`
-  enum + data table (cost, save-id, column prerequisite), purchase logic
-  (`buy_infinity_upgrade`, IP-gated bitmask on `GameState::infinity_upgrades`), and
-  the effect readers other modules call (`buy_ten_multiplier`, `dim_boost_power`,
-  `galaxy_strength_effect`, `reset_boost_reduction`, the AD-multiplier
-  contributions, `skip_resets_if_possible`, passive `generate_passive_ip`). Effects
-  are *applied* at the original's sites (dimension multiplier, tickspeed, boost/
-  galaxy requirement, reset paths). See
-  `design-docs/2026-07-03-infinity-upgrades.md`.
-- `src/break_infinity_upgrades.rs` — Break Infinity + its 12 upgrades (Feature 2.3).
-  `GameState::broke_infinity` (↔ `player.break`) lifts the `1e308` cap and switches
-  `gained_infinity_points` to the scaling formula (both in `crunch.rs` / `tick.rs`);
-  `break_infinity()` is gated on `break_infinity_unlockable()` (Big Crunch autobuyer
-  maxed). This module owns the `BreakInfinityUpgrade` (9 one-time, sharing the save's
-  `infinityUpgrades`) + `BreakInfinityRebuyable` (3, in `infinityRebuyables`) types,
-  purchase logic, and the effect readers (`break_infinity_upgrade_common_mult`,
-  `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`); six effects are
-  deferred (neutral). See `design-docs/2026-07-03-break-infinity.md`.
-- `src/replicanti.rs` — Replicanti (Feature 3.2): `ReplicantiState` on `GameState`,
-  unlocked with IP (`unlock_replicanti`), grown each tick (`tick_replicanti`, the
-  capped continuous approximation), and spent on Replicanti Galaxies
-  (`buy_replicanti_galaxy` → an antimatter-galaxy-like reset). RGs feed the tickspeed
-  formula via `effective_galaxies()` (used in `tickspeed.rs`); `replicanti_mult` is
-  folded into `id_common_multiplier` (`infinity_dimensions.rs`). Three IP upgrades
-  (chance / interval / galaxy cap). Persists across a Big Crunch. See
-  `design-docs/2026-07-03-replicanti.md`.
-- `src/eternity.rs` — Eternity (Feature 4.1): the second prestige.
-  `eternity_goal`/`can_eternity` (peak IP this eternity, or the running EC's
-  scaled goal), the EP formula (`5^(log10(maxIP + pending crunch IP)/308 − 0.7)
-  × totalEPMult`), `eternity()` rewards (EP, eternities, TS191 banked
-  infinities, the recent-eternities ring) and the layered reset —
-  `eternity_full_reset` (autobuyers/break + respec) over `eternity_reset_core`
-  (shared with `startEternityChallenge`), with the Eternity-Milestone keeps.
-  Also `update_prestige_rates` (bestIP/EPmin).
-- `src/eternity_milestones.rs` — Eternity Milestones (Feature 4.2): the
-  27-milestone catalogue (pure derived state, `eternities >= threshold`);
-  per-tick autoIC/autoUnlockID hooks; unlockAllND/replicantiNoReset are read at
-  their sites (state.rs / replicanti.rs), the reset keeps in eternity.rs.
-- `src/time_dimensions.rs` — Time Dimensions (Feature 4.3): 8 EP-bought tiers
-  (TD5–8 await Dilation), the threshold/e6000 cost curve, production chain →
-  Time Shards → free Tickspeed upgrades (`FreeTickspeed.fromShards` port with
-  the 300k softcap + Newton inversion). Made tickspeed a `Decimal`
-  (`current_tickspeed_ms`).
-- `src/time_studies.rs` — Time Studies (Feature 4.4): Time Theorems (AM/IP/EP
-  purchases gated on owning a TD), the 58-study pre-dilation catalogue with the
-  original structural rules (Dimension split + TS201, exclusive Pace columns,
-  Light/Dark pairs, EC-gated specials), respec. ~40 study effects live at
-  their engine sites (each site names its study).
-- `src/eternity_challenges.rs` — Eternity Challenges (Feature 4.5): EC study
-  slots (TT cost + secondary requirements + requirementBits waivers),
-  start/exit/complete flow through the Eternity reset, scaled goals (×5
-  completions), EC4/EC12 restriction failures, the EC12 game-speed factor,
-  and the restriction/reward effect readers consumed across the engine.
-- `src/dilation.rs` — Time Dilation (Features 5.1 + 5.2): dilation studies
-  (the real unlock gate + TD5–8), the dilated-run flow through the Eternity
-  reset (`dilatedValueOf` compression applied to the final AD/ID/TD
-  multipliers and the tickspeed interval), Tachyon Particles / Dilated Time /
-  Tachyon Galaxies (threshold crossings, free galaxies), and the Dilation
-  Upgrades (3 rebuyables + 7 one-time) with their effects at the usual sites.
-- `src/eternity_upgrades.rs` — Eternity Upgrades (Feature 4.6): the 6 one-time
-  EP upgrades (ID mults from EP/eternities/IC record times — with per-IC
-  best-time records written on completion in crunch.rs — TD mults from
-  achievements/TT/days played) and the rebuyable ×5 `epMult` feeding
-  `totalEPMult`.
-- `src/reality.rs` — Reality (Feature 6.1): `RealityState` (RM, realities,
-  Perk Points, the glyph RNG seeds, Reality-Upgrade bits, auto-achievement
-  machinery) + `RequirementChecks`, the RM formula (`uncapped_rm` with the
-  pre-first-reality softcap), `gained_glyph_level` (EP/replicanti/DT records →
-  instability softcaps), `reality()`/`reset_reality()` and the full
-  `finishProcessReality` port, achievement locking + `tick_auto_achievements`.
-- `src/glyphs.rs` — Glyphs (Feature 6.2): the JS-faithful seeded `GlyphRng`
-  (xorshift32 + Marsaglia spare, ToInt32 seed semantics; outputs verified
-  bit-for-bit against the original's algorithm), generation (strength/effect
-  rolls, the early-reality uniformity code, the uncommon guarantee), the
-  120-slot inventory + equip/respec, sacrifice (RU19-gated, 5 type boosts),
-  and the 20 generated effects' combiners; effects are applied at their
-  engine sites (each names its glyph effect).
-- `src/perks.rs` — Perks (Feature 6.3): the 35-perk catalogue + connection
-  graph, purchase (1 PP, adjacency), on-purchase side effects (START bumps,
-  EU1, ACHNR), `starting_ip`/`starting_ep`, and `tick_perk_effects` (EU
-  auto-grants, auto TT-gen/TD/Reality-study unlocks). Effects live at their
-  sites; the EC-autocomplete and autobuyer-speed perks are deferred.
-- `src/reality_upgrades.rs` — Reality Upgrades (Feature 6.4): 5 rebuyable
-  Amplifiers (the original's hybrid linear cost scaling) + 20 one-time
-  upgrades with `upgReqs` requirement tracking checked at the original's
-  events, `applyRUPG10`, RU11/RU14 continuous generation. RU13/RU25
-  (autobuyer improvements) deferred.
-- `src/black_holes.rs` — Black Holes (Feature 6.5): both holes' state machine
-  (BH2's phase advances only while BH1 is active), interval/power/duration
-  upgrades, pause + the 5 s unpause power ramp, and the game-speed factor
-  consumed by `game_speed_factor` (stacked with the `timespeed` glyph).
-- `src/automator/` — The Automator (Feature 6.6, all five stages): `mod.rs`
-  (script/constant storage + limits, AP unlock at 100), `lexer.rs` +
-  `parser.rs` + `compile.rs` (hand-written line-oriented scanner,
-  recursive-descent parser with per-line error recovery, game-state-aware
-  validation with the original's error text), `program.rs` + `exec.rs` (the
-  instruction set and the stack machine: interval
-  `max(0.994^realities × 500, 1)` ms, ≤100 commands/update, save-resume by
-  line re-matching), `blocks.rs` (text → block-editor structures),
-  `templates.rs` (the five script generators + warnings), `transfer.rs`
-  (serde-gated import/export text codec). See
-  `design-docs/2026-07-05-automator.md`.
-- `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
-  (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
-  multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
-  action methods; see `design-docs/2026-06-30-achievements.md`.
-- `src/tab_notifications.rs` — Tab notification badges: the pulsing yellow `!`
-  on tab/subtab buttons pointing at newly relevant content. `tab_notifications`
-  (the badged `tabKey + subtabKey` strings, ↔ `player.tabNotifications`) +
-  `triggered_tab_notification_bits` on `GameState`; the modelled
-  `TabNotificationId`s (firstInfinity / breakInfinity / ICUnlock / replicanti /
-  newAutobuyer) fire inline from `big_crunch_reset`, `break_infinity`,
-  `upgrade_autobuyer_interval`, and the per-tick IC-unlock/affordable-autobuyer
-  checks; the frontend acknowledges a viewed tab via `tab_notification_seen`.
-  See `design-docs/2026-07-04-tab-notifications.md`.
-- `src/tutorial.rs` — Tutorial-highlight state machine (`tutorial_state` /
-  `tutorial_active`): the gold glow + `!` that points a new player at the next
-  action. Advances passively in `tick()` and on the boost/galaxy/tickspeed
-  actions; the frontend renders the highlight. See
-  `design-docs/2026-06-30-ui-reveal-and-tutorial.md`.
-- `src/autobuyers.rs` — Automation system (Feature 2.6). The 8 AD + Tickspeed
-  autobuyers (antimatter-unlocked "slow versions") plus the Dim Boost / Galaxy /
-  Big Crunch autobuyers (challenge-only, from NC10/11/12). The IP-cost
-  **interval-upgrade** machinery (`cost ×2`, `interval ×0.6`, 100 ms floor) is
-  addressed via the `AutobuyerTarget` handle (`autobuyer_can_be_upgraded`,
-  `upgrade_autobuyer_interval`, `has_maxed_interval`). `break_infinity_unlockable()`
-  exposes the NC12-completed + maxed-Big-Crunch-interval gate that Feature 2.3
-  (Break Infinity) consumes. See `design-docs/2026-07-03-autobuyers.md`.
-- `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
-  `player.options`), held in `GameState`, preserved across a Big Crunch.
-  Includes the per-action `Confirmations` toggles (boost/galaxy/sacrifice/crunch),
-  the `Animations`/`ShowHintText`/`AwayProgress` toggle groups, header-gain
-  coloring, the sidebar resource id, and the hidden-tab bitmasks
-  (`hidden_tab_bits`/`hidden_subtab_bits`, keyed by the original tab ids)
-- `src/observed.rs` — `ObservedState`: read-only snapshot of `GameState` plus
-  computed fields (costs, affordability, `next_sacrifice_boost`). The decision
-  input for `ad-sim` controllers and the trace/GUI view.
-- `src/data/` — Static game configuration (constants, costs, dimension configs)
+- **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** — how the workspace fits
+  together (crate responsibilities, dependency graph, design principles). Read
+  before cross-crate work. **Living — keep current.**
+- **`crates/<crate>/ARCHITECTURE.md`** — file-by-file map of a crate's internals
+  (currently [`ad-core`](crates/ad-core/ARCHITECTURE.md) and
+  [`ad-sim`](crates/ad-sim/ARCHITECTURE.md)). Read and update these when working
+  inside those crates. **Living — keep current.**
+- **[`crates/ad-gui/AGENTS.md`](crates/ad-gui/AGENTS.md)** — frontend-specific
+  agent instructions.
+- **[`docs/PORTING.md`](docs/PORTING.md)** — fidelity standard and how to
+  reference the original JS game.
+- **[`docs/design/`](docs/design/)** — design docs / RFCs, written before coding.
+  Historical; see [`docs/README.md`](docs/README.md) for the index and the status
+  of each.
+- **[`docs/worklog/`](docs/worklog/)** — append-only log written after each work
+  session. See [`docs/worklog/README.md`](docs/worklog/README.md).
+- **[`docs/README.md`](docs/README.md)** — the documentation index and conventions
+  (naming, status front-matter, cross-linking).
 
-### Key Source Files (ad-sim)
-
-- `src/controller.rs` — `Controller` trait (`on_start` + per-tick `act`) and
-  `StrategyController` (fixed-strategy player; emits `Action`s only)
-- `src/simulator.rs` — `run_simulation` driver loop, `simulate` wrapper, and the
-  `StateTrace`/`StopCondition`/`StopReason`/`Simulation{Config,Result}` types
-- `src/strategy.rs` — `StrategyConfig` and its enums (sacrifice/purchase/prestige)
-
-## Architecture Principles
-
-1. **Immutable config, mutable state.** All game configuration is `const`/`static` in the `data` module. Only `GameState` mutates.
-2. **No `dyn` on hot paths.** Effect computation uses enums (jump table) rather than trait objects to allow inlining.
-3. **Deterministic simulation.** The engine is fully deterministic given the same inputs—no `SystemTime`, no unseeded RNG.
-4. **Frontend as thin shell.** The GUI never computes game logic; it only reads `GameState` for display.
-5. **No ECS.** The game has a fixed, known set of entities. Plain structs with named fields are simpler and faster.
-
-## Development Guidelines
-
-### Building and Testing
+## Building and Testing
 
 ```bash
 cargo build                    # Build all crates
@@ -242,7 +74,7 @@ cargo clippy                   # Lint
 cargo fmt                      # Format
 ```
 
-#### Frontend (ad-gui)
+### Frontend (ad-gui)
 
 ```bash
 cargo install wasm-pack                        # once (frontend build needs it)
@@ -259,10 +91,10 @@ numbers in-process via that module.
 `cargo run` serves the pre-built `dist/` (rebuild the frontend after JS/Vue
 changes — no Rust rebuild needed). `cargo tauri build` produces a bundled
 macOS `.app` with the custom icon (requires `cargo install tauri-cli`).
-See `crates/ad-gui/AGENTS.md` for the frontend architecture and how to add
-a page.
+See [`crates/ad-gui/AGENTS.md`](crates/ad-gui/AGENTS.md) for the frontend
+architecture and how to add a page.
 
-#### Python
+### Python
 
 ```bash
 uv run task format             # Format Python code (ruff)
@@ -272,24 +104,24 @@ uv run maturin develop         # Build Python bindings
 
 After editing Python code, always run `uv run task format` first, then `uv run task check-style`.
 
-### Code Style
+## Code Style
 
-#### Rust
+### Rust
 
-- **Max line width: 89 characters** (configured in `rustfmt.toml`; also applies to prose in `design-docs/`)
+- **Max line width: 89 characters** (configured in `rustfmt.toml`; also applies to prose in `docs/`)
 - Use `cargo fmt` before committing
 - Follow standard Rust naming conventions (`snake_case` for functions/variables, `CamelCase` for types)
 - Prefer `i64` for the Decimal exponent (not `f64`—this is an intentional departure from the JS port)
 - Comment only where clarification is needed; don't comment obvious code
 
-#### Python
+### Python
 
 - **Max line width: 89 characters** (configured via `[tool.ruff]` in `pyproject.toml`)
 - Use `uv run task format` (ruff) before committing
 - Follow PEP 8 naming conventions
 - Python source lives in `python/`; the native extension is `antimatter_dimensions._native`
 
-### Number System (`break_infinity`)
+## Number System (`break_infinity`)
 
 The `Decimal` type represents numbers as `mantissa × 10^exponent`:
 - `mantissa: f64` — normalized to [1, 10) or 0
@@ -301,15 +133,11 @@ The `Decimal` type represents numbers as `mantissa × 10^exponent`:
   for already-normalized values, so it can initialize `const`/`static` items
   (e.g. `BIG_CRUNCH_THRESHOLD`); `new` cannot, as normalization isn't const.
 
-### Adding Game Systems
+## Adding a Game System
 
-The project follows a phased approach (see `design-docs/2026-06-19-architecture.md` §9):
-1. Foundation: `break_infinity` + basic `GameState`
-2. Core: antimatter dimensions, tickspeed, dim boosts, galaxies, sacrifice
-3. First prestige: infinity, infinity dimensions, normal challenges
-4. Second prestige: eternity, time dimensions, time studies
-5. Mid-game: replicanti, dilation, eternity challenges
-6. Reality: glyphs, perks, celestials
+The project follows a phased porting roadmap; see the fidelity standard and the
+phase list in [`docs/PORTING.md`](docs/PORTING.md), and the original architecture
+decision in [`docs/design/2026-06-19-architecture.md`](docs/design/2026-06-19-architecture.md) §9.
 
 When adding a new system:
 - Add game state fields to `GameState` in `state.rs`
@@ -317,87 +145,39 @@ When adding a new system:
 - Implement logic as methods on `GameState` or in a dedicated module
 - Integrate into the tick loop in `tick.rs`
 - Add unit tests alongside the code and integration tests in `tests/`
+- Update [`crates/ad-core/ARCHITECTURE.md`](crates/ad-core/ARCHITECTURE.md) (and
+  `docs/ARCHITECTURE.md` for cross-crate changes) — see below.
 
-### Updating Documentation
+## Updating Documentation
 
-After completing a significant piece of work (new game system, architectural
-change, new crate, major refactor, or new tooling), update all relevant
-documentation before considering the task done:
+Documentation that drifts from the code is worse than no documentation. This
+applies to both human and AI contributors. The docs fall into three buckets by
+*when* they are written and *how* they are maintained:
 
-- **This file (`AGENTS.md`)** — update repository structure, key source files,
-  crate responsibilities, build commands, or any section affected by the change.
-- **`crates/ad-gui/AGENTS.md`** — if the frontend was modified.
-- **`design-docs/`** — add a new design doc for major architectural decisions;
-  update existing docs if they reference changed behaviour.
-- **Design Documents table** (in this file) — add entries for any new design
-  docs created.
-- **README or inline doc-comments** — if public APIs or usage instructions
-  changed.
+- **Living (keep current):** `AGENTS.md`, `docs/ARCHITECTURE.md`,
+  `crates/*/ARCHITECTURE.md`, `crates/ad-gui/AGENTS.md`. When you change code,
+  update these in the *same* change so they always describe how things work
+  **now**.
+- **Design docs (`docs/design/`) — historical.** Written before coding. Do **not**
+  rewrite them to match new code. The only edits allowed after the fact are:
+  (1) the `status:` front-matter field, and (2) ticking checkboxes in embedded
+  plans/checklists. When a doc no longer reflects reality, set `status: Superseded`
+  (with `superseded_by:` if applicable) rather than editing the body.
+- **Worklog (`docs/worklog/`) — historical, append-only.** After a work session,
+  add a **new** dated file. Never edit an existing worklog entry.
 
-This applies to both human and AI contributors. Documentation that drifts from
-the code is worse than no documentation.
+After a significant piece of work (new system, architectural change, new crate,
+major refactor, new tooling):
 
-### Referencing the Original Game
-
-The original JS source is at `../antimatter-dimensions/src/core/`. Key directories:
-- `src/core/dimensions/` — Dimension classes
-- `src/core/secret-formula/` — Game data/constants/configurations
-- `src/core/game-mechanics/` — Base classes (Effect, Purchasable, etc.)
-- `src/core/celestials/` — Endgame celestial mechanics
-- `src/game.js` — Main game loop + prestige formulas
-
-When porting a system, aim for **behavioral fidelity** (same gameplay results) rather than structural fidelity (same code organization).
-
-**UI fidelity:** The UI should match the original game **exactly** — same layout,
-sizing, colors, fonts, and styling. The frontend vendors the original game's
-stylesheets verbatim (see `crates/ad-gui/frontend/public/stylesheets/`), so for
-any UI implementation, consult the original game code to see how those stylesheets
-are applied: which classes a component uses, the exact CSS values (widths,
-font-sizes, spacing), and which CSS variables (e.g. `--color-accent`,
-`--color-good`) it references. The original Vue components live in
-`../antimatter-dimensions/src/components/`. Prefer reusing the vendored classes
-and variables over inventing new styles, and copy concrete values from the
-original rather than guessing.
-
-**Number formatting / notations:** `src/core/format.js` holds only the thin wrappers
-(`format`, `formatInt`, `formatX`, …). The actual notation strategies (Scientific,
-Engineering, Standard, Letters, …) live in the external `@antimatter-dimensions/notations`
-package, not in `src/core/`. Its source is the bundled dist (no `.ts` sources shipped):
-`../antimatter-dimensions/node_modules/@antimatter-dimensions/notations/dist/ad-notations.esm.js`
-(run `npm install` in `../antimatter-dimensions` if `node_modules` is absent).
-
-## Design Documents
-
-Located in `design-docs/`:
-
-| Document | Summary |
-|----------|---------|
-| `2026-06-11-codebase-analysis.md` | Full analysis of the original JS game's architecture |
-| `2026-06-11-endgame-analysis.md` | Analysis of the endgame mod's additions |
-| `2026-06-19-architecture.md` | Rust project architecture, workspace layout, design decisions |
-| `2026-06-19-break-infinity-review.md` | Code review of the vendored break_infinity crate |
-| `2026-06-21-break-eternity-representation.md` | Design for extending Decimal to support break_eternity (tower numbers) |
-| `2026-06-24-ui-framework-analysis.md` | Comparison of GUI framework options for the playable frontend |
-| `2026-06-25-frontend-architecture.md` | `ad-gui` design: Tauri + Vue 3/Vite/Pinia, vendored CSS, Rust-authoritative snapshot |
-| `2026-06-25-number-formatting.md` | Where number formatting lives (Rust now; PyO3 + WASM later) and why |
-| `2026-06-27-options-tabs.md` | Analysis of the Visual & Gameplay options tabs + iterative port plan |
-| `2026-06-27-simulation-architecture.md` | Options for a full end-to-end simulation driver (Action IR + Controller trait) kept cleanly separate from game logic |
-| `2026-06-28-js-frontend-rust-wasm-engine.md` | Feasibility analysis of keeping the original JS/Vue app and swapping its engine for Rust/WASM (rejected; recommends a WASM target for `ad-core` instead) |
-| `2026-06-30-offline-progress.md` | How the original simulates offline progress, how it maps onto our `simulate`/`ticks` primitives, the game-speed/timestamp implications, and a design for a manual Offline-mode button |
-| `2026-06-30-ui-reveal-and-tutorial.md` | Progressive UI reveal (hiding/showing AD rows, tickspeed, sacrifice), first-time/disable-able confirmation modals (boost/galaxy/sacrifice/crunch), and the tutorial glow + exclamation highlight; how the original implements each and a phased plan |
-| `2026-06-30-achievements.md` | Normal achievements: bitmask state on `GameState`, unlock hooks inline in the buy/galaxy/boost/crunch/tick methods (rows 1–2 minus News), per-achievement effects + the global achievement-power multiplier, `achievementBits` save round-trip, the sprite-driven tab, and the unlock toast; phased plan |
-| `2026-07-02-infinity-points-and-records.md` | Completing Feature 2.1: Infinity Points / Infinities currency, the `Records` struct (time played, this/best infinity), the IP gain formula (pre-break = 1), Big Crunch reward+reset semantics, save/load round-trip, and the Infinity tab + IP header |
-| `2026-07-03-infinity-upgrades.md` | Feature 2.2: the 16-upgrade Infinity grid — data table, bitmask state, purchase/column prereqs, every effect and its engine application site, passive `ipGen`, save/load, and the grid UI; bottom row (`ipMult`/`ipOffline`) deferred |
-| `2026-07-03-normal-challenges.md` | Feature 2.5: the 12 Normal Challenges — run state machine (start/complete/exit, forced Big-Crunch reset, unlock chain), all 12 modifiers mapped to their engine sites, reward→autobuyer wiring, save/load, the Challenges tab UI, and an incremental plan (NC1 slice first) |
-| `2026-07-04-dilation.md` | Phase 5 (Time Dilation): design for Features 5.1–5.2 — dilation studies, the dilated run + TP/DT/Tachyon-Galaxy mechanics, and the Dilation Upgrades |
-| `2026-07-04-eternity.md` | Phase 4 (Eternity): design for Features 4.1–4.6 — EP formula + reset semantics, milestones, Time Dimensions/free tickspeed, the Time Studies tree + effect map, Eternity Challenges, Eternity Upgrades; frontier corrections (TD5–8 are Dilation-gated; Big Crunch resets Replicanti) |
-| `2026-07-05-reality.md` | Phase 6 (Reality): design for Features 6.1–6.5 — RM formula + reality reset, the seeded glyph generator/effects/sacrifice, the perk tree, Reality Upgrades, Black Holes; frontier cuts (celestial content, automator) and the save mapping |
-| `2026-07-05-automator.md` | Feature 6.6 (Automator): mechanics, frontier cuts, the five-stage porting plan (engine prerequisites / language core / execution engine / text-editor UI / block editor + templates + import-export) and per-stage implementation notes (§12–§16) |
-| `2026-07-04-tab-notifications.md` | Tab notification badges (the yellow `!` on tabs): the original's two-field state + trigger/clear semantics, the 5 in-frontier notifications, and the engine-owned port (trigger hooks, save round-trip, sidebar rendering + seen-acknowledgement) |
-
-The table lists key documents; see the `design-docs/` folder for the full,
-date-prefixed set. Read these before making architectural decisions. The
-architecture doc is the primary reference.
+1. Update the **living** docs the change touches (`crates/*/ARCHITECTURE.md`,
+   `docs/ARCHITECTURE.md`, `crates/ad-gui/AGENTS.md`, this file).
+2. Add a **worklog** entry `docs/worklog/YYYY-MM-DD-<slug>.md` — see
+   [`docs/worklog/README.md`](docs/worklog/README.md) for the template.
+3. **Cross-link:** in the worklog entry, link the design doc(s) you implemented
+   and note any **deviations** from them. If a design doc no longer matches the
+   code, update its `status` (do not rewrite its body).
+4. If you added a new design doc, add a row to the index table in
+   [`docs/README.md`](docs/README.md) and set its `status`.
 
 ## Testing
 
