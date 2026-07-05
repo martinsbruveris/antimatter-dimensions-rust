@@ -26,6 +26,9 @@ export const useUiStore = defineStore("ui", {
     // keyboard shortcuts (?, H) drive the same state; only one modal is open
     // at once.
     openModal: null,
+    // Optional payload for the open modal (e.g. the glyph a sacrifice
+    // confirmation targets). Cleared with the modal.
+    modalPayload: null,
     // Whether Shift is currently held (original ui.view.shiftDown): overrides
     // the Info-Display hint options so hint text always shows while held.
     shiftDown: false,
@@ -197,11 +200,13 @@ export const useUiStore = defineStore("ui", {
       const next = (idx + delta + subtabs.length) % subtabs.length;
       this.setSubtab(tab.key, subtabs[next].key);
     },
-    showModal(name) {
+    showModal(name, payload = null) {
       this.openModal = name;
+      this.modalPayload = payload;
     },
     closeModal() {
       this.openModal = null;
+      this.modalPayload = null;
     },
     // Open `name`, or close it if it's already the open modal (matches the
     // original's ?/H toggle behaviour).

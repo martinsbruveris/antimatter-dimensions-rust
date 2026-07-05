@@ -1020,7 +1020,7 @@ impl GameState {
 
     /// replicationglyphlevel (bit 11): replicanti exponent for glyph level,
     /// with the diminishing-stack softcap.
-    pub(crate) fn glyph_effect_replicationglyphlevel_impl(&self) -> f64 {
+    pub fn glyph_effect_replicationglyphlevel_impl(&self) -> f64 {
         let values: Vec<f64> = self
             .glyph_effect_values(11)
             .iter()
@@ -1106,6 +1106,45 @@ impl GameState {
             .iter()
             .map(|&(l, s)| (l * s).sqrt())
             .product()
+    }
+
+    /// A single glyph's value for effect `bit`, as a Decimal (presentation:
+    /// glyph tooltips / the choice modal). Mirrors the per-effect formulas
+    /// used by the combiners above; `powermult` is computed in log space.
+    pub fn glyph_single_effect_value(glyph: &Glyph, bit: u8) -> Decimal {
+        let l = glyph.level as f64;
+        let s = glyph.strength;
+        let v = |x: f64| Decimal::from_float(x);
+        match bit {
+            0 => v(1.01 + l.powf(0.32) * s.powf(0.45) / 75.0),
+            1 => v(1.0 + l.powf(0.3) * s.powf(0.65) / 20.0),
+            2 => v(((s + 3.0) * l).powf(0.9)),
+            3 => v((l * s).powi(3) * 100.0),
+            4 => v((l * s).powf(1.5) * 2.0),
+            5 => v(1.0 - l.powf(0.17) * s.powf(0.35) / 100.0),
+            6 => v((l * s).sqrt() / 10_000.0),
+            7 => v(1.1 + l.powf(0.7) * s.powf(0.7) / 25.0),
+            8 => v(l * s * 3.0),
+            9 => v(1.1 + l.sqrt() * s / 25.0),
+            10 => v(0.0003 * l.powf(0.3) * s.powf(0.65)),
+            11 => v((l.powf(0.25) * s.powf(0.4)).sqrt() / 50.0),
+            12 => v(1.007 + l.powf(0.21) * s.powf(0.4) / 75.0),
+            13 => v(l.powf(0.2) * s.powf(0.4) * 0.04),
+            14 => v((l * (s + 1.0)).powi(6) * 10_000.0),
+            15 => v((l * s).powf(1.5) * 2.0),
+            16 => v(1.015 + l.powf(0.2) * s.powf(0.4) / 75.0),
+            17 => {
+                let base = l * s * 10.0;
+                if base <= 0.0 {
+                    Decimal::ONE
+                } else {
+                    Decimal::pow10(base * base.log10())
+                }
+            }
+            18 => v((l * s).sqrt()),
+            19 => v(1.0 + l * s / 12.0),
+            _ => Decimal::ZERO,
+        }
     }
 
     /// powerbuy10 (bit 19): buy-10 multiplier `×x`.

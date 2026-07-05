@@ -12,6 +12,7 @@ import EternityMilestonesTab from "../components/tabs/EternityMilestonesTab.vue"
 import TimeDimensionsTab from "../components/tabs/TimeDimensionsTab.vue";
 import TimeStudiesTab from "../components/tabs/TimeStudiesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
+import GlyphsTab from "../components/tabs/reality/GlyphsTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
 import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
@@ -146,6 +147,29 @@ export const TABS = [
         component: TimeDilationTab,
         condition: (s) => Boolean(s?.dilation?.unlocked),
         hideId: [7, 3],
+      },
+    ],
+  },
+  {
+    key: "reality",
+    name: "Reality",
+    hideId: 8,
+    // JS: `condition: () => PlayerProgress.realityUnlocked() ||
+    // TimeStudy.reality.isBought`.
+    condition: (s) =>
+      Boolean(s?.reality?.unlocked || s?.reality?.has_reality_study),
+    uiClass: "o-tab-btn--reality",
+    subtabs: [
+      { key: "glyphs", name: "Glyphs", symbol: "<i class='fas fa-clone'></i>", component: GlyphsTab, hideId: [8, 0] },
+      { key: "upgrades", name: "Reality Upgrades", symbol: "<i class='fas fa-arrow-up'></i>", component: null, hideId: [8, 1] },
+      { key: "perks", name: "Perks", symbol: "<i class='fas fa-project-diagram'></i>", component: null, hideId: [8, 3] },
+      {
+        key: "hole",
+        name: "Black Hole",
+        symbol: "<i class='fas fa-circle'></i>",
+        component: null,
+        condition: (s) => Boolean(s?.reality?.unlocked),
+        hideId: [8, 4],
       },
     ],
   },

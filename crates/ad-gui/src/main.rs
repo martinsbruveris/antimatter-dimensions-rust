@@ -319,6 +319,8 @@ struct GameView {
     eternity_upgrades: EternityUpgradesView,
     /// Time Dilation tab state.
     dilation: DilationView,
+    /// The Reality layer (header button, Glyphs tab, Reality modal).
+    reality: RealityView,
     /// Whether the EC subtab is available (a study held or any completion).
     eternity_challenges_unlocked: bool,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
@@ -520,6 +522,86 @@ struct DilationStudyView {
     cost: f64,
     is_bought: bool,
     can_buy: bool,
+}
+
+/// Serializable view of one glyph (equipped, inventory, or a Reality choice).
+#[derive(Serialize)]
+struct GlyphView {
+    id: u32,
+    idx: u32,
+    /// Type id ("power" … "companion").
+    kind: String,
+    strength: f64,
+    level: u32,
+    /// Effect bitmask (generated bits 0–19; companion bits 8/9).
+    effects: u32,
+    /// Per-effect values for the tooltip, in display order.
+    effect_values: Vec<GlyphEffectValueView>,
+    /// Sacrifice value (0 before RU19 / for the companion).
+    sacrifice_value: f64,
+}
+
+/// One effect entry on a glyph (bit + this glyph's value).
+#[derive(Serialize)]
+struct GlyphEffectValueView {
+    bit: u8,
+    value: Num,
+}
+
+/// One *combined* active glyph effect (the Current Glyph Effects panel).
+#[derive(Serialize)]
+struct ActiveGlyphEffectView {
+    bit: u8,
+    value: Num,
+    /// Whether a softcap reduced the combined value.
+    capped: bool,
+}
+
+/// Serializable view of the Reality layer (header button + Glyphs tab).
+#[derive(Serialize)]
+struct RealityView {
+    /// Whether the player has ever realitied.
+    unlocked: bool,
+    /// Whether the Reality study (dilation study 6) is bought.
+    has_reality_study: bool,
+    /// `isRealityAvailable()`.
+    is_available: bool,
+    realities: u32,
+    machines: Num,
+    perk_points: f64,
+    /// RM a Reality would grant right now.
+    gained_rm: Num,
+    /// The glyph level a Reality would grant + its unfloored value.
+    glyph_level: u32,
+    glyph_level_exact: f64,
+    /// EP needed for the next whole RM (the button's "Next at X EP").
+    next_machine_ep: Num,
+    /// Real time in this reality (minutes), for the RM/min readout.
+    reality_time_minutes: f64,
+    /// Best glyph level ever attained (modal comparison).
+    best_glyph_level: u32,
+    /// Whether the next Reality unequips glyphs.
+    respec: bool,
+    /// Glyph choices offered (1 pre-START, 4 after).
+    choice_count: usize,
+    /// The upcoming glyph choice(s) (RNG-stable preview).
+    upcoming_glyphs: Vec<GlyphView>,
+    /// Equipped glyphs + slot count.
+    active_glyphs: Vec<GlyphView>,
+    active_slot_count: usize,
+    /// Inventory glyphs (sparse; `idx` = slot in the 120-slot grid).
+    inventory_glyphs: Vec<GlyphView>,
+    protected_rows: u32,
+    free_inventory_space: u32,
+    /// Whether glyph sacrifice is unlocked (RU19).
+    can_sacrifice: bool,
+    /// Sacrifice totals per basic type (BASIC_GLYPH_TYPES order).
+    sac_totals: Vec<f64>,
+    /// The five sacrifice-effect values (power/infinity/time/replication/
+    /// dilation order; power+replication are integer delays).
+    sac_effects: Vec<f64>,
+    /// Combined active glyph effects, in the panel's display order.
+    active_effects: Vec<ActiveGlyphEffectView>,
 }
 
 /// Serializable view of the Eternity Upgrades tab.
@@ -977,6 +1059,175 @@ fn build_dilation_view(game: &GameState) -> DilationView {
     }
 }
 
+/// The Current Glyph Effects panel's display order (`glyphEffectsOrder` in
+/// CurrentGlyphEffects.vue), restricted to the generated bits.
+const GLYPH_EFFECT_DISPLAY_ORDER: [u8; 20] = [
+    16, 17, 18, 19, // power
+    12, 15, 14, 13, // infinity
+    9, 10, 8, 11, // replication
+    0, 3, 1, 2, // time
+    7, 6, 4, 5, // dilation
+];
+
+fn build_glyph_view(game: &GameState, glyph: &ad_core::Glyph) -> GlyphView {
+    // The companion's effect bits live in the non-generated bit space (its
+    // "effects" are flavour text), so it gets no numeric effect values.
+    let effect_values = if glyph.kind == ad_core::GlyphType::Companion {
+        Vec::new()
+    } else {
+        GLYPH_EFFECT_DISPLAY_ORDER
+            .iter()
+            .filter(|&&bit| glyph.effects & (1u32 << bit) != 0)
+            .map(|&bit| GlyphEffectValueView {
+                bit,
+                value: num(&GameState::glyph_single_effect_value(glyph, bit)),
+            })
+            .collect()
+    };
+    GlyphView {
+        id: glyph.id,
+        idx: glyph.idx,
+        kind: glyph.kind.save_id().to_string(),
+        strength: glyph.strength,
+        level: glyph.level,
+        effects: glyph.effects,
+        effect_values,
+        sacrifice_value: game.glyph_sacrifice_gain(glyph),
+    }
+}
+
+/// `EPforRM` from RealityButton.vue: the EP needed for a given RM amount
+/// (inverse of the RM formula), for the "Next at X EP" readout.
+fn ep_for_rm(game: &GameState, rm: &Decimal) -> Decimal {
+    if *rm <= Decimal::ONE {
+        return Decimal::pow10(4000.0);
+    }
+    if *rm <= Decimal::from_float(10.0) {
+        return Decimal::pow10(4000.0 / 27.0 * (rm.to_f64() + 26.0));
+    }
+    let mut result = Decimal::pow10(4000.0 * (rm.log10() / 3.0 + 1.0));
+    // Pre-first-reality softcap inverse: past 1e6000 the tax quadruples the
+    // required log-distance.
+    if !game.reality_unlocked() && result >= Decimal::pow10(6000.0) {
+        result = Decimal::pow10((result.log10() - 6000.0) * 4.0 + 6000.0);
+    }
+    result
+}
+
+fn build_reality_view(game: &GameState) -> RealityView {
+    let is_available = game.is_reality_available();
+    let gained_rm = game.gained_reality_machines();
+    let glyph_level = game.gained_glyph_level();
+
+    // Combined active effects: union of the equipped basic glyphs' bits.
+    let mut active_bits = 0u32;
+    for g in &game.reality.glyphs.active {
+        if g.kind != ad_core::GlyphType::Companion {
+            active_bits |= g.effects;
+        }
+    }
+    let active_effects = GLYPH_EFFECT_DISPLAY_ORDER
+        .iter()
+        .filter(|&&bit| active_bits & (1u32 << bit) != 0)
+        .map(|&bit| {
+            let (value, capped) = combined_glyph_effect(game, bit);
+            ActiveGlyphEffectView {
+                bit,
+                value: num(&value),
+                capped,
+            }
+        })
+        .collect();
+
+    RealityView {
+        unlocked: game.reality_unlocked(),
+        has_reality_study: game.dilation_study_bought(6),
+        is_available,
+        realities: game.reality.realities,
+        machines: num(&game.reality.machines),
+        perk_points: game.reality.perk_points,
+        gained_rm: num(&gained_rm),
+        glyph_level: glyph_level.actual_level,
+        glyph_level_exact: game.gained_glyph_level_exact(),
+        next_machine_ep: num(&ep_for_rm(game, &(gained_rm + Decimal::ONE))),
+        reality_time_minutes: game.records.this_reality.real_time_ms / 60_000.0,
+        best_glyph_level: game.records.best_reality.glyph_level,
+        respec: game.reality.respec,
+        choice_count: game.glyph_choice_count(),
+        upcoming_glyphs: if is_available {
+            game.upcoming_glyphs()
+                .iter()
+                .map(|g| build_glyph_view(game, g))
+                .collect()
+        } else {
+            Vec::new()
+        },
+        active_glyphs: game
+            .reality
+            .glyphs
+            .active
+            .iter()
+            .map(|g| build_glyph_view(game, g))
+            .collect(),
+        active_slot_count: game.glyph_active_slot_count(),
+        inventory_glyphs: game
+            .reality
+            .glyphs
+            .inventory
+            .iter()
+            .map(|g| build_glyph_view(game, g))
+            .collect(),
+        protected_rows: game.reality.glyphs.protected_rows,
+        free_inventory_space: game.glyph_free_inventory_space(),
+        can_sacrifice: game.can_sacrifice_glyphs(),
+        sac_totals: game.reality.glyphs.sac.to_vec(),
+        // BASIC_GLYPH_TYPES order (power/infinity/replication/time/dilation),
+        // matching `sac_totals`.
+        sac_effects: vec![
+            game.glyph_sac_power_effect() as f64,
+            game.glyph_sac_infinity_effect(),
+            game.glyph_sac_replication_effect() as f64,
+            game.glyph_sac_time_effect(),
+            game.glyph_sac_dilation_effect(),
+        ],
+        active_effects,
+    }
+}
+
+/// The combined value of active-glyph effect `bit` plus its softcap flag.
+fn combined_glyph_effect(game: &GameState, bit: u8) -> (Decimal, bool) {
+    let d = Decimal::from_float;
+    match bit {
+        0 => (d(game.glyph_effect_timepow()), false),
+        1 => (d(game.glyph_effect_timespeed()), false),
+        2 => (d(game.glyph_effect_timeetermult()), false),
+        3 => (d(game.glyph_effect_time_ep()), false),
+        4 => (game.glyph_effect_dilation_dt(), false),
+        5 => {
+            let value = game.glyph_effect_dilation_galaxy_threshold();
+            (d(value), value < 0.4)
+        }
+        6 => (d(game.glyph_effect_dilation_ttgen()), false),
+        7 => (d(game.glyph_effect_dilationpow()), false),
+        8 => (game.glyph_effect_replicationspeed(), false),
+        9 => (d(game.glyph_effect_replicationpow()), false),
+        10 => (d(game.glyph_effect_replicationdtgain()), false),
+        11 => {
+            let value = game.glyph_effect_replicationglyphlevel_impl();
+            (d(value), value > 0.1)
+        }
+        12 => (d(game.glyph_effect_infinitypow()), false),
+        13 => (d(game.glyph_effect_infinityrate()), false),
+        14 => (d(game.glyph_effect_infinity_ip()), false),
+        15 => (game.glyph_effect_infinityinfmult(), false),
+        16 => (d(game.glyph_effect_powerpow()), false),
+        17 => (game.glyph_effect_powermult(), false),
+        18 => (d(game.glyph_effect_powerdimboost()), false),
+        19 => (d(game.glyph_effect_powerbuy10()), false),
+        _ => (Decimal::ZERO, false),
+    }
+}
+
 fn build_eternity_upgrades_view(game: &GameState) -> EternityUpgradesView {
     use ad_core::EternityUpgrade;
     let effect = |u: EternityUpgrade| -> Decimal {
@@ -1125,6 +1376,7 @@ fn build_game_view(game: &GameState) -> GameView {
         eternity_challenges: build_eternity_challenges_view(game),
         eternity_upgrades: build_eternity_upgrades_view(game),
         dilation: build_dilation_view(game),
+        reality: build_reality_view(game),
         eternity_challenges_unlocked: game.eternity_challenge_unlocked != 0
             || (1..=12).any(|id| game.eternity_challenge_completions(id) > 0),
         eternity_milestones: ad_core::ETERNITY_MILESTONES
@@ -1483,6 +1735,52 @@ fn eternity(state: State<'_, Mutex<GameState>>) {
 fn break_infinity(state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
     game.break_infinity();
+}
+
+#[tauri::command]
+fn do_reality(
+    choice: Option<usize>,
+    sacrifice: bool,
+    state: State<'_, Mutex<GameState>>,
+) {
+    let mut game = state.lock().unwrap();
+    game.reality_with_glyph_choice(choice, sacrifice);
+}
+
+#[tauri::command]
+fn reset_reality(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.reset_reality();
+}
+
+#[tauri::command]
+fn equip_glyph(id: u32, slot: Option<u32>, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    // No slot given: use the first empty active slot.
+    let slot = slot.or_else(|| {
+        (0..game.glyph_active_slot_count() as u32)
+            .find(|&s| !game.reality.glyphs.active.iter().any(|g| g.idx == s))
+    });
+    if let Some(slot) = slot {
+        game.equip_glyph(id, slot);
+    }
+}
+
+#[tauri::command]
+fn sacrifice_glyph(id: u32, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.sacrifice_glyph(id);
+}
+
+#[tauri::command]
+fn move_glyph(id: u32, slot: u32, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.move_glyph_to_slot(id, slot);
+}
+
+#[tauri::command]
+fn set_glyph_respec(respec: bool, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().reality.respec = respec;
 }
 
 /// Buy a one-time Break Infinity Upgrade by its original save id (e.g.
@@ -2188,6 +2486,12 @@ pub fn run() {
             buy_max_time_theorems,
             set_respec,
             break_infinity,
+            do_reality,
+            reset_reality,
+            equip_glyph,
+            sacrifice_glyph,
+            move_glyph,
+            set_glyph_respec,
             buy_break_infinity_upgrade,
             buy_break_infinity_rebuyable,
             buy_infinity_dimension,

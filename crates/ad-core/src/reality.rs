@@ -267,6 +267,17 @@ impl GameState {
         }
     }
 
+    /// The exact (unfloored) actual glyph level, for the Reality button's
+    /// "% to next level" readout.
+    pub fn gained_glyph_level_exact(&self) -> f64 {
+        let (_, actual) = self.glyph_level_inputs();
+        if actual.is_finite() {
+            actual.max(0.0)
+        } else {
+            0.0
+        }
+    }
+
     /// The `(rawLevel, actualLevel)` pair of `getGlyphLevelInputs`.
     fn glyph_level_inputs(&self) -> (f64, f64) {
         // EP factor: pending Eternity gain counts while an Eternity is
@@ -364,6 +375,17 @@ impl GameState {
         true
     }
 
+    /// The forced, reward-free Reality reset
+    /// (`finishProcessReality(getRealityProps(true))` — the "Start this
+    /// Reality over" button). No RM/glyph/Perk Point, no records.
+    pub fn reset_reality(&mut self) -> bool {
+        if !self.reality_unlocked() {
+            return false;
+        }
+        self.reality_reset_internal();
+        true
+    }
+
     /// `giveRealityRewards` + `finishProcessReality`: award RM / a reality /
     /// a Perk Point, update the reality records, then reset everything from
     /// the Eternity layer down.
@@ -419,7 +441,12 @@ impl GameState {
         self.reality.realities += 1;
         self.reality.perk_points += 1.0;
 
-        // -- The reset (`finishProcessReality`) --
+        self.reality_reset_internal();
+    }
+
+    /// The reset half of `finishProcessReality`, shared by a rewarded Reality
+    /// and the forced reset.
+    fn reality_reset_internal(&mut self) {
         if self.reality.respec {
             self.unequip_all_glyphs();
             self.reality.respec = false;

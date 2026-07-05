@@ -30,6 +30,9 @@ import SacrificeConfirmModal from "./components/SacrificeConfirmModal.vue";
 import BigCrunchConfirmModal from "./components/BigCrunchConfirmModal.vue";
 import EternityConfirmModal from "./components/EternityConfirmModal.vue";
 import DilationConfirmModal from "./components/DilationConfirmModal.vue";
+import RealityModal from "./components/RealityModal.vue";
+import ResetRealityModal from "./components/ResetRealityModal.vue";
+import GlyphSacrificeConfirmModal from "./components/GlyphSacrificeConfirmModal.vue";
 
 const game = useGameStore();
 const ui = useUiStore();
@@ -323,6 +326,9 @@ onUnmounted(() => {
   <EternityConfirmModal v-if="ui.openModal === 'eternityConfirm'" />
 
   <DilationConfirmModal v-if="ui.openModal === 'dilationConfirm'" />
+  <RealityModal v-if="ui.openModal === 'reality'" />
+  <ResetRealityModal v-if="ui.openModal === 'resetReality'" />
+  <GlyphSacrificeConfirmModal v-if="ui.openModal === 'glyphSacrifice'" />
 
   <!-- Transient top-right toast popups (e.g. autobuyer pause/resume). -->
   <NotificationContainer />

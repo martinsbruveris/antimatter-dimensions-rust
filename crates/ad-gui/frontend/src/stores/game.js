@@ -173,6 +173,33 @@ export const useGameStore = defineStore("game", {
     buyDilationStudy(id) {
       return invoke("buy_dilation_study", { id });
     },
+    // --- Reality ---
+    // Perform a Reality with glyph choice `choice` (undefined = the default
+    // pick); `sacrifice` sends the picked glyph straight to sacrifice.
+    async doReality(choice, sacrifice = false) {
+      await invoke("do_reality", { choice: choice ?? null, sacrifice });
+      this.snapshot = await this.getState();
+    },
+    async resetReality() {
+      await invoke("reset_reality");
+      this.snapshot = await this.getState();
+    },
+    // Equip inventory glyph `id` (first free slot unless one is given).
+    async equipGlyph(id, slot = null) {
+      await invoke("equip_glyph", { id, slot });
+      this.snapshot = await this.getState();
+    },
+    async sacrificeGlyph(id) {
+      await invoke("sacrifice_glyph", { id });
+      this.snapshot = await this.getState();
+    },
+    moveGlyph(id, slot) {
+      return invoke("move_glyph", { id, slot });
+    },
+    async setGlyphRespec(respec) {
+      await invoke("set_glyph_respec", { respec });
+      this.snapshot = await this.getState();
+    },
     buyDilationUpgrade(id) {
       return invoke("buy_dilation_upgrade", { id });
     },
