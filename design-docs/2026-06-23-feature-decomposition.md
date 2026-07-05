@@ -981,22 +981,28 @@ frontier).
 
 ### Feature 6.6: Automator
 
-**Dependencies:** Feature 6.3 (perks unlock automator)
+**Dependencies:** Feature 6.3 (perks + reality upgrades grant Automator Points; unlocks
+at 100 AP). Also depends on engine features deferred by earlier phases: time study
+presets, big crunch autobuyer modes, eternity autobuyer, reality autobuyer.
 
 **Scope:** A scripting language that automates game actions (buying studies, prestiging,
 waiting for conditions, etc.). Uses a visual block editor or text editor.
 
-**Commands:**
-- `start/stop [dilation|ec N|challenge N]`
-- `studies [load/respec/buy]`
-- `auto [infinity/eternity/reality] [on/off/setting]`
-- `if/while [condition] { ... }`
-- `wait [condition]`
-- `unlock [dilation/ec/etc]`
-- `buy [upgrade]`
+**Analysis:** see `2026-07-05-automator.md` — full mechanics, frontier cuts, Rust
+design, and a five-stage porting plan (A: engine prerequisites, B: language core,
+C: execution engine, D: tab + text editor + docs UI, E: block editor + templates +
+import/export). The command sketch originally listed here was approximate; the
+actual grammar (22 commands; no `define` or `buy` command) is documented there.
 
-**Parser:** Uses the Chevrotain parser library in JS. For Rust, a simple hand-written
-parser or `nom`/`pest` would work.
+**Commands (actual set):** `auto`, prestige (`infinity/eternity/reality`),
+`studies purchase/load/respec`, `unlock`/`start` (dilation, ECs), `if`/`while`/
+`until` blocks, `wait` (condition / prestige event / black hole), `pause`,
+`notify`, `black hole on/off`, `store game time` (celestial-gated), `stop`,
+comments.
+
+**Parser:** Uses the Chevrotain parser library in JS. For Rust: a hand-written
+line-oriented lexer + recursive-descent parser (chosen over `nom`/`pest` for
+error-recovery and error-message fidelity; see the design doc).
 
 ---
 
