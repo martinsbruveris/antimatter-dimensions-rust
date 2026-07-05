@@ -853,6 +853,13 @@ eternity challenges, infinity dimensions, replicanti, all pre-eternity).
 **What persists:** Reality Machines, Glyphs, Perks, Reality Upgrades, Black Holes,
 Celestial progress, Achievement count.
 
+**Status:** ✅ Implemented (RM formula with the pre-first-reality softcap +
+1→10 linear ramp, the full `finishProcessReality` reset, reality records +
+recent-realities ring, requirement-check flags, achievement locking + the
+auto-achievement timer with perk reductions, the Reality study — dilation
+study 6 — gated on the *implemented* pre-Reality achievements, header Reality
+button + glyph-choice modal). See `2026-07-05-reality.md`.
+
 ---
 
 ### Feature 6.2: Glyphs
@@ -880,6 +887,15 @@ using type-specific rules (additive, multiplicative, or max).
 
 **Glyph sacrifice:** Sacrifice unneeded glyphs for Alchemy resources (later feature).
 
+**Status:** ✅ Implemented (the JS-faithful seeded RNG — xorshift32 +
+Marsaglia spare, verified bit-for-bit against node runs of the original,
+including the uniformity code —, strength/effect rolls, level from the
+reality records with instability softcaps, 120-slot inventory with protected
+rows, equip/respec, sacrifice with all 5 type boosts, all 20 generated
+effects at their engine sites, the Glyphs tab + tooltips). Celestial glyph
+types, cosmetics, the filter, undo, and alchemy refining are out of
+frontier.
+
 ---
 
 ### Feature 6.3: Perks
@@ -900,6 +916,12 @@ Reality). Perks provide QoL and progression bonuses.
 
 **Structure:** Tree with branching paths. Each perk costs 1 PP and requires its parent
 perk to be purchased.
+
+**Status:** ✅ Implemented (the catalogue is actually 35 perks + the
+connection graph, not ~100; purchases, on-purchase side effects, and every
+in-frontier effect at its site; EC auto-completion and the autobuyer-speed
+perks are deferred with their target systems; SVG tree tab on the original's
+fixed layout).
 
 ---
 
@@ -922,6 +944,12 @@ improvements.
 **Imaginary Upgrades:** 25 additional endgame upgrades purchased with Imaginary Machines
 (iM). Unlocked progressively from RM-based gates.
 
+**Status:** ✅ Implemented for the 25 Reality Upgrades (rebuyable hybrid
+cost scaling, upgReqs requirement tracking at the original's check events,
+RU10's start package, RU11/14 continuous generation, effects at their sites;
+RU13/RU25 autobuyer halves deferred). Imaginary Machines/Upgrades are out of
+frontier (RM hardcap gate).
+
 ---
 
 ### Feature 6.5: Black Holes
@@ -942,6 +970,12 @@ configurable intervals.
 - Power (speed multiplier)
 - Duration (active time)
 - Interval (time between activations, shorter = better)
+
+**Status:** ✅ Implemented (BH1 unlock at 100 RM, BH2 via RU20, the three
+upgrades per hole with hybrid costs, the phase state machine with BH2
+advancing only during BH1, pause + the 5 s unpause ramp, game-speed
+integration, tab UI; inversion/auto-pause are celestial-gated and out of
+frontier).
 
 ---
 

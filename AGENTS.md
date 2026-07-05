@@ -137,6 +137,33 @@ antimatter-dimensions-rust/
   best-time records written on completion in crunch.rs — TD mults from
   achievements/TT/days played) and the rebuyable ×5 `epMult` feeding
   `totalEPMult`.
+- `src/reality.rs` — Reality (Feature 6.1): `RealityState` (RM, realities,
+  Perk Points, the glyph RNG seeds, Reality-Upgrade bits, auto-achievement
+  machinery) + `RequirementChecks`, the RM formula (`uncapped_rm` with the
+  pre-first-reality softcap), `gained_glyph_level` (EP/replicanti/DT records →
+  instability softcaps), `reality()`/`reset_reality()` and the full
+  `finishProcessReality` port, achievement locking + `tick_auto_achievements`.
+- `src/glyphs.rs` — Glyphs (Feature 6.2): the JS-faithful seeded `GlyphRng`
+  (xorshift32 + Marsaglia spare, ToInt32 seed semantics; outputs verified
+  bit-for-bit against the original's algorithm), generation (strength/effect
+  rolls, the early-reality uniformity code, the uncommon guarantee), the
+  120-slot inventory + equip/respec, sacrifice (RU19-gated, 5 type boosts),
+  and the 20 generated effects' combiners; effects are applied at their
+  engine sites (each names its glyph effect).
+- `src/perks.rs` — Perks (Feature 6.3): the 35-perk catalogue + connection
+  graph, purchase (1 PP, adjacency), on-purchase side effects (START bumps,
+  EU1, ACHNR), `starting_ip`/`starting_ep`, and `tick_perk_effects` (EU
+  auto-grants, auto TT-gen/TD/Reality-study unlocks). Effects live at their
+  sites; the EC-autocomplete and autobuyer-speed perks are deferred.
+- `src/reality_upgrades.rs` — Reality Upgrades (Feature 6.4): 5 rebuyable
+  Amplifiers (the original's hybrid linear cost scaling) + 20 one-time
+  upgrades with `upgReqs` requirement tracking checked at the original's
+  events, `applyRUPG10`, RU11/RU14 continuous generation. RU13/RU25
+  (autobuyer improvements) deferred.
+- `src/black_holes.rs` — Black Holes (Feature 6.5): both holes' state machine
+  (BH2's phase advances only while BH1 is active), interval/power/duration
+  upgrades, pause + the 5 s unpause power ramp, and the game-speed factor
+  consumed by `game_speed_factor` (stacked with the `timespeed` glyph).
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
@@ -353,6 +380,7 @@ Located in `design-docs/`:
 | `2026-07-03-normal-challenges.md` | Feature 2.5: the 12 Normal Challenges — run state machine (start/complete/exit, forced Big-Crunch reset, unlock chain), all 12 modifiers mapped to their engine sites, reward→autobuyer wiring, save/load, the Challenges tab UI, and an incremental plan (NC1 slice first) |
 | `2026-07-04-dilation.md` | Phase 5 (Time Dilation): design for Features 5.1–5.2 — dilation studies, the dilated run + TP/DT/Tachyon-Galaxy mechanics, and the Dilation Upgrades |
 | `2026-07-04-eternity.md` | Phase 4 (Eternity): design for Features 4.1–4.6 — EP formula + reset semantics, milestones, Time Dimensions/free tickspeed, the Time Studies tree + effect map, Eternity Challenges, Eternity Upgrades; frontier corrections (TD5–8 are Dilation-gated; Big Crunch resets Replicanti) |
+| `2026-07-05-reality.md` | Phase 6 (Reality): design for Features 6.1–6.5 — RM formula + reality reset, the seeded glyph generator/effects/sacrifice, the perk tree, Reality Upgrades, Black Holes; frontier cuts (celestial content, automator) and the save mapping |
 | `2026-07-04-tab-notifications.md` | Tab notification badges (the yellow `!` on tabs): the original's two-field state + trigger/clear semantics, the 5 in-frontier notifications, and the engine-owned port (trigger hooks, save round-trip, sidebar rendering + seen-acknowledgement) |
 
 The table lists key documents; see the `design-docs/` folder for the full,

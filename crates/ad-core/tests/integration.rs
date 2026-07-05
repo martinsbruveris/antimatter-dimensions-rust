@@ -368,3 +368,83 @@ fn test_simulate_produces_antimatter() {
     let tolerance = Decimal::from_float(0.1);
     assert!(game.antimatter.ge_tolerance(&expected, &tolerance));
 }
+
+// ============================================================
+// Phase 6 (Reality) end-to-end arc
+// ============================================================
+
+#[test]
+fn test_reality_arc_glyphs_perks_upgrades_black_hole() {
+    let mut game = GameState::new();
+
+    // Reach the Reality frontier by construction (the START perk isn't
+    // bought yet, so pre-purchase it via perk points after the first reality;
+    // the achievement gate is waived here by granting the perk directly).
+    game.reality.perks.insert(0);
+    game.eternity_unlocked = true;
+    game.eternities = Decimal::from_float(1e6);
+    game.time_theorems = Decimal::from_float(1e10);
+    game.max_theorem = Decimal::from_float(1e10);
+    game.eternity_points = Decimal::new(1.0, 6000);
+    game.records.this_reality.max_ep = Decimal::new(1.0, 6000);
+    game.records.this_reality.max_replicanti = Decimal::new(1.0, 20_000);
+    game.records.this_reality.max_dt = Decimal::new(1.0, 15);
+    game.dilation.studies = vec![1, 2, 3, 4, 5];
+
+    // Buy the Reality study and reality.
+    assert!(game.buy_dilation_study(6));
+    assert!(game.is_reality_available());
+    assert!(game.reality_with_glyph_choice(None, false));
+
+    // First reality: starting + companion glyphs, 1 RM-ish reward, 1 PP.
+    assert_eq!(game.reality.realities, 1);
+    assert_eq!(game.reality.perk_points, 1.0);
+    assert!(game.reality.machines > Decimal::ZERO);
+    assert_eq!(game.reality.glyphs.inventory.len(), 2);
+
+    // Equip the starting glyph; its powerpow effect must move the AD mult.
+    let before = game.dimension_multiplier(0);
+    let id = game.reality.glyphs.inventory[0].id;
+    assert!(game.equip_glyph(id, 0));
+    game.dimensions[0].bought = 10;
+    let after = game.dimension_multiplier(0);
+    assert!(after > before);
+
+    // The START perk grants 4 glyph choices.
+    assert_eq!(game.glyph_choice_count(), 4);
+    // Spend the reality's Perk Point on an adjacent perk.
+    assert!(game.buy_perk(10));
+
+    // Reality Upgrades: give RM and complete a rebuyable + RU10's path.
+    game.reality.machines = Decimal::from_float(1e6);
+    assert!(game.buy_reality_rebuyable(1));
+    game.infinity_points = Decimal::new(1.0, 400);
+    // Meet RU10's requirement by performing the (manual) Eternity that
+    // fires the check.
+    game.records.this_eternity.max_ip = ad_core::ETERNITY_GOAL;
+    assert!(game.eternity());
+    assert!(game.buy_reality_upgrade(10));
+    assert!(game.broke_infinity);
+    assert_eq!(game.eternities, Decimal::from_float(100.0));
+
+    // Black hole: unlock, upgrade, and see the speed factor while active.
+    assert!(game.unlock_black_hole());
+    assert!(game.buy_black_hole_upgrade(0, 1));
+    game.records.real_time_played_ms = 1e7;
+    game.black_holes.holes[0].active = true;
+    assert!(game.game_speed_factor() > 200.0);
+
+    // A game tick with everything live doesn't blow up and advances time.
+    game.tick(100.0);
+    assert!(game.records.this_reality.time_ms > 0.0);
+
+    // The whole thing round-trips through the save.
+    let save = ad_core::save::encode_save(&game, 0);
+    let reloaded = ad_core::save::decode_save(&save).unwrap();
+    assert_eq!(reloaded.reality.realities, 1);
+    assert_eq!(reloaded.reality.glyphs.active.len(), 1);
+    assert_eq!(reloaded.reality.glyphs.inventory.len(), 1);
+    assert!(reloaded.perk_bought(0));
+    assert!(reloaded.reality_upgrade_bought(10));
+    assert!(reloaded.black_holes.holes[0].unlocked);
+}

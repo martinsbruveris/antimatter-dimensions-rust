@@ -525,6 +525,38 @@ renders the result. See `design-docs/2026-06-30-ui-reveal-and-tutorial.md` and
   `toggle_dilation` — mirrored by `stores/game.js` actions
   (`requestDilation` gates on `confirmations.dilation`).
 
+## Reality (Phase 6)
+
+- **Header:** once the Reality study is bought (or realities > 0) the center
+  block swaps its AM/sec + tickspeed lines for the RM readout +
+  `RealityButton.vue` (vendored `c-reality-button` styling). Clicking opens
+  the `reality` modal (`RealityModal.vue`): first-reality explainer, gained
+  resources, the glyph choice row (click to select, Confirm / Sacrifice),
+  and the glyph-level comparison.
+- **Reality tab** (id 8, `o-tab-btn--reality`), subtabs:
+  - **Glyphs** (`tabs/reality/GlyphsTab.vue` + `EquippedGlyphs` /
+    `GlyphInventory` / `CurrentGlyphEffects` / `SacrificedGlyphs` and the
+    shared `GlyphComponent.vue`): equipped circle + respec toggle, the
+    effects/sacrifice info panels, the 12×10 inventory (double-click equips,
+    shift-click sacrifices via the `glyphSacrifice` confirm modal,
+    Ctrl+Shift skips it), the reset-reality button (`resetReality` modal).
+    `glyphs.css` is vendored; glyph display data (symbols, rarity table,
+    effect descriptions) lives in `data/glyphs.js`, per-glyph and combined effect
+    *values* ship in the snapshot (engine-computed).
+  - **Reality Upgrades** (`RealityUpgradesTab.vue`): Amplifier row + 5×4
+    one-time grid (strings in `data/realityUpgrades.js`).
+  - **Perks** (`PerksTab.vue`): static SVG of the original's "Default
+    Untangled" layout (`data/perks.js` holds positions/colors/descriptions);
+    click a highlighted node to buy.
+  - **Black Hole** (`BlackHoleTab.vue`, condition realities > 0): unlock
+    button, per-hole status + 3 upgrade buttons, pause toggle.
+- **Commands:** `do_reality(choice, sacrifice)`, `reset_reality`,
+  `equip_glyph`, `sacrifice_glyph`, `move_glyph`, `set_glyph_respec`,
+  `buy_perk`, `buy_reality_rebuyable`, `buy_reality_upgrade`,
+  `unlock_black_hole`, `buy_black_hole_upgrade`, `toggle_black_hole_pause` —
+  mirrored by `stores/game.js` actions. `ui.showModal(name, payload)` now
+  carries an optional payload (`ui.modalPayload`) for the sacrifice confirm.
+
 ## Conventions
 
 - **Vendored CSS, verbatim.** All game-component styling comes from the
