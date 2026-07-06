@@ -3,15 +3,19 @@ use crate::state::GameState;
 
 /// A single legal player action.
 ///
-/// This is the engine's stable *action vocabulary* — the one place where a
-/// caller's intent becomes a state mutation. The GUI, the autobuyers, and the
-/// simulation layer all drive the game by producing `Action`s and feeding them to
-/// [`GameState::apply_action`], rather than calling the underlying methods
-/// directly. Keeping the set exhaustive means a new mechanic that forgets to wire
-/// up its action is a compile error in `apply_action`.
+/// This is an *action vocabulary* — a caller's intent expressed as a value that
+/// [`GameState::apply_action`] turns into a state mutation. Today the simulation
+/// layer (`ad-sim`) is its only consumer: it produces `Action`s and feeds them to
+/// `apply_action`. The GUI and the autobuyers do **not** go through this seam —
+/// they call the underlying `GameState` methods directly.
 ///
-/// The vocabulary covers only currently-implemented pre-Infinity mechanics; it
-/// grows alongside the engine.
+/// Because of that, the vocabulary is *not* exhaustive over the engine's action
+/// surface. It holds the variants the simulation needs, plus a few prestige
+/// actions; several implemented mechanics (Break Infinity, Infinity Challenges,
+/// Infinity Dimensions, Break Infinity upgrades) have no `Action` yet. The
+/// intended end state is to route every caller — including the GUI — through
+/// `apply_action`, so the set becomes exhaustive and a mechanic that forgets to
+/// wire up its action is a compile error; that refactor is still pending.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Action {

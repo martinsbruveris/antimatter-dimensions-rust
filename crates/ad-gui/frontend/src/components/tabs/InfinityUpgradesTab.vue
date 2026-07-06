@@ -77,13 +77,9 @@ function buy(cell) {
     v-if="s"
     class="l-infinity-upgrades-tab"
   >
-    <div class="c-infinity-tab__header">
-      You have
-      <span class="c-infinity-tab__infinity-points">{{ formatDecimal(s.infinity_points, 2) }}</span>
-      {{ ipWord }}.
-    </div>
-
+    <br>
     Within each column, the upgrades must be purchased from top to bottom.
+    <br>
 
     <div class="l-infinity-upgrade-grid l-infinity-upgrades-tab__grid">
       <div

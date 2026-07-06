@@ -29,10 +29,13 @@ const ui = useUiStore();
           v-for="subtab in ui.visibleSubtabs(tab)"
           :key="subtab.key"
           class="o-tab-btn o-tab-btn--subtab"
-          :class="{
-            'o-subtab-btn--active':
-              ui.currentTabKey === tab.key && ui.currentSubtab.key === subtab.key,
-          }"
+          :class="[
+            tab.uiClass,
+            {
+              'o-subtab-btn--active':
+                ui.currentTabKey === tab.key && ui.currentSubtab.key === subtab.key,
+            },
+          ]"
           @click="ui.setSubtab(tab.key, subtab.key)"
         >
           <!-- eslint-disable-next-line vue/no-v-html -->
@@ -65,6 +68,24 @@ const ui = useUiStore();
 
 .o-tab-btn--active::before {
   width: 0.5rem;
+}
+
+/* Prestige tabs tint the active-tab accent bar to match their text/symbol
+   colour (original ModernTabButton.vue scoped style). */
+.o-tab-btn--infinity::before {
+  background-color: var(--color-infinity);
+}
+
+.o-tab-btn--eternity::before {
+  background-color: var(--color-eternity);
+}
+
+.o-tab-btn--reality::before {
+  background-color: var(--color-reality);
+}
+
+.o-tab-btn--celestial::before {
+  background-color: var(--color-celestials);
 }
 
 .o-subtab-btn--active {

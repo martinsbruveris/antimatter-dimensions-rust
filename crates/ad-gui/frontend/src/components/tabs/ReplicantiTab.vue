@@ -34,7 +34,7 @@ const nextIntervalText = computed(() =>
     <!-- Locked: the unlock button. -->
     <button
       v-if="!r.unlocked"
-      class="o-primary-btn l-replicanti-tab__unlock"
+      class="o-primary-btn o-primary-btn--replicanti-unlock"
       :class="{ 'o-primary-btn--disabled': !r.can_unlock }"
       @click="r.can_unlock && game.unlockReplicanti()"
     >
@@ -151,7 +151,6 @@ const nextIntervalText = computed(() =>
   opacity: 0.85;
 }
 
-.l-replicanti-tab__unlock,
 .l-replicanti-tab__galaxy {
   min-width: 22rem;
 }

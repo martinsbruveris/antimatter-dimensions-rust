@@ -113,13 +113,15 @@ export const TABS = [
         condition: (s) => Boolean(s?.infinity_dimensions?.unlocked),
         hideId: [0, 1],
       },
-      // Break Infinity: appears once Infinity is broken (`player.break`).
+      // Break Infinity: appears from the first Big Crunch (JS condition is
+      // `infinityUnlocked()`), showing the "reduce the Big Crunch interval to
+      // 0.1s" hint and a disabled BREAK INFINITY button until it can be broken.
       {
         key: "break",
         name: "Break Infinity",
-        symbol: "<i class='fas fa-arrows-alt-h'></i>",
+        symbol: "∝",
         component: BreakInfinityTab,
-        condition: (s) => Boolean(s?.break_infinity?.unlocked),
+        condition: (s) => Boolean(s?.infinity_unlocked),
         hideId: [6, 1],
       },
       // Replicanti: visible from the first Infinity (JS `infinityUnlocked()`); the

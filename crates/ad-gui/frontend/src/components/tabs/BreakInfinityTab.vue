@@ -8,6 +8,7 @@ import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
 import { formatDecimal } from "../../util/format";
+import BreakInfinityButton from "../BreakInfinityButton.vue";
 import {
   BREAK_INFINITY_UPGRADES,
   BREAK_INFINITY_REBUYABLES,
@@ -16,6 +17,11 @@ import {
 const game = useGameStore();
 const s = computed(() => game.snapshot);
 const bi = computed(() => s.value?.break_infinity);
+
+// The original's `isUnlocked = Autobuyer.bigCrunch.hasMaxedInterval`: once the
+// Big Crunch autobuyer's interval hits the 0.1 s floor the tab swaps the unlock
+// hint for the upgrade grid (the BREAK INFINITY button becomes clickable).
+const unlockable = computed(() => Boolean(s.value?.break_infinity_unlockable));
 
 const byId = computed(
   () => new Map((bi.value?.upgrades ?? []).map((u) => [u.id, u])),
@@ -81,7 +87,16 @@ function buyRebuyable(cell) {
       Infinity Points.
     </div>
 
-    <div class="l-break-infinity-grid">
+    <div v-if="!unlockable">
+      Reduce the interval of Automatic Big Crunch Autobuyer to 0.1 seconds to
+      unlock Break Infinity.
+    </div>
+    <BreakInfinityButton class="l-break-infinity-tab__break-btn" />
+
+    <div
+      v-if="unlockable"
+      class="l-break-infinity-grid"
+    >
       <button
         v-for="cell in upgrades"
         :key="cell.meta.id"
