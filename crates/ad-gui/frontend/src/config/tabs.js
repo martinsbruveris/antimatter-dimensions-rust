@@ -23,6 +23,7 @@ import GlyphsTab from "../components/tabs/reality/GlyphsTab.vue";
 import PerksTab from "../components/tabs/reality/PerksTab.vue";
 import RealityUpgradesTab from "../components/tabs/reality/RealityUpgradesTab.vue";
 import BlackHoleTab from "../components/tabs/reality/BlackHoleTab.vue";
+import TeresaTab from "../components/tabs/celestials/TeresaTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
 import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
@@ -184,6 +185,20 @@ export const TABS = [
         condition: (s) => Boolean(s?.reality?.unlocked),
         hideId: [8, 4],
       },
+    ],
+  },
+  {
+    // Celestials (Phase 7). JS `condition: () => Teresa.isUnlocked`; we gate on
+    // reality being unlocked (design doc §5). The original's celestial-navigation
+    // SVG hub subtab is cut in favour of plain per-celestial subtabs. Effarig /
+    // Enslaved / V land with their own features.
+    key: "celestials",
+    name: "Celestials",
+    hideId: 9,
+    condition: (s) => Boolean(s?.celestials?.unlocked),
+    uiClass: "o-tab-btn--celestial",
+    subtabs: [
+      { key: "teresa", name: "Teresa", symbol: "Ϟ", component: TeresaTab, hideId: [9, 1] },
     ],
   },
   {

@@ -242,7 +242,9 @@ impl GameState {
         if rm >= Decimal::ONE && rm < Decimal::from_float(10.0) {
             rm = Decimal::from_float(27.0 / 4000.0 * log10_ep - 26.0);
         }
-        // `realityMachineMultiplier` sources are celestial/shop → 1 here.
+        // `realityMachineMultiplier`: Teresa's pool multiplier + Perk-Shop
+        // rmMult (celestial/Ra sources are out of frontier → 1).
+        rm *= Decimal::from_float(self.reality_machine_multiplier());
         rm.floor()
     }
 
@@ -449,6 +451,12 @@ impl GameState {
         self.reality.realities += 1;
         self.reality.perk_points += 1.0;
 
+        // Relic Shards + the per-celestial run-completion hooks (Teresa best AM,
+        // Effarig stage unlock, Enslaved completion). Read the pre-reset run
+        // flags, before `reality_reset_internal` clears them.
+        self.effarig_gain_relic_shards();
+        self.celestial_reality_completion_hooks();
+
         self.reality_reset_internal();
 
         // The Automator's REALITY_RESET_AFTER handling: the prestige
@@ -471,6 +479,10 @@ impl GameState {
     /// The reset half of `finishProcessReality`, shared by a rewarded Reality
     /// and the forced reset.
     fn reality_reset_internal(&mut self) {
+        // `clearCelestialRuns()`: a Reality (rewarded or forced) always exits
+        // any celestial run.
+        self.clear_celestial_runs();
+
         if self.reality.respec {
             self.unequip_all_glyphs();
             self.reality.respec = false;
@@ -604,11 +616,13 @@ impl GameState {
         self.grant_reality_glyphs_impl();
     }
 
-    /// Hook for Feature 6.4 (RU10's start-of-reality package, RU14's flow).
+    /// Hook for Feature 6.4 (RU10's start-of-reality package, RU14's flow) and
+    /// Teresa's `startEU` (grant all 6 Eternity Upgrades on reset).
     fn apply_post_reality_upgrades(&mut self) {
         if self.reality_upgrade_bought(10) {
             self.apply_rupg10();
         }
+        self.apply_teresa_start_eu();
     }
 
     // --- Achievements on Reality -------------------------------------------------

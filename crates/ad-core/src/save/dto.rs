@@ -57,6 +57,12 @@ const AUTOBUYER_MODE_BUY_10: i64 = 10;
 /// The fixed number of antimatter dimension tiers (and their autobuyers).
 const DIMENSION_COUNT: usize = 8;
 
+/// serde default for `bestRunAM` (`DC.D1`), since the field's `with` module has
+/// no default of its own.
+fn decimal_one() -> Decimal {
+    Decimal::ONE
+}
+
 /// Top-level `player` object (modelled subset).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -163,6 +169,101 @@ pub struct PlayerDTO {
     pub reality: RealityDTO,
     /// `player.requirementChecks` — the "avoided X" run flags (modelled subset).
     pub requirement_checks: RequirementChecksDTO,
+    /// `player.celestials` — Teresa/Effarig/Enslaved/V (Phase 7). Defaulted so
+    /// pre-celestial saves (and hand-built test JSON) load; the Ra/Laitela/Pelle
+    /// sub-objects are unmodelled and round-trip via the encode template.
+    #[serde(default)]
+    pub celestials: CelestialsDTO,
+}
+
+/// `player.celestials` (modelled subset). Each sub-object defaults so a partial
+/// save loads; unmodelled sub-fields (quote bits, glyph weights, Ra/Laitela/
+/// Pelle) are dropped on read and re-supplied from the encode template on write.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CelestialsDTO {
+    #[serde(default)]
+    pub teresa: TeresaDTO,
+    #[serde(default)]
+    pub effarig: EffarigDTO,
+    #[serde(default)]
+    pub enslaved: EnslavedDTO,
+    #[serde(default)]
+    pub v: VCelestialDTO,
+}
+
+/// `player.celestials.teresa`. `timePoured` is a runtime accumulator (not in the
+/// save), so it is not modelled here.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeresaDTO {
+    #[serde(default)]
+    pub poured_amount: f64,
+    #[serde(default)]
+    pub unlock_bits: u32,
+    #[serde(default)]
+    pub run: bool,
+    #[serde(
+        default = "decimal_one",
+        rename = "bestRunAM",
+        with = "break_infinity::serde_string"
+    )]
+    pub best_run_am: Decimal,
+    #[serde(default)]
+    pub perk_shop: Vec<u32>,
+}
+
+/// `player.celestials.effarig`.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EffarigDTO {
+    #[serde(default)]
+    pub relic_shards: f64,
+    #[serde(default)]
+    pub unlock_bits: u32,
+    #[serde(default)]
+    pub run: bool,
+}
+
+/// `player.celestials.enslaved`.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnslavedDTO {
+    #[serde(default)]
+    pub is_storing: bool,
+    #[serde(default)]
+    pub stored: f64,
+    #[serde(default)]
+    pub is_storing_real: bool,
+    #[serde(default)]
+    pub stored_real: f64,
+    /// `unlocks` — an array of unlocked ids (0/1).
+    #[serde(default)]
+    pub unlocks: Vec<u8>,
+    #[serde(default)]
+    pub run: bool,
+    #[serde(default)]
+    pub completed: bool,
+    #[serde(default)]
+    pub tesseracts: u32,
+}
+
+/// `player.celestials.v`.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VCelestialDTO {
+    #[serde(default)]
+    pub unlock_bits: u32,
+    #[serde(default)]
+    pub run: bool,
+    #[serde(default)]
+    pub run_unlocks: Vec<u32>,
+    #[serde(default)]
+    pub goal_reduction_steps: Vec<u32>,
+    #[serde(default, rename = "STSpent")]
+    pub st_spent: u32,
+    #[serde(default)]
+    pub run_records: Vec<f64>,
 }
 
 /// `player.reality` (modelled subset). The glyph inventory lives under
@@ -1121,6 +1222,60 @@ impl GameState {
             reality_max_glyphs: dto.requirement_checks.reality.max_glyphs,
         };
 
+        // Celestials (Phase 7). Vec→array copies clamp to the modelled length,
+        // leaving the constructor defaults for missing entries.
+        let celestials = {
+            let cel = &dto.celestials;
+            let mut teresa = crate::celestials::TeresaState::new();
+            teresa.poured_amount = cel.teresa.poured_amount;
+            teresa.unlock_bits = cel.teresa.unlock_bits;
+            teresa.run = cel.teresa.run;
+            teresa.best_run_am = cel.teresa.best_run_am;
+            for (i, v) in cel.teresa.perk_shop.iter().take(5).enumerate() {
+                teresa.perk_shop[i] = *v;
+            }
+
+            let mut effarig = crate::celestials::EffarigState::new();
+            effarig.relic_shards = cel.effarig.relic_shards;
+            effarig.unlock_bits = cel.effarig.unlock_bits;
+            effarig.run = cel.effarig.run;
+
+            let mut enslaved = crate::celestials::EnslavedState::new();
+            enslaved.is_storing = cel.enslaved.is_storing;
+            enslaved.stored = cel.enslaved.stored;
+            enslaved.is_storing_real = cel.enslaved.is_storing_real;
+            enslaved.stored_real = cel.enslaved.stored_real;
+            enslaved.run = cel.enslaved.run;
+            enslaved.completed = cel.enslaved.completed;
+            enslaved.tesseracts = cel.enslaved.tesseracts;
+            // The original stores `unlocks` as an array of ids; we pack it into
+            // a bitset.
+            for id in &cel.enslaved.unlocks {
+                enslaved.unlock_bits |= 1u32 << id;
+            }
+
+            let mut v = crate::celestials::VState::new();
+            v.unlock_bits = cel.v.unlock_bits;
+            v.run = cel.v.run;
+            v.st_spent = cel.v.st_spent;
+            for (i, x) in cel.v.run_unlocks.iter().take(9).enumerate() {
+                v.run_unlocks[i] = *x;
+            }
+            for (i, x) in cel.v.goal_reduction_steps.iter().take(9).enumerate() {
+                v.goal_reduction_steps[i] = *x;
+            }
+            for (i, x) in cel.v.run_records.iter().take(9).enumerate() {
+                v.run_records[i] = *x;
+            }
+
+            crate::celestials::CelestialsState {
+                teresa,
+                effarig,
+                enslaved,
+                v,
+            }
+        };
+
         // Achievement bitmask. The original's `achievementBits` is 17 rows in a
         // fresh or pre-Pelle save and grows to 18 the moment a row-18 (Pelle)
         // achievement is touched. Accept either length and zero-fill the missing
@@ -1465,6 +1620,7 @@ impl GameState {
             triggered_tab_notification_bits: dto.triggered_tab_notification_bits,
             tutorial_state: dto.tutorial_state,
             tutorial_active: dto.tutorial_active,
+            celestials,
             autobuyers,
             options,
         })

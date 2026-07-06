@@ -92,7 +92,14 @@ impl GameState {
         let ip = self.records.this_eternity.max_ip + self.gained_infinity_points();
         let exponent = ip.log10() / 308.0 - 0.7;
         let base = Decimal::from_float(5.0).pow(&Decimal::from_float(exponent));
-        (base * self.total_ep_mult()).floor()
+        let mut ep = base * self.total_ep_mult();
+        // Celestial run modifiers: Teresa `^0.55`, V `^0.5`.
+        if self.celestials.teresa.run {
+            ep = ep.pow(&Decimal::from_float(0.55));
+        } else if self.celestials.v.run {
+            ep = ep.pow(&Decimal::from_float(0.5));
+        }
+        ep.floor()
     }
 
     /// Eternities an Eternity would grant (`gainedEternities`): the

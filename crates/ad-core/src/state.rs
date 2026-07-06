@@ -25,7 +25,7 @@ fn default_true() -> bool {
 /// serde default for `Decimal` fields whose neutral value is `1` (e.g.
 /// `chall8_total_sacrifice`, `matter`), since `Decimal`'s own `Default` is `0`.
 #[cfg(feature = "serde")]
-fn default_decimal_one() -> Decimal {
+pub(crate) fn default_decimal_one() -> Decimal {
     Decimal::ONE
 }
 
@@ -445,6 +445,10 @@ pub struct GameState {
     /// performs the highlighted action and re-set on advancing to the next step.
     #[cfg_attr(feature = "serde", serde(default = "default_true"))]
     pub tutorial_active: bool,
+    /// Celestials (`player.celestials`): Teresa, Effarig, Enslaved, V (Phase 7).
+    /// Persists forever. See `crate::celestials`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub celestials: crate::celestials::CelestialsState,
     /// Autobuyer state for dimensions and tickspeed.
     pub autobuyers: AutobuyerState,
     /// Player options (UI/UX preferences). Not pre-Infinity progress, so they
@@ -519,6 +523,7 @@ impl GameState {
             triggered_tab_notification_bits: 0,
             tutorial_state: 0,
             tutorial_active: true,
+            celestials: crate::celestials::CelestialsState::new(),
             autobuyers: AutobuyerState::new(),
             options: Options::new(),
         }

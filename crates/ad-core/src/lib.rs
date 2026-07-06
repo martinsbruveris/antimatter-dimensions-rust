@@ -5,6 +5,7 @@ pub mod automator;
 pub mod automator_points;
 pub mod black_holes;
 pub mod break_infinity_upgrades;
+pub mod celestials;
 pub mod challenges;
 pub mod crunch;
 pub mod data;
@@ -45,6 +46,7 @@ pub use break_infinity_upgrades::{
     BreakInfinityRebuyable, BreakInfinityUpgrade, ALL_BREAK_INFINITY_REBUYABLES,
     ALL_BREAK_INFINITY_UPGRADES, BREAK_INFINITY_UPGRADE_COUNT,
 };
+pub use celestials::{Celestial, CelestialsState};
 pub use challenges::{NormalChallengeState, NORMAL_CHALLENGE_COUNT};
 pub use dilation::DilationState;
 pub use eternity::ETERNITY_GOAL;

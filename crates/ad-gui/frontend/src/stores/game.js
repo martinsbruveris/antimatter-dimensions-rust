@@ -217,6 +217,23 @@ export const useGameStore = defineStore("game", {
       await invoke("buy_reality_upgrade", { id });
       this.snapshot = await this.getState();
     },
+    // --- Celestials (Phase 7) ---
+    // Pouring is called each frame while the button is held; the main tick loop
+    // refreshes the snapshot, so no getState here.
+    teresaPourRm(diffMs) {
+      return invoke("teresa_pour_rm", { diffMs });
+    },
+    teresaStopPouring() {
+      return invoke("teresa_stop_pouring");
+    },
+    async buyPerkShop(id) {
+      await invoke("buy_perk_shop", { id });
+      this.snapshot = await this.getState();
+    },
+    async startCelestialReality(celestial) {
+      await invoke("start_celestial_reality", { celestial });
+      this.snapshot = await this.getState();
+    },
     async unlockBlackHole() {
       await invoke("unlock_black_hole");
       this.snapshot = await this.getState();

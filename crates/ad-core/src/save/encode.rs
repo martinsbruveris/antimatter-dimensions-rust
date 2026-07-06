@@ -329,6 +329,46 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     player["requirementChecks"]["reality"]["maxGlyphs"] =
         json!(state.requirement_checks.reality_max_glyphs);
 
+    // Celestials (Phase 7). Modelled sub-fields are overwritten in place; the
+    // unmodelled ones (quote bits, glyph weights, Ra/Laitela/Pelle) stay at
+    // their template defaults.
+    {
+        let cel = &state.celestials;
+        let teresa = &mut player["celestials"]["teresa"];
+        teresa["pouredAmount"] = json!(cel.teresa.poured_amount);
+        teresa["unlockBits"] = json!(cel.teresa.unlock_bits);
+        teresa["run"] = json!(cel.teresa.run);
+        teresa["bestRunAM"] = decimal(&cel.teresa.best_run_am);
+        teresa["perkShop"] = json!(cel.teresa.perk_shop);
+
+        let effarig = &mut player["celestials"]["effarig"];
+        effarig["relicShards"] = json!(cel.effarig.relic_shards);
+        effarig["unlockBits"] = json!(cel.effarig.unlock_bits);
+        effarig["run"] = json!(cel.effarig.run);
+
+        let enslaved = &mut player["celestials"]["enslaved"];
+        enslaved["isStoring"] = json!(cel.enslaved.is_storing);
+        enslaved["stored"] = json!(cel.enslaved.stored);
+        enslaved["isStoringReal"] = json!(cel.enslaved.is_storing_real);
+        enslaved["storedReal"] = json!(cel.enslaved.stored_real);
+        enslaved["run"] = json!(cel.enslaved.run);
+        enslaved["completed"] = json!(cel.enslaved.completed);
+        enslaved["tesseracts"] = json!(cel.enslaved.tesseracts);
+        // Pack the unlock bitset back into the `unlocks` id array.
+        let unlocks: Vec<u8> = (0..2u8)
+            .filter(|id| cel.enslaved.unlock_bits & (1u32 << id) != 0)
+            .collect();
+        enslaved["unlocks"] = json!(unlocks);
+
+        let v = &mut player["celestials"]["v"];
+        v["unlockBits"] = json!(cel.v.unlock_bits);
+        v["run"] = json!(cel.v.run);
+        v["runUnlocks"] = json!(cel.v.run_unlocks);
+        v["goalReductionSteps"] = json!(cel.v.goal_reduction_steps);
+        v["STSpent"] = json!(cel.v.st_spent);
+        v["runRecords"] = json!(cel.v.run_records);
+    }
+
     // Black Holes.
     player["blackHole"] = json!(state
         .black_holes

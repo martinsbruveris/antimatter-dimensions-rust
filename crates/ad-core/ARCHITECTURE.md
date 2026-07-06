@@ -146,6 +146,19 @@ not the current state).
   `templates.rs` (the five script generators + warnings), `transfer.rs`
   (serde-gated import/export text codec). See
   `../../docs/design/2026-07-05-automator.md`.
+- `src/celestials/` — Celestials (Phase 7). `mod.rs` owns `CelestialsState`
+  (`player.celestials`) + the shared run machinery: the mutually-exclusive
+  per-celestial `run` flags, `is_in_celestial_reality`, `clear_celestial_runs`
+  (called from `reality_reset_internal`), `start_celestial_reality` (a reward-
+  free Reality that sets one run flag), and `celestial_reality_completion_hooks`
+  (run from `finish_process_reality`). `teresa.rs` (Feature 7.1): pour-RM pool +
+  `rmMultiplier` (into `reality_machine_multiplier` → `uncapped_rm`), the 6
+  threshold unlocks (`startEU` grants the 6 EUs on reset), Teresa's Reality
+  (IP/EP `^0.55` in `crunch.rs`/`eternity.rs`, glyph-TT-gen off in `dilation.rs`),
+  the `runRewardMultiplier` glyph-sacrifice bonus (`glyphs.rs`), passive `epGen`
+  (`tick.rs`), and the 4-entry Perk Shop. `effarig.rs`/`enslaved.rs`/`v.rs` hold
+  their state blocks + run flags (fleshed out by their own features). See
+  `../../docs/design/2026-07-06-celestials.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant

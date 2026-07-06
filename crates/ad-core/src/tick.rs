@@ -36,6 +36,8 @@ impl GameState {
         self.generate_passive_ip(dt_ms);
         // TS181: 1% of the pending crunch IP per second.
         self.generate_ts181_ip(dt_ms);
+        // Teresa's `epGen` unlock: passive EP from the peak EP/min.
+        self.generate_teresa_ep(dt_ms);
 
         let dt_seconds = dt_ms / 1000.0;
         let dt = Decimal::from_float(dt_seconds);

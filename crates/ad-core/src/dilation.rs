@@ -333,10 +333,13 @@ impl GameState {
                 * Decimal::from_float(dt_s);
             self.add_time_theorems_decimal(gain);
         }
-        // The `dilationTTgen` glyph effect streams TT too.
-        let glyph_ttgen = self.glyph_effect_dilation_ttgen();
-        if glyph_ttgen > 0.0 {
-            self.add_time_theorems_decimal(Decimal::from_float(glyph_ttgen * dt_s));
+        // The `dilationTTgen` glyph effect streams TT too — disabled inside
+        // Teresa's and Enslaved's Realities (`getTTPerSecond`).
+        if !self.celestials.teresa.run && !self.celestials.enslaved.run {
+            let glyph_ttgen = self.glyph_effect_dilation_ttgen();
+            if glyph_ttgen > 0.0 {
+                self.add_time_theorems_decimal(Decimal::from_float(glyph_ttgen * dt_s));
+            }
         }
     }
 

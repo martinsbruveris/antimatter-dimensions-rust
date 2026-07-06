@@ -451,6 +451,8 @@ struct GameView {
     tutorial_active: bool,
     /// Automator tab state (Feature 6.6 Stage D).
     automator: AutomatorTabView,
+    /// Celestials tab state (Phase 7).
+    celestials: CelestialsView,
 }
 
 /// Serializable view of the Automator tab.
@@ -962,6 +964,108 @@ struct AwayProgressView {
     infinity_points: bool,
     replicanti: bool,
     replicanti_galaxies: bool,
+}
+
+/// The Celestials tab (Phase 7). One sub-view per implemented celestial; the
+/// `unlocked` gate mirrors `celestials_unlocked`.
+#[derive(Serialize)]
+struct CelestialsView {
+    unlocked: bool,
+    teresa: TeresaView,
+}
+
+/// Teresa subtab (Feature 7.1).
+#[derive(Serialize)]
+struct TeresaView {
+    /// RM poured into Teresa (`pouredAmount`).
+    poured_amount: Num,
+    /// Current Reality Machines (the pour source).
+    reality_machines: Num,
+    /// The RM-gain multiplier from the pool (`rmMultiplier`).
+    rm_multiplier: f64,
+    /// The live glyph-sacrifice multiplier (`runRewardMultiplier`).
+    run_reward_multiplier: f64,
+    /// Pour-bar fill in [0, 1] (`fill`).
+    fill: f64,
+    /// Fill the pool *could* reach with all current RM (`possibleFill`).
+    possible_fill: f64,
+    /// Whether Teresa's Reality is unlocked / running / startable.
+    run_unlocked: bool,
+    is_running: bool,
+    can_start_run: bool,
+    /// Whether the Perk Shop is unlocked.
+    shop_unlocked: bool,
+    /// Unspent Perk Points (the Perk-Shop currency).
+    perk_points: f64,
+    /// The 6 threshold unlocks, in save-id order.
+    unlocks: Vec<TeresaUnlockView>,
+    /// The 4 Perk-Shop rebuyables (modelled subset).
+    perk_shop: Vec<PerkShopView>,
+}
+
+#[derive(Serialize)]
+struct TeresaUnlockView {
+    id: u8,
+    price: Num,
+    unlocked: bool,
+}
+
+#[derive(Serialize)]
+struct PerkShopView {
+    id: usize,
+    cost: Num,
+    effect: Num,
+    bought: u32,
+    capped: bool,
+    can_buy: bool,
+}
+
+/// Build the Celestials tab view.
+fn build_celestials_view(game: &GameState) -> CelestialsView {
+    let f = |x: f64| num(&Decimal::from_float(x));
+    let unlocks = ad_core::celestials::teresa::TERESA_UNLOCKS
+        .iter()
+        .map(|u| TeresaUnlockView {
+            id: u.id,
+            price: f(u.price),
+            unlocked: game.celestials.teresa.unlock_bought(u.id),
+        })
+        .collect();
+    let perk_shop = ad_core::celestials::teresa::PERK_SHOP_ENTRIES
+        .iter()
+        .map(|&e| PerkShopView {
+            id: e.id,
+            cost: f(game.perk_shop_cost(e)),
+            effect: f(game.perk_shop_effect(e)),
+            bought: game.perk_shop_bought(e),
+            capped: game.perk_shop_capped(e),
+            can_buy: game.perk_shop_can_buy(e),
+        })
+        .collect();
+    let teresa = TeresaView {
+        poured_amount: f(game.celestials.teresa.poured_amount),
+        reality_machines: num(&game.reality.machines),
+        rm_multiplier: game.teresa_rm_multiplier(),
+        run_reward_multiplier: game.teresa_run_reward_multiplier(),
+        fill: game.teresa_fill(),
+        // `possibleFill = min(log10(RM + poured)/24, 1)`.
+        possible_fill: ((game.reality.machines
+            + Decimal::from_float(game.celestials.teresa.poured_amount))
+        .pos_log10()
+            / 24.0)
+            .clamp(0.0, 1.0),
+        run_unlocked: game.teresa_run_unlocked(),
+        is_running: game.celestials.teresa.run,
+        can_start_run: game.can_start_celestial_reality(ad_core::Celestial::Teresa),
+        shop_unlocked: game.teresa_shop_unlocked(),
+        perk_points: game.reality.perk_points,
+        unlocks,
+        perk_shop,
+    };
+    CelestialsView {
+        unlocked: game.celestials_unlocked(),
+        teresa,
+    }
 }
 
 /// Build the serializable view for one autobuyer, including its interval-upgrade
@@ -1758,6 +1862,7 @@ fn build_game_view(game: &GameState) -> GameView {
         tutorial_state: game.tutorial_state,
         tutorial_active: game.tutorial_active,
         automator: build_automator_view(game),
+        celestials: build_celestials_view(game),
         options: OptionsView {
             hotkeys: game.options.hotkeys,
             retry_challenge: game.options.retry_challenge,
@@ -2257,6 +2362,45 @@ fn buy_reality_rebuyable(id: u8, state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn buy_reality_upgrade(id: u8, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().buy_reality_upgrade(id);
+}
+
+// --- Celestials (Phase 7) --------------------------------------------------
+
+/// Pour RM into Teresa for `diff_ms` of real time (the Teresa tab's pour
+/// button, held down; the frontend passes the frame delta).
+#[tauri::command]
+fn teresa_pour_rm(diff_ms: f64, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().teresa_pour_rm(diff_ms);
+}
+
+/// Reset Teresa's pour-rate timer (the pour button was released).
+#[tauri::command]
+fn teresa_stop_pouring(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().teresa_stop_pouring();
+}
+
+/// Buy one level of a Teresa Perk-Shop rebuyable by id (0–3).
+#[tauri::command]
+fn buy_perk_shop(id: usize, state: State<'_, Mutex<GameState>>) {
+    if let Some(&entry) = ad_core::celestials::teresa::PERK_SHOP_ENTRIES
+        .iter()
+        .find(|e| e.id == id)
+    {
+        state.lock().unwrap().buy_perk_shop(entry);
+    }
+}
+
+/// Enter a celestial's Reality (`teresa`/`effarig`/`enslaved`/`v`).
+#[tauri::command]
+fn start_celestial_reality(celestial: String, state: State<'_, Mutex<GameState>>) {
+    let cel = match celestial.as_str() {
+        "teresa" => ad_core::Celestial::Teresa,
+        "effarig" => ad_core::Celestial::Effarig,
+        "enslaved" => ad_core::Celestial::Enslaved,
+        "v" => ad_core::Celestial::V,
+        _ => return,
+    };
+    state.lock().unwrap().start_celestial_reality(cel);
 }
 
 #[tauri::command]
@@ -3629,6 +3773,10 @@ pub fn run() {
             buy_perk,
             buy_reality_rebuyable,
             buy_reality_upgrade,
+            teresa_pour_rm,
+            teresa_stop_pouring,
+            buy_perk_shop,
+            start_celestial_reality,
             unlock_black_hole,
             buy_black_hole_upgrade,
             toggle_black_hole_pause,

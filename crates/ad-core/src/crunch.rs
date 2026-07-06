@@ -101,7 +101,16 @@ impl GameState {
         } else {
             Decimal::from_float(308.0 / div)
         };
-        (base * self.total_ip_mult()).floor()
+        let mut ip = base * self.total_ip_mult();
+        // Celestial run modifiers: Teresa `^0.55`, V `^0.5` (mutually
+        // exclusive; the Effarig eternity-stage cap is applied in the Effarig
+        // task at its site).
+        if self.celestials.teresa.run {
+            ip = ip.pow(&Decimal::from_float(0.55));
+        } else if self.celestials.v.run {
+            ip = ip.pow(&Decimal::from_float(0.5));
+        }
+        ip.floor()
     }
 
     /// Infinities a Big Crunch would grant right now. Mirrors `gainedInfinities`:
