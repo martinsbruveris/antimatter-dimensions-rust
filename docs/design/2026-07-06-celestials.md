@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Partial
 feature: "7.1-7.4"
 ---
 
