@@ -135,7 +135,7 @@ impl GameState {
             self.effarig_complete_stage();
         }
         if self.celestials.enslaved.run {
-            self.celestials.enslaved.completed = true;
+            self.enslaved_complete_run();
         }
         // V's completion is handled continuously by `v_check_run_unlocks` each
         // tick; a rewarded Reality just exits the run.

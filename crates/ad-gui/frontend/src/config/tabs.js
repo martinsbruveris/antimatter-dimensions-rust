@@ -25,6 +25,7 @@ import RealityUpgradesTab from "../components/tabs/reality/RealityUpgradesTab.vu
 import BlackHoleTab from "../components/tabs/reality/BlackHoleTab.vue";
 import TeresaTab from "../components/tabs/celestials/TeresaTab.vue";
 import EffarigTab from "../components/tabs/celestials/EffarigTab.vue";
+import EnslavedTab from "../components/tabs/celestials/EnslavedTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
 import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
@@ -207,6 +208,14 @@ export const TABS = [
         component: EffarigTab,
         condition: (s) => Boolean(s?.celestials?.effarig?.unlocked),
         hideId: [9, 2],
+      },
+      {
+        key: "enslaved",
+        name: "The Nameless Ones",
+        symbol: "<i class='fas fa-link'></i>",
+        component: EnslavedTab,
+        condition: (s) => Boolean(s?.celestials?.enslaved?.unlocked),
+        hideId: [9, 3],
       },
     ],
   },

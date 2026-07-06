@@ -125,6 +125,10 @@ impl GameState {
 
     /// Whether tier `t` can be bought now (unlocked + affordable).
     pub fn td_available_for_purchase(&self, tier: usize) -> bool {
+        // Enslaved's Reality limits each Time Dimension to 1 purchase.
+        if self.celestials.enslaved.run && self.time_dimensions[tier].bought > 0 {
+            return false;
+        }
         self.td_is_unlocked(tier)
             && self.eternity_points >= self.time_dimensions[tier].cost
     }
@@ -341,17 +345,35 @@ impl GameState {
     /// (`FreeTickspeed.fromShards`) and take any gain (the game-loop's
     /// `totalTickGained += clampMin(newAmount - totalTickGained, 0)`).
     pub(crate) fn update_free_tickspeed(&mut self) {
-        let (new_amount, _) =
-            free_tickspeed_from_shards(self.time_shards, self.free_tickspeed_mult());
+        let (new_amount, _) = free_tickspeed_from_shards(
+            self.time_shards,
+            self.free_tickspeed_mult(),
+            self.free_tickspeed_softcap(),
+        );
         if new_amount > self.total_tick_gained {
             self.total_tick_gained = new_amount;
+        }
+    }
+
+    /// `FreeTickspeed.softcap`: the base 300 000, +100 000 with Enslaved's
+    /// free-tickspeed-softcap unlock.
+    pub(crate) fn free_tickspeed_softcap(&self) -> f64 {
+        if self.enslaved_softcap_unlocked() {
+            FREE_TICKSPEED_SOFTCAP + 100_000.0
+        } else {
+            FREE_TICKSPEED_SOFTCAP
         }
     }
 
     /// The shard total the *next* free Tickspeed upgrade needs
     /// (`fromShards(...).nextShards`), for the Time Dimensions tab readout.
     pub fn next_free_tickspeed_shards(&self) -> Decimal {
-        free_tickspeed_from_shards(self.time_shards, self.free_tickspeed_mult()).1
+        free_tickspeed_from_shards(
+            self.time_shards,
+            self.free_tickspeed_mult(),
+            self.free_tickspeed_softcap(),
+        )
+        .1
     }
 
     /// On an Eternity: each tier's amount returns to its bought base and costs
@@ -371,14 +393,18 @@ impl GameState {
 /// softcap the count is `ceil(ln(shards) / ln(mult))`; past it, upgrades follow
 /// the quadratic cost curve `cost(n) = c·n² + n` (in implicit post-cap units),
 /// inverted with Newton's method exactly like the original.
-fn free_tickspeed_from_shards(shards: Decimal, tickmult: f64) -> (u64, Decimal) {
+fn free_tickspeed_from_shards(
+    shards: Decimal,
+    tickmult: f64,
+    softcap: f64,
+) -> (u64, Decimal) {
     let log_tickmult = tickmult.ln();
     if shards <= Decimal::ZERO {
         return (0, Decimal::ONE);
     }
     let log_shards = shards.ln();
     let uncapped = (log_shards / log_tickmult).max(0.0);
-    if uncapped <= FREE_TICKSPEED_SOFTCAP {
+    if uncapped <= softcap {
         let count = uncapped.ceil();
         let next = Decimal::from_float(tickmult).pow(&Decimal::from_float(count));
         return (count as u64, next);
@@ -386,7 +412,7 @@ fn free_tickspeed_from_shards(shards: Decimal, tickmult: f64) -> (u64, Decimal) 
 
     // Log of (cost - cost up to softcap); costs implicitly transformed by
     // (ln(x) - priceToCap) / logTickmult.
-    let price_to_cap = FREE_TICKSPEED_SOFTCAP * log_tickmult;
+    let price_to_cap = softcap * log_tickmult;
     let desired_cost = (log_shards - price_to_cap) / log_tickmult;
     let coeff = FREE_TICKSPEED_GROWTH_RATE / FREE_TICKSPEED_GROWTH_EXP / log_tickmult;
     let bought_to_cost =
@@ -421,7 +447,7 @@ fn free_tickspeed_from_shards(shards: Decimal, tickmult: f64) -> (u64, Decimal) 
         price_to_cap + bought_to_cost(purchases + 1.0) * log_tickmult,
     )
     .exp();
-    ((purchases + FREE_TICKSPEED_SOFTCAP) as u64, next)
+    ((purchases + softcap) as u64, next)
 }
 
 #[cfg(test)]
@@ -514,14 +540,21 @@ mod tests {
     #[test]
     fn free_tickspeed_softcap_slows_growth() {
         // Below the cap: count = ceil(ln(shards)/ln(1.33)).
-        let (below, next) = free_tickspeed_from_shards(Decimal::new(1.0, 300), 1.33);
+        let (below, next) = free_tickspeed_from_shards(
+            Decimal::new(1.0, 300),
+            1.33,
+            FREE_TICKSPEED_SOFTCAP,
+        );
         assert!(next > Decimal::new(1.0, 300));
         assert_eq!(below, ((300.0 * 10f64.ln()) / 1.33f64.ln()).ceil() as u64);
 
         // Far above the softcap the count grows much slower than ln-linear.
         let shards_at_cap = Decimal::from_float(1.33f64.ln() * 300_000.0).exp();
-        let (above, _) =
-            free_tickspeed_from_shards(shards_at_cap * Decimal::new(1.0, 10000), 1.33);
+        let (above, _) = free_tickspeed_from_shards(
+            shards_at_cap * Decimal::new(1.0, 10000),
+            1.33,
+            FREE_TICKSPEED_SOFTCAP,
+        );
         let uncapped_equiv = 300_000.0 + (10_000.0 * 10f64.ln()) / 1.33f64.ln();
         assert!(above as f64 > FREE_TICKSPEED_SOFTCAP);
         assert!((above as f64) < uncapped_equiv);

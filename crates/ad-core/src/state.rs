@@ -562,6 +562,10 @@ impl GameState {
         if tier >= self.max_dimensions_unlockable() {
             return false;
         }
+        // Enslaved's Reality limits the 8th Antimatter Dimension to 1 purchase.
+        if tier == 7 && self.celestials.enslaved.run && self.dimensions[7].bought >= 1 {
+            return false;
+        }
         // unlockAllND milestone (30 eternities): the boost band and the
         // own-the-tier-below rule are both bypassed.
         if self.eternity_milestone_reached(30) {

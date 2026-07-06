@@ -238,6 +238,18 @@ export const useGameStore = defineStore("game", {
       await invoke("effarig_buy_unlock", { id });
       this.snapshot = await this.getState();
     },
+    async toggleStoreGameTime() {
+      await invoke("toggle_store_game_time");
+      this.snapshot = await this.getState();
+    },
+    async enslavedRelease() {
+      await invoke("enslaved_release");
+      this.snapshot = await this.getState();
+    },
+    async buyEnslavedUnlock(id) {
+      await invoke("buy_enslaved_unlock", { id });
+      this.snapshot = await this.getState();
+    },
     async unlockBlackHole() {
       await invoke("unlock_black_hole");
       this.snapshot = await this.getState();

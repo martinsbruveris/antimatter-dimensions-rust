@@ -230,8 +230,14 @@ impl GameState {
     /// The base TP a dilated run's peak antimatter is worth
     /// (`getBaseTP × tachyonGainMultiplier`); 0 below the Eternity goal.
     pub fn tp_for_antimatter(&self, antimatter: Decimal) -> Decimal {
-        let base = Decimal::from_float(antimatter.pos_log10() / 400.0)
+        let mut base = Decimal::from_float(antimatter.pos_log10() / 400.0)
             .pow(&Decimal::from_float(1.5));
+        // Enslaved's Reality nerfs base TP (`getBaseTP`: `^tachyonNerf`).
+        if self.celestials.enslaved.run {
+            base = base.pow(&Decimal::from_float(
+                crate::celestials::enslaved::TACHYON_NERF,
+            ));
+        }
         base * self.tachyon_gain_multiplier()
     }
 
@@ -296,6 +302,11 @@ impl GameState {
         if dtgain > 0.0 {
             let factor = (self.replicanti.amount.pos_log10() * dtgain).max(1.0);
             rate *= Decimal::from_float(factor);
+        }
+        // Enslaved's Reality nerfs the DT rate: `10^(log10(rate+1)^0.85 − 1)`.
+        if self.celestials.enslaved.run && rate != Decimal::ZERO {
+            let exp = (rate + Decimal::ONE).log10().powf(0.85) - 1.0;
+            rate = Decimal::pow10(exp);
         }
         rate
     }

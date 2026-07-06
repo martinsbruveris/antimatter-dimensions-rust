@@ -56,6 +56,25 @@ export const EFFARIG_STAGE_DESCRIPTIONS = {
 
 export const EFFARIG_STAGE_LABELS = { 4: "Infinity", 5: "Eternity", 6: "Reality" };
 
+// Enslaved unlock descriptions (`ENSLAVED_UNLOCKS`), keyed by id.
+export const ENSLAVED_UNLOCK_DESCRIPTIONS = {
+  0: "Increase the softcap to Tickspeed upgrades from Time Dimensions by 100,000",
+  1: "Unlock The Nameless Ones' Reality (requires a level 5000 Glyph and a 100% rarity Glyph)",
+};
+
+// The Nameless Ones' Reality description
+// (`GameDatabase.celestials.descriptions[2]`).
+export const ENSLAVED_RUN_DESCRIPTION = [
+  "Glyph levels are boosted to a minimum of 5000.",
+  "Infinity, Time, and 8th Antimatter Dimension purchases are limited to 1 each.",
+  "Antimatter Dimension multipliers are always Dilated.",
+  "Time Study 192 (uncapped Replicanti) is locked.",
+  "The Black Hole is disabled.",
+  "Tachyon Particle and Dilated Time production are severely reduced.",
+  "Time Theorem generation from Dilation Glyphs is disabled.",
+  "Stored game time is discharged at a reduced effectiveness (exponent^0.55).",
+];
+
 // Effarig's Reality description (`GameDatabase.celestials.descriptions[1]`).
 export const EFFARIG_RUN_DESCRIPTION =
   "All Dimension multipliers, game speed, and tickspeed are severely lowered, like Dilation. " +

@@ -353,8 +353,18 @@ impl GameState {
             return 0.001;
         }
         let mut factor = 1.0;
-        factor *= self.black_hole_speed_factor();
+        // Enslaved's Reality disables the Black Hole.
+        if !self.celestials.enslaved.run {
+            factor *= self.black_hole_speed_factor();
+        }
         factor *= self.glyph_effect_timespeed();
+        // Effarig's Reality compresses game speed too (`getGameSpeedupFactor`
+        // NERFS block).
+        if self.celestials.effarig.run {
+            factor = self
+                .effarig_multiplier(Decimal::from_float(factor))
+                .to_f64();
+        }
         factor.clamp(1e-300, 1e300)
     }
 

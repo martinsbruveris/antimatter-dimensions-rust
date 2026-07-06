@@ -96,7 +96,13 @@ impl GameState {
 
     /// Whether tier `t` is at its purchase cap.
     pub fn id_is_capped(&self, tier: usize) -> bool {
-        self.infinity_dimensions[tier].purchases() >= Self::id_purchase_cap(tier)
+        // Enslaved's Reality caps every Infinity Dimension at 1 purchase.
+        let cap = if self.celestials.enslaved.run {
+            1
+        } else {
+            Self::id_purchase_cap(tier)
+        };
+        self.infinity_dimensions[tier].purchases() >= cap
     }
 
     /// Whether tier `t` can be unlocked now: peak antimatter this eternity has

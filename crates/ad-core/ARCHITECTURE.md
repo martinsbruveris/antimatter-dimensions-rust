@@ -164,8 +164,18 @@ not the current state).
   `adjusted_glyph_level` (`glyphs.rs`) — and the Infinity-stage IP handling
   (`total_ip_mult` → 1 + base cap 1e200, `crunch.rs`); the persistent glyph/
   replicanti rewards (Effarig glyph type, `maxRarityBoost`, cap mult/`bonusRG`)
-  are deferred. `enslaved.rs`/`v.rs` hold their state blocks + run flags (fleshed
-  out by their own features). See `../../docs/design/2026-07-06-celestials.md`.
+  are deferred. `enslaved.rs` (Feature 7.3): game-time storage (bank the
+  Black-Hole boost via `enslaved_apply_time_flow` at the top of `tick`) + release
+  burst, the 2 stored-time unlocks (softcap → `free_tickspeed_softcap`; run,
+  glyph-gated), and the run restrictions — glyph-level min (`adjusted_glyph_level`),
+  always-dilated AD (`dimensions.rs`), 8th-AD/ID/TD purchase caps
+  (`state.rs`/`infinity_dimensions.rs`/`time_dimensions.rs`), TS192 lock
+  (`replicanti.rs`), disabled Black Hole + Effarig game-speed nerf
+  (`game_speed_factor`), TP/DT nerfs (`dilation.rs`), the discharge nerf; EC1
+  goal-1000 (needs a u16 completion widening), real-time storage/amplification,
+  and Tesseracts' effect are deferred. `v.rs` holds its state block + run flag
+  (fleshed out by its own feature). See
+  `../../docs/design/2026-07-06-celestials.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant

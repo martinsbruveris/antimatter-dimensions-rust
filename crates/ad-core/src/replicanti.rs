@@ -109,9 +109,9 @@ impl GameState {
     }
 
     /// Whether Replicanti may exceed the 1.8e308 cap (`Replicanti.isUncapped`,
-    /// TS192).
+    /// TS192). Enslaved's Reality locks TS192.
     pub fn replicanti_uncapped(&self) -> bool {
-        self.time_study_bought(192)
+        self.time_study_bought(192) && !self.celestials.enslaved.run
     }
 
     /// The total Replicanti speed multiplier (`totalReplicantiSpeedMult`):

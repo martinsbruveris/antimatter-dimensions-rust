@@ -20,7 +20,10 @@ impl GameState {
         // Black-hole phases advance on real time, before the speed factor is
         // read (`BlackHoles.updatePhases`).
         self.tick_black_holes(real_dt_ms);
-        let dt_ms = dt_ms * self.game_speed_factor();
+        // Enslaved game-time storage/release wraps the speed factor: while
+        // storing, the Black-Hole boost is banked and the game runs at 1×; a
+        // release injects its burst as raw game time.
+        let dt_ms = self.enslaved_apply_time_flow(real_dt_ms, self.game_speed_factor());
 
         // Advance the per-run challenge accumulators first, matching the original
         // game loop (`updateNormalAndInfinityChallenges` runs before autobuyers

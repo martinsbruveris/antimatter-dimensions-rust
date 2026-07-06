@@ -973,6 +973,40 @@ struct CelestialsView {
     unlocked: bool,
     teresa: TeresaView,
     effarig: EffarigView,
+    enslaved: EnslavedView,
+}
+
+/// Enslaved — The Nameless Ones subtab (Feature 7.3). Times are in ms (the
+/// frontend renders them with `timeDisplayShort`).
+#[derive(Serialize)]
+struct EnslavedView {
+    /// Whether Enslaved is available (Effarig's Eternity stage done).
+    unlocked: bool,
+    /// Stored game time (ms) and real time (ms).
+    stored: f64,
+    stored_real: f64,
+    /// Whether game-time storage is active / toggleable.
+    is_storing_game_time: bool,
+    can_modify_game_time_storage: bool,
+    /// Whether a discharge is possible now.
+    can_release: bool,
+    /// Whether Enslaved's Reality is unlocked / running / startable / completed.
+    run_unlocked: bool,
+    is_running: bool,
+    can_start_run: bool,
+    completed: bool,
+    /// Whether the run unlock's glyph requirement (level 5000 / rarity 100) is met.
+    run_requirement_met: bool,
+    /// The two unlocks (softcap id 0, run id 1).
+    unlocks: Vec<EnslavedUnlockView>,
+}
+
+#[derive(Serialize)]
+struct EnslavedUnlockView {
+    id: u8,
+    price_ms: f64,
+    owned: bool,
+    can_buy: bool,
 }
 
 /// Effarig subtab (Feature 7.2).
@@ -1100,6 +1134,35 @@ fn build_celestials_view(game: &GameState) -> CelestialsView {
         unlocked: game.celestials_unlocked(),
         teresa,
         effarig: build_effarig_view(game),
+        enslaved: build_enslaved_view(game),
+    }
+}
+
+/// Build the Enslaved subtab view.
+fn build_enslaved_view(game: &GameState) -> EnslavedView {
+    use ad_core::celestials::enslaved::{ENSLAVED_UNLOCK_RUN, ENSLAVED_UNLOCK_SOFTCAP};
+    let unlocks = [ENSLAVED_UNLOCK_SOFTCAP, ENSLAVED_UNLOCK_RUN]
+        .iter()
+        .map(|&id| EnslavedUnlockView {
+            id,
+            price_ms: GameState::enslaved_unlock_price(id),
+            owned: game.celestials.enslaved.unlock_bought(id),
+            can_buy: game.can_buy_enslaved_unlock(id),
+        })
+        .collect();
+    EnslavedView {
+        unlocked: game.enslaved_unlocked(),
+        stored: game.celestials.enslaved.stored,
+        stored_real: game.celestials.enslaved.stored_real,
+        is_storing_game_time: game.is_storing_game_time(),
+        can_modify_game_time_storage: game.can_modify_game_time_storage(),
+        can_release: game.celestials.enslaved.stored > 0.0 && !game.ec_running(12),
+        run_unlocked: game.enslaved_run_unlocked(),
+        is_running: game.celestials.enslaved.run,
+        can_start_run: game.can_start_celestial_reality(ad_core::Celestial::Enslaved),
+        completed: game.celestials.enslaved.completed,
+        run_requirement_met: game.enslaved_run_requirement_met(),
+        unlocks,
     }
 }
 
@@ -2468,6 +2531,24 @@ fn buy_perk_shop(id: usize, state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn effarig_buy_unlock(id: u8, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().effarig_buy_unlock(id);
+}
+
+/// Toggle Enslaved's game-time storage (charge/uncharge the Black Hole).
+#[tauri::command]
+fn toggle_store_game_time(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().toggle_store_game_time();
+}
+
+/// Discharge Enslaved's stored game time (a burst on the next tick).
+#[tauri::command]
+fn enslaved_release(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().enslaved_release_stored_time();
+}
+
+/// Buy an Enslaved unlock by id (0 softcap / 1 run) with stored game time.
+#[tauri::command]
+fn buy_enslaved_unlock(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_enslaved_unlock(id);
 }
 
 /// Enter a celestial's Reality (`teresa`/`effarig`/`enslaved`/`v`).
@@ -3857,6 +3938,9 @@ pub fn run() {
             teresa_stop_pouring,
             buy_perk_shop,
             effarig_buy_unlock,
+            toggle_store_game_time,
+            enslaved_release,
+            buy_enslaved_unlock,
             start_celestial_reality,
             unlock_black_hole,
             buy_black_hole_upgrade,
