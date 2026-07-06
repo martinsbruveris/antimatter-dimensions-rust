@@ -1,0 +1,13 @@
+{
+  "name": "ad-fidelity-oracle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright oracle: ticks real AD saves in headless Chromium to produce fidelity fixtures",
+  "type": "commonjs",
+  "scripts": {
+    "generate": "node generate-replay-fixtures.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ad-fidelity-capture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local save-capture server for the AD fidelity harness (pairs with userscript.js)",
+  "type": "commonjs",
+  "scripts": {
+    "server": "node save-server.js"
+  }
+}

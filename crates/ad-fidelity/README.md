@@ -33,12 +33,33 @@ ad-fidelity/
 │   └── section7_production.rs
 ├── fixtures/
 │   └── pre-infinity.json   # Reference values from the JS game
-└── js-harness/
-    ├── package.json
-    ├── shims.js            # Global shims for pre-infinity context
-    ├── loader.js           # Loads actual JS source files
-    └── generate-fixtures.js
+├── js-harness/            # Analytical-fixture generator (leaf JS formulas)
+│   ├── package.json
+│   ├── shims.js            # Global shims for pre-infinity context
+│   ├── loader.js           # Loads actual JS source files
+│   └── generate-fixtures.js
+├── capture/               # Save-replay: capture rig (userscript + save server)
+│   ├── userscript.js       # Speed buttons + time-based capture (in-browser)
+│   └── save-server.js      # Local server that stores POSTed saves
+└── oracle/                # Save-replay: Playwright oracle (reference fixtures)
+    └── generate-replay-fixtures.js
 ```
+
+## Save-replay harness (capture + oracle)
+
+A second, broader fidelity mechanism (design:
+[`docs/design/2026-07-06-fidelity-testing.md`](../../docs/design/2026-07-06-fidelity-testing.md)):
+capture real savefiles from a manual playthrough, then replay each in both the
+original JS game and Rust, ticking forward and diffing the persisted state.
+
+- **[`capture/`](capture/)** — the capture rig: an in-browser userscript (speed
+  controls + time-based save capture) and a local server that stores the saves.
+- **[`oracle/`](oracle/)** — a Playwright script that boots the real game in
+  headless Chromium, deterministically ticks each save to fixed horizons, and
+  writes the expected post-tick saves as fixtures.
+
+The Rust replay/comparison harness that diffs against those fixtures is not yet
+built (next step).
 
 ## Prerequisites
 
