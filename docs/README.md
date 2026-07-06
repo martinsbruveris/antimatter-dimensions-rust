@@ -109,6 +109,7 @@ decisions.
 | Implemented | [`2026-07-05-automator.md`](design/2026-07-05-automator.md) | Feature 6.6: the Automator (all five stages) |
 | Reference | [`2026-07-05-port-audit.md`](design/2026-07-05-port-audit.md) | Code-level audit of what is ported vs remaining (2026-07-05) — the current status snapshot |
 | Partial | [`2026-07-05-reality.md`](design/2026-07-05-reality.md) | Phase 6 (6.1–6.5): Reality, Glyphs, Perks, Reality Upgrades, Black Holes |
+| Accepted | [`2026-07-06-fidelity-testing.md`](design/2026-07-06-fidelity-testing.md) | Save-replay differential fidelity harness (design agreed; not yet built) |
 
 ## Analysis (study of the original JS game)
 
