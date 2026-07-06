@@ -306,6 +306,12 @@ impl GameState {
         if glyph_pow != 1.0 {
             mult = mult.pow(&Decimal::from_float(glyph_pow));
         }
+        // V's `adPow` reward: a persistent AD power `1 + √ST/100`
+        // (`applyNDPowers`' `VUnlocks.adPow`).
+        let ad_pow = self.v_ad_pow();
+        if ad_pow != 1.0 {
+            mult = mult.pow(&Decimal::from_float(ad_pow));
+        }
 
         // Time Dilation compresses the final multiplier (raised to the
         // `dilationpow` glyph power first); the `ndMultDT` Dilation Upgrade

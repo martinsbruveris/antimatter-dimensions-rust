@@ -173,8 +173,14 @@ not the current state).
   (`replicanti.rs`), disabled Black Hole + Effarig game-speed nerf
   (`game_speed_factor`), TP/DT nerfs (`dilation.rs`), the discharge nerf; EC1
   goal-1000 (needs a u16 completion widening), real-time storage/amplification,
-  and Tesseracts' effect are deferred. `v.rs` holds its state block + run flag
-  (fleshed out by its own feature). See
+  and Tesseracts' effect are deferred. `v.rs` (Feature 7.4): the six main-unlock
+  conditions + `v_unlock_celestial`, V's Reality run modifiers (AD/EP/IP/DT `^0.5`
+  across `dimensions.rs`/`crunch.rs`/`eternity.rs`/`dilation.rs`, squared
+  Replicanti interval in `replicanti.rs`), the 9 V-achievements
+  (`v_check_for_unlocks` in `tick.rs` runs `tryComplete`; hard ids 6–8 need Ra's
+  flip so never complete), Space Theorems, and the `adPow` AD power
+  (`dimensions.rs`). The Perk-Point goal reduction and the fastAutoEC/
+  autoAutoClean/achievementBH/raUnlock reward effects are deferred. See
   `../../docs/design/2026-07-06-celestials.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`

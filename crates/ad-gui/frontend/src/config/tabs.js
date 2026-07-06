@@ -26,6 +26,7 @@ import BlackHoleTab from "../components/tabs/reality/BlackHoleTab.vue";
 import TeresaTab from "../components/tabs/celestials/TeresaTab.vue";
 import EffarigTab from "../components/tabs/celestials/EffarigTab.vue";
 import EnslavedTab from "../components/tabs/celestials/EnslavedTab.vue";
+import VTab from "../components/tabs/celestials/VTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
 import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
@@ -216,6 +217,14 @@ export const TABS = [
         component: EnslavedTab,
         condition: (s) => Boolean(s?.celestials?.enslaved?.unlocked),
         hideId: [9, 3],
+      },
+      {
+        key: "v",
+        name: "V",
+        symbol: "⌬",
+        component: VTab,
+        condition: (s) => Boolean(s?.celestials?.v?.unlocked),
+        hideId: [9, 4],
       },
     ],
   },

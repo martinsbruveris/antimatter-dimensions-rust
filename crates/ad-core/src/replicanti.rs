@@ -160,7 +160,12 @@ impl GameState {
                 / REPLICANTI_CAP.log10();
             interval *= OVER_CAP_SCALE_FACTOR.powf(increases);
         }
-        interval / self.replicanti_speed_mult()
+        interval /= self.replicanti_speed_mult();
+        // V's Reality squares the (post-speed) Replicanti interval.
+        if self.celestials.v.run {
+            interval = interval.powi(2);
+        }
+        interval
     }
 
     /// Grow Replicanti over `dt_ms` (`replicantiLoop`'s continuous "fast gain"

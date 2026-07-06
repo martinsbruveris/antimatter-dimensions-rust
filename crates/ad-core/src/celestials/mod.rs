@@ -199,6 +199,8 @@ mod tests {
         game.celestials.enslaved.unlock_bits = 0b11;
         game.celestials.v.unlock_bits = 0b101;
         game.celestials.v.run_unlocks = [1, 2, 0, 0, 0, 3, 0, 0, 0];
+        game.celestials.v.goal_reduction_steps = [0, 100, 0, 0, 0, 0, 0, 0, 0];
+        game.celestials.v.st_spent = 4;
         game.celestials.v.run_records[4] = 9500.0;
 
         let encoded = crate::save::encode_save(&game, 0);
@@ -220,6 +222,11 @@ mod tests {
             decoded.celestials.v.run_unlocks,
             [1, 2, 0, 0, 0, 3, 0, 0, 0]
         );
+        assert_eq!(
+            decoded.celestials.v.goal_reduction_steps,
+            [0, 100, 0, 0, 0, 0, 0, 0, 0]
+        );
+        assert_eq!(decoded.celestials.v.st_spent, 4);
         assert_eq!(decoded.celestials.v.run_records[4], 9500.0);
     }
 }

@@ -81,3 +81,38 @@ export const EFFARIG_RUN_DESCRIPTION =
   "Infinity Power reduces the production and game speed penalties and Time Shards reduce the " +
   "tickspeed penalty. Glyph levels are temporarily capped, rarity is unaffected.\n" +
   "You will exit Effarig's Reality when you complete a Layer of it for the first time.";
+
+// V main-unlock condition labels (`v.mainUnlock`), in id order.
+export const V_MAIN_UNLOCK_LABELS = [
+  "Realities",
+  "Eternities",
+  "Infinities",
+  "Dilated Time",
+  "Replicanti",
+  "Reality Machines",
+];
+
+// V-achievement display data (`v.runUnlocks`), keyed by id. `type` drives the
+// value formatting: negcount (−value glyphs), int, pow10 (10^value), bh
+// (1 / 10^value Black Hole).
+export const V_ACHIEVEMENTS = [
+  { id: 0, name: "Glyph Knight", type: "negcount" },
+  { id: 1, name: "AntiStellar", type: "int" },
+  { id: 2, name: "Se7en deadly matters", type: "pow10" },
+  { id: 3, name: "Young Boy", type: "pow10" },
+  { id: 4, name: "Eternal Sunshine", type: "pow10" },
+  { id: 5, name: "Matterception", type: "int" },
+  { id: 6, name: "Requiem for a Glyph", type: "negcount" },
+  { id: 7, name: "Post-destination", type: "bh" },
+  { id: 8, name: "Shutter Glyph", type: "int" },
+];
+
+// V ST-gated reward descriptions (`v.unlocks`), keyed by unlock bit id.
+export const V_REWARD_DESCRIPTIONS = {
+  1: "Spend Perk Points to reduce the goal of all V-Achievement tiers.",
+  2: "Antimatter Dimension power based on total Space Theorems.",
+  3: "Achievement multiplier reduces Auto-EC completion time.",
+  4: "Unlock the ability to Automatically Purge Glyphs on Reality.",
+  5: "Achievement multiplier affects Black Hole power.",
+  6: "Reduce the Space Theorem cost of Time Studies by 2. Unlock Ra.",
+};

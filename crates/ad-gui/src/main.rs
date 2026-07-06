@@ -974,6 +974,44 @@ struct CelestialsView {
     teresa: TeresaView,
     effarig: EffarigView,
     enslaved: EnslavedView,
+    v: VView,
+}
+
+/// V subtab (Feature 7.4).
+#[derive(Serialize)]
+struct VView {
+    /// Whether the V tab is available (V unlocked, or the chain reached it).
+    unlocked: bool,
+    /// Whether V (the celestial) is unlocked.
+    is_v_unlocked: bool,
+    /// Whether all six main conditions are met (the "unlock V" prompt).
+    can_unlock: bool,
+    /// The six main-unlock progress fractions [0, 1].
+    main_progress: Vec<f64>,
+    is_running: bool,
+    can_start_run: bool,
+    space_theorems: u32,
+    available_st: u32,
+    achievements: Vec<VAchievementView>,
+    rewards: Vec<VRewardView>,
+}
+
+#[derive(Serialize)]
+struct VAchievementView {
+    id: u8,
+    completions: u32,
+    tiers: u32,
+    current_value: f64,
+    next_goal: f64,
+    condition_met: bool,
+    is_hard: bool,
+}
+
+#[derive(Serialize)]
+struct VRewardView {
+    id: u8,
+    st_required: u32,
+    unlocked: bool,
 }
 
 /// Enslaved — The Nameless Ones subtab (Feature 7.3). Times are in ms (the
@@ -1135,6 +1173,47 @@ fn build_celestials_view(game: &GameState) -> CelestialsView {
         teresa,
         effarig: build_effarig_view(game),
         enslaved: build_enslaved_view(game),
+        v: build_v_view(game),
+    }
+}
+
+/// Build the V subtab view.
+fn build_v_view(game: &GameState) -> VView {
+    use ad_core::celestials::v::V_UNLOCK_ST_THRESHOLDS;
+    let achievements = (0..9usize)
+        .map(|id| {
+            let (completions, tiers, current_value, next_goal, condition_met, is_hard) =
+                game.v_achievement_status(id);
+            VAchievementView {
+                id: id as u8,
+                completions,
+                tiers,
+                current_value,
+                next_goal,
+                condition_met,
+                is_hard,
+            }
+        })
+        .collect();
+    let rewards = V_UNLOCK_ST_THRESHOLDS
+        .iter()
+        .map(|&(bit, st)| VRewardView {
+            id: bit,
+            st_required: st,
+            unlocked: game.celestials.v.unlock_bought(bit),
+        })
+        .collect();
+    VView {
+        unlocked: game.v_tab_available(),
+        is_v_unlocked: game.v_celestial_unlocked(),
+        can_unlock: game.v_can_unlock_celestial(),
+        main_progress: game.v_main_unlock_progress().to_vec(),
+        is_running: game.celestials.v.run,
+        can_start_run: game.can_start_celestial_reality(ad_core::Celestial::V),
+        space_theorems: game.v_space_theorems(),
+        available_st: game.v_available_space_theorems(),
+        achievements,
+        rewards,
     }
 }
 
@@ -2551,6 +2630,12 @@ fn buy_enslaved_unlock(id: u8, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().buy_enslaved_unlock(id);
 }
 
+/// Unlock V (the celestial) once all six main conditions are met.
+#[tauri::command]
+fn v_unlock_celestial(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().v_unlock_celestial();
+}
+
 /// Enter a celestial's Reality (`teresa`/`effarig`/`enslaved`/`v`).
 #[tauri::command]
 fn start_celestial_reality(celestial: String, state: State<'_, Mutex<GameState>>) {
@@ -3941,6 +4026,7 @@ pub fn run() {
             toggle_store_game_time,
             enslaved_release,
             buy_enslaved_unlock,
+            v_unlock_celestial,
             start_celestial_reality,
             unlock_black_hole,
             buy_black_hole_upgrade,

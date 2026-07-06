@@ -194,6 +194,10 @@ impl GameState {
             self.unlock_achievement(24);
         }
 
+        // V's per-tick unlock checks (`V.checkForUnlocks`): the ST-gated
+        // rewards and, while running, the V-achievement completions.
+        self.v_check_for_unlocks();
+
         // Advance the tutorial highlight if the next step's condition now holds
         // (mirrors the original's game-loop-driven `tutorialLoop`).
         self.tutorial_loop();

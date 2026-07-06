@@ -308,6 +308,10 @@ impl GameState {
             let exp = (rate + Decimal::ONE).log10().powf(0.85) - 1.0;
             rate = Decimal::pow10(exp);
         }
+        // V's Reality square-roots the DT rate.
+        if self.celestials.v.run {
+            rate = rate.pow(&Decimal::from_float(0.5));
+        }
         rate
     }
 

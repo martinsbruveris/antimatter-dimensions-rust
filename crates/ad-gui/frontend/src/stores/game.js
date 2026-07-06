@@ -250,6 +250,10 @@ export const useGameStore = defineStore("game", {
       await invoke("buy_enslaved_unlock", { id });
       this.snapshot = await this.getState();
     },
+    async vUnlockCelestial() {
+      await invoke("v_unlock_celestial");
+      this.snapshot = await this.getState();
+    },
     async unlockBlackHole() {
       await invoke("unlock_black_hole");
       this.snapshot = await this.getState();
