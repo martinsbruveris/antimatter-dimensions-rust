@@ -24,6 +24,7 @@ import PerksTab from "../components/tabs/reality/PerksTab.vue";
 import RealityUpgradesTab from "../components/tabs/reality/RealityUpgradesTab.vue";
 import BlackHoleTab from "../components/tabs/reality/BlackHoleTab.vue";
 import TeresaTab from "../components/tabs/celestials/TeresaTab.vue";
+import EffarigTab from "../components/tabs/celestials/EffarigTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
 import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
@@ -199,6 +200,14 @@ export const TABS = [
     uiClass: "o-tab-btn--celestial",
     subtabs: [
       { key: "teresa", name: "Teresa", symbol: "Ϟ", component: TeresaTab, hideId: [9, 1] },
+      {
+        key: "effarig",
+        name: "Effarig",
+        symbol: "Ϙ",
+        component: EffarigTab,
+        condition: (s) => Boolean(s?.celestials?.effarig?.unlocked),
+        hideId: [9, 2],
+      },
     ],
   },
   {

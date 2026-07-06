@@ -972,6 +972,40 @@ struct AwayProgressView {
 struct CelestialsView {
     unlocked: bool,
     teresa: TeresaView,
+    effarig: EffarigView,
+}
+
+/// Effarig subtab (Feature 7.2).
+#[derive(Serialize)]
+struct EffarigView {
+    /// Whether Effarig is unlocked at all (Teresa's `effarig` threshold).
+    unlocked: bool,
+    relic_shards: Num,
+    shards_gained: Num,
+    /// Current stage (1 Infinity / 2 Eternity / 3 Reality / 4 Completed).
+    current_stage: u8,
+    glyph_level_cap: u32,
+    run_unlocked: bool,
+    is_running: bool,
+    can_start_run: bool,
+    /// Relic-Shard purchasable unlocks (adjuster/glyphFilter/setSaves/run).
+    shop_unlocks: Vec<EffarigUnlockView>,
+    /// The three stage unlocks (infinity/eternity/reality).
+    stage_unlocks: Vec<EffarigStageView>,
+}
+
+#[derive(Serialize)]
+struct EffarigUnlockView {
+    id: u8,
+    cost: Num,
+    unlocked: bool,
+    can_buy: bool,
+}
+
+#[derive(Serialize)]
+struct EffarigStageView {
+    id: u8,
+    unlocked: bool,
 }
 
 /// Teresa subtab (Feature 7.1).
@@ -1065,6 +1099,46 @@ fn build_celestials_view(game: &GameState) -> CelestialsView {
     CelestialsView {
         unlocked: game.celestials_unlocked(),
         teresa,
+        effarig: build_effarig_view(game),
+    }
+}
+
+/// Build the Effarig subtab view.
+fn build_effarig_view(game: &GameState) -> EffarigView {
+    use ad_core::celestials::effarig;
+    let f = |x: f64| num(&Decimal::from_float(x));
+    let shop_unlocks = effarig::EFFARIG_UNLOCK_COSTS
+        .iter()
+        .map(|&(id, cost)| EffarigUnlockView {
+            id,
+            cost: f(cost),
+            unlocked: game.celestials.effarig.unlock_bought(id),
+            can_buy: !game.celestials.effarig.unlock_bought(id)
+                && game.celestials.effarig.relic_shards >= cost,
+        })
+        .collect();
+    let stage_unlocks = [
+        effarig::EFFARIG_UNLOCK_INFINITY,
+        effarig::EFFARIG_UNLOCK_ETERNITY,
+        effarig::EFFARIG_UNLOCK_REALITY,
+    ]
+    .iter()
+    .map(|&id| EffarigStageView {
+        id,
+        unlocked: game.celestials.effarig.unlock_bought(id),
+    })
+    .collect();
+    EffarigView {
+        unlocked: game.effarig_unlocked(),
+        relic_shards: f(game.celestials.effarig.relic_shards),
+        shards_gained: f(game.effarig_shards_gained()),
+        current_stage: game.effarig_current_stage() as u8,
+        glyph_level_cap: game.effarig_glyph_level_cap(),
+        run_unlocked: game.effarig_run_unlocked(),
+        is_running: game.celestials.effarig.run,
+        can_start_run: game.can_start_celestial_reality(ad_core::Celestial::Effarig),
+        shop_unlocks,
+        stage_unlocks,
     }
 }
 
@@ -2388,6 +2462,12 @@ fn buy_perk_shop(id: usize, state: State<'_, Mutex<GameState>>) {
     {
         state.lock().unwrap().buy_perk_shop(entry);
     }
+}
+
+/// Buy an Effarig Relic-Shard unlock by id.
+#[tauri::command]
+fn effarig_buy_unlock(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().effarig_buy_unlock(id);
 }
 
 /// Enter a celestial's Reality (`teresa`/`effarig`/`enslaved`/`v`).
@@ -3776,6 +3856,7 @@ pub fn run() {
             teresa_pour_rm,
             teresa_stop_pouring,
             buy_perk_shop,
+            effarig_buy_unlock,
             start_celestial_reality,
             unlock_black_hole,
             buy_black_hole_upgrade,

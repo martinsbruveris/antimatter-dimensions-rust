@@ -40,6 +40,14 @@ impl GameState {
     /// 85/93/116/125 are later features. Read by
     /// [`GameState::generate_passive_ip`] too.
     pub(crate) fn total_ip_mult(&self) -> Decimal {
+        // Effarig's Infinity stage nullifies every IP multiplier (`totalIPMult`
+        // returns 1).
+        if self.celestials.effarig.run
+            && self.effarig_current_stage()
+                == crate::celestials::effarig::EffarigStage::Infinity
+        {
+            return Decimal::ONE;
+        }
         let mut mult = Decimal::ONE;
         // TS41: ×1.2 per galaxy of any kind.
         if self.time_study_bought(41) {
@@ -95,12 +103,19 @@ impl GameState {
     /// floored.
     pub fn gained_infinity_points(&self) -> Decimal {
         let div = self.ip_gain_divisor();
-        let base = if self.broke_infinity {
+        let mut base = if self.broke_infinity {
             let exponent = self.records.this_infinity.max_am.log10() / div - 0.75;
             Decimal::pow10(exponent)
         } else {
             Decimal::from_float(308.0 / div)
         };
+        // Effarig's Infinity stage caps base IP at 1e200.
+        if self.celestials.effarig.run
+            && self.effarig_current_stage()
+                == crate::celestials::effarig::EffarigStage::Infinity
+        {
+            base = base.min(&Decimal::new_unchecked(1.0, 200));
+        }
         let mut ip = base * self.total_ip_mult();
         // Celestial run modifiers: Teresa `^0.55`, V `^0.5` (mutually
         // exclusive; the Effarig eternity-stage cap is applied in the Effarig
@@ -304,6 +319,12 @@ impl GameState {
         // dispatched at the end of every reset, forced ones included; the
         // trigger's condition is IP >= 1e140).
         self.try_trigger_tab_notification(TabNotificationId::Replicanti);
+
+        // `bigCrunchCheckUnlocks` (only at the goal): completing Effarig's
+        // Infinity stage unlocks it and forces a reward-free Reality exit.
+        if at_goal {
+            self.effarig_on_big_crunch();
+        }
     }
 }
 

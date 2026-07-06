@@ -1,12 +1,46 @@
-//! Effarig (Feature 7.2) — a multi-stage Reality with a Relic-Shard economy and
-//! a glyph forge. See `docs/design/2026-07-06-celestials.md` §2.
+//! Effarig (Feature 7.2) — a multi-stage Reality with a Relic-Shard economy.
+//! See `docs/design/2026-07-06-celestials.md` §2. Original:
+//! `celestials/effarig.js` + `secret-formula/celestials/effarig.js`.
 //!
-//! **Work in progress:** the state block + run flag land here so save/load and
-//! the shared celestial machinery compile; the full logic (Relic Shards, the
-//! 3-stage run nerfs, glyph level cap, the Effarig glyph type) is filled in by
-//! its own task.
+//! **Scope.** The run experience is ported in full: the three stages
+//! (Infinity → Eternity → Reality) with their prestige-hook unlocks + exits,
+//! the dilation-like nerfs (AD multiplier, tickspeed, glyph-level cap), and the
+//! infinity-stage IP handling. Relic Shards are gained on each Reality. The
+//! **persistent glyph rewards** — the Effarig glyph type, the `maxRarityBoost`
+//! into glyph generation, and the infinity-stage Replicanti-cap multiplier +
+//! `bonusRG` — are deferred (they need glyph/replicanti subsystem extensions;
+//! see the design doc), as are the glyph adjuster/filter/preset QoL unlocks.
 
 use crate::state::GameState;
+use break_infinity::Decimal;
+
+/// Effarig unlocks (`secret-formula/celestials/effarig.js`), bought with Relic
+/// Shards (adjuster/glyphFilter/setSaves/run) or earned by completing a run
+/// stage (infinity/eternity/reality). `id` is the save bit.
+pub const EFFARIG_UNLOCK_ADJUSTER: u8 = 0;
+pub const EFFARIG_UNLOCK_GLYPH_FILTER: u8 = 1;
+pub const EFFARIG_UNLOCK_SET_SAVES: u8 = 2;
+pub const EFFARIG_UNLOCK_RUN: u8 = 3;
+pub const EFFARIG_UNLOCK_INFINITY: u8 = 4;
+pub const EFFARIG_UNLOCK_ETERNITY: u8 = 5;
+pub const EFFARIG_UNLOCK_REALITY: u8 = 6;
+
+/// The relic-shard costs of the four purchasable unlocks, `(id, cost)`.
+pub const EFFARIG_UNLOCK_COSTS: [(u8, f64); 4] = [
+    (EFFARIG_UNLOCK_ADJUSTER, 1e7),
+    (EFFARIG_UNLOCK_GLYPH_FILTER, 2e8),
+    (EFFARIG_UNLOCK_SET_SAVES, 3e9),
+    (EFFARIG_UNLOCK_RUN, 5e11),
+];
+
+/// Effarig's Reality stages (`EFFARIG_STAGES`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffarigStage {
+    Infinity = 1,
+    Eternity = 2,
+    Reality = 3,
+    Completed = 4,
+}
 
 /// `player.celestials.effarig`.
 #[derive(Debug, Clone, Default)]
@@ -35,17 +69,239 @@ impl EffarigState {
 }
 
 impl GameState {
-    /// Whether Effarig's Reality is unlocked (the `run` unlock, id 3). Stub
-    /// until the Effarig task wires the Relic-Shard purchase.
+    // --- Unlocks / stages -------------------------------------------------------
+
+    /// Whether Effarig's Reality is unlocked (the `run` unlock, id 3).
     pub fn effarig_run_unlocked(&self) -> bool {
-        self.celestials.effarig.unlock_bought(3)
+        self.celestials.effarig.unlock_bought(EFFARIG_UNLOCK_RUN)
     }
 
-    /// The Effarig completion hook from `giveRealityRewards`. Stub until the
-    /// stage machinery lands.
-    pub(crate) fn effarig_complete_stage(&mut self) {}
+    /// Whether Effarig itself is available — Teresa's `effarig` threshold is met
+    /// (`Effarig.isUnlocked` via `TeresaUnlocks.effarig`).
+    pub fn effarig_unlocked(&self) -> bool {
+        self.teresa_effarig_unlocked()
+    }
 
-    /// `giveRealityRewards`: add the run's Relic Shards. Stub until the shard
-    /// formula + Teresa-effarig gate lands.
-    pub(crate) fn effarig_gain_relic_shards(&mut self) {}
+    /// `Effarig.currentStage`: the lowest stage whose unlock bit is unset.
+    pub fn effarig_current_stage(&self) -> EffarigStage {
+        let e = &self.celestials.effarig;
+        if !e.unlock_bought(EFFARIG_UNLOCK_INFINITY) {
+            EffarigStage::Infinity
+        } else if !e.unlock_bought(EFFARIG_UNLOCK_ETERNITY) {
+            EffarigStage::Eternity
+        } else if !e.unlock_bought(EFFARIG_UNLOCK_REALITY) {
+            EffarigStage::Reality
+        } else {
+            EffarigStage::Completed
+        }
+    }
+
+    /// Buy a Relic-Shard unlock by id (adjuster/glyphFilter/setSaves/run).
+    /// Returns whether it happened.
+    pub fn effarig_buy_unlock(&mut self, id: u8) -> bool {
+        let Some(&(_, cost)) = EFFARIG_UNLOCK_COSTS.iter().find(|(i, _)| *i == id)
+        else {
+            return false;
+        };
+        if self.celestials.effarig.unlock_bought(id)
+            || self.celestials.effarig.relic_shards < cost
+        {
+            return false;
+        }
+        self.celestials.effarig.relic_shards -= cost;
+        self.celestials.effarig.unlock_bits |= 1u32 << id;
+        true
+    }
+
+    // --- Run nerfs (dilation-like) ----------------------------------------------
+
+    /// `Effarig.nerfFactor(power)`: `3·(1 − c/(c + √(pLog10(power))))`, where the
+    /// stage constant `c` is 1500 / 29.29 / 25 for Infinity / Eternity / Reality.
+    pub(crate) fn effarig_nerf_factor(&self, power: Decimal) -> f64 {
+        let c = match self.effarig_current_stage() {
+            EffarigStage::Infinity => 1500.0,
+            EffarigStage::Eternity => 29.29,
+            _ => 25.0,
+        };
+        3.0 * (1.0 - c / (c + power.pos_log10().sqrt()))
+    }
+
+    /// `Effarig.multDilation`: `0.25 + 0.25·nerfFactor(infinityPower)`.
+    fn effarig_mult_dilation(&self) -> f64 {
+        0.25 + 0.25 * self.effarig_nerf_factor(self.infinity_power)
+    }
+
+    /// `Effarig.tickDilation`: `0.7 + 0.1·nerfFactor(timeShards)`.
+    fn effarig_tick_dilation(&self) -> f64 {
+        0.7 + 0.1 * self.effarig_nerf_factor(self.time_shards)
+    }
+
+    /// `Effarig.multiplier(mult)`: `10^(pLog10(mult)^multDilation)` — compresses
+    /// the final AD multiplier (the run's replacement for the dilation/V stage).
+    pub(crate) fn effarig_multiplier(&self, mult: Decimal) -> Decimal {
+        let base = mult.pos_log10();
+        Decimal::pow10(base.powf(self.effarig_mult_dilation()))
+    }
+
+    /// `Effarig.tickspeed`: compress the tickspeed interval `base` via
+    /// `10^(-((3 + log10(1/base))^tickDilation))`.
+    pub(crate) fn effarig_tickspeed(&self, base: Decimal) -> Decimal {
+        // `base.reciprocal().log10() = -log10(base)`.
+        let b = (3.0 - base.log10()).max(0.0);
+        Decimal::pow10(-(b.powf(self.effarig_tick_dilation())))
+    }
+
+    /// `Effarig.glyphLevelCap`: 100 / 1500 / 2000 by current stage.
+    pub fn effarig_glyph_level_cap(&self) -> u32 {
+        match self.effarig_current_stage() {
+            EffarigStage::Infinity => 100,
+            EffarigStage::Eternity => 1500,
+            _ => 2000,
+        }
+    }
+
+    // --- Relic Shards -----------------------------------------------------------
+
+    /// `Effarig.glyphEffectAmount`: the count of distinct effect bits across the
+    /// equipped (non-companion) glyphs. Our frontier only generates basic
+    /// types, so the generated/non-generated split collapses to one popcount.
+    fn effarig_glyph_effect_amount(&self) -> u32 {
+        let mask = self
+            .active_glyphs_without_companion()
+            .iter()
+            .fold(0u32, |acc, g| acc | g.effects);
+        mask.count_ones()
+    }
+
+    /// `Effarig.shardsGained`: `floor((EP.exponent/7500)^glyphEffectAmount)`
+    /// (the Alchemy factor is out of frontier → 1). Gained on each Reality once
+    /// Teresa's `effarig` unlock is owned.
+    pub fn effarig_shards_gained(&self) -> f64 {
+        if !self.effarig_unlocked() {
+            return 0.0;
+        }
+        let exp = self.eternity_points.exponent() as f64;
+        let amount = self.effarig_glyph_effect_amount();
+        (exp / 7500.0).powi(amount as i32).floor()
+    }
+
+    /// `giveRealityRewards`: add the run's Relic Shards on a rewarded Reality.
+    pub(crate) fn effarig_gain_relic_shards(&mut self) {
+        if !self.effarig_unlocked() {
+            return;
+        }
+        self.celestials.effarig.relic_shards += self.effarig_shards_gained();
+    }
+
+    // --- Stage completion hooks -------------------------------------------------
+
+    /// `bigCrunchCheckUnlocks`: completing the Infinity stage inside the run
+    /// unlocks it and forces a reward-free Reality exit.
+    pub(crate) fn effarig_on_big_crunch(&mut self) {
+        if self.celestials.effarig.run
+            && !self
+                .celestials
+                .effarig
+                .unlock_bought(EFFARIG_UNLOCK_INFINITY)
+        {
+            self.celestials.effarig.unlock_bits |= 1u32 << EFFARIG_UNLOCK_INFINITY;
+            self.reset_reality();
+        }
+    }
+
+    /// The Eternity hook: completing the Eternity stage inside the run unlocks
+    /// it and forces a reward-free Reality exit.
+    pub(crate) fn effarig_on_eternity(&mut self) {
+        if self.celestials.effarig.run
+            && !self
+                .celestials
+                .effarig
+                .unlock_bought(EFFARIG_UNLOCK_ETERNITY)
+        {
+            self.celestials.effarig.unlock_bits |= 1u32 << EFFARIG_UNLOCK_ETERNITY;
+            self.reset_reality();
+        }
+    }
+
+    /// `giveRealityRewards`: a rewarded Reality inside the run unlocks the
+    /// Reality stage (the Effarig glyph type; the type generation itself is
+    /// deferred).
+    pub(crate) fn effarig_complete_stage(&mut self) {
+        if !self
+            .celestials
+            .effarig
+            .unlock_bought(EFFARIG_UNLOCK_REALITY)
+        {
+            self.celestials.effarig.unlock_bits |= 1u32 << EFFARIG_UNLOCK_REALITY;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn effarig_game() -> GameState {
+        let mut game = GameState::new();
+        game.reality.realities = 1;
+        // Teresa's effarig threshold (unlocks Effarig).
+        game.celestials.teresa.unlock_bits |= 1 << 3;
+        game
+    }
+
+    #[test]
+    fn buying_unlocks_spends_relic_shards() {
+        let mut game = effarig_game();
+        game.celestials.effarig.relic_shards = 1e8;
+        assert!(game.effarig_buy_unlock(EFFARIG_UNLOCK_ADJUSTER)); // 1e7
+        assert!((game.celestials.effarig.relic_shards - 9e7).abs() < 1.0);
+        // Can't afford the 5e11 run unlock yet.
+        assert!(!game.effarig_buy_unlock(EFFARIG_UNLOCK_RUN));
+    }
+
+    #[test]
+    fn stage_advances_with_unlock_bits() {
+        let mut game = effarig_game();
+        assert_eq!(game.effarig_current_stage(), EffarigStage::Infinity);
+        game.celestials.effarig.unlock_bits |= 1 << EFFARIG_UNLOCK_INFINITY;
+        assert_eq!(game.effarig_current_stage(), EffarigStage::Eternity);
+        game.celestials.effarig.unlock_bits |= 1 << EFFARIG_UNLOCK_ETERNITY;
+        assert_eq!(game.effarig_current_stage(), EffarigStage::Reality);
+        game.celestials.effarig.unlock_bits |= 1 << EFFARIG_UNLOCK_REALITY;
+        assert_eq!(game.effarig_current_stage(), EffarigStage::Completed);
+    }
+
+    #[test]
+    fn glyph_level_cap_by_stage() {
+        let mut game = effarig_game();
+        assert_eq!(game.effarig_glyph_level_cap(), 100);
+        game.celestials.effarig.unlock_bits |= 1 << EFFARIG_UNLOCK_INFINITY;
+        assert_eq!(game.effarig_glyph_level_cap(), 1500);
+        game.celestials.effarig.unlock_bits |= 1 << EFFARIG_UNLOCK_ETERNITY;
+        assert_eq!(game.effarig_glyph_level_cap(), 2000);
+    }
+
+    #[test]
+    fn multiplier_compresses_large_values() {
+        let mut game = effarig_game();
+        game.celestials.effarig.run = true;
+        let big = Decimal::new(1.0, 1000);
+        let compressed = game.effarig_multiplier(big);
+        // The compression brings 1e1000 well below itself.
+        assert!(compressed < big);
+        assert!(compressed > Decimal::ONE);
+    }
+
+    #[test]
+    fn infinity_stage_completion_unlocks_and_exits() {
+        let mut game = effarig_game();
+        game.celestials.effarig.run = true;
+        game.effarig_on_big_crunch();
+        assert!(game
+            .celestials
+            .effarig
+            .unlock_bought(EFFARIG_UNLOCK_INFINITY));
+        // The forced reset exited the run.
+        assert!(!game.celestials.effarig.run);
+    }
 }

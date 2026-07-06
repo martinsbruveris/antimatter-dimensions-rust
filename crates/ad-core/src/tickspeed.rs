@@ -62,9 +62,16 @@ impl GameState {
     /// Decimal too.
     pub fn current_tickspeed_ms(&self) -> Decimal {
         let multiplier = self.tickspeed_purchase_multiplier();
-        let tickspeed = Decimal::from_float(INITIAL_TICKSPEED_MS)
+        let base = Decimal::from_float(INITIAL_TICKSPEED_MS)
             * Decimal::from_float(multiplier)
                 .pow(&Decimal::from(self.total_tickspeed_upgrades()));
+        // Effarig's Reality replaces the tickspeed value with a compressed one
+        // (`Tickspeed.current`: `Effarig.isRunning ? Effarig.tickspeed : base`).
+        let tickspeed = if self.celestials.effarig.run {
+            self.effarig_tickspeed(base)
+        } else {
+            base
+        };
         // Time Dilation compresses the interval too (`Tickspeed.current`).
         if self.dilation.active {
             self.dilated_value_of(tickspeed)

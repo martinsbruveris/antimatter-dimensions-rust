@@ -195,6 +195,10 @@ impl GameState {
             crate::automator::PrestigeLayer::Eternity,
             gained_ep,
         );
+
+        // `giveEternityRewards`: completing Effarig's Eternity stage inside the
+        // run unlocks it and forces a reward-free Reality exit.
+        self.effarig_on_eternity();
         true
     }
 

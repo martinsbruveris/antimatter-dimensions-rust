@@ -925,6 +925,21 @@ impl GameState {
 
     // --- Effects (glyph-effects.js) --------------------------------------------------
 
+    /// `getAdjustedGlyphLevel`: a glyph's *effective* level for effect
+    /// computation. Inside a celestial run the level is clamped — Enslaved
+    /// raises it to a 5000 minimum, Effarig caps it at the current stage's cap.
+    /// (Pelle's cap + the Reality-glyph level boost are out of frontier.)
+    pub(crate) fn adjusted_glyph_level(&self, glyph: &Glyph) -> f64 {
+        let level = glyph.level as f64;
+        if self.celestials.enslaved.run {
+            return level.max(crate::celestials::enslaved::GLYPH_LEVEL_MIN as f64);
+        }
+        if self.celestials.effarig.run {
+            return level.min(self.effarig_glyph_level_cap() as f64);
+        }
+        level
+    }
+
     /// Effect values of `bit` across the equipped basic-type glyphs.
     fn glyph_effect_values(&self, bit: u8) -> Vec<(f64, f64)> {
         self.reality
@@ -933,7 +948,7 @@ impl GameState {
             .iter()
             .filter(|g| g.kind != GlyphType::Companion)
             .filter(|g| g.effects & (1 << bit) != 0)
-            .map(|g| (g.level as f64, g.strength))
+            .map(|g| (self.adjusted_glyph_level(g), g.strength))
             .collect()
     }
 

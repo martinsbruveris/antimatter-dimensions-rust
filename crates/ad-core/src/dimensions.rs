@@ -316,6 +316,9 @@ impl GameState {
                 mult = mult.pow(&Decimal::from_float(dilation_pow));
             }
             mult = self.dilated_value_of(mult);
+        } else if self.celestials.enslaved.run {
+            // Enslaved keeps AD multipliers "always dilated".
+            mult = self.dilated_value_of(mult);
         }
         if self.dilation_upgrade_bought(6) {
             mult *= self
@@ -323,6 +326,14 @@ impl GameState {
                 .dilated_time
                 .pow(&Decimal::from_float(308.0))
                 .max(&Decimal::ONE);
+        }
+
+        // Celestial-run final-stage transforms (mutually exclusive, after all
+        // nerfs): Effarig compresses via `multiplier`, V square-roots.
+        if self.celestials.effarig.run {
+            mult = self.effarig_multiplier(mult);
+        } else if self.celestials.v.run {
+            mult = mult.pow(&Decimal::from_float(0.5));
         }
         mult
     }

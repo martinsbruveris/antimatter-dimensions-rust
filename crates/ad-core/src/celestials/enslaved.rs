@@ -7,6 +7,10 @@
 
 use crate::state::GameState;
 
+/// `Enslaved.glyphLevelMin` — inside the run glyph levels are boosted to at
+/// least this (`getAdjustedGlyphLevel`).
+pub const GLYPH_LEVEL_MIN: u32 = 5000;
+
 /// `player.celestials.enslaved`.
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

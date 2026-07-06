@@ -234,6 +234,10 @@ export const useGameStore = defineStore("game", {
       await invoke("start_celestial_reality", { celestial });
       this.snapshot = await this.getState();
     },
+    async effarigBuyUnlock(id) {
+      await invoke("effarig_buy_unlock", { id });
+      this.snapshot = await this.getState();
+    },
     async unlockBlackHole() {
       await invoke("unlock_black_hole");
       this.snapshot = await this.getState();

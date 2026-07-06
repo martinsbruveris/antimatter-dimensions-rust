@@ -156,9 +156,16 @@ not the current state).
   threshold unlocks (`startEU` grants the 6 EUs on reset), Teresa's Reality
   (IP/EP `^0.55` in `crunch.rs`/`eternity.rs`, glyph-TT-gen off in `dilation.rs`),
   the `runRewardMultiplier` glyph-sacrifice bonus (`glyphs.rs`), passive `epGen`
-  (`tick.rs`), and the 4-entry Perk Shop. `effarig.rs`/`enslaved.rs`/`v.rs` hold
-  their state blocks + run flags (fleshed out by their own features). See
-  `../../docs/design/2026-07-06-celestials.md`.
+  (`tick.rs`), and the 4-entry Perk Shop. `effarig.rs` (Feature 7.2): Relic
+  Shards + the 4 shard unlocks, the 3-stage run (Infinity/Eternity/Reality) with
+  its prestige-hook unlocks + reward-free exits (`crunch.rs`/`eternity.rs`), the
+  dilation-like nerfs — `effarig_multiplier` (AD final mult, `dimensions.rs`),
+  `effarig_tickspeed` (`tickspeed.rs`), the glyph-level cap via
+  `adjusted_glyph_level` (`glyphs.rs`) — and the Infinity-stage IP handling
+  (`total_ip_mult` → 1 + base cap 1e200, `crunch.rs`); the persistent glyph/
+  replicanti rewards (Effarig glyph type, `maxRarityBoost`, cap mult/`bonusRG`)
+  are deferred. `enslaved.rs`/`v.rs` hold their state blocks + run flags (fleshed
+  out by their own features). See `../../docs/design/2026-07-06-celestials.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
