@@ -201,6 +201,12 @@ impl Default for AwayProgress {
 pub struct Options {
     /// Whether keyboard shortcuts are active (original `hotkeys`).
     pub hotkeys: bool,
+    /// Whether crunching (manually or via the autobuyer) while inside an
+    /// antimatter challenge re-enters that challenge instead of exiting it
+    /// (original `retryChallenge`, the Challenges tab's "Automatically retry
+    /// challenges" toggle).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub retry_challenge: bool,
     /// Game-loop cadence in milliseconds (original `updateRate`). The frontend
     /// only ticks the engine once this much wall-clock time has elapsed, so a
     /// larger value means coarser, less frequent updates.
@@ -297,6 +303,7 @@ impl Options {
     pub fn new() -> Self {
         Self {
             hotkeys: true,
+            retry_challenge: false,
             update_rate: DEFAULT_UPDATE_RATE_MS,
             notation: DEFAULT_NOTATION.to_string(),
             notation_digits_comma: DEFAULT_NOTATION_DIGITS_COMMA,

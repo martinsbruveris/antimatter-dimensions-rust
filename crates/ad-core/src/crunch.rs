@@ -140,7 +140,13 @@ impl GameState {
         if !self.can_big_crunch() {
             return false;
         }
-        self.big_crunch_reset(false, false);
+        // With "Automatically retry challenges" on, crunching inside an antimatter
+        // challenge re-enters it (mirrors `bigCrunchReset`'s default
+        // `enteringAntimatterChallenge = isInAntimatterChallenge && retryChallenge`):
+        // `handle_challenge_completion` keeps it active and the reset starts fresh.
+        let entering_challenge =
+            self.options.retry_challenge && self.in_antimatter_challenge();
+        self.big_crunch_reset(false, entering_challenge);
         true
     }
 

@@ -723,6 +723,8 @@ pub struct AutobuyerDTO {
 #[serde(rename_all = "camelCase")]
 pub struct OptionsDTO {
     pub hotkeys: bool,
+    /// `player.options.retryChallenge` — auto-retry antimatter challenges.
+    pub retry_challenge: bool,
     pub update_rate: u32,
     pub notation: String,
     pub notation_digits: NotationDigitsDTO,
@@ -1232,6 +1234,7 @@ impl GameState {
         // default, since we implement only a subset of notations.
         let mut options = Options::new();
         options.hotkeys = dto.options.hotkeys;
+        options.retry_challenge = dto.options.retry_challenge;
         options.set_update_rate(check_range(
             "options.updateRate",
             dto.options.update_rate,
@@ -1931,6 +1934,7 @@ mod tests {
     fn valid_in_range_options_are_applied() {
         let mut player = base_player();
         player["options"]["hotkeys"] = json!(false);
+        player["options"]["retryChallenge"] = json!(true);
         player["options"]["updateRate"] = json!(100);
         player["options"]["notation"] = json!("Engineering");
         player["options"]["notationDigits"] = json!({ "comma": 4, "notation": 12 });
@@ -1939,6 +1943,7 @@ mod tests {
 
         let state = load(player).unwrap();
         assert!(!state.options.hotkeys);
+        assert!(state.options.retry_challenge);
         assert_eq!(state.options.update_rate, 100);
         assert_eq!(state.options.notation, "Engineering");
         assert_eq!(state.options.notation_digits_comma, 4);

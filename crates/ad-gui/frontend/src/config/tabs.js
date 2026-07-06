@@ -1,3 +1,4 @@
+import { defineAsyncComponent } from "vue";
 import AntimatterDimensionsTab from "../components/tabs/AntimatterDimensionsTab.vue";
 import InfinityUpgradesTab from "../components/tabs/InfinityUpgradesTab.vue";
 import BreakInfinityTab from "../components/tabs/BreakInfinityTab.vue";
@@ -12,7 +13,12 @@ import EternityMilestonesTab from "../components/tabs/EternityMilestonesTab.vue"
 import TimeDimensionsTab from "../components/tabs/TimeDimensionsTab.vue";
 import TimeStudiesTab from "../components/tabs/TimeStudiesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
-import AutomatorTab from "../components/tabs/AutomatorTab.vue";
+// Lazy-loaded: the Automator subtab pulls in CodeMirror + vuedraggable, which
+// are only reachable post-Reality. Splitting it into its own chunk keeps those
+// deps out of the initial bundle. Rendered via <component :is> in App.vue, so
+// no other wiring is needed.
+const AutomatorTab = defineAsyncComponent(() =>
+  import("../components/tabs/AutomatorTab.vue"));
 import GlyphsTab from "../components/tabs/reality/GlyphsTab.vue";
 import PerksTab from "../components/tabs/reality/PerksTab.vue";
 import RealityUpgradesTab from "../components/tabs/reality/RealityUpgradesTab.vue";

@@ -190,8 +190,11 @@ impl GameState {
 
     /// Called from the Big-Crunch reward path. Completes the running challenge, or
     /// NC1 on the first-ever Infinity performed outside a challenge, then exits the
-    /// challenge (no `retryChallenge` modelled). Mirrors `handleChallengeCompletion`.
+    /// challenge — unless the "Automatically retry challenges" option
+    /// (`retry_challenge`) is on, in which case the challenge stays active so the
+    /// crunch re-enters it. Mirrors `handleChallengeCompletion`.
     pub(crate) fn handle_challenge_completion(&mut self) {
+        let retry = self.options.retry_challenge;
         // An Infinity Challenge takes precedence (the two never run at once).
         if self.infinity_challenge.current != 0 {
             let ic = self.infinity_challenge.current;
@@ -204,7 +207,9 @@ impl GameState {
                 );
             }
             self.complete_infinity_challenge(ic);
-            self.infinity_challenge.current = 0;
+            if !retry {
+                self.infinity_challenge.current = 0;
+            }
             return;
         }
         let current = self.challenge.current;
@@ -215,7 +220,15 @@ impl GameState {
             return;
         }
         self.complete_challenge(current);
-        self.challenge.current = 0;
+        if !retry {
+            self.challenge.current = 0;
+        }
+    }
+
+    /// Whether an antimatter challenge (Normal or Infinity) is currently running.
+    /// Mirrors `Player.isInAntimatterChallenge`.
+    pub fn in_antimatter_challenge(&self) -> bool {
+        self.challenge.current != 0 || self.infinity_challenge.current != 0
     }
 
     /// Grant a challenge's reward: unlock the corresponding autobuyer. NC1–8 →
@@ -294,6 +307,25 @@ mod tests {
         assert!(game.challenge_completed(3));
         assert!(game.autobuyers.dimensions[2].is_bought);
         assert!(!game.any_challenge_running());
+    }
+
+    #[test]
+    fn retry_challenge_keeps_it_running_after_crunch() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.options.retry_challenge = true;
+        game.start_challenge(3);
+        assert!(game.challenge_running(3));
+
+        // Reaching the goal and crunching completes and rewards NC3 as usual, but
+        // the challenge stays active (re-entered) instead of exiting.
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+
+        assert!(game.challenge_completed(3));
+        assert!(game.autobuyers.dimensions[2].is_bought);
+        assert!(game.challenge_running(3));
+        assert!(game.any_challenge_running());
     }
 
     #[test]

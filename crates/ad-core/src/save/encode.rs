@@ -390,6 +390,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // Options.
     let options = &mut player["options"];
     options["hotkeys"] = json!(state.options.hotkeys);
+    options["retryChallenge"] = json!(state.options.retry_challenge);
     options["updateRate"] = json!(state.options.update_rate);
     options["notation"] = json!(state.options.notation);
     options["notationDigits"]["comma"] = json!(state.options.notation_digits_comma);

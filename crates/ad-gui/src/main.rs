@@ -883,6 +883,9 @@ struct EternityMilestoneView {
 #[derive(Serialize)]
 struct OptionsView {
     hotkeys: bool,
+    /// "Automatically retry challenges" toggle (original `retryChallenge`):
+    /// crunching inside an antimatter challenge re-enters it.
+    retry_challenge: bool,
     update_rate: u32,
     /// Active notation name; the frontend passes it to the WASM formatter.
     notation: String,
@@ -1757,6 +1760,7 @@ fn build_game_view(game: &GameState) -> GameView {
         automator: build_automator_view(game),
         options: OptionsView {
             hotkeys: game.options.hotkeys,
+            retry_challenge: game.options.retry_challenge,
             update_rate: game.options.update_rate,
             notation: game.options.notation.clone(),
             notation_digits_comma: game.options.notation_digits_comma,
@@ -3177,6 +3181,14 @@ fn set_header_text_colored(enabled: bool, state: State<'_, Mutex<GameState>>) {
     game.options.header_text_colored = enabled;
 }
 
+/// Toggles "Automatically retry challenges" (original `retryChallenge`): when on,
+/// crunching inside an antimatter challenge re-enters it instead of exiting.
+#[tauri::command]
+fn set_retry_challenge(enabled: bool, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.retry_challenge = enabled;
+}
+
 /// Sets the sidebar resource (original `sidebarResourceID`; 0 = latest).
 #[tauri::command]
 fn set_sidebar_resource(id: u32, state: State<'_, Mutex<GameState>>) {
@@ -3654,6 +3666,7 @@ pub fn run() {
             set_hint_text,
             set_away_progress,
             set_header_text_colored,
+            set_retry_challenge,
             set_sidebar_resource,
             toggle_tab_visibility,
             unhide_tab,

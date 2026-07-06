@@ -274,6 +274,23 @@ mod tests {
     }
 
     #[test]
+    fn retry_challenge_re_enters_ic_after_crunch() {
+        let mut game = GameState::new();
+        game.records.this_eternity.max_am = Decimal::new(1.0, 12000);
+        game.options.retry_challenge = true;
+        game.start_infinity_challenge(3);
+        assert!(game.infinity_challenge_running(3));
+
+        // Crunching at the IC goal completes it, but with retry on the IC stays
+        // active (re-entered) rather than exiting.
+        game.antimatter = Decimal::new(1.0, 5000);
+        assert!(game.big_crunch());
+        assert!(game.infinity_challenge_completed(3));
+        assert!(game.infinity_challenge_running(3));
+        assert!(game.any_infinity_challenge_running());
+    }
+
+    #[test]
     fn ic1_composes_normal_challenge_modifiers() {
         let mut game = GameState::new();
         game.records.this_eternity.max_am = Decimal::new(1.0, 2000);

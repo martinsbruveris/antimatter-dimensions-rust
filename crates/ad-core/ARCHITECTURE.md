@@ -29,6 +29,9 @@ not the current state).
 - `src/challenges.rs` — Normal Challenges (Feature 2.5): `NormalChallengeState` on
   `GameState` (`current` + `completed` bitmask), unlock/start/exit/complete logic,
   the reward wiring (completing NC1–9 unlocks the AD/Tickspeed autobuyers), the
+  "Automatically retry challenges" behavior (`options.retry_challenge`: a crunch
+  inside an antimatter challenge re-enters it — `handle_challenge_completion` keeps
+  it active and `big_crunch` starts it fresh), the
   per-run accumulator reset (`reset_challenge_stuff`), and the NC-specific helpers
   (`max_dimensions_unlockable`, `max_boosts`, the NC9 same-cost bumps). **All 12
   modifiers are implemented**, each applied inline at its engine site via

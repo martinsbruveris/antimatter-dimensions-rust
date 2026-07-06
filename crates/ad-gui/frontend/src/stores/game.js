@@ -343,6 +343,11 @@ export const useGameStore = defineStore("game", {
     exitChallenge() {
       return invoke("exit_challenge");
     },
+    // Toggle "Automatically retry challenges" (original `retryChallenge`): when
+    // on, crunching inside an antimatter challenge re-enters it.
+    setRetryChallenge(enabled) {
+      return invoke("set_retry_challenge", { enabled });
+    },
     // Start Infinity Challenge `id` (a forced Big Crunch that also breaks Infinity,
     // then enter). Navigates to the Antimatter Dimensions tab.
     startInfinityChallenge(id) {

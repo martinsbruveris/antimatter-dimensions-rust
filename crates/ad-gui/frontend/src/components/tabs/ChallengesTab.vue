@@ -3,7 +3,7 @@
 // ChallengeBox.vue + ChallengeTabHeader.vue: a grid of 12 challenge boxes plus an
 // Exit/Restart header while a challenge runs. Layout + descriptions live in
 // data/normalChallenges.js; the engine owns run/complete/unlock state. The
-// retry/show-all toggles and the start-confirmation modal are deferred.
+// show-all toggle and the start-confirmation modal are deferred.
 import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
@@ -62,7 +62,13 @@ function box(meta) {
     text = `Locked (${inf}/${meta.lockedAt})`;
   }
 
-  return { meta, isUnlocked, isRunning, unenterable, classes, text };
+  // A locked challenge hides its description behind the unlock requirement
+  // (original NormalChallengeBox.descriptionDisplayConfig).
+  const description = isUnlocked
+    ? meta.description
+    : `Infinity ${meta.lockedAt} times to unlock.`;
+
+  return { meta, isUnlocked, isRunning, unenterable, classes, text, description };
 }
 
 const boxes = computed(() => NORMAL_CHALLENGES.map(box));
@@ -81,6 +87,15 @@ function restartChallenge() {
   game.exitChallenge();
   if (id >= 2) game.startChallenge(id);
 }
+
+// "Automatically retry challenges" (original retryChallenge): crunching inside an
+// antimatter challenge re-enters it instead of exiting.
+const retryChallenge = computed(() =>
+  Boolean(s.value?.options?.retry_challenge),
+);
+function toggleRetryChallenge() {
+  game.setRetryChallenge(!retryChallenge.value);
+}
 </script>
 
 <template>
@@ -90,6 +105,12 @@ function restartChallenge() {
   >
     <div class="l-challenges-tab__header">
       <div class="c-subtab-option-container">
+        <button
+          class="o-primary-btn o-primary-btn--subtab-option"
+          @click="toggleRetryChallenge"
+        >
+          Automatically retry challenges: {{ retryChallenge ? "ON" : "OFF" }}
+        </button>
         <button
           v-if="anyRunning"
           class="o-primary-btn o-primary-btn--subtab-option"
@@ -109,6 +130,10 @@ function restartChallenge() {
     <div>
       Some Normal Challenges have requirements to be able to run that challenge.
     </div>
+    <div>
+      If you have an active Big Crunch Autobuyer, it will attempt to Crunch
+      as soon as possible when reaching Infinite antimatter.
+    </div>
 
     <div class="l-challenge-grid">
       <div
@@ -123,7 +148,7 @@ function restartChallenge() {
           >
             C{{ b.meta.id }}
           </div>
-          <span>{{ b.meta.description }}</span>
+          <span>{{ b.description }}</span>
           <div class="l-challenge-box__fill" />
           <button
             :class="b.classes"
