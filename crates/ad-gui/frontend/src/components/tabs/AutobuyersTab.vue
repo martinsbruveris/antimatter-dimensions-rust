@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
+import OpenHotkeysButton from "../options/OpenHotkeysButton.vue";
 import AutobuyerToggles from "./autobuyers/AutobuyerToggles.vue";
 import BigCrunchAutobuyerBox from "./autobuyers/BigCrunchAutobuyerBox.vue";
 import DimensionAutobuyerBox from "./autobuyers/DimensionAutobuyerBox.vue";
@@ -23,10 +24,7 @@ const auto = computed(() => game.snapshot.autobuyers);
 <template>
   <div class="l-autobuyers-tab">
     <AutobuyerToggles />
-    <div>
-      Complete Normal Challenges to unlock the prestige autobuyers and to upgrade
-      autobuyer intervals with Infinity Points.
-    </div>
+    <OpenHotkeysButton />
     <b>Autobuyers with no displayed bulk have unlimited bulk by default.</b>
     <b>
       Antimatter Dimension Autobuyers can have their bulk upgraded once interval

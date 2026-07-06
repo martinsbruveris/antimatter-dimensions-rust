@@ -12,6 +12,7 @@ const entry = computed(() => game.snapshot.autobuyers.tickspeed);
 <template>
   <AutobuyerBox
     :entry="entry"
+    :show-bulk="entry.mode === 'single'"
     @unlock="game.unlockTickspeedAutobuyer()"
     @toggle="game.toggleTickspeedAutobuyer()"
   >

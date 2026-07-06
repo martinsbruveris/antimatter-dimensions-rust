@@ -9,8 +9,10 @@ import { formatDecimal } from "../../../util/format";
 // controls are passed in via the `intervalSlot` / `toggleSlot` slots.
 const props = defineProps({
   entry: { type: Object, required: true },
-  // Antimatter Dimension autobuyers display a "Current bulk" line; tickspeed
-  // does not.
+  // Whether to show the "Current bulk" line. The original shows it whenever the
+  // bulk is finite (`AutobuyerIntervalLabel.isShowingBulk`): AD autobuyers until
+  // the unlimited-bulk achievement, and tickspeed while in single mode. Bulk is
+  // always ×1 in the current model (bulk upgrades aren't ported yet).
   showBulk: { type: Boolean, default: false },
 });
 const emit = defineEmits(["unlock", "toggle"]);
@@ -60,7 +62,7 @@ const stateClass = computed(() => {
         Current interval: {{ entry.interval_seconds }} seconds
         <span v-if="showBulk">
           <br>
-          Current bulk: ×1.00
+          Current bulk: ×1
         </span>
       </div>
     </div>

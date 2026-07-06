@@ -4,9 +4,11 @@ import { computed } from "vue";
 import { useGameStore } from "../../../stores/game";
 import IntervalUpgradeButton from "./IntervalUpgradeButton.vue";
 
-// The Dim Boost / Galaxy / Big Crunch autobuyers. Unlike the AD/Tickspeed boxes
-// these have no antimatter "slow version": they show a full row once their
-// Normal Challenge is completed (`is_unlocked`), and a locked hint before that.
+// The Dim Boost / Galaxy autobuyers. Unlike the AD/Tickspeed boxes these have no
+// antimatter "slow version": they show a full row once their Normal Challenge is
+// completed (`is_unlocked`) and are hidden entirely before that. The original's
+// `AutobuyerBox` renders nothing when the autobuyer is neither unlocked nor
+// buyable, and these prestige autobuyers have no buy box.
 const props = defineProps({
   entry: { type: Object, required: true },
   // The string autobuyer handle ("dimBoost" / "galaxy" / "bigCrunch").
@@ -72,13 +74,5 @@ const stateClass = computed(() => {
         type="checkbox"
       >
     </div>
-  </div>
-  <div
-    v-else
-    class="c-autobuyer-buy-box o-primary-btn o-primary-btn--disabled"
-  >
-    {{ entry.name }}
-    <br>
-    Complete Normal Challenge {{ entry.unlock_challenge }} to unlock
   </div>
 </template>

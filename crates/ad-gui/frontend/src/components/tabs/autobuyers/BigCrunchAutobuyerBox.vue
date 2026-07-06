@@ -3,8 +3,9 @@
 // pre-break it is the plain interval-upgrade row; post-break the interval
 // slot shows the goal-mode selector (dropdown once the `bigCrunchModes`
 // milestone is reached) and the toggle slot the threshold input; amount mode
-// adds the "Dynamic amount" checkbox. Locked display (NC12 not complete)
-// matches our PrestigeAutobuyerBox.
+// adds the "Dynamic amount" checkbox. Until NC12 is completed (`is_unlocked`)
+// the box is hidden entirely, matching the original's `AutobuyerBox` (this
+// autobuyer has no antimatter buy box, so it renders nothing when locked).
 import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
@@ -97,14 +98,6 @@ function modeLabel(id) {
       :is-active="entry.is_active"
       @toggle="game.toggleAutobuyer('bigCrunch')"
     />
-  </div>
-  <div
-    v-else
-    class="c-autobuyer-buy-box o-primary-btn o-primary-btn--disabled"
-  >
-    Automatic Big Crunch
-    <br>
-    Complete Normal Challenge {{ entry.unlock_challenge }} to unlock
   </div>
 </template>
 
