@@ -271,12 +271,17 @@ impl GameState {
         let mut mult = Decimal::from_float(1.0);
 
         // Buy-10 multiplier: base^(bought / 10). Base is 2, or 2.2 with the
-        // `buy10Mult` Infinity Upgrade (`buy_ten_multiplier`).
-        let buy10_groups = self.dimensions[tier].bought / 10;
-        if buy10_groups > 0 {
+        // `buy10Mult` Infinity Upgrade (`buy_ten_multiplier`). Lai'tela's
+        // Continuum replaces the discrete buy-10 count with a continuous value.
+        let buy10_value = if self.continuum_active() {
+            self.ad_continuum_value(tier)
+        } else {
+            (self.dimensions[tier].bought / 10) as f64
+        };
+        if buy10_value > 0.0 {
             mult *= self
                 .buy_ten_multiplier()
-                .pow(&Decimal::from_float(buy10_groups as f64));
+                .pow(&Decimal::from_float(buy10_value));
         }
 
         // Dim boost: power^max(0, boosts - tier)
@@ -466,6 +471,10 @@ impl GameState {
         }
         // EC3: Antimatter Dimensions 5–8 don't produce anything.
         if self.ec_running(3) && tier > 3 {
+            return Decimal::ZERO;
+        }
+        // Lai'tela's Reality disables dimensions above `maxAllowedDimension`.
+        if self.laitela_dimension_disabled((tier + 1) as u32) {
             return Decimal::ZERO;
         }
 

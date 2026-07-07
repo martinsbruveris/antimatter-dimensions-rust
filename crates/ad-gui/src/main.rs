@@ -976,6 +976,77 @@ struct CelestialsView {
     enslaved: EnslavedView,
     v: VView,
     ra: RaView,
+    laitela: LaitelaView,
+}
+
+/// Lai'tela subtab (Feature 7.6).
+#[derive(Serialize)]
+struct LaitelaView {
+    unlocked: bool,
+    is_running: bool,
+    can_start_run: bool,
+    dark_matter: Num,
+    max_dark_matter: Num,
+    dark_energy: Num,
+    singularities: Num,
+    singularity_cap: Num,
+    singularity_cap_increases: u32,
+    singularities_gained: Num,
+    can_condense: bool,
+    dark_matter_mult: f64,
+    dark_matter_mult_gain: f64,
+    can_annihilate: bool,
+    annihilation_unlocked: bool,
+    continuum_unlocked: bool,
+    continuum_active: bool,
+    difficulty_tier: u32,
+    max_allowed_dimension: u32,
+    entropy: f64,
+    reality_reward: f64,
+    dimensions: Vec<DmdView>,
+    milestones: Vec<MilestoneView>,
+    imaginary_machines: Num,
+    im_cap: Num,
+    imaginary_upgrades: Vec<ImaginaryUpgradeView>,
+    imaginary_rebuyables: Vec<ImaginaryRebuyableView>,
+}
+
+#[derive(Serialize)]
+struct DmdView {
+    tier: usize,
+    unlocked: bool,
+    amount: Num,
+    interval_ms: f64,
+    interval_cost: Num,
+    power_dm: Num,
+    power_dm_cost: Num,
+    power_de: Num,
+    power_de_cost: Num,
+    can_ascend: bool,
+    ascensions: u32,
+}
+
+#[derive(Serialize)]
+struct MilestoneView {
+    id: usize,
+    unlocked: bool,
+    completions: u32,
+    start: f64,
+}
+
+#[derive(Serialize)]
+struct ImaginaryUpgradeView {
+    id: u8,
+    cost: Num,
+    bought: bool,
+    available: bool,
+}
+
+#[derive(Serialize)]
+struct ImaginaryRebuyableView {
+    id: u8,
+    cost: Num,
+    count: u32,
 }
 
 /// Ra subtab (Feature 7.5).
@@ -1226,6 +1297,80 @@ fn build_celestials_view(game: &GameState) -> CelestialsView {
         enslaved: build_enslaved_view(game),
         v: build_v_view(game),
         ra: build_ra_view(game),
+        laitela: build_laitela_view(game),
+    }
+}
+
+/// Build the Lai'tela subtab view.
+fn build_laitela_view(game: &GameState) -> LaitelaView {
+    let f = |x: f64| num(&Decimal::from_float(x.min(1e300)));
+    let l = &game.celestials.laitela;
+    let dimensions = (0..4)
+        .map(|tier| DmdView {
+            tier,
+            unlocked: game.dmd_unlocked(tier),
+            amount: num(&l.dimensions[tier].amount),
+            interval_ms: game.dmd_interval(tier),
+            interval_cost: num(&game.dmd_interval_cost(tier)),
+            power_dm: num(&game.dmd_power_dm(tier)),
+            power_dm_cost: num(&game.dmd_power_dm_cost(tier)),
+            power_de: f(game.dmd_power_de(tier)),
+            power_de_cost: num(&game.dmd_power_de_cost(tier)),
+            can_ascend: game.dmd_interval(tier) <= 10.0,
+            ascensions: l.dimensions[tier].ascension_count,
+        })
+        .collect();
+    let milestones = (0..ad_core::celestials::singularity::MILESTONE_COUNT)
+        .map(|id| MilestoneView {
+            id,
+            unlocked: game.singularity_milestone_unlocked(id),
+            completions: game.singularity_milestone_completions(id),
+            start: ad_core::celestials::singularity::MILESTONES[id].start,
+        })
+        .collect();
+    let imaginary_upgrades = (11..=25u8)
+        .map(|id| ImaginaryUpgradeView {
+            id,
+            cost: f(game.imaginary_upgrade_cost(id)),
+            bought: game.imaginary_upgrade_bought(id),
+            available: game.imaginary_upgrade_available(id),
+        })
+        .collect();
+    let imaginary_rebuyables = (1..=10u8)
+        .map(|id| ImaginaryRebuyableView {
+            id,
+            cost: f(game.imaginary_rebuyable_cost(id)),
+            count: game.imaginary_rebuyable_count(id),
+        })
+        .collect();
+    LaitelaView {
+        unlocked: game.laitela_unlocked(),
+        is_running: game.laitela_is_running(),
+        can_start_run: game.can_start_celestial_reality(ad_core::Celestial::Laitela),
+        dark_matter: num(&l.dark_matter),
+        max_dark_matter: num(&l.max_dark_matter),
+        dark_energy: f(l.dark_energy),
+        singularities: f(l.singularities),
+        singularity_cap: f(game.singularity_cap()),
+        singularity_cap_increases: l.singularity_cap_increases,
+        singularities_gained: f(game.singularities_gained()),
+        can_condense: game.singularity_cap_reached(),
+        dark_matter_mult: l.dark_matter_mult,
+        dark_matter_mult_gain: game.dark_matter_mult_gain(),
+        can_annihilate: game.can_annihilate(),
+        annihilation_unlocked: game.annihilation_unlocked(),
+        continuum_unlocked: game.continuum_unlocked(),
+        continuum_active: game.continuum_active(),
+        difficulty_tier: l.difficulty_tier,
+        max_allowed_dimension: game.laitela_max_allowed_dimension(),
+        entropy: l.entropy.max(0.0),
+        reality_reward: game.laitela_reality_reward(),
+        dimensions,
+        milestones,
+        imaginary_machines: num(&game.reality.imaginary_machines),
+        im_cap: f(game.imaginary_machine_cap()),
+        imaginary_upgrades,
+        imaginary_rebuyables,
     }
 }
 
@@ -2787,6 +2932,62 @@ fn alchemy_toggle_reaction(id: usize, state: State<'_, Mutex<GameState>>) {
 }
 
 #[tauri::command]
+fn dmd_buy_upgrade(tier: usize, kind: u8, state: State<'_, Mutex<GameState>>) {
+    let mut g = state.lock().unwrap();
+    match kind {
+        0 => g.dmd_buy_interval(tier),
+        1 => g.dmd_buy_power_dm(tier),
+        2 => g.dmd_buy_power_de(tier),
+        _ => false,
+    };
+}
+
+#[tauri::command]
+fn dmd_ascend(tier: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().dmd_ascend(tier);
+}
+
+#[tauri::command]
+fn laitela_max_all_dmd(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().laitela_max_all_dmd();
+}
+
+#[tauri::command]
+fn laitela_annihilate(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().annihilate(false);
+}
+
+#[tauri::command]
+fn laitela_condense_singularity(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().condense_singularity();
+}
+
+#[tauri::command]
+fn laitela_set_continuum(on: bool, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().set_continuum(on);
+}
+
+#[tauri::command]
+fn laitela_change_singularity_cap(increase: bool, state: State<'_, Mutex<GameState>>) {
+    let mut g = state.lock().unwrap();
+    if increase {
+        g.singularity_increase_cap();
+    } else {
+        g.singularity_decrease_cap();
+    }
+}
+
+#[tauri::command]
+fn buy_imaginary_upgrade(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_imaginary_upgrade(id);
+}
+
+#[tauri::command]
+fn buy_imaginary_rebuyable(id: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_imaginary_rebuyable(id);
+}
+
+#[tauri::command]
 fn unlock_black_hole(state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().unlock_black_hole();
 }
@@ -4170,6 +4371,15 @@ pub fn run() {
             ra_buy_chunk_upgrade,
             ra_set_remembrance,
             alchemy_toggle_reaction,
+            dmd_buy_upgrade,
+            dmd_ascend,
+            laitela_max_all_dmd,
+            laitela_annihilate,
+            laitela_condense_singularity,
+            laitela_set_continuum,
+            laitela_change_singularity_cap,
+            buy_imaginary_upgrade,
+            buy_imaginary_rebuyable,
             unlock_black_hole,
             buy_black_hole_upgrade,
             toggle_black_hole_pause,

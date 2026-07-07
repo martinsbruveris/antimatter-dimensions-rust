@@ -62,9 +62,15 @@ impl GameState {
     /// Decimal too.
     pub fn current_tickspeed_ms(&self) -> Decimal {
         let multiplier = self.tickspeed_purchase_multiplier();
+        // Lai'tela's Continuum replaces the discrete bought count with a
+        // continuous value (`Tickspeed.continuumValue`).
+        let upgrades = if self.continuum_active() {
+            self.tickspeed_continuum_value() + self.total_tick_gained as f64
+        } else {
+            self.total_tickspeed_upgrades() as f64
+        };
         let base = Decimal::from_float(INITIAL_TICKSPEED_MS)
-            * Decimal::from_float(multiplier)
-                .pow(&Decimal::from(self.total_tickspeed_upgrades()));
+            * Decimal::from_float(multiplier).pow(&Decimal::from_float(upgrades));
         // Effarig's Reality replaces the tickspeed value with a compressed one
         // (`Tickspeed.current`: `Effarig.isRunning ? Effarig.tickspeed : base`).
         let tickspeed = if self.celestials.effarig.run {

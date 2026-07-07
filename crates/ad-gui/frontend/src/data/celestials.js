@@ -182,3 +182,71 @@ export const ALCHEMY_RESOURCES = [
   { id: 19, name: "Unpredictability", symbol: "Λ", effect: "Reactions may trigger twice" },
   { id: 20, name: "Reality", symbol: "Ϟ", effect: "Consumed to create Reality Glyphs" },
 ];
+
+// Singularity Milestone descriptions (`secret-formula/celestials/
+// singularity-milestones.js`), keyed by engine milestone id.
+export const MILESTONE_DESCRIPTIONS = [
+  "Continuum percentage multiplier",
+  "Dark Matter production multiplier",
+  "Dark Energy production multiplier",
+  "Dark Matter Dimension upgrades are cheaper",
+  "Singularity gain multiplier",
+  "Dark Matter Dimension interval decrease",
+  "Ascension affects Dark Matter production more",
+  "Ascension increases the interval less",
+  "Automatically condense Singularities above the cap",
+  "Dark Matter Dimension Autobuyers",
+  "DMD Ascension Autobuyers",
+  "Autobuyer speed for all DMD Autobuyers",
+  "Dark Energy mult. based on disabled Dimensions",
+  "Increased Singularity gain per cap increase",
+  "DMD Interval cost scaling is better",
+  "Tesseracts boost Dark Matter and Dark Energy",
+  "Infinities boost Dark Matter and Dark Energy",
+  "Singularities improve the repeatable DT upgrade",
+  "Boost Dark Matter/Energy based on Glyph level",
+  "Singularities boost game speed",
+  "Time Theorems boost Dark Matter and Dark Energy",
+  "Annihilation mult. generates the 4th DMD",
+  "4th DMD amount boosts Dark Matter and Dark Energy",
+  "Unlock an Autobuyer for Annihilation",
+  "Singularities give a power effect to Time Theorems",
+  "Game speed boosts Dark Matter and Dark Energy",
+  "Singularities boost pre-instability Glyph level",
+  "Dilated Time boosts Dark Matter production",
+  "Infinities gain a power effect from Singularities",
+  "Singularities increase effective Tesseract count",
+];
+
+// Imaginary Upgrade descriptions (`secret-formula/reality/imaginary-upgrades.js`).
+export const IMAGINARY_UPGRADE_DESCRIPTIONS = {
+  11: "Time Dimension power based on total antimatter",
+  12: "Time Study power based on total time played",
+  13: "Multiply the Imaginary Machine cap",
+  14: "Antimatter Dimension multiplier based on Dark Matter",
+  15: "Convert Antimatter Dimensions to Continuum and unlock Lai'tela",
+  16: "Unlock the 2nd Dark Matter Dimension",
+  17: "Unlock the 3rd Dark Matter Dimension",
+  18: "Unlock the 4th Dark Matter Dimension",
+  19: "Unlock Dark Matter Annihilation",
+  20: "Autobuyers for repeatable Imaginary Upgrades; ×10 iM speed",
+  21: "Annihilation multiplier improved by Imaginary Machines",
+  22: "All Glyph Sacrifice totals raised to 1e100",
+  23: "Free Dimboost count based on Tesseract count",
+  24: "Free Dimboost strength based on Singularity count",
+  25: "Unlock Pelle, Celestial of Antimatter",
+};
+
+// Imaginary Rebuyable descriptions, keyed by id 1-10.
+export const IMAGINARY_REBUYABLE_DESCRIPTIONS = {
+  1: "Increase Temporal Amplifier multiplier",
+  2: "Increase Replicative Amplifier multiplier",
+  3: "Increase Eternal Amplifier multiplier",
+  4: "Increase Superluminal Amplifier multiplier",
+  5: "Increase Boundless Amplifier multiplier",
+  6: "Increase the Reality Machine cap",
+  7: "Delay Glyph Instability starting level",
+  8: "Multiply Infinity Dimensions",
+  9: "Increase Galaxy strength",
+  10: "Increase Singularity gain",
+};

@@ -198,7 +198,24 @@ not the current state).
   unpredictability/decoherence internal to reactions). Deferred: the `reality`
   resource's Reality Glyph, `uncountability` passive generation (u32 realities),
   `boundless`/`multiversal` (inert targets), and the QoL/automation unlocks. See
-  `../../docs/design/2026-07-07-ra.md`.
+  `../../docs/design/2026-07-07-ra.md`. `laitela.rs` + `singularity.rs` +
+  `imaginary_upgrades.rs` (Feature 7.6): Lai'tela's `LaitelaState` — the 4 Dark
+  Matter Dimensions (`dmd_tick` real-time DM/DE production in `tick.rs`,
+  interval/powerDM/powerDE upgrades, ascension), annihilation, Dark Energy →
+  Singularities (`singularity.rs`, the 30-milestone catalogue + `completions`/
+  effect readers), Continuum (`ad_continuum_value`/`tickspeed_continuum_value`
+  into the buy-10 seams — linear-branch approximation), and the entropy
+  destabilization run (`laitela_reality_tick`, `maxAllowedDimension` disabling
+  top AD/ID/TD tiers). Milestone effects wired: DMD-internal (dark mult/interval/
+  cost/ascension), plus `gamespeedFromSingularities` (`game_speed_factor`),
+  `glyphLevelFromSingularities` (`reality.rs`). `imaginary_upgrades.rs`: Imaginary
+  Machines (approach `baseIMCap`), the 10 rebuyables + 15 one-time upgrades
+  (requirement-gated, purchase seeds the DMDs for 15–18; effects wired: iU8 ID
+  mult, iU10 singularity gain, iU21 annihilation, iU15 Lai'tela/Continuum unlock,
+  iU19 annihilation unlock). Deferred: the Continuum super-exponential branch, the
+  DMD/annihilation/condense autobuyers, the deep imaginary-upgrade requirements
+  (11–14/22–24), and the tesseract-linked effects. iU25 (Pelle unlock) lands with
+  7.7. See `../../docs/design/2026-07-07-laitela.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant

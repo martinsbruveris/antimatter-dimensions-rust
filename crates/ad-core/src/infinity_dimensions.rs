@@ -166,6 +166,11 @@ impl GameState {
         d.cost = (cost * mult).round();
         d.amount += Decimal::from_float(10.0);
         d.base_amount += 10;
+        // A 1st Infinity Dimension purchase fails Imaginary Upgrade 15's
+        // "no ID1 this Reality" requirement.
+        if tier == 0 {
+            self.requirement_checks.reality_had_id1 = true;
+        }
         true
     }
 
@@ -248,6 +253,8 @@ impl GameState {
         }
         // Ra Alchemy `dimensionality` (all-dim ×10^(5·amount)).
         mult *= Decimal::pow10(self.alchemy_dimensionality_log10());
+        // Imaginary Upgrade 8 (Hyperbolic Apeirogon): ×1e100000 per purchase.
+        mult *= self.imaginary_upgrade_id_mult();
         mult
     }
 
@@ -313,6 +320,10 @@ impl GameState {
         // EC11: production without any multiplier.
         if self.ec_running(11) {
             return d.amount;
+        }
+        // Lai'tela's Reality disables dimensions above `maxAllowedDimension`.
+        if self.laitela_dimension_disabled((tier + 1) as u32) {
+            return Decimal::ZERO;
         }
         let mut production = d.amount * self.id_multiplier(tier);
         // EC7: Tickspeed directly applies to Infinity Dimensions.

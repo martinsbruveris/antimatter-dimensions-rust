@@ -501,6 +501,11 @@ impl GameState {
         let def = time_study_def(id).expect("checked in can_buy");
         self.time_theorems -= Decimal::from_float(def.cost);
         self.studies.push(id);
+        // Track the peak study count this Reality (Imaginary Upgrade 19's gate).
+        self.requirement_checks.reality_max_studies = self
+            .requirement_checks
+            .reality_max_studies
+            .max(self.studies.len() as u32);
         true
     }
 

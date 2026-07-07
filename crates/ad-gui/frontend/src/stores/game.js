@@ -274,6 +274,42 @@ export const useGameStore = defineStore("game", {
       await invoke("alchemy_toggle_reaction", { id });
       this.snapshot = await this.getState();
     },
+    async dmdBuyUpgrade(tier, kind) {
+      await invoke("dmd_buy_upgrade", { tier, kind });
+      this.snapshot = await this.getState();
+    },
+    async dmdAscend(tier) {
+      await invoke("dmd_ascend", { tier });
+      this.snapshot = await this.getState();
+    },
+    async laitelaMaxAllDmd() {
+      await invoke("laitela_max_all_dmd");
+      this.snapshot = await this.getState();
+    },
+    async laitelaAnnihilate() {
+      await invoke("laitela_annihilate");
+      this.snapshot = await this.getState();
+    },
+    async laitelaCondense() {
+      await invoke("laitela_condense_singularity");
+      this.snapshot = await this.getState();
+    },
+    async laitelaSetContinuum(on) {
+      await invoke("laitela_set_continuum", { on });
+      this.snapshot = await this.getState();
+    },
+    async laitelaChangeSingularityCap(increase) {
+      await invoke("laitela_change_singularity_cap", { increase });
+      this.snapshot = await this.getState();
+    },
+    async buyImaginaryUpgrade(id) {
+      await invoke("buy_imaginary_upgrade", { id });
+      this.snapshot = await this.getState();
+    },
+    async buyImaginaryRebuyable(id) {
+      await invoke("buy_imaginary_rebuyable", { id });
+      this.snapshot = await this.getState();
+    },
     async unlockBlackHole() {
       await invoke("unlock_black_hole");
       this.snapshot = await this.getState();

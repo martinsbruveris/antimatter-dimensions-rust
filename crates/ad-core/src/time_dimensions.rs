@@ -306,6 +306,10 @@ impl GameState {
         if self.ec_running(11) {
             return self.time_dimensions[tier].amount;
         }
+        // Lai'tela's Reality disables dimensions above `maxAllowedDimension`.
+        if self.laitela_dimension_disabled((tier + 1) as u32) {
+            return Decimal::ZERO;
+        }
         let mut production =
             self.time_dimensions[tier].amount * self.td_multiplier(tier);
         // EC7: Tickspeed directly applies to Time Dimensions.

@@ -28,6 +28,7 @@ import EffarigTab from "../components/tabs/celestials/EffarigTab.vue";
 import EnslavedTab from "../components/tabs/celestials/EnslavedTab.vue";
 import VTab from "../components/tabs/celestials/VTab.vue";
 import RaTab from "../components/tabs/celestials/RaTab.vue";
+import LaitelaTab from "../components/tabs/celestials/LaitelaTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
 import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
@@ -234,6 +235,14 @@ export const TABS = [
         component: RaTab,
         condition: (s) => Boolean(s?.celestials?.ra?.unlocked),
         hideId: [9, 5],
+      },
+      {
+        key: "laitela",
+        name: "Lai'tela",
+        symbol: "ᛝ",
+        component: LaitelaTab,
+        condition: (s) => Boolean(s?.celestials?.laitela?.unlocked),
+        hideId: [9, 6],
       },
     ],
   },

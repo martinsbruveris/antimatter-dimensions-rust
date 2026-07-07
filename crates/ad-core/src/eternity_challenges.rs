@@ -358,6 +358,11 @@ impl GameState {
             factor *= self.black_hole_speed_factor();
         }
         factor *= self.glyph_effect_timespeed();
+        // Lai'tela's `gamespeedFromSingularities` milestone.
+        factor *= self.singularity_milestone_effect_or(
+            crate::celestials::singularity::GAMESPEED_FROM_SINGULARITIES,
+            1.0,
+        );
         // Effarig's Reality compresses game speed too (`getGameSpeedupFactor`
         // NERFS block).
         if self.celestials.effarig.run {

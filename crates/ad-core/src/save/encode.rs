@@ -413,7 +413,45 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
             "dilation": ra.highest_refinement_value[4],
             "effarig": ra.highest_refinement_value[5],
         });
+
+        // Lai'tela (Feature 7.6).
+        let l = &cel.laitela;
+        let lj = &mut player["celestials"]["laitela"];
+        lj["darkMatter"] = decimal(&l.dark_matter);
+        lj["maxDarkMatter"] = decimal(&l.max_dark_matter);
+        lj["darkEnergy"] = json!(l.dark_energy);
+        lj["singularities"] = json!(l.singularities);
+        lj["singularityCapIncreases"] = json!(l.singularity_cap_increases);
+        lj["darkMatterMult"] = json!(l.dark_matter_mult);
+        lj["run"] = json!(l.run);
+        lj["entropy"] = json!(l.entropy);
+        lj["thisCompletion"] = json!(l.this_completion);
+        lj["fastestCompletion"] = json!(l.fastest_completion);
+        lj["difficultyTier"] = json!(l.difficulty_tier);
+        lj["dimensions"] = json!(l
+            .dimensions
+            .iter()
+            .map(|d| json!({
+                "amount": d.amount.to_string(),
+                "intervalUpgrades": d.interval_upgrades,
+                "powerDMUpgrades": d.power_dm_upgrades,
+                "powerDEUpgrades": d.power_de_upgrades,
+                "timeSinceLastUpdate": d.time_since_last_update,
+                "ascensionCount": d.ascension_count,
+            }))
+            .collect::<Vec<_>>());
     }
+
+    // Imaginary Upgrades (Feature 6.4-late / 7.6).
+    player["reality"]["imaginaryUpgradeBits"] =
+        json!(state.reality.imaginary_upgrade_bits);
+    player["reality"]["imaginaryRebuyables"] = json!(state
+        .reality
+        .imaginary_rebuyables
+        .iter()
+        .enumerate()
+        .map(|(i, &n)| ((i + 1).to_string(), n))
+        .collect::<std::collections::HashMap<_, _>>());
 
     // Black Holes.
     player["blackHole"] = json!(state

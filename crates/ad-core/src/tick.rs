@@ -31,6 +31,13 @@ impl GameState {
         self.ra_memory_tick(real_dt_ms, !self.celestials.enslaved.is_storing_real);
         self.ra_tick(real_dt_ms);
 
+        // Lai'tela's real-time mechanics: Dark Matter Dimensions produce DM/DE,
+        // the entropy/destabilization run advances, and Imaginary Machines
+        // approach their cap.
+        self.dmd_tick(real_dt_ms);
+        self.laitela_reality_tick(real_dt_ms);
+        self.tick_imaginary_machines(real_dt_ms);
+
         // Advance the per-run challenge accumulators first, matching the original
         // game loop (`updateNormalAndInfinityChallenges` runs before autobuyers
         // and production).

@@ -14,12 +14,16 @@ use crate::state::GameState;
 pub mod alchemy;
 pub mod effarig;
 pub mod enslaved;
+pub mod imaginary_upgrades;
+pub mod laitela;
 pub mod ra;
+pub mod singularity;
 pub mod teresa;
 pub mod v;
 
 pub use effarig::EffarigState;
 pub use enslaved::EnslavedState;
+pub use laitela::LaitelaState;
 pub use ra::RaState;
 pub use teresa::TeresaState;
 pub use v::VState;
@@ -33,6 +37,7 @@ pub enum Celestial {
     Enslaved,
     V,
     Ra,
+    Laitela,
 }
 
 /// `player.celestials` — one sub-struct per implemented celestial. Ra, Lai'tela
@@ -51,6 +56,8 @@ pub struct CelestialsState {
     pub v: VState,
     #[cfg_attr(feature = "serde", serde(default))]
     pub ra: RaState,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub laitela: LaitelaState,
 }
 
 impl CelestialsState {
@@ -61,6 +68,7 @@ impl CelestialsState {
             enslaved: EnslavedState::new(),
             v: VState::new(),
             ra: RaState::new(),
+            laitela: LaitelaState::new(),
         }
     }
 }
@@ -73,6 +81,7 @@ impl GameState {
             || self.celestials.enslaved.run
             || self.celestials.v.run
             || self.celestials.ra.run
+            || self.celestials.laitela.run
     }
 
     /// `clearCelestialRuns()`: clear every celestial run flag. Called at the
@@ -84,6 +93,7 @@ impl GameState {
         self.celestials.enslaved.run = false;
         self.celestials.v.run = false;
         self.celestials.ra.run = false;
+        self.celestials.laitela.run = false;
     }
 
     /// Whether the Celestials tab / features are available. The original gates
@@ -106,6 +116,7 @@ impl GameState {
             Celestial::Enslaved => self.enslaved_run_unlocked(),
             Celestial::V => self.v_celestial_unlocked(),
             Celestial::Ra => self.ra_run_unlocked(),
+            Celestial::Laitela => self.laitela_run_unlocked(),
         }
     }
 
@@ -131,6 +142,10 @@ impl GameState {
             Celestial::Enslaved => self.celestials.enslaved.run = true,
             Celestial::V => self.celestials.v.run = true,
             Celestial::Ra => self.celestials.ra.run = true,
+            Celestial::Laitela => {
+                self.celestials.laitela.run = true;
+                self.laitela_on_enter();
+            }
         }
         true
     }
@@ -226,6 +241,17 @@ mod tests {
         game.celestials.ra.alchemy[0].amount = 5000.0;
         game.celestials.ra.alchemy[6].reaction = true;
         game.celestials.ra.highest_refinement_value[0] = 9000.0;
+        // Lai'tela state.
+        game.celestials.laitela.dark_matter = Decimal::new(1.0, 40);
+        game.celestials.laitela.singularities = 1234.0;
+        game.celestials.laitela.singularity_cap_increases = 3;
+        game.celestials.laitela.dark_matter_mult = 7.5;
+        game.celestials.laitela.difficulty_tier = 2;
+        game.celestials.laitela.run = true;
+        game.celestials.laitela.dimensions[1].power_dm_upgrades = 9;
+        game.celestials.laitela.dimensions[1].ascension_count = 4;
+        game.reality.imaginary_upgrade_bits = (1 << 15) | (1 << 19);
+        game.reality.imaginary_rebuyables[7] = 6;
 
         let encoded = crate::save::encode_save(&game, 0);
         let decoded = crate::save::decode_save(&encoded).expect("decode");
@@ -265,5 +291,19 @@ mod tests {
         assert_eq!(decoded.celestials.ra.alchemy[0].amount, 5000.0);
         assert!(decoded.celestials.ra.alchemy[6].reaction);
         assert_eq!(decoded.celestials.ra.highest_refinement_value[0], 9000.0);
+        // Lai'tela round-trip.
+        assert_eq!(decoded.celestials.laitela.dark_matter, Decimal::new(1.0, 40));
+        assert_eq!(decoded.celestials.laitela.singularities, 1234.0);
+        assert_eq!(decoded.celestials.laitela.singularity_cap_increases, 3);
+        assert_eq!(decoded.celestials.laitela.dark_matter_mult, 7.5);
+        assert_eq!(decoded.celestials.laitela.difficulty_tier, 2);
+        assert!(decoded.celestials.laitela.run);
+        assert_eq!(decoded.celestials.laitela.dimensions[1].power_dm_upgrades, 9);
+        assert_eq!(decoded.celestials.laitela.dimensions[1].ascension_count, 4);
+        assert_eq!(
+            decoded.reality.imaginary_upgrade_bits,
+            (1 << 15) | (1 << 19)
+        );
+        assert_eq!(decoded.reality.imaginary_rebuyables[7], 6);
     }
 }

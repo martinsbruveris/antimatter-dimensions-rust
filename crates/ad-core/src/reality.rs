@@ -110,6 +110,18 @@ pub struct RealityState {
     /// unlocks the Automator regardless of AP (see `automator_points.rs`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub automator_force_unlock: bool,
+    /// Imaginary Machines (`Currency.imaginaryMachines`) + the highest ever
+    /// (`player.reality.imaginaryUpgradeBits` etc.). Feature 6.4-late / 7.6.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub imaginary_machines: Decimal,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub max_im: Decimal,
+    /// One-time Imaginary Upgrades (ids 11–25), bit `1 << id`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub imaginary_upgrade_bits: u32,
+    /// Rebuyable Imaginary Upgrade counts, ids 1–10 (`imaginaryRebuyables`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub imaginary_rebuyables: [u32; 10],
 }
 
 impl RealityState {
@@ -136,6 +148,10 @@ impl RealityState {
             gained_auto_achievements: true,
             glyphs: crate::glyphs::GlyphState::new(),
             automator_force_unlock: false,
+            imaginary_machines: Decimal::ZERO,
+            max_im: Decimal::ZERO,
+            imaginary_upgrade_bits: 0,
+            imaginary_rebuyables: [0; 10],
         }
     }
 }
@@ -160,6 +176,18 @@ pub struct RequirementChecks {
     /// Peak simultaneously-equipped glyph count this reality
     /// (`reality.maxGlyphs`).
     pub reality_max_glyphs: i32,
+    /// Whether a 1st Infinity Dimension was purchased this reality
+    /// (`reality.maxID1` ≠ 0). Gates Imaginary Upgrade 15.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub reality_had_id1: bool,
+    /// Peak Time Study count this reality (`reality.maxStudies`). Gates
+    /// Imaginary Upgrade 19.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub reality_max_studies: u32,
+    /// Whether Continuum stayed disabled all reality (`reality.noContinuum`).
+    /// Gates Imaginary Upgrade 21.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub reality_no_continuum: bool,
 }
 
 impl RequirementChecks {
@@ -169,6 +197,9 @@ impl RequirementChecks {
             reality_no_infinities: true,
             reality_no_eternities: true,
             reality_max_glyphs: 0,
+            reality_had_id1: false,
+            reality_max_studies: 0,
+            reality_no_continuum: true,
         }
     }
 }
@@ -323,7 +354,13 @@ impl GameState {
             1.0
         };
 
-        let base_level = ep_base * repl_base * dt_base * eter_base;
+        let mut base_level = ep_base * repl_base * dt_base * eter_base;
+        // Lai'tela's `glyphLevelFromSingularities` milestone boosts the
+        // pre-instability level.
+        base_level *= self.singularity_milestone_effect_or(
+            crate::celestials::singularity::GLYPH_LEVEL_FROM_SINGULARITIES,
+            1.0,
+        );
 
         // Instability softcaps: linear → quadratic past each threshold.
         let instability_softcap = |level: f64, begin: f64, rate: f64| {

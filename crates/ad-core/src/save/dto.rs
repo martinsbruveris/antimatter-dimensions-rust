@@ -192,6 +192,8 @@ pub struct CelestialsDTO {
     pub v: VCelestialDTO,
     #[serde(default)]
     pub ra: RaDTO,
+    #[serde(default)]
+    pub laitela: LaitelaDTO,
 }
 
 /// `player.celestials.teresa`. `timePoured` is a runtime accumulator (not in the
@@ -365,6 +367,57 @@ pub struct RefinementDTO {
     pub effarig: f64,
 }
 
+fn f64_3600() -> f64 {
+    3600.0
+}
+
+/// `player.celestials.laitela` (Feature 7.6).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaitelaDTO {
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub dark_matter: Decimal,
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub max_dark_matter: Decimal,
+    #[serde(default)]
+    pub dark_energy: f64,
+    #[serde(default)]
+    pub singularities: f64,
+    #[serde(default)]
+    pub singularity_cap_increases: u32,
+    #[serde(default = "f64_one")]
+    pub dark_matter_mult: f64,
+    #[serde(default)]
+    pub run: bool,
+    #[serde(default)]
+    pub entropy: f64,
+    #[serde(default = "f64_3600")]
+    pub this_completion: f64,
+    #[serde(default = "f64_3600")]
+    pub fastest_completion: f64,
+    #[serde(default)]
+    pub difficulty_tier: u32,
+    #[serde(default)]
+    pub dimensions: Vec<DarkMatterDimensionDTO>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DarkMatterDimensionDTO {
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub amount: Decimal,
+    #[serde(default)]
+    pub interval_upgrades: u32,
+    #[serde(default, rename = "powerDMUpgrades")]
+    pub power_dm_upgrades: u32,
+    #[serde(default, rename = "powerDEUpgrades")]
+    pub power_de_upgrades: u32,
+    #[serde(default)]
+    pub time_since_last_update: f64,
+    #[serde(default)]
+    pub ascension_count: u32,
+}
+
 /// `player.reality` (modelled subset). The glyph inventory lives under
 /// `reality.glyphs` (Feature 6.2); the automator subtree is ignored.
 #[derive(Debug, Clone, Deserialize)]
@@ -397,6 +450,13 @@ pub struct RealityDTO {
     /// `player.reality.automator`: scripts, constants, editor + run state
     /// (Feature 6.6 Stage B), and the force-unlock flag.
     pub automator: RealityAutomatorDTO,
+    /// Imaginary Upgrades (Feature 6.4-late / 7.6). The iM currency is encoded
+    /// into `maxRM` in the real save (out of frontier); we round-trip the bits
+    /// + rebuyables (the iM balance is re-earned from the cap each session).
+    #[serde(default)]
+    pub imaginary_upgrade_bits: u32,
+    #[serde(default)]
+    pub imaginary_rebuyables: std::collections::HashMap<String, u32>,
 }
 
 /// `player.reality.automator`.
@@ -1321,6 +1381,20 @@ impl GameState {
                 gained_auto_achievements: dto.reality.gained_auto_achievements,
                 glyphs,
                 automator_force_unlock: dto.reality.automator.force_unlock,
+                imaginary_machines: Decimal::ZERO,
+                max_im: Decimal::ZERO,
+                imaginary_upgrade_bits: dto.reality.imaginary_upgrade_bits,
+                imaginary_rebuyables: {
+                    let mut r = [0u32; 10];
+                    for (k, v) in &dto.reality.imaginary_rebuyables {
+                        if let Ok(id) = k.parse::<usize>() {
+                            if (1..=10).contains(&id) {
+                                r[id - 1] = *v;
+                            }
+                        }
+                    }
+                    r
+                },
             }
         };
         let requirement_checks = crate::reality::RequirementChecks {
@@ -1328,6 +1402,9 @@ impl GameState {
             reality_no_infinities: dto.requirement_checks.reality.no_infinities,
             reality_no_eternities: dto.requirement_checks.reality.no_eternities,
             reality_max_glyphs: dto.requirement_checks.reality.max_glyphs,
+            reality_had_id1: false,
+            reality_max_studies: 0,
+            reality_no_continuum: true,
         };
 
         // Celestials (Phase 7). Vec→array copies clamp to the modelled length,
@@ -1425,12 +1502,39 @@ impl GameState {
                 ];
             }
 
+            let mut laitela = crate::celestials::LaitelaState::new();
+            {
+                let l = &cel.laitela;
+                laitela.dark_matter = l.dark_matter;
+                laitela.max_dark_matter = l.max_dark_matter;
+                laitela.dark_energy = l.dark_energy;
+                laitela.singularities = l.singularities;
+                laitela.singularity_cap_increases = l.singularity_cap_increases;
+                laitela.dark_matter_mult = l.dark_matter_mult;
+                laitela.run = l.run;
+                laitela.entropy = l.entropy;
+                laitela.this_completion = l.this_completion;
+                laitela.fastest_completion = l.fastest_completion;
+                laitela.difficulty_tier = l.difficulty_tier;
+                for (i, d) in l.dimensions.iter().take(4).enumerate() {
+                    laitela.dimensions[i] = crate::celestials::laitela::DarkMatterDimension {
+                        amount: d.amount,
+                        interval_upgrades: d.interval_upgrades,
+                        power_dm_upgrades: d.power_dm_upgrades,
+                        power_de_upgrades: d.power_de_upgrades,
+                        time_since_last_update: d.time_since_last_update,
+                        ascension_count: d.ascension_count,
+                    };
+                }
+            }
+
             crate::celestials::CelestialsState {
                 teresa,
                 effarig,
                 enslaved,
                 v,
                 ra,
+                laitela,
             }
         };
 
