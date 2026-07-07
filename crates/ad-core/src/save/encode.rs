@@ -627,9 +627,13 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     ae["clearOnReality"] = json!(state.options.automator_events.clear_on_reality);
     ae["clearOnRestart"] = json!(state.options.automator_events.clear_on_restart);
 
-    // Autobuyers. `lastTick` stays the template's derived state; we write the
-    // flags/modes plus the interval-upgrade state (interval + IP cost, Feature 2.6)
-    // and the AD-only "Buys max" bulk multiplier.
+    // Autobuyers. We write the flags/modes plus the interval-upgrade state
+    // (interval + IP cost, Feature 2.6), the AD-only "Buys max" bulk multiplier,
+    // and `lastTick` — the JS absolute-timestamp timer phase, reconstructed from
+    // our elapsed-time `timer_ms` as `realTimePlayed - timer_ms` (the inverse of
+    // the load conversion).
+    let real_time = state.records.real_time_played_ms;
+    let last_tick = |timer_ms: f64| json!(real_time - timer_ms);
     player["auto"]["autobuyersOn"] = json!(state.autobuyers.enabled);
     for (tier, ab) in state.autobuyers.dimensions.iter().enumerate() {
         let entry = &mut player["auto"]["antimatterDims"]["all"][tier];
@@ -639,6 +643,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         entry["interval"] = json!(ab.interval_ms);
         entry["cost"] = json!(ab.cost);
         entry["bulk"] = json!(ab.bulk);
+        entry["lastTick"] = last_tick(ab.timer_ms);
     }
     let tickspeed = &mut player["auto"]["tickspeed"];
     tickspeed["isActive"] = json!(state.autobuyers.tickspeed.is_active);
@@ -646,6 +651,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     tickspeed["mode"] = json!(mode_to_raw(state.autobuyers.tickspeed.mode));
     tickspeed["interval"] = json!(state.autobuyers.tickspeed.interval_ms);
     tickspeed["cost"] = json!(state.autobuyers.tickspeed.cost);
+    tickspeed["lastTick"] = last_tick(state.autobuyers.tickspeed.timer_ms);
     // Prestige autobuyers (Dim Boost / Galaxy / Big Crunch): active flag +
     // interval-upgrade state. Dim Boost/Galaxy limit config stays at the
     // template default.
@@ -658,6 +664,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         entry["isActive"] = json!(ab.is_active);
         entry["interval"] = json!(ab.interval_ms);
         entry["cost"] = json!(ab.cost);
+        entry["lastTick"] = last_tick(ab.timer_ms);
     }
     // Big Crunch goal settings (post-break modes).
     let s = &state.autobuyers.big_crunch_settings;

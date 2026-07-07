@@ -432,7 +432,9 @@ mod decimal_str_or_num {
         let v = serde_json::Value::deserialize(d)?;
         Ok(match v {
             serde_json::Value::String(s) => s.parse().unwrap_or(Decimal::ZERO),
-            serde_json::Value::Number(n) => Decimal::from_float(n.as_f64().unwrap_or(0.0)),
+            serde_json::Value::Number(n) => {
+                Decimal::from_float(n.as_f64().unwrap_or(0.0))
+            }
             _ => Decimal::ZERO,
         })
     }
@@ -1029,6 +1031,10 @@ pub struct BigCrunchAutobuyerDTO {
     pub is_active: bool,
     pub interval: f64,
     pub cost: f64,
+    /// `lastTick` — the JS absolute-timestamp timer phase, converted to our
+    /// elapsed-time `timer_ms` on load (see [`AutobuyerDTO::last_tick`]).
+    #[serde(default)]
+    pub last_tick: f64,
     /// `AUTO_CRUNCH_MODE`: 0 amount, 1 time, 2 X highest.
     pub mode: i64,
     #[serde(with = "break_infinity::serde_string")]
@@ -1078,6 +1084,10 @@ pub struct PrestigeAutobuyerDTO {
     pub is_active: bool,
     pub interval: f64,
     pub cost: f64,
+    /// `lastTick` — the JS absolute-timestamp timer phase, converted to our
+    /// elapsed-time `timer_ms` on load (see [`AutobuyerDTO::last_tick`]).
+    #[serde(default)]
+    pub last_tick: f64,
 }
 
 /// `player.auto.antimatterDims` — the `all` array holds the 8 tier autobuyers.
@@ -1090,9 +1100,8 @@ pub struct AntimatterDimsDTO {
 ///
 /// We read `isActive`/`isBought`/`mode` plus the interval-upgrade state
 /// (`interval`/`cost`), which round-trips now that interval upgrades are modelled
-/// (Feature 2.6), and the AD-only `bulk` multiplier for "Buys max". `lastTick` is
-/// transient timer phase (an absolute timestamp in the original; an elapsed-time
-/// accumulator for us) reset to 0 on load.
+/// (Feature 2.6), and the AD-only `bulk` multiplier for "Buys max", plus the
+/// `lastTick` timer phase.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutobuyerDTO {
@@ -1108,6 +1117,14 @@ pub struct AutobuyerDTO {
     /// save has no `bulk`, so it defaults to 1.
     #[serde(default = "default_dto_bulk")]
     pub bulk: u32,
+    /// `lastTick` — the JS timer phase, stored as the absolute `realTimePlayed`
+    /// timestamp of the autobuyer's last fire. We model the timer as elapsed time
+    /// (`timer_ms`), so on load we convert `timer_ms = realTimePlayed - lastTick`
+    /// (clamped ≥ 0). Discarding it (the old "reset to 0") shifted every
+    /// autobuyer's firing phase and mistimed purchases on replay. A save omitting
+    /// it defaults to 0, matching the JS default (fires as soon as affordable).
+    #[serde(default)]
+    pub last_tick: f64,
 }
 
 /// serde default for [`AutobuyerDTO::bulk`] — the tickspeed autobuyer save omits it.
@@ -1645,22 +1662,21 @@ impl GameState {
                 laitela.fastest_completion = l.fastest_completion;
                 laitela.difficulty_tier = l.difficulty_tier;
                 for (i, d) in l.dimensions.iter().take(4).enumerate() {
-                    laitela.dimensions[i] = crate::celestials::laitela::DarkMatterDimension {
-                        amount: d.amount,
-                        interval_upgrades: d.interval_upgrades,
-                        power_dm_upgrades: d.power_dm_upgrades,
-                        power_de_upgrades: d.power_de_upgrades,
-                        time_since_last_update: d.time_since_last_update,
-                        ascension_count: d.ascension_count,
-                    };
+                    laitela.dimensions[i] =
+                        crate::celestials::laitela::DarkMatterDimension {
+                            amount: d.amount,
+                            interval_upgrades: d.interval_upgrades,
+                            power_dm_upgrades: d.power_dm_upgrades,
+                            power_de_upgrades: d.power_de_upgrades,
+                            time_since_last_update: d.time_since_last_update,
+                            ascension_count: d.ascension_count,
+                        };
                 }
             }
 
             let mut pelle = crate::celestials::PelleState::new();
             {
-                use crate::celestials::pelle::{
-                    GalaxyGenerator, PelleRecords, Rift,
-                };
+                use crate::celestials::pelle::{GalaxyGenerator, PelleRecords, Rift};
                 let p = &cel.pelle;
                 pelle.doomed = p.doomed;
                 pelle.remnants = p.remnants;
@@ -1754,6 +1770,12 @@ impl GameState {
         // overlay only the saved active/bought/mode flags (§4.4).
         let mut autobuyers = AutobuyerState::new();
         autobuyers.enabled = dto.auto.autobuyers_on;
+        // The JS interval autobuyers store `lastTick` as an absolute
+        // `realTimePlayed` timestamp; we model the timer as elapsed time, so
+        // convert `timer_ms = realTimePlayed - lastTick` (clamped ≥ 0) to
+        // preserve each autobuyer's firing phase across a load.
+        let real_time = dto.records.real_time_played;
+        let timer_from = |last_tick: f64| (real_time - last_tick).max(0.0);
         for (tier, ab) in autobuyers.dimensions.iter_mut().enumerate() {
             let src = &ad_autobuyers[tier];
             ab.is_active = src.is_active;
@@ -1764,6 +1786,7 @@ impl GameState {
             ab.cost = src.cost;
             // "Buys max" bulk multiplier.
             ab.bulk = src.bulk;
+            ab.timer_ms = timer_from(src.last_tick);
         }
         // The tickspeed autobuyer's mode is locked to single pre-Infinity for us,
         // so only its active/bought flags (and interval-upgrade state) are taken.
@@ -1771,31 +1794,36 @@ impl GameState {
         autobuyers.tickspeed.is_bought = dto.auto.tickspeed.is_bought;
         autobuyers.tickspeed.interval_ms = dto.auto.tickspeed.interval;
         autobuyers.tickspeed.cost = dto.auto.tickspeed.cost;
+        autobuyers.tickspeed.timer_ms = timer_from(dto.auto.tickspeed.last_tick);
         // The prestige autobuyers (Dim Boost / Galaxy / Big Crunch): active flag +
         // interval-upgrade state. They unlock by challenge, not `is_bought`.
-        for (ab, is_active, interval, cost) in [
+        for (ab, is_active, interval, cost, last_tick) in [
             (
                 &mut autobuyers.dim_boost,
                 dto.auto.dim_boost.is_active,
                 dto.auto.dim_boost.interval,
                 dto.auto.dim_boost.cost,
+                dto.auto.dim_boost.last_tick,
             ),
             (
                 &mut autobuyers.galaxy,
                 dto.auto.galaxy.is_active,
                 dto.auto.galaxy.interval,
                 dto.auto.galaxy.cost,
+                dto.auto.galaxy.last_tick,
             ),
             (
                 &mut autobuyers.big_crunch,
                 dto.auto.big_crunch.is_active,
                 dto.auto.big_crunch.interval,
                 dto.auto.big_crunch.cost,
+                dto.auto.big_crunch.last_tick,
             ),
         ] {
             ab.is_active = is_active;
             ab.interval_ms = interval;
             ab.cost = cost;
+            ab.timer_ms = timer_from(last_tick);
         }
         // Big Crunch goal settings + the Eternity / Reality autobuyers.
         autobuyers.big_crunch_settings = PrestigeGoalSettings {

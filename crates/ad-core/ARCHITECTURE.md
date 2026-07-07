@@ -253,7 +253,15 @@ not the current state).
   addressed via the `AutobuyerTarget` handle (`autobuyer_can_be_upgraded`,
   `upgrade_autobuyer_interval`, `has_maxed_interval`). `break_infinity_unlockable()`
   exposes the NC12-completed + maxed-Big-Crunch-interval gate that Feature 2.3
-  (Break Infinity) consumes. See `../../docs/design/2026-07-03-autobuyers.md`.
+  (Break Infinity) consumes. Each interval autobuyer's `timer_ms` is the
+  elapsed-time form of the original's `timeSinceLastTick` (`realTimePlayed −
+  lastTick`); `Autobuyer::advance` mirrors `IntervaledAutobuyerState` — it tests
+  the phase held over from prior ticks *before* adding the current `dt` (the
+  original compares against the pre-advance `realTimePlayed`) and resets to 0 on
+  a fire (dropping overshoot, like `lastTick = realTimePlayed`). The save codec
+  converts `lastTick ↔ timer_ms` on load/store (see `save/dto.rs` /
+  `save/encode.rs`); discarding it desynchronises every autobuyer's firing phase
+  on replay. See `../../docs/design/2026-07-03-autobuyers.md`.
 - `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
   `player.options`), held in `GameState`, preserved across a Big Crunch.
   Includes the per-action `Confirmations` toggles (boost/galaxy/sacrifice/crunch),

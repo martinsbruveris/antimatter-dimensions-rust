@@ -7,6 +7,15 @@ fn unlock_ad(game: &mut GameState, tier: usize) {
     game.autobuyers.dimensions[tier].is_bought = true;
 }
 
+// Helper: arm an autobuyer's timer to a full interval of phase, so it fires on
+// the next tick. The engine checks the accumulated phase *before* adding the
+// tick's dt (matching the original), so a fresh timer (phase 0) would otherwise
+// spend the first interval warming up. Arming isolates the *buy* behaviour from
+// that warm-up: it sets the phase to one full interval (the autobuyer is due).
+fn arm(ab: &mut Autobuyer) {
+    ab.timer_ms = ab.interval_ms;
+}
+
 // ============================================================
 // Basic autobuyer state tests
 // ============================================================
@@ -120,17 +129,26 @@ fn test_autobuyer_does_not_fire_when_inactive() {
 fn test_autobuyer_fires_after_interval() {
     let mut ab = Autobuyer::new(1000.0, AutobuyerMode::BuySingle);
     ab.is_bought = true;
-    assert!(!fire(&mut ab, 500.0));
-    assert!(fire(&mut ab, 500.0));
+    // The phase held over from prior ticks is tested *before* this tick's dt is
+    // added (mirroring the original's `realTimePlayed - lastTick >= interval`,
+    // using the pre-advance `realTimePlayed`), so a fresh autobuyer accumulates a
+    // full interval before it can fire.
+    assert!(!fire(&mut ab, 500.0)); // phase 0 -> 500
+    assert!(!fire(&mut ab, 500.0)); // phase 500 -> 1000
+    assert!(fire(&mut ab, 500.0)); // phase 1000 >= interval -> fires
 }
 
 #[test]
 fn test_autobuyer_timer_resets_after_firing() {
     let mut ab = Autobuyer::new(1000.0, AutobuyerMode::BuySingle);
     ab.is_bought = true;
-    assert!(fire(&mut ab, 1200.0));
-    assert!(!fire(&mut ab, 700.0));
-    assert!(fire(&mut ab, 100.0));
+    // Warm up to the first fire.
+    assert!(!fire(&mut ab, 500.0)); // phase 0 -> 500
+    assert!(!fire(&mut ab, 500.0)); // phase 500 -> 1000
+    assert!(fire(&mut ab, 500.0)); // fires; phase resets to 0 (overshoot dropped)
+                                   // After the reset another full interval must accumulate before it fires again.
+    assert!(!fire(&mut ab, 500.0)); // phase 500 -> 1000
+    assert!(fire(&mut ab, 500.0)); // fires again
 }
 
 // `advance` is private; exercise it via the game tick instead. This tiny
@@ -156,6 +174,7 @@ fn test_dimension_autobuyer_buys_single() {
     game.antimatter = Decimal::from_float(100.0);
     unlock_ad(&mut game, 0);
     game.autobuyers.dimensions[0].mode = AutobuyerMode::BuySingle;
+    arm(&mut game.autobuyers.dimensions[0]);
 
     // AD1 autobuyer interval is 500 ms.
     game.tick(500.0);
@@ -169,6 +188,7 @@ fn test_dimension_autobuyer_buys_max_fills_group_of_ten() {
     game.antimatter = Decimal::from_float(1e6);
     unlock_ad(&mut game, 0);
     game.autobuyers.dimensions[0].mode = AutobuyerMode::BuyMax;
+    arm(&mut game.autobuyers.dimensions[0]);
 
     game.tick(500.0);
 
@@ -210,9 +230,10 @@ fn test_multiple_dimension_autobuyers() {
     for i in 0..4 {
         unlock_ad(&mut game, i);
         game.autobuyers.dimensions[i].mode = AutobuyerMode::BuySingle;
+        arm(&mut game.autobuyers.dimensions[i]);
     }
 
-    // 1000 ms exceeds every AD interval (500..=800 ms), so each fires once.
+    // Each armed autobuyer is due, so a single tick fires each exactly once.
     game.tick(1000.0);
 
     for i in 0..4 {
@@ -235,6 +256,7 @@ fn test_tickspeed_autobuyer_buys_single() {
     game.antimatter = Decimal::from_float(1e6);
     game.autobuyers.tickspeed.is_bought = true;
     game.autobuyers.tickspeed.mode = AutobuyerMode::BuySingle;
+    arm(&mut game.autobuyers.tickspeed);
 
     // Tickspeed autobuyer interval is 500 ms.
     game.tick(500.0);
@@ -248,6 +270,7 @@ fn test_tickspeed_autobuyer_buys_max() {
     game.antimatter = Decimal::from_float(1e10);
     game.autobuyers.tickspeed.is_bought = true;
     game.autobuyers.tickspeed.mode = AutobuyerMode::BuyMax;
+    arm(&mut game.autobuyers.tickspeed);
 
     game.tick(500.0);
 
@@ -288,8 +311,10 @@ fn test_autobuyers_fire_during_simulation() {
     game.antimatter = Decimal::from_float(1e30);
     unlock_ad(&mut game, 0);
     game.autobuyers.dimensions[0].mode = AutobuyerMode::BuySingle;
+    arm(&mut game.autobuyers.dimensions[0]);
 
-    // 5000 ms at 100 ms ticks; AD1 interval is 500 ms -> fires 10 times.
+    // 5000 ms at 100 ms ticks; AD1 interval is 500 ms -> fires 10 times (armed,
+    // so the first fire lands on the first tick).
     game.simulate(5000.0, 100.0);
 
     assert_eq!(game.dimensions[0].bought, 10);
@@ -302,8 +327,10 @@ fn test_autobuyer_interval_change() {
     unlock_ad(&mut game, 0);
     game.autobuyers.dimensions[0].mode = AutobuyerMode::BuySingle;
     game.autobuyers.dimensions[0].interval_ms = 500.0;
+    arm(&mut game.autobuyers.dimensions[0]);
 
-    // 2000 ms at 100 ms ticks; fires every 500 ms -> 4 times.
+    // 2000 ms at 100 ms ticks; fires every 500 ms -> 4 times (armed, so the
+    // first fire lands on the first tick).
     game.simulate(2000.0, 100.0);
 
     assert_eq!(game.dimensions[0].bought, 4);

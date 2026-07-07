@@ -256,28 +256,39 @@ impl Autobuyer {
         self.interval_ms <= AUTOBUYER_MIN_INTERVAL_MS
     }
 
-    /// Advance the timer by `dt_ms`, firing when it reaches `effective_interval_ms`
-    /// (the stored interval after the `autobuyerSpeed` Break Infinity Upgrade's
-    /// halving). Does nothing (and never fires) while inactive. The *unlocked*
-    /// check lives in the caller ([`GameState::tick_autobuyers`]) via
-    /// `autobuyer_is_unlocked`, since some autobuyers unlock by challenge rather
-    /// than the `is_bought` flag.
+    /// Advance the timer, firing when the accumulated phase reaches
+    /// `effective_interval_ms` (the stored interval after the `autobuyerSpeed`
+    /// Break Infinity Upgrade's halving). Does nothing (and never fires) while
+    /// inactive. The *unlocked* check lives in the caller
+    /// ([`GameState::tick_autobuyers`]) via `autobuyer_is_unlocked`, since some
+    /// autobuyers unlock by challenge rather than the `is_bought` flag.
+    ///
+    /// This mirrors the original `IntervaledAutobuyerState`, whose `canTick`
+    /// compares `realTimePlayed - lastTick >= interval` using the `realTimePlayed`
+    /// *before* the game loop advances it, and whose `tick()` sets
+    /// `lastTick = realTimePlayed` — resetting the phase to 0 and discarding any
+    /// overshoot. So we test the phase held over from prior ticks *before* adding
+    /// this tick's `dt`, then add `dt` (the loop's real-time advance). A fresh
+    /// timer (phase 0) therefore does not fire on the very first tick unless it
+    /// already carried a full interval — matching the original, where a
+    /// just-reset autobuyer waits a full interval before firing again.
+    ///
+    /// `timer_ms` is the elapsed-time form of the original's
+    /// `timeSinceLastTick` (`= realTimePlayed - lastTick`); the save codec
+    /// converts between the two on load/store.
     fn advance(&mut self, dt_ms: f64, effective_interval_ms: f64) -> bool {
         if !self.is_active {
             return false;
         }
 
-        self.timer_ms += dt_ms;
-        if self.timer_ms >= effective_interval_ms {
-            self.timer_ms -= effective_interval_ms;
-            // Clamp timer to prevent unbounded accumulation if dt is very large.
-            if self.timer_ms >= effective_interval_ms {
-                self.timer_ms = 0.0;
-            }
-            true
-        } else {
-            false
+        let fired = self.timer_ms >= effective_interval_ms;
+        if fired {
+            // `lastTick = realTimePlayed`: the phase resets to 0, dropping the
+            // overshoot (the original does not carry the remainder forward).
+            self.timer_ms = 0.0;
         }
+        self.timer_ms += dt_ms;
+        fired
     }
 }
 
@@ -931,6 +942,9 @@ mod tests {
         game.autobuyers.dimensions[0].mode = AutobuyerMode::BuyMax;
         game.autobuyers.dimensions[0].bulk = 3;
         game.autobuyers.dimensions[0].interval_ms = 100.0;
+        // Arm the timer: a full interval of phase has accumulated, so it fires
+        // this tick (a fresh timer would wait an interval first).
+        game.autobuyers.dimensions[0].timer_ms = 100.0;
 
         game.tick_autobuyers(150.0);
         // Three groups of ten in one fire.
@@ -1034,6 +1048,8 @@ mod tests {
         let mut game = GameState::new();
         game.complete_challenge(10); // unlock the Dim Boost autobuyer
         game.autobuyers.dim_boost.interval_ms = 100.0;
+        // Arm the timer so it fires this tick (see the AD-autobuyer test above).
+        game.autobuyers.dim_boost.timer_ms = 100.0;
         // A satisfiable boost: 20 of the 4th dimension.
         game.dimensions[3].amount = Decimal::from_float(20.0);
         assert!(game.can_dim_boost());
@@ -1047,6 +1063,8 @@ mod tests {
         let mut game = GameState::new();
         game.complete_challenge(12); // unlock the Big Crunch autobuyer
         game.autobuyers.big_crunch.interval_ms = 100.0;
+        // Arm the timer so it fires this tick (see the AD-autobuyer test above).
+        game.autobuyers.big_crunch.timer_ms = 100.0;
         game.antimatter = BIG_CRUNCH_THRESHOLD; // at the goal
         let inf_before = game.infinities;
 
