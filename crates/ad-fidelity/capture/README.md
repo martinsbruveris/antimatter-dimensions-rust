@@ -47,13 +47,13 @@ Leave it running. (Any host/port works — see *Serving at a different URL* belo
 
 ```bash
 cd crates/ad-fidelity/capture
-npm run server                         # writes to ./captures, listens on :8899
+npm run server                         # writes to ../saves/captures, listens on :8899
 # or, explicitly:  node save-server.js <port> <outDir>
-# or, via env:     PORT=8899 CAPTURE_DIR=captures node save-server.js
+# or, via env:     PORT=8899 CAPTURE_DIR=../saves/captures node save-server.js
 ```
 
 It prints the output directory and the next sequence number, and logs each
-capture. `captures/` is created if missing and is git-ignored.
+capture. `saves/captures/` is created if missing and is git-ignored.
 
 ### 3. Install the userscript
 
@@ -84,10 +84,10 @@ speed 1× · capture off · 0 saved
 - **Status line** — current speed, whether capture is on, and the running count.
 
 Play the game normally, pick a speed your machine can sustain, and click
-**Start capture**. Savefiles land in `captures/` as `NNNNN-HHHH-MM-SS-timed.txt`,
-where `HHHH-MM-SS` is the game time elapsed at capture; on-demand saves are
-`NNNNN-HHHH-MM-SS-manual.txt`. Metadata for every capture is appended to
-`captures/index.jsonl`.
+**Start capture**. Savefiles land in `saves/captures/` as
+`NNNNN-HHHH-MM-SS-timed.txt`, where `HHHH-MM-SS` is the game time elapsed at
+capture; on-demand saves are `NNNNN-HHHH-MM-SS-manual.txt`. Metadata for every
+capture is appended to `saves/captures/index.jsonl`.
 
 ## Configuration
 
@@ -111,7 +111,7 @@ script runs on. It ships matching `http://localhost:8080/*`,
 | Setting | Env var | Positional arg | Default |
 |---------|---------|----------------|---------|
 | Port | `PORT` | 1st | `8899` |
-| Output dir | `CAPTURE_DIR` | 2nd | `./captures` |
+| Output dir | `CAPTURE_DIR` | 2nd | `../saves/captures` |
 
 Examples: `PORT=9000 node save-server.js`, or `node save-server.js 9000 /tmp/caps`.
 
@@ -128,12 +128,12 @@ port, or a built `dist/` served statically):
 
 ## Output format
 
-- `captures/NNNNN-HHHH-MM-SS-<tag>.txt` — the raw savefile string, exactly as the
-  game's export produces it (importable back into the game, and decodable by the
-  Rust save codec). `NNNNN` is the capture sequence; `HHHH-MM-SS` is the game time
-  elapsed at capture (hours-minutes-seconds). The capture *cadence* is real time,
-  but this timestamp is game time, so it marks the run's progression.
-- `captures/index.jsonl` — one JSON object per capture:
+- `saves/captures/NNNNN-HHHH-MM-SS-<tag>.txt` — the raw savefile string, exactly
+  as the game's export produces it (importable back into the game, and decodable
+  by the Rust save codec). `NNNNN` is the capture sequence; `HHHH-MM-SS` is the
+  game time elapsed at capture (hours-minutes-seconds). The capture *cadence* is
+  real time, but this timestamp is game time, so it marks the run's progression.
+- `saves/captures/index.jsonl` — one JSON object per capture:
 
   ```json
   {"file":"00007-0001-00-00-timed.txt","tag":"timed","wall":1751799600000,
@@ -146,12 +146,13 @@ port, or a built `dist/` served statically):
 ## Feeding captures into the oracle
 
 The [oracle](../oracle) reads `*.txt` savefiles from a directory (`SAVES_DIR`,
-default the repo `saves/`). To turn a capture run into fixtures, pick a
-representative subset (the curated set) and point the oracle at it:
+default `../saves/captures` — where this server writes). To turn a capture run
+into fixtures, run the oracle (or point it at a curated subset via `SAVES_DIR`):
 
 ```bash
 cd ../oracle
-SAVES_DIR=../capture/captures npm run generate   # or copy chosen files into saves/
+npm run generate                                 # reads ../saves/captures
+# or a curated subset:  SAVES_DIR=/path/to/subset npm run generate
 ```
 
 Use `index.jsonl` (game time / magnitudes) to choose saves spread across the
@@ -179,5 +180,5 @@ game's progression rather than clustered where you spent real time.
 - The cadence is measured in **real time**, so captures land on a steady
   wall-clock schedule regardless of the chosen speed (the filename timestamp is
   still game time — `records.totalTimePlayed` — marking the run's progression).
-- `captures/` is git-ignored; the curated subset used by tests is selected from a
-  capture run separately.
+- `saves/captures/` is git-ignored; the curated subset used by tests is selected
+  from a capture run separately.

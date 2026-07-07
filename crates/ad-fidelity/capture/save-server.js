@@ -8,7 +8,7 @@
 // described in docs/design/2026-07-06-fidelity-testing.md §4 ("Capture rig").
 //
 //   node save-server.js [port] [outDir]
-//   PORT=8899 CAPTURE_DIR=captures node save-server.js
+//   PORT=8899 CAPTURE_DIR=../saves/captures node save-server.js
 //
 // POST /save  body: {"tag": "...", "wall": <ms>, "save": "<savefile>", "meta": {...}}
 //   -> writes NNNNN-HHHH-MM-SS-<tag>.txt containing the savefile, and appends a
@@ -20,7 +20,9 @@ const path = require("path");
 
 const PORT = Number(process.env.PORT || process.argv[2] || 8899);
 const OUT_DIR = path.resolve(
-  process.env.CAPTURE_DIR || process.argv[3] || "captures"
+  process.env.CAPTURE_DIR ||
+    process.argv[3] ||
+    path.join(__dirname, "..", "saves", "captures")
 );
 
 fs.mkdirSync(OUT_DIR, { recursive: true });

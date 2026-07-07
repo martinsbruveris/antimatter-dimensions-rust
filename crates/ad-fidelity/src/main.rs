@@ -23,10 +23,10 @@ use ad_fidelity::fixture::{load_dir, Fixture};
 use ad_fidelity::report::{table, verbose};
 use ad_fidelity::run::{run, RunConfig};
 
-/// The oracle's default fixture output directory (`oracle/fixtures`, relative to
+/// The oracle's default fixture output directory (`saves/fixtures`, relative to
 /// this crate).
 const DEFAULT_FIXTURES_DIR: &str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/oracle/fixtures");
+    concat!(env!("CARGO_MANIFEST_DIR"), "/saves/fixtures");
 
 #[derive(Parser, Debug)]
 #[command(

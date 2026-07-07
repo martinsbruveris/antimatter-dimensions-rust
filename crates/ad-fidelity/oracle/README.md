@@ -26,7 +26,7 @@ the shipped bundle with zero API gaps. See design §10.
    cd crates/ad-fidelity/oracle
    npm install                 # pulls Playwright
    npx playwright install chromium
-   npm run generate            # reads ../../../saves, writes ./fixtures
+   npm run generate            # reads ../saves/captures, writes ../saves/fixtures
    ```
 
 Output: one `fixtures/<save>.json` per input, containing the input save and the
@@ -43,8 +43,8 @@ expected savefile after each horizon:
 ## Configuration (env vars)
 
 - `GAME_URL` — where the game is served (default `http://localhost:8080`).
-- `SAVES_DIR` — input saves (default the repo `saves/`).
-- `OUT_DIR` — fixture output (default `./fixtures`, git-ignored).
+- `SAVES_DIR` — input saves (default `../saves/captures`).
+- `OUT_DIR` — fixture output (default `../saves/fixtures`, git-ignored).
 - `TICK_MS` — tick granularity, default 50 (design §10; a parameter).
 - `HORIZONS` — comma list, default `1,10,100,1000`.
 
@@ -70,5 +70,5 @@ Applied so the oracle is reproducible and matches the Rust engine's assumptions:
 
 Implemented; **not yet run end-to-end here** (requires the game served +
 `playwright install`). Syntax-checked. First run should be verified against the
-one save in `saves/` (`01_pre_big_crunch.txt`, an early-game state where the
-replicanti/glyph paths are inert). `fixtures/` is git-ignored.
+one save in `saves/captures/` (`01_pre_big_crunch.txt`, an early-game state where
+the replicanti/glyph paths are inert). `saves/fixtures/` is git-ignored.

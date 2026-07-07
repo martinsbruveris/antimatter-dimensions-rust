@@ -38,10 +38,12 @@ ad-fidelity/
 │   └── replay_smoke.rs     # End-to-end plumbing tests (no Node needed)
 ├── capture/               # Stage 1: capture rig (userscript + save server)
 │   ├── userscript.js       # Speed buttons + time-based capture (in-browser)
-│   ├── save-server.js      # Local server that stores POSTed saves
-│   └── captures/           # Captured savefiles + index.jsonl
-└── oracle/                # Stage 2: Playwright oracle (reference fixtures)
-    └── generate-replay-fixtures.js
+│   └── save-server.js      # Local server that stores POSTed saves
+├── oracle/                # Stage 2: Playwright oracle (reference fixtures)
+│   └── generate-replay-fixtures.js
+└── saves/                 # Data (git-ignored)
+    ├── captures/           # Captured savefiles + index.jsonl
+    └── fixtures/           # Oracle reference fixtures (<save>.json)
 ```
 
 ## Prerequisites
@@ -56,7 +58,7 @@ Running the oracle requires:
 
 See [`capture/README.md`](capture/README.md). The userscript adds speed controls and
 periodically POSTs the current savefile to `save-server.js`, which writes each into
-`capture/captures/` and appends an entry to `index.jsonl`.
+`saves/captures/` and appends an entry to `index.jsonl`.
 
 ## Oracle
 
@@ -68,15 +70,15 @@ resulting savefiles as fixtures the Rust harness will diff against.
 cd crates/ad-fidelity/oracle
 npm install                 # pulls Playwright
 npx playwright install chromium
-npm run generate            # reads captured saves, writes ./fixtures
+npm run generate            # reads ../saves/captures, writes ../saves/fixtures
 ```
 
 ## Rust comparison (the `ad-fidelity` binary)
 
-Once the oracle has written `fixtures/`, replay them through `ad-core` and diff:
+Once the oracle has written `saves/fixtures/`, replay them through `ad-core` and diff:
 
 ```bash
-# From the workspace root; defaults to oracle/fixtures at every horizon present.
+# From the workspace root; defaults to saves/fixtures at every horizon present.
 cargo run -p ad-fidelity                       # pass/fail table
 cargo run -p ad-fidelity -- --verbose          # + per-field divergences
 cargo run -p ad-fidelity -- path/to/fixtures   # a different fixtures dir
@@ -101,7 +103,7 @@ Options:
 
 | Flag | Meaning |
 |------|---------|
-| `[DIR]` | Fixtures directory (default `oracle/fixtures`). |
+| `[DIR]` | Fixtures directory (default `saves/fixtures`). |
 | `--tests 1,3,12` | Only these fixtures, by 0-based row index. |
 | `--ticks 1,10` | Only these horizons (columns). |
 | `--tick-ms 50` | Override the fixture's `meta.tickMs` (must match the oracle). |

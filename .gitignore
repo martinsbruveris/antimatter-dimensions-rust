@@ -16,4 +16,5 @@ crates/ad-gui/frontend/dist/
 crates/ad-gui/gen/
 
 # Savefiles
-saves/
+crates/ad-fidelity/saves/
+saves/01_pre_big_crunch.txt

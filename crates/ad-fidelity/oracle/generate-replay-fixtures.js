@@ -20,9 +20,11 @@ const { chromium } = require("playwright");
 
 const GAME_URL = process.env.GAME_URL || "http://localhost:8080";
 const SAVES_DIR = path.resolve(
-  process.env.SAVES_DIR || path.join(__dirname, "..", "capture", "captures")
+  process.env.SAVES_DIR || path.join(__dirname, "..", "saves", "captures")
 );
-const OUT_DIR = path.resolve(process.env.OUT_DIR || path.join(__dirname, "fixtures"));
+const OUT_DIR = path.resolve(
+  process.env.OUT_DIR || path.join(__dirname, "..", "saves", "fixtures")
+);
 const TICK_MS = Number(process.env.TICK_MS || 50); // §10: 50 ms granularity (parameter)
 const HORIZONS = (process.env.HORIZONS || "1,10,100,1000").split(",").map(Number);
 
