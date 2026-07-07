@@ -60,34 +60,34 @@ pub const RA_UNLOCK_COUNT: u8 = 28;
 
 /// `(pet, required_level)` for each unlock id (index = id).
 pub const RA_UNLOCK_REQS: [(usize, u32); RA_UNLOCK_COUNT as usize] = [
-    (PET_TERESA, 1),   // 0 autoTP
-    (PET_TERESA, 2),   // 1 chargedInfinityUpgrades
-    (PET_TERESA, 5),   // 2 teresaXP
-    (PET_TERESA, 10),  // 3 alteredGlyphs
-    (PET_TERESA, 8),   // 4 effarigUnlock
-    (PET_TERESA, 15),  // 5 perkShopIncrease
-    (PET_TERESA, 25),  // 6 unlockDilationStartingTP
-    (PET_EFFARIG, 1),  // 7 extraGlyphChoices
-    (PET_EFFARIG, 2),  // 8 unlockGlyphAlchemy
-    (PET_EFFARIG, 5),  // 9 effarigXP
-    (PET_EFFARIG, 10), // 10 glyphEffectCount
-    (PET_EFFARIG, 8),  // 11 enslavedUnlock
-    (PET_EFFARIG, 15), // 12 relicShardGlyphLevelBoost
-    (PET_EFFARIG, 25), // 13 maxGlyphRarity
-    (PET_ENSLAVED, 1), // 14 blackHolePowerAutobuyers
-    (PET_ENSLAVED, 2), // 15 improvedStoredTime
-    (PET_ENSLAVED, 5), // 16 enslavedXP
+    (PET_TERESA, 1),    // 0 autoTP
+    (PET_TERESA, 2),    // 1 chargedInfinityUpgrades
+    (PET_TERESA, 5),    // 2 teresaXP
+    (PET_TERESA, 10),   // 3 alteredGlyphs
+    (PET_TERESA, 8),    // 4 effarigUnlock
+    (PET_TERESA, 15),   // 5 perkShopIncrease
+    (PET_TERESA, 25),   // 6 unlockDilationStartingTP
+    (PET_EFFARIG, 1),   // 7 extraGlyphChoices
+    (PET_EFFARIG, 2),   // 8 unlockGlyphAlchemy
+    (PET_EFFARIG, 5),   // 9 effarigXP
+    (PET_EFFARIG, 10),  // 10 glyphEffectCount
+    (PET_EFFARIG, 8),   // 11 enslavedUnlock
+    (PET_EFFARIG, 15),  // 12 relicShardGlyphLevelBoost
+    (PET_EFFARIG, 25),  // 13 maxGlyphRarity
+    (PET_ENSLAVED, 1),  // 14 blackHolePowerAutobuyers
+    (PET_ENSLAVED, 2),  // 15 improvedStoredTime
+    (PET_ENSLAVED, 5),  // 16 enslavedXP
     (PET_ENSLAVED, 10), // 17 autoPulseTime
-    (PET_ENSLAVED, 8), // 18 vUnlock
+    (PET_ENSLAVED, 8),  // 18 vUnlock
     (PET_ENSLAVED, 15), // 19 peakGamespeedDT
     (PET_ENSLAVED, 25), // 20 allGamespeedGlyphs
-    (PET_V, 1),        // 21 instantEC
-    (PET_V, 2),        // 22 autoUnlockDilation
-    (PET_V, 5),        // 23 vXP
-    (PET_V, 6),        // 24 unlockHardV
-    (PET_V, 10),       // 25 continuousTTBoost
-    (PET_V, 15),       // 26 achievementTTMult
-    (PET_V, 25),       // 27 achievementPower
+    (PET_V, 1),         // 21 instantEC
+    (PET_V, 2),         // 22 autoUnlockDilation
+    (PET_V, 5),         // 23 vXP
+    (PET_V, 6),         // 24 unlockHardV
+    (PET_V, 10),        // 25 continuousTTBoost
+    (PET_V, 15),        // 26 achievementTTMult
+    (PET_V, 25),        // 27 achievementPower
 ];
 
 /// One Celestial Memory (`player.celestials.ra.pets[i]`).
@@ -177,7 +177,8 @@ impl RaState {
             peak_gamespeed: 1.0,
             pet_with_remembrance: -1,
             momentum_time: 0.0,
-            alchemy: [super::alchemy::AlchemyResource::default(); super::alchemy::ALCHEMY_COUNT],
+            alchemy: [super::alchemy::AlchemyResource::default();
+                super::alchemy::ALCHEMY_COUNT],
             highest_refinement_value: [0.0; 6],
         }
     }
@@ -345,8 +346,10 @@ impl GameState {
             let mem_upgrade_mult =
                 1.3f64.powi(self.celestials.ra.pets[pet].memory_upgrades as i32);
             let p = &self.celestials.ra.pets[pet];
-            let new_memories =
-                seconds * (p.memory_chunks + new_chunks / 2.0) * per_chunk * mem_upgrade_mult;
+            let new_memories = seconds
+                * (p.memory_chunks + new_chunks / 2.0)
+                * per_chunk
+                * mem_upgrade_mult;
             let p = &mut self.celestials.ra.pets[pet];
             p.memory_chunks += new_chunks;
             p.memories += new_memories;
@@ -373,7 +376,9 @@ impl GameState {
 
     pub fn ra_purchase_memory_upgrade(&mut self, pet: usize) -> bool {
         let cost = self.ra_memory_upgrade_cost(pet);
-        if self.celestials.ra.pets[pet].memories < cost || self.ra_memory_upgrade_capped(pet) {
+        if self.celestials.ra.pets[pet].memories < cost
+            || self.ra_memory_upgrade_capped(pet)
+        {
             return false;
         }
         self.celestials.ra.pets[pet].memories -= cost;
@@ -383,7 +388,9 @@ impl GameState {
 
     pub fn ra_purchase_chunk_upgrade(&mut self, pet: usize) -> bool {
         let cost = self.ra_chunk_upgrade_cost(pet);
-        if self.celestials.ra.pets[pet].memories < cost || self.ra_chunk_upgrade_capped(pet) {
+        if self.celestials.ra.pets[pet].memories < cost
+            || self.ra_chunk_upgrade_capped(pet)
+        {
             return false;
         }
         self.celestials.ra.pets[pet].memories -= cost;
@@ -444,7 +451,11 @@ impl GameState {
             return false;
         }
         self.celestials.ra.pet_with_remembrance =
-            if self.celestials.ra.pet_with_remembrance == pet { -1 } else { pet };
+            if self.celestials.ra.pet_with_remembrance == pet {
+                -1
+            } else {
+                pet
+            };
         true
     }
 
@@ -464,7 +475,8 @@ impl GameState {
     }
 
     pub fn ra_charges_left(&self) -> u32 {
-        self.ra_total_charges().saturating_sub(self.ra_charges_used())
+        self.ra_total_charges()
+            .saturating_sub(self.ra_charges_used())
     }
 
     /// Whether Infinity-Upgrade save-id `id` (0–15) is charged.
@@ -553,7 +565,9 @@ impl GameState {
     /// 1)` (1 if not unlocked).
     pub(crate) fn ra_peak_gamespeed_dt(&self) -> f64 {
         if self.ra_unlock_active(RA_UNLOCK_PEAK_GAMESPEED_DT) {
-            (self.celestials.ra.peak_gamespeed.log10() - 90.0).powi(3).max(1.0)
+            (self.celestials.ra.peak_gamespeed.log10() - 90.0)
+                .powi(3)
+                .max(1.0)
         } else {
             1.0
         }
@@ -670,7 +684,9 @@ mod tests {
             game.ra_required_memories_for_level(20)
                 > game.ra_required_memories_for_level(10)
         );
-        assert!(game.ra_required_memories_for_level(RA_LEVEL_CAP).is_infinite());
+        assert!(game
+            .ra_required_memories_for_level(RA_LEVEL_CAP)
+            .is_infinite());
     }
 
     #[test]

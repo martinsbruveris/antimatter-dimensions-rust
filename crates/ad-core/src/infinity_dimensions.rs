@@ -293,7 +293,8 @@ impl GameState {
             mult = mult.pow(&Decimal::from_float(infinitypow));
         }
         // Ra Alchemy `infinity` (ID `^(1 + amount/200000)`) then `momentumValue`.
-        let alch_inf = self.alchemy_dimension_power(crate::celestials::alchemy::INFINITY);
+        let alch_inf =
+            self.alchemy_dimension_power(crate::celestials::alchemy::INFINITY);
         if alch_inf != 1.0 {
             mult = mult.pow(&Decimal::from_float(alch_inf));
         }

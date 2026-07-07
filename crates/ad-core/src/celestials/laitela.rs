@@ -157,7 +157,8 @@ impl GameState {
     /// `Laitela.realityReward` — the DMD boost from difficulty + fastest time.
     pub fn laitela_reality_reward(&self) -> f64 {
         let l = &self.celestials.laitela;
-        (100f64.powi(l.difficulty_tier as i32) * (360.0 / l.fastest_completion).powi(2)).max(1.0)
+        (100f64.powi(l.difficulty_tier as i32) * (360.0 / l.fastest_completion).powi(2))
+            .max(1.0)
     }
 
     // --- Dark Matter Dimensions -------------------------------------------------
@@ -200,7 +201,8 @@ impl GameState {
             * Decimal::from_float(self.celestials.laitela.dark_matter_mult)
             * Decimal::from_float(self.dmd_common_dark_mult())
             * Decimal::from_float(
-                self.dmd_power_dm_per_ascension().powi(d.ascension_count as i32),
+                self.dmd_power_dm_per_ascension()
+                    .powi(d.ascension_count as i32),
             );
         mult *= Decimal::from_float(
             self.singularity_milestone_effect_or(sing::DARK_MATTER_MULT, 1.0),
@@ -219,8 +221,13 @@ impl GameState {
         }
         let d = &self.celestials.laitela.dimensions[tier];
         let tier_factor = 15f64.powi(tier as i32);
-        let destabilize = if self.laitela_is_fully_destabilized() { 8.0 } else { 1.0 };
-        ((1.0 + d.power_de_upgrades as f64 * 0.1) * 1.005f64.powi(d.power_de_upgrades as i32)
+        let destabilize = if self.laitela_is_fully_destabilized() {
+            8.0
+        } else {
+            1.0
+        };
+        ((1.0 + d.power_de_upgrades as f64 * 0.1)
+            * 1.005f64.powi(d.power_de_upgrades as i32)
             * tier_factor
             / 1000.0)
             * self.dmd_common_dark_mult()
@@ -238,9 +245,13 @@ impl GameState {
             * 4f64.powi(tier as i32)
             * INTERVAL_PER_UPGRADE.powi(d.interval_upgrades as i32)
             * self
-                .singularity_milestone_effect_or(sing::ASCENSION_INTERVAL_SCALING, 1200.0)
+                .singularity_milestone_effect_or(
+                    sing::ASCENSION_INTERVAL_SCALING,
+                    1200.0,
+                )
                 .powi(d.ascension_count as i32)
-            * self.singularity_milestone_effect_or(sing::DARK_DIM_INTERVAL_REDUCTION, 1.0)
+            * self
+                .singularity_milestone_effect_or(sing::DARK_DIM_INTERVAL_REDUCTION, 1.0)
     }
 
     /// `DarkMatterDimension.interval` (floored at 10 ms). `tier` is 0-indexed.
@@ -258,7 +269,10 @@ impl GameState {
 
     fn dmd_interval_cost_increase(&self) -> f64 {
         5f64.powf(
-            self.singularity_milestone_effect_or(sing::INTERVAL_COST_SCALING_REDUCTION, 1.0),
+            self.singularity_milestone_effect_or(
+                sing::INTERVAL_COST_SCALING_REDUCTION,
+                1.0,
+            ),
         )
     }
 
@@ -344,7 +358,11 @@ impl GameState {
                     continue;
                 }
                 let candidates = [
-                    (0u8, self.dmd_can_buy_interval(tier).then(|| self.dmd_interval_cost(tier))),
+                    (
+                        0u8,
+                        self.dmd_can_buy_interval(tier)
+                            .then(|| self.dmd_interval_cost(tier)),
+                    ),
                     (1u8, Some(self.dmd_power_dm_cost(tier))),
                     (2u8, Some(self.dmd_power_de_cost(tier))),
                 ];
@@ -383,7 +401,8 @@ impl GameState {
                 continue;
             }
             let interval = self.dmd_interval(tier);
-            self.celestials.laitela.dimensions[tier].time_since_last_update += real_diff_ms;
+            self.celestials.laitela.dimensions[tier].time_since_last_update +=
+                real_diff_ms;
             let tsu = self.celestials.laitela.dimensions[tier].time_since_last_update;
             if interval < tsu {
                 let ticks = (tsu / interval).floor();
@@ -393,8 +412,11 @@ impl GameState {
                 let production_dm = amount * Decimal::from_float(ticks) * power_dm;
                 if tier == 0 {
                     self.celestials.laitela.dark_matter += production_dm;
-                    self.celestials.laitela.max_dark_matter =
-                        self.celestials.laitela.max_dark_matter.max(&self.celestials.laitela.dark_matter);
+                    self.celestials.laitela.max_dark_matter = self
+                        .celestials
+                        .laitela
+                        .max_dark_matter
+                        .max(&self.celestials.laitela.dark_matter);
                 } else {
                     self.celestials.laitela.dimensions[tier - 1].amount += production_dm;
                 }
@@ -422,8 +444,8 @@ impl GameState {
 
     /// `darkMatterMultGain` — the annihilation reward.
     pub fn dark_matter_mult_gain(&self) -> f64 {
-        let ratio = self.celestials.laitela.dark_matter
-            / Decimal::from_float(ANNIHILATION_DM);
+        let ratio =
+            self.celestials.laitela.dark_matter / Decimal::from_float(ANNIHILATION_DM);
         let base = (ratio.pos_log10() + 1.0).max(0.0).powf(1.5);
         // Imaginary Upgrade 21: improved by iM.
         let iu21 = if self.imaginary_upgrade_bought(21) {
@@ -436,7 +458,8 @@ impl GameState {
 
     pub fn can_annihilate(&self) -> bool {
         self.annihilation_unlocked()
-            && self.celestials.laitela.dark_matter >= Decimal::from_float(ANNIHILATION_DM)
+            && self.celestials.laitela.dark_matter
+                >= Decimal::from_float(ANNIHILATION_DM)
     }
 
     /// `Laitela.annihilate(force)`: bank the mult gain and reset the DMDs.

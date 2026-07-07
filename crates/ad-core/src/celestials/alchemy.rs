@@ -61,34 +61,45 @@ struct AlchemyConfig {
 }
 
 const fn base(unlocked_at: u32) -> AlchemyConfig {
-    AlchemyConfig { is_base: true, unlocked_at, reagents: &[] }
+    AlchemyConfig {
+        is_base: true,
+        unlocked_at,
+        reagents: &[],
+    }
 }
 const fn adv(unlocked_at: u32, reagents: &'static [(usize, f64)]) -> AlchemyConfig {
-    AlchemyConfig { is_base: false, unlocked_at, reagents }
+    AlchemyConfig {
+        is_base: false,
+        unlocked_at,
+        reagents,
+    }
 }
 
 /// The 21 resource configs, indexed by id.
 static ALCHEMY: [AlchemyConfig; ALCHEMY_COUNT] = [
-    base(2),                                              // 0 power
-    base(3),                                              // 1 infinity
-    base(4),                                              // 2 time
-    base(5),                                              // 3 replication
-    base(6),                                              // 4 dilation
-    adv(8, &[(TIME, 8.0), (REPLICATION, 7.0)]),           // 5 cardinality
-    adv(9, &[(TIME, 11.0), (INFINITY, 4.0)]),             // 6 eternity
-    adv(10, &[(POWER, 10.0), (INFINITY, 5.0)]),           // 7 dimensionality
-    adv(11, &[(POWER, 9.0), (DILATION, 6.0)]),            // 8 inflation
-    adv(12, &[(REPLICATION, 5.0), (DILATION, 10.0)]),     // 9 alternation
-    base(7),                                              // 10 effarig
+    base(2),                                                           // 0 power
+    base(3),                                                           // 1 infinity
+    base(4),                                                           // 2 time
+    base(5),                                                           // 3 replication
+    base(6),                                                           // 4 dilation
+    adv(8, &[(TIME, 8.0), (REPLICATION, 7.0)]),                        // 5 cardinality
+    adv(9, &[(TIME, 11.0), (INFINITY, 4.0)]),                          // 6 eternity
+    adv(10, &[(POWER, 10.0), (INFINITY, 5.0)]), // 7 dimensionality
+    adv(11, &[(POWER, 9.0), (DILATION, 6.0)]),  // 8 inflation
+    adv(12, &[(REPLICATION, 5.0), (DILATION, 10.0)]), // 9 alternation
+    base(7),                                    // 10 effarig
     adv(13, &[(EFFARIG, 3.0), (REPLICATION, 16.0), (INFINITY, 14.0)]), // 11 synergism
-    adv(15, &[(EFFARIG, 11.0), (POWER, 4.0), (TIME, 20.0)]),           // 12 momentum
-    adv(14, &[(EFFARIG, 13.0), (ALTERNATION, 8.0)]),      // 13 decoherence
-    adv(18, &[(INFLATION, 18.0), (SYNERGISM, 3.0)]),      // 14 exponential
-    adv(17, &[(DIMENSIONALITY, 7.0), (MOMENTUM, 8.0)]),   // 15 force
+    adv(15, &[(EFFARIG, 11.0), (POWER, 4.0), (TIME, 20.0)]), // 12 momentum
+    adv(14, &[(EFFARIG, 13.0), (ALTERNATION, 8.0)]), // 13 decoherence
+    adv(18, &[(INFLATION, 18.0), (SYNERGISM, 3.0)]), // 14 exponential
+    adv(17, &[(DIMENSIONALITY, 7.0), (MOMENTUM, 8.0)]), // 15 force
     adv(19, &[(INFINITY, 20.0), (EFFARIG, 6.0), (CARDINALITY, 16.0)]), // 16 uncountability
-    adv(20, &[(ETERNITY, 13.0), (INFLATION, 18.0)]),      // 17 boundless
-    adv(16, &[(ALTERNATION, 16.0), (DECOHERENCE, 3.0)]),  // 18 multiversal
-    adv(21, &[(EFFARIG, 15.0), (DECOHERENCE, 3.0), (SYNERGISM, 10.0)]), // 19 unpredictability
+    adv(20, &[(ETERNITY, 13.0), (INFLATION, 18.0)]),                   // 17 boundless
+    adv(16, &[(ALTERNATION, 16.0), (DECOHERENCE, 3.0)]),               // 18 multiversal
+    adv(
+        21,
+        &[(EFFARIG, 15.0), (DECOHERENCE, 3.0), (SYNERGISM, 10.0)],
+    ), // 19 unpredictability
     adv(
         25,
         &[
@@ -306,7 +317,11 @@ impl GameState {
         if cfg.is_base || !self.alchemy_resource_unlocked(id) {
             return 0.0;
         }
-        if cfg.reagents.iter().any(|&(r, _)| !self.alchemy_resource_unlocked(r)) {
+        if cfg
+            .reagents
+            .iter()
+            .any(|&(r, _)| !self.alchemy_resource_unlocked(r))
+        {
             return 0.0;
         }
         let min_reagent = cfg
@@ -330,7 +345,9 @@ impl GameState {
         if base_yield == 0.0 {
             return 0.0;
         }
-        let max_from = self.reaction_base_production(id) * base_yield * self.reaction_efficiency(id);
+        let max_from = self.reaction_base_production(id)
+            * base_yield
+            * self.reaction_efficiency(id);
         let prod_before = self.amt(id);
         let prod_after = prod_before + max_from;
         let mut capped = base_yield;
@@ -340,7 +357,8 @@ impl GameState {
             let diff_before = reagent_before - prod_before;
             let diff_after = reagent_after - prod_after;
             if diff_before != diff_after {
-                capped = capped.min(base_yield * diff_before / (diff_before - diff_after));
+                capped =
+                    capped.min(base_yield * diff_before / (diff_before - diff_after));
             }
         }
         capped.max(0.0)
@@ -392,7 +410,8 @@ impl GameState {
                 self.celestials.ra.alchemy[r].amount -= yield_ * cost;
             }
             let effective = (yield_ * base_production * efficiency).max(0.05);
-            let new_amount = (self.celestials.ra.alchemy[id].amount + effective).min(cap);
+            let new_amount =
+                (self.celestials.ra.alchemy[id].amount + effective).min(cap);
             self.celestials.ra.alchemy[id].amount = new_amount;
         }
     }
@@ -406,7 +425,9 @@ impl GameState {
             return;
         }
         // Sort reaction ids by descending priority.
-        let mut ids: Vec<usize> = (0..ALCHEMY_COUNT).filter(|&id| !ALCHEMY[id].is_base).collect();
+        let mut ids: Vec<usize> = (0..ALCHEMY_COUNT)
+            .filter(|&id| !ALCHEMY[id].is_base)
+            .collect();
         ids.sort_by(|&a, &b| {
             self.reaction_priority(b)
                 .partial_cmp(&self.reaction_priority(a))
@@ -414,7 +435,11 @@ impl GameState {
         });
         // Poisson mean for the re-trigger: p/(1-p) extra events on average.
         let p = self.alchemy_unpredictability();
-        let times = if p >= 1.0 { 2 } else { 1 + (p / (1.0 - p)).round() as u32 };
+        let times = if p >= 1.0 {
+            2
+        } else {
+            1 + (p / (1.0 - p)).round() as u32
+        };
         for id in ids {
             self.combine_reagents(id, times);
         }

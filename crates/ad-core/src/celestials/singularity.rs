@@ -18,8 +18,18 @@ pub struct MilestoneConfig {
     pub limit: f64,
 }
 
-const fn m(start: f64, repeat: f64, increase_threshold: f64, limit: f64) -> MilestoneConfig {
-    MilestoneConfig { start, repeat, increase_threshold, limit }
+const fn m(
+    start: f64,
+    repeat: f64,
+    increase_threshold: f64,
+    limit: f64,
+) -> MilestoneConfig {
+    MilestoneConfig {
+        start,
+        repeat,
+        increase_threshold,
+        limit,
+    }
 }
 
 pub const MILESTONE_COUNT: usize = 30;
@@ -57,36 +67,36 @@ pub const INFINITIED_POW: usize = 28;
 pub const TESSERACT_MULT_FROM_SINGULARITIES: usize = 29;
 
 pub static MILESTONES: [MilestoneConfig; MILESTONE_COUNT] = [
-    m(1.0, 125.0, 20.0, f64::INFINITY),      // 0 continuumMult
-    m(2.0, 20.0, 30.0, f64::INFINITY),       // 1 darkMatterMult
-    m(3.0, 120.0, 10.0, f64::INFINITY),      // 2 darkEnergyMult
-    m(4.0, 40.0, 25.0, f64::INFINITY),       // 3 darkDimensionCostReduction
-    m(50.0, 3000.0, 5.0, f64::INFINITY),     // 4 singularityMult
-    m(10.0, 100.0, 20.0, f64::INFINITY),     // 5 darkDimensionIntervalReduction
+    m(1.0, 125.0, 20.0, f64::INFINITY),  // 0 continuumMult
+    m(2.0, 20.0, 30.0, f64::INFINITY),   // 1 darkMatterMult
+    m(3.0, 120.0, 10.0, f64::INFINITY),  // 2 darkEnergyMult
+    m(4.0, 40.0, 25.0, f64::INFINITY),   // 3 darkDimensionCostReduction
+    m(50.0, 3000.0, 5.0, f64::INFINITY), // 4 singularityMult
+    m(10.0, 100.0, 20.0, f64::INFINITY), // 5 darkDimensionIntervalReduction
     m(200000.0, 4000.0, 15.0, f64::INFINITY), // 6 improvedAscensionDM
-    m(1.2e5, 2400.0, 0.0, 8.0),              // 7 ascensionIntervalScaling
-    m(8.0, 80.0, 0.0, 8.0),                  // 8 autoCondense
-    m(30.0, 170.0, 0.0, 4.0),                // 9 darkDimensionAutobuyers
-    m(1e8, 140.0, 0.0, 4.0),                 // 10 ascensionAutobuyers
-    m(45.0, 650.0, 0.0, 8.0),                // 11 darkAutobuyerSpeed
-    m(1500.0, 10000.0, 0.0, 6.0),            // 12 realityDEMultiplier
-    m(150.0, 10000.0, 0.0, 4.0),             // 13 improvedSingularityCap
-    m(130000.0, 50000.0, 0.0, 5.0),          // 14 intervalCostScalingReduction
-    m(80.0, 0.0, 0.0, 1.0),                  // 15 darkFromTesseracts
-    m(3000.0, 0.0, 0.0, 1.0),                // 16 multFromInfinitied
-    m(8e4, 0.0, 0.0, 1.0),                   // 17 dilatedTimeFromSingularities
-    m(3e6, 0.0, 0.0, 1.0),                   // 18 darkFromGlyphLevel
-    m(8e7, 0.0, 0.0, 1.0),                   // 19 gamespeedFromSingularities
-    m(3e9, 0.0, 0.0, 1.0),                   // 20 darkFromTheorems
-    m(5e11, 0.0, 0.0, 1.0),                  // 21 dim4Generation
-    m(5e12, 0.0, 0.0, 1.0),                  // 22 darkFromDM4
-    m(4e18, 0.0, 0.0, 1.0),                  // 23 annihilationAutobuyer
-    m(3e21, 0.0, 0.0, 1.0),                  // 24 theoremPowerFromSingularities
-    m(8e22, 0.0, 0.0, 1.0),                  // 25 darkFromGamespeed
-    m(3e24, 0.0, 0.0, 1.0),                  // 26 glyphLevelFromSingularities
-    m(8e33, 0.0, 0.0, 1.0),                  // 27 darkFromDilatedTime
-    m(3e38, 0.0, 0.0, 1.0),                  // 28 infinitiedPow
-    m(2.5e45, 0.0, 0.0, 1.0),                // 29 tesseractMultFromSingularities
+    m(1.2e5, 2400.0, 0.0, 8.0),          // 7 ascensionIntervalScaling
+    m(8.0, 80.0, 0.0, 8.0),              // 8 autoCondense
+    m(30.0, 170.0, 0.0, 4.0),            // 9 darkDimensionAutobuyers
+    m(1e8, 140.0, 0.0, 4.0),             // 10 ascensionAutobuyers
+    m(45.0, 650.0, 0.0, 8.0),            // 11 darkAutobuyerSpeed
+    m(1500.0, 10000.0, 0.0, 6.0),        // 12 realityDEMultiplier
+    m(150.0, 10000.0, 0.0, 4.0),         // 13 improvedSingularityCap
+    m(130000.0, 50000.0, 0.0, 5.0),      // 14 intervalCostScalingReduction
+    m(80.0, 0.0, 0.0, 1.0),              // 15 darkFromTesseracts
+    m(3000.0, 0.0, 0.0, 1.0),            // 16 multFromInfinitied
+    m(8e4, 0.0, 0.0, 1.0),               // 17 dilatedTimeFromSingularities
+    m(3e6, 0.0, 0.0, 1.0),               // 18 darkFromGlyphLevel
+    m(8e7, 0.0, 0.0, 1.0),               // 19 gamespeedFromSingularities
+    m(3e9, 0.0, 0.0, 1.0),               // 20 darkFromTheorems
+    m(5e11, 0.0, 0.0, 1.0),              // 21 dim4Generation
+    m(5e12, 0.0, 0.0, 1.0),              // 22 darkFromDM4
+    m(4e18, 0.0, 0.0, 1.0),              // 23 annihilationAutobuyer
+    m(3e21, 0.0, 0.0, 1.0),              // 24 theoremPowerFromSingularities
+    m(8e22, 0.0, 0.0, 1.0),              // 25 darkFromGamespeed
+    m(3e24, 0.0, 0.0, 1.0),              // 26 glyphLevelFromSingularities
+    m(8e33, 0.0, 0.0, 1.0),              // 27 darkFromDilatedTime
+    m(3e38, 0.0, 0.0, 1.0),              // 28 infinitiedPow
+    m(2.5e45, 0.0, 0.0, 1.0),            // 29 tesseractMultFromSingularities
 ];
 
 impl GameState {
@@ -169,7 +179,11 @@ impl GameState {
 
     /// The milestone's effect value (using `completions` for repeatables and the
     /// live formula for uniques), or `default` if it isn't unlocked.
-    pub(crate) fn singularity_milestone_effect_or(&self, id: usize, default: f64) -> f64 {
+    pub(crate) fn singularity_milestone_effect_or(
+        &self,
+        id: usize,
+        default: f64,
+    ) -> f64 {
         if !self.singularity_milestone_unlocked(id) {
             return default;
         }
@@ -199,10 +213,10 @@ impl GameState {
             INTERVAL_COST_SCALING_REDUCTION => 1.0 - 0.03 * c,
             // Uniques.
             DARK_FROM_TESSERACTS => 1.0, // tesseract count inert
-            MULT_FROM_INFINITIED => (self.infinities_total().pos_log10() / 1000.0).max(1.0),
-            DILATED_TIME_FROM_SINGULARITIES => {
-                1.0 + (sing.log10() / 100.0).min(0.35)
+            MULT_FROM_INFINITIED => {
+                (self.infinities_total().pos_log10() / 1000.0).max(1.0)
             }
+            DILATED_TIME_FROM_SINGULARITIES => 1.0 + (sing.log10() / 100.0).min(0.35),
             DARK_FROM_GLYPH_LEVEL => {
                 (((self.records.best_reality.glyph_level as f64 - 15000.0) / 2000.0)
                     .max(1.0))
@@ -222,10 +236,13 @@ impl GameState {
             DARK_FROM_GAMESPEED => {
                 ((self.game_speed_factor() / 1e120).log10() / 40.0).max(1.0)
             }
-            GLYPH_LEVEL_FROM_SINGULARITIES => 1.0 + ((sing.log10() - 20.0) / 30.0).max(0.0),
-            DARK_FROM_DILATED_TIME => {
-                1.6f64.powf((self.dilation.dilated_time + break_infinity::Decimal::ONE).pos_log10() / 1000.0)
+            GLYPH_LEVEL_FROM_SINGULARITIES => {
+                1.0 + ((sing.log10() - 20.0) / 30.0).max(0.0)
             }
+            DARK_FROM_DILATED_TIME => 1.6f64.powf(
+                (self.dilation.dilated_time + break_infinity::Decimal::ONE).pos_log10()
+                    / 1000.0,
+            ),
             INFINITIED_POW => 1.0 + (sing + 1.0).log10() / 300.0,
             TESSERACT_MULT_FROM_SINGULARITIES => 1.0, // tesseract target inert
             _ => default,
@@ -273,6 +290,9 @@ mod tests {
             1.0
         );
         game.celestials.laitela.singularities = 1e8; // start 8e7
-        assert_eq!(game.singularity_milestone_completions(GAMESPEED_FROM_SINGULARITIES), 1);
+        assert_eq!(
+            game.singularity_milestone_completions(GAMESPEED_FROM_SINGULARITIES),
+            1
+        );
     }
 }

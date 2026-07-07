@@ -377,7 +377,8 @@ impl GameState {
         // Static post-instability adders: +1 per fully-bought Reality Upgrade
         // row, plus Ra's `relicShardGlyphLevelBoost` (the achievement adders
         // 148/166 are out of frontier).
-        let inc = self.reality_upgrade_row_factor() as f64 + self.ra_relic_shard_glyph_level();
+        let inc =
+            self.reality_upgrade_row_factor() as f64 + self.ra_relic_shard_glyph_level();
         (base_level + inc, (scaled + inc).max(1.0))
     }
 

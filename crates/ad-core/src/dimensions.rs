@@ -433,7 +433,9 @@ impl GameState {
                 mult = mult.pow(&Decimal::from_float(0.5));
             }
             if self.pelle_rift_unlocked(crate::celestials::pelle::RIFT_PARADOX) {
-                mult = mult.pow(&self.pelle_rift_effect(crate::celestials::pelle::RIFT_PARADOX));
+                mult = mult.pow(
+                    &self.pelle_rift_effect(crate::celestials::pelle::RIFT_PARADOX),
+                );
             }
         }
 

@@ -24,11 +24,11 @@ pub const RIFT_COUNT: usize = 5;
 
 /// Per-rift milestone percentage thresholds.
 pub const RIFT_MILESTONES: [[f64; 3]; RIFT_COUNT] = [
-    [0.04, 0.06, 0.4],   // vacuum
-    [0.2, 0.6, 1.0],     // decay
-    [0.09, 0.15, 1.0],   // chaos
-    [0.10, 0.15, 1.0],   // recursion
-    [0.15, 0.25, 0.5],   // paradox
+    [0.04, 0.06, 0.4], // vacuum
+    [0.2, 0.6, 1.0],   // decay
+    [0.09, 0.15, 1.0], // chaos
+    [0.10, 0.15, 1.0], // recursion
+    [0.15, 0.25, 0.5], // paradox
 ];
 
 /// Galaxy-Generator per-phase caps, sorted ascending (paradox 1e5 < vacuum 1000
@@ -58,7 +58,12 @@ pub struct Rift {
 
 impl Default for Rift {
     fn default() -> Self {
-        Self { fill: Decimal::ZERO, active: false, reduced_to: 1.0, percentage_spent: 0.0 }
+        Self {
+            fill: Decimal::ZERO,
+            active: false,
+            reduced_to: 1.0,
+            percentage_spent: 0.0,
+        }
     }
 }
 
@@ -208,7 +213,8 @@ impl GameState {
             ip *= 10.0;
             ep *= 5.0;
         }
-        let gain = (((am + 2.0).log10() + (ip + 2.0).log10() + (ep + 2.0).log10()) / 1.64)
+        let gain = (((am + 2.0).log10() + (ip + 2.0).log10() + (ep + 2.0).log10())
+            / 1.64)
             .powf(7.5);
         if gain < 1.0 {
             gain
@@ -325,7 +331,8 @@ impl GameState {
         if i == RIFT_DECAY && self.pelle_chaos_forces_decay() {
             return true;
         }
-        self.pelle_rift_unlocked(i) && self.pelle_rift_percentage(i) >= RIFT_MILESTONES[i][m]
+        self.pelle_rift_unlocked(i)
+            && self.pelle_rift_percentage(i) >= RIFT_MILESTONES[i][m]
     }
 
     fn pelle_chaos_forces_decay(&self) -> bool {
@@ -338,7 +345,13 @@ impl GameState {
         if !self.pelle_rift_unlocked(i) {
             return false;
         }
-        let active = self.celestials.pelle.rifts.iter().filter(|r| r.active).count();
+        let active = self
+            .celestials
+            .pelle
+            .rifts
+            .iter()
+            .filter(|r| r.active)
+            .count();
         let r = &mut self.celestials.pelle.rifts[i];
         if !r.active && active >= 2 {
             return false;
@@ -371,8 +384,9 @@ impl GameState {
                 let after = decay_pct * drain;
                 let spent = decay_pct - after;
                 self.celestials.pelle.rifts[RIFT_DECAY].percentage_spent += spent;
-                let new_fill =
-                    (self.celestials.pelle.rifts[i].fill + Decimal::from_float(spent)).min(&max_fill);
+                let new_fill = (self.celestials.pelle.rifts[i].fill
+                    + Decimal::from_float(spent))
+                .min(&max_fill);
                 self.celestials.pelle.rifts[i].fill = new_fill;
             }
             _ => {
@@ -384,7 +398,8 @@ impl GameState {
                 let spent = value - after;
                 let new_value = (value - spent).max(&Decimal::ONE);
                 self.pelle_set_fill_currency(i, new_value);
-                let new_fill = (self.celestials.pelle.rifts[i].fill + spent).min(&max_fill);
+                let new_fill =
+                    (self.celestials.pelle.rifts[i].fill + spent).min(&max_fill);
                 self.celestials.pelle.rifts[i].fill = new_fill;
             }
         }
@@ -471,7 +486,9 @@ impl GameState {
     pub const PELLE_REBUYABLE_CAPS: [u32; 5] = [44, 35, 26, 21, 9];
 
     pub fn buy_pelle_rebuyable(&mut self, id: usize) -> bool {
-        if id >= 5 || self.celestials.pelle.rebuyables[id] >= Self::PELLE_REBUYABLE_CAPS[id] {
+        if id >= 5
+            || self.celestials.pelle.rebuyables[id] >= Self::PELLE_REBUYABLE_CAPS[id]
+        {
             return false;
         }
         let cost = self.pelle_rebuyable_cost(id);
@@ -486,8 +503,8 @@ impl GameState {
     /// One-time Pelle Upgrade costs (id → cost).
     pub fn pelle_upgrade_cost(&self, id: u32) -> Decimal {
         const COSTS: [f64; 23] = [
-            1e5, 5e5, 5e6, 2.5e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e14, 1e15, 1e16, 1e17, 1e19,
-            1e20, 1e21, 1e22, 1e24, 1e25, 1e26, 1e45, 1e50, 1e30,
+            1e5, 5e5, 5e6, 2.5e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e14, 1e15, 1e16, 1e17,
+            1e19, 1e20, 1e21, 1e22, 1e24, 1e25, 1e26, 1e45, 1e50, 1e30,
         ];
         Decimal::from_float(COSTS.get(id as usize).copied().unwrap_or(f64::INFINITY))
     }
@@ -575,11 +592,16 @@ impl GameState {
             return;
         }
         // Reality Shards accrue from Remnants.
-        let rs = self.reality_shard_gain_per_second() * Decimal::from_float(diff_ms / 1000.0);
+        let rs =
+            self.reality_shard_gain_per_second() * Decimal::from_float(diff_ms / 1000.0);
         self.celestials.pelle.reality_shards += rs;
         // Track the doomed records (peak totals).
-        self.celestials.pelle.records.total_antimatter =
-            self.celestials.pelle.records.total_antimatter.max(&self.total_antimatter);
+        self.celestials.pelle.records.total_antimatter = self
+            .celestials
+            .pelle
+            .records
+            .total_antimatter
+            .max(&self.total_antimatter);
         self.celestials.pelle.records.total_infinity_points = self
             .celestials
             .pelle
@@ -696,7 +718,8 @@ mod tests {
         game.celestials.pelle.doomed = true;
         assert!(game.game_end_state() < 1.0);
         // The game-end antimatter is ~1e(9e15) (a log10-of-log10 threshold).
-        game.celestials.pelle.records.total_antimatter = Decimal::new(1.0, 9_500_000_000_000_000);
+        game.celestials.pelle.records.total_antimatter =
+            Decimal::new(1.0, 9_500_000_000_000_000);
         game.pelle_tick(1000.0);
         assert!(game.game_end_state() >= 1.0);
         assert!(game.is_game_end);

@@ -314,13 +314,19 @@ mod tests {
         assert!(decoded.celestials.ra.alchemy[6].reaction);
         assert_eq!(decoded.celestials.ra.highest_refinement_value[0], 9000.0);
         // Lai'tela round-trip.
-        assert_eq!(decoded.celestials.laitela.dark_matter, Decimal::new(1.0, 40));
+        assert_eq!(
+            decoded.celestials.laitela.dark_matter,
+            Decimal::new(1.0, 40)
+        );
         assert_eq!(decoded.celestials.laitela.singularities, 1234.0);
         assert_eq!(decoded.celestials.laitela.singularity_cap_increases, 3);
         assert_eq!(decoded.celestials.laitela.dark_matter_mult, 7.5);
         assert_eq!(decoded.celestials.laitela.difficulty_tier, 2);
         assert!(decoded.celestials.laitela.run);
-        assert_eq!(decoded.celestials.laitela.dimensions[1].power_dm_upgrades, 9);
+        assert_eq!(
+            decoded.celestials.laitela.dimensions[1].power_dm_upgrades,
+            9
+        );
         assert_eq!(decoded.celestials.laitela.dimensions[1].ascension_count, 4);
         assert_eq!(
             decoded.reality.imaginary_upgrade_bits,
@@ -330,7 +336,10 @@ mod tests {
         // Pelle round-trip.
         assert!(decoded.celestials.pelle.doomed);
         assert_eq!(decoded.celestials.pelle.remnants, 42.0);
-        assert_eq!(decoded.celestials.pelle.reality_shards, Decimal::new(1.0, 12));
+        assert_eq!(
+            decoded.celestials.pelle.reality_shards,
+            Decimal::new(1.0, 12)
+        );
         assert_eq!(
             decoded.celestials.pelle.records.total_antimatter,
             Decimal::new(1.0, 5000)
@@ -339,9 +348,15 @@ mod tests {
         assert_eq!(decoded.celestials.pelle.rebuyables, [3, 1, 0, 2, 4]);
         assert_eq!(decoded.celestials.pelle.gg_rebuyables, [1, 2, 0, 0, 0]);
         assert_eq!(decoded.celestials.pelle.progress_bits, 0b101010);
-        assert_eq!(decoded.celestials.pelle.rifts[0].fill, Decimal::new(1.0, 20));
+        assert_eq!(
+            decoded.celestials.pelle.rifts[0].fill,
+            Decimal::new(1.0, 20)
+        );
         assert!(decoded.celestials.pelle.rifts[0].active);
-        assert_eq!(decoded.celestials.pelle.rifts[2].fill, Decimal::from_float(3.5));
+        assert_eq!(
+            decoded.celestials.pelle.rifts[2].fill,
+            Decimal::from_float(3.5)
+        );
         assert_eq!(decoded.celestials.pelle.rifts[1].percentage_spent, 0.15);
         assert!(decoded.celestials.pelle.galaxy_generator.unlocked);
         assert_eq!(

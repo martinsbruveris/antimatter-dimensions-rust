@@ -25,9 +25,9 @@ pub const IMAGINARY_REBUYABLES: [(f64, f64, f64); 10] = [
     (1.0, 30.0, 0.6),    // 5 Boundless Intensifier
     (1e4, 500.0, 1e100), // 6 Elliptic Materiality (RM cap ×1e100/buy — decimal)
     (2e5, 500.0, 200.0), // 7 Runic Assurance (+200 instability start)
-    (1e7, 800.0, 1e5),   // 8 Hyperbolic Apeirogon (ID ×1e100000/buy — decimal, see below)
+    (1e7, 800.0, 1e5), // 8 Hyperbolic Apeirogon (ID ×1e100000/buy — decimal, see below)
     (1e9, 1000.0, 0.03), // 9 Cosmic Filament (galaxy strength +3%)
-    (8e9, 2000.0, 1.0),  // 10 Entropic Condensing (singularity gain +1/buy)
+    (8e9, 2000.0, 1.0), // 10 Entropic Condensing (singularity gain +1/buy)
 ];
 
 /// One-time upgrade costs, ids 11–25.
@@ -70,12 +70,18 @@ impl GameState {
             return;
         }
         // scaleTime = 60 / iU20 effect (iU20 → ×10 speed).
-        let scale = 60.0 / if self.imaginary_upgrade_bought(20) { 10.0 } else { 1.0 };
+        let scale = 60.0
+            / if self.imaginary_upgrade_bought(20) {
+                10.0
+            } else {
+                1.0
+            };
         let im = self.reality.imaginary_machines.to_f64();
         let gained = (cap - im) * (1.0 - 2f64.powf(-dt_ms / 1000.0 / scale));
         if gained > 0.0 {
             self.reality.imaginary_machines += Decimal::from_float(gained);
-            self.reality.max_im = self.reality.max_im.max(&self.reality.imaginary_machines);
+            self.reality.max_im =
+                self.reality.max_im.max(&self.reality.imaginary_machines);
         }
     }
 
