@@ -1,5 +1,5 @@
 ---
-status: Proposed
+status: Superseeded
 ---
 
 # Fidelity Test Plan: Pre-Infinity & Infinity Stages

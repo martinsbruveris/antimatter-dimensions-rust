@@ -22,7 +22,7 @@ compare against *values*, not against a *running engine*:
 - **Fixture tests** (`tests/fixture_tests.rs` + `fixtures/pre-infinity.json`) —
   reference values produced by loading isolated JS formula files under Node's
   `vm` with everything else stubbed. This works *only* because pre-infinity lets
-  ~90% of the game be stubbed to identity.
+  ~90% of the game be stubbed to identity. [Note: This has been removed.]
 
 Neither exercises the whole engine ticking forward from a real game state. This
 doc proposes a **record-and-replay differential test**: capture real save states

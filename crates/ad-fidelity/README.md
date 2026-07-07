@@ -5,15 +5,20 @@ original JavaScript [Antimatter Dimensions](https://ivark.github.io/AntimachDim/
 
 ## Overview
 
-The crate contains two kinds of tests:
+Fidelity is checked with a **save-replay** harness (design:
+[`docs/design/2026-07-06-fidelity-testing.md`](../../docs/design/2026-07-06-fidelity-testing.md)):
+capture real savefiles from a manual playthrough, then replay each in both the
+original JS game and Rust, ticking forward and diffing the persisted state.
 
-- **Fixture-driven tests** (`tests/fixture_tests.rs`) — compare `ad-core` against
-  reference values produced by running the actual JS game code.
-- **Analytical tests** (`tests/section*.rs`) — verify individual formulas using
-  hand-computed expected values derived from the JS source.
+The harness has three stages:
 
-The fixture-driven tests are the primary fidelity mechanism. The analytical tests
-provide finer-grained coverage and are useful during development.
+1. **Capture** ([`capture/`](capture/)) — an in-browser userscript (speed controls
+   + time-based save capture) plus a local server that stores the POSTed saves.
+2. **Oracle** ([`oracle/`](oracle/)) — a Playwright script that boots the real game
+   in headless Chromium, deterministically ticks each save to fixed horizons, and
+   writes the expected post-tick saves as reference fixtures.
+3. **Rust comparison** (not yet built) — replays the same saves through `ad-core`,
+   ticks to the same horizons, and diffs against the oracle fixtures.
 
 ## Directory Structure
 
@@ -21,122 +26,45 @@ provide finer-grained coverage and are useful during development.
 ad-fidelity/
 ├── src/
 │   ├── lib.rs              # Crate root
-│   └── tolerance.rs        # Log-space comparison utilities
-├── tests/
-│   ├── fixture_tests.rs    # Fixture-driven tests (reads pre-infinity.json)
-│   ├── section1_dimension_costs.rs
-│   ├── section2_buy10_multiplier.rs
-│   ├── section3_dimboost.rs
-│   ├── section4_tickspeed.rs
-│   ├── section5_galaxies.rs
-│   ├── section6_sacrifice.rs
-│   └── section7_production.rs
-├── fixtures/
-│   └── pre-infinity.json   # Reference values from the JS game
-├── js-harness/            # Analytical-fixture generator (leaf JS formulas)
-│   ├── package.json
-│   ├── shims.js            # Global shims for pre-infinity context
-│   ├── loader.js           # Loads actual JS source files
-│   └── generate-fixtures.js
-├── capture/               # Save-replay: capture rig (userscript + save server)
+│   └── tolerance.rs        # Log-space comparison utilities (for the Rust diff)
+├── capture/               # Stage 1: capture rig (userscript + save server)
 │   ├── userscript.js       # Speed buttons + time-based capture (in-browser)
-│   └── save-server.js      # Local server that stores POSTed saves
-└── oracle/                # Save-replay: Playwright oracle (reference fixtures)
+│   ├── save-server.js      # Local server that stores POSTed saves
+│   └── captures/           # Captured savefiles + index.jsonl
+└── oracle/                # Stage 2: Playwright oracle (reference fixtures)
     └── generate-replay-fixtures.js
 ```
 
-## Save-replay harness (capture + oracle)
-
-A second, broader fidelity mechanism (design:
-[`docs/design/2026-07-06-fidelity-testing.md`](../../docs/design/2026-07-06-fidelity-testing.md)):
-capture real savefiles from a manual playthrough, then replay each in both the
-original JS game and Rust, ticking forward and diffing the persisted state.
-
-- **[`capture/`](capture/)** — the capture rig: an in-browser userscript (speed
-  controls + time-based save capture) and a local server that stores the saves.
-- **[`oracle/`](oracle/)** — a Playwright script that boots the real game in
-  headless Chromium, deterministically ticks each save to fixed horizons, and
-  writes the expected post-tick saves as fixtures.
-
-The Rust replay/comparison harness that diffs against those fixtures is not yet
-built (next step).
-
 ## Prerequisites
 
-Generating fixtures requires:
+Running the oracle requires:
 
 1. **Node.js** (v18+)
 2. **The original game source** at `../../../antimatter-dimensions/` (sibling to the
    workspace root) with `npm install` already run.
 
-Running the Rust tests only requires the pre-generated `fixtures/pre-infinity.json` file,
-which is checked into the repository.
+## Capture
 
-## Generating Fixtures
+See [`capture/README.md`](capture/README.md). The userscript adds speed controls and
+periodically POSTs the current savefile to `save-server.js`, which writes each into
+`capture/captures/` and appends an entry to `index.jsonl`.
 
-The fixture generator loads the actual Antimatter Dimensions JS source files
-(`constants.js`, `antimatter-dimension.js`, `dimboost.js`, `sacrifice.js`,
-`tickspeed.js`, `galaxy.js`) via Node's `vm` module with minimal shims for
-globals that are inactive in pre-infinity (challenges, upgrades, achievements, etc.).
+## Oracle
 
-```bash
-# From the workspace root
-cd crates/ad-fidelity/js-harness
-
-# Ensure game dependencies are installed
-(cd ../../../../antimatter-dimensions && npm install)
-
-# Generate fixtures
-node generate-fixtures.js
-```
-
-This writes `fixtures/pre-infinity.json` containing 218 reference values across
-7 sections:
-
-| Section | Entries | What it covers |
-|---------|---------|----------------|
-| Dimension costs | 88 | Per-10-purchase cost scaling for all 8 tiers |
-| Buy-10 multiplier | 6 | Base multiplier and scaling with purchases |
-| Dim boost multiplier | 72 | Tier-dependent boost formula at various boost counts |
-| Dim boost requirements | 11 | Required tier and amount for each boost level |
-| Tickspeed multiplier | 11 | Galaxy effect on tickspeed (linear and exponential) |
-| Galaxy requirements | 8 | AD8 requirement for each galaxy |
-| Sacrifice | 15 | `totalBoost` and `nextBoost` formulas |
-| Dimension multipliers | 7 | Full multiplier including buy-10, dim boost, sacrifice |
-
-## Running Tests
+See [`oracle/README.md`](oracle/README.md). The oracle runs the **actual** JS game in
+headless Chromium, ticks each captured save forward deterministically, and writes the
+resulting savefiles as fixtures the Rust harness will diff against.
 
 ```bash
-# Run all fidelity tests
-cargo test -p ad-fidelity
-
-# Run only fixture-driven tests
-cargo test -p ad-fidelity --test fixture_tests
-
-# Run only a specific section
-cargo test -p ad-fidelity --test section4_tickspeed
+cd crates/ad-fidelity/oracle
+npm install                 # pulls Playwright
+npx playwright install chromium
+npm run generate            # reads captured saves, writes ./fixtures
 ```
-
-## How the JS Harness Works
-
-The game's source files use ES module syntax (`import`/`export`) and reference many
-globals. The harness handles this by:
-
-1. **`shims.js`** sets up the global scope with inactive stubs for all game systems
-   (challenges, upgrades, achievements, celestials, etc.). In pre-infinity, all these
-   return identity values (multiplier = 1, effect = 0, `isRunning` = false).
-
-2. **`loader.js`** reads each game source file, strips `import`/`export` statements,
-   replaces `window.` with `global.`, and evaluates the transformed source via
-   `vm.Script.runInThisContext()`. This makes classes like `DimBoost`, `Sacrifice`,
-   `Galaxy`, and `AntimatterDimension` available in the global scope.
-
-3. **`generate-fixtures.js`** sets up specific game states (e.g., 10 galaxies,
-   50 bought AD1) and calls the real game functions to capture reference values.
 
 ## Tolerance
 
-Comparisons use log-space relative tolerance:
+The (upcoming) Rust comparison uses log-space relative tolerance for numeric fields:
 
 ```
 |log10(rust_value) - log10(js_value)| < epsilon
@@ -144,14 +72,3 @@ Comparisons use log-space relative tolerance:
 
 - `EPSILON_EXACT` (1e-10): for single formula evaluations
 - `EPSILON_SIMULATION` (1e-6): for multi-step simulations with accumulated error
-
-## Adding New Test Scenarios
-
-1. Add the scenario to `generate-fixtures.js` with appropriate player state setup.
-   Remember that `AntimatterDimension(tier)` is 1-indexed and reads from
-   `player.dimensions.antimatter[tier - 1]`.
-2. Regenerate: `node generate-fixtures.js`
-3. Add a corresponding test in `fixture_tests.rs` that reads the new fixture data.
-
-If the game code references a new global that isn't shimmed, you'll get a
-`ReferenceError`. Add the missing shim to `shims.js`.

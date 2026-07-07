@@ -4,9 +4,12 @@
 //! implementation matches the original JavaScript Antimatter
 //! Dimensions game.
 //!
-//! This crate provides:
-//! - Tolerance-based comparison utilities for Decimal values
-//! - Pre-computed reference values from the JS game
-//! - Test scenarios covering the pre-infinity phase
+//! Fidelity is checked with a save-replay harness: real savefiles are
+//! captured from the JS game (`capture/`), replayed through the JS oracle
+//! to produce reference fixtures (`oracle/`), and — once built — replayed
+//! through `ad-core` and diffed against those fixtures.
+//!
+//! This crate currently provides the tolerance-based comparison utilities
+//! ([`tolerance`]) used by that diff.
 
 pub mod tolerance;
