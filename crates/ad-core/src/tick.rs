@@ -42,44 +42,41 @@ impl GameState {
         // Teresa's `epGen` unlock: passive EP from the peak EP/min.
         self.generate_teresa_ep(dt_ms);
 
-        let dt_seconds = dt_ms / 1000.0;
-        let dt = Decimal::from_float(dt_seconds);
+        // Production flows from higher dimensions to lower and, from the 1st
+        // dimension, into antimatter (`AntimatterDimensions.tick`). Two subtleties
+        // must match the original exactly:
+        //
+        //  * Dimension→dimension production runs at 1/10 the rate of the
+        //    1st-dimension→antimatter production: the original passes `diff / 10`
+        //    to `produceDimensions` but the full `diff` to `produceCurrency`, and
+        //    `productionForDiff` scales linearly by that interval.
+        //  * The chain is applied top-down, mutating each tier's amount before the
+        //    tier below reads it (`for (tier = max; tier >= 1; --tier)`), so a
+        //    dimension produces from its amount *including* this tick's gain from
+        //    the tier above (and AD1 feeds antimatter from its just-bumped amount).
+        let dt = Decimal::from_float(dt_ms / 1000.0);
+        let dt_dim = Decimal::from_float(dt_ms / 10.0 / 1000.0);
 
-        // Production flows from higher dimensions to lower.
-        // AD8 produces AD7, AD7 produces AD6, ..., AD2 produces AD1, AD1 produces
-        // antimatter. We compute all production first to avoid order-of-update issues.
+        // Normal Challenge 12 shifts the chain up by one: the 1st *and* 2nd
+        // dimensions make antimatter, and higher dimensions feed 2 tiers below
+        // (AD3→AD1, AD4→AD2, …). Locked dimensions and EC3-silenced tiers produce
+        // 0 via `dimension_production_per_second`, so the loop needs no extra guard.
+        let offset = if self.challenge_running(12) { 2 } else { 1 };
+        for producer in (offset..8).rev() {
+            let produced = self.dimension_production_per_second(producer) * dt_dim;
+            self.dimensions[producer - offset].amount += produced;
+        }
 
-        let unlocked = self.unlocked_dimensions();
-        let productions: [Decimal; 8] = std::array::from_fn(|tier| {
-            if tier < unlocked {
-                self.dimension_production_per_second(tier) * dt
-            } else {
-                Decimal::ZERO
-            }
-        });
-
-        // Apply production. Normally the 1st dimension makes antimatter and every
-        // higher dimension feeds the tier directly below it. Normal Challenge 12
-        // shifts this: the 1st *and* 2nd dimensions both make antimatter, and
-        // higher dimensions feed 2 tiers below (AD3→AD1, AD4→AD2, …).
+        // The 1st dimension (and the 2nd under NC12) makes antimatter at the full
+        // interval, reading its amount after the chain above has fed into it.
         // `total_antimatter` (monotonic, survives crunches) counts all antimatter
         // produced, before the Big Crunch cap.
+        let mut am_gain = self.dimension_production_per_second(0) * dt;
         if self.challenge_running(12) {
-            let am_gain = productions[0] + productions[1];
-            self.antimatter += am_gain;
-            self.total_antimatter += am_gain;
-            for tier in 2..unlocked {
-                self.dimensions[tier - 2].amount += productions[tier];
-            }
-        } else {
-            self.antimatter += productions[0];
-            self.total_antimatter += productions[0];
-            // EC3 stops the chain above the 4th dimension (`maxTierProduced = 3`).
-            let max_feeder = if self.ec_running(3) { 4 } else { unlocked };
-            for tier in 1..max_feeder.min(unlocked) {
-                self.dimensions[tier - 1].amount += productions[tier];
-            }
+            am_gain += self.dimension_production_per_second(1) * dt;
         }
+        self.antimatter += am_gain;
+        self.total_antimatter += am_gain;
 
         // Cap antimatter at the current goal while a crunch goal is in force:
         // pre-break the player must Crunch to progress, and even post-break any

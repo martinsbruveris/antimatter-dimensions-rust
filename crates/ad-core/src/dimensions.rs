@@ -109,15 +109,11 @@ impl GameState {
         }
     }
 
-    /// Buy the maximum number of the specified dimension tier
-    /// that can be afforded. Returns the number of dimensions
-    /// bought.
+    /// Buy the maximum number of the specified dimension tier that can be
+    /// afforded. Mirrors the original `buyMaxDimension(tier)` (unbounded bulk).
+    /// Returns the number of dimensions bought.
     pub fn buy_max_dimension(&mut self, tier: usize) -> u64 {
-        let mut count = 0u64;
-        while self.buy_dimension(tier) {
-            count += 1;
-        }
-        count
+        self.buy_max_dimension_bulk(tier, f64::INFINITY)
     }
 
     /// Buy dimensions until the next group of 10 is complete.
@@ -144,6 +140,99 @@ impl GameState {
     pub fn dimension_cost_until_10(&self, tier: usize) -> Decimal {
         let remaining = 10 - (self.dimensions[tier].bought % 10);
         self.dimension_cost(tier) * Decimal::from_float(remaining as f64)
+    }
+
+    /// Whether the whole next group of 10 is affordable (`isAffordableUntil10`):
+    /// the currency covers `costUntil10`, not merely a single purchase.
+    pub fn dim_affordable_until_10(&self, tier: usize) -> bool {
+        self.dim_currency_amount(tier) >= self.dimension_cost_until_10(tier)
+    }
+
+    /// Faithful port of the original `buyMaxDimension(tier, bulk)` — the "Buys
+    /// max" (`BUY_10`) action for both the manual button (`bulk = ∞`) and the AD
+    /// autobuyer (`bulk` = its bulk-multiplier setting). It always buys in
+    /// *complete groups of ten*, never leaving a partial group:
+    ///
+    ///  1. Bail unless the whole current group is affordable (`isAffordableUntil10`).
+    ///  2. Complete the current group (one "set"), consuming one unit of bulk.
+    ///  3. Bulk-buy further complete groups, up to the remaining bulk. In the
+    ///     normal regime this is the analytic `getMaxBought` (below), charging only
+    ///     for the most expensive group obtained — the original's deliberate bulk
+    ///     simplification — which also makes huge buys O(1) rather than a loop.
+    ///     Under NC9 / IC5 the per-group cost bumps are abnormal, so it instead
+    ///     loops group-by-group (like the original) to trigger them.
+    ///
+    /// Returns the number of dimensions bought.
+    pub fn buy_max_dimension_bulk(&mut self, tier: usize, bulk: f64) -> u64 {
+        if !self.dim_available_for_purchase(tier) || !self.dim_affordable_until_10(tier)
+        {
+            return 0;
+        }
+        // In an antimatter challenge, a group whose single cost already exceeds the
+        // Big Crunch goal is not bought (`dimension.cost.gt(goal) && isInChallenge`).
+        let goal = self.infinity_goal();
+        if self.dimension_cost(tier) > goal && self.in_any_antimatter_challenge() {
+            return 0;
+        }
+
+        // Complete the current group (the original's "buy any remaining until 10
+        // before attempting to bulk-buy"). The affordability check above guarantees
+        // every buy in it succeeds, landing on the next multiple of ten.
+        let mut count = self.buy_until_10_dimension(tier);
+        let mut bulk_left = bulk - 1.0;
+        if bulk_left <= 0.0 {
+            return count;
+        }
+
+        // NC9 (equal-cost) / IC5 (per-tier) impose abnormal per-group cost bumps,
+        // so bulk-buying must proceed one group at a time to apply them.
+        if self.challenge_running(9) || self.infinity_challenge_running(5) {
+            while bulk_left > 0.0
+                && self.dim_affordable_until_10(tier)
+                && self.dimension_cost(tier) < goal
+            {
+                count += self.buy_until_10_dimension(tier);
+                bulk_left -= 1.0;
+            }
+            return count;
+        }
+
+        // Normal regime: analytic bulk buy over the geometric cost curve.
+        let (base, mult) = if self.challenge_running(6) {
+            (C6_AD_BASE_COSTS[tier], C6_AD_COST_MULTIPLIERS[tier])
+        } else {
+            (AD_BASE_COSTS[tier], AD_COST_MULTIPLIERS[tier])
+        };
+        let log_base = base.log10();
+        let log_mult = mult.log10();
+        let p0 = (self.dimensions[tier].bought / 10 + self.dimensions[tier].cost_bumps)
+            as i64;
+        // `getMaxBought`: divide by the 10-per-set so we don't buy a whole set we
+        // can only partly afford; the `1 +` is because the first purchase carries
+        // no multiplier. Linear (geometric) branch only — Rust models cost below
+        // the e308 super-exponential threshold.
+        let log_money =
+            (self.dim_currency_amount(tier) / Decimal::from_float(10.0)).log10();
+        let new_purchases = (1.0 + (log_money - log_base) / log_mult).floor() as i64;
+        if new_purchases <= p0 {
+            return count;
+        }
+        let quantity = new_purchases - p0;
+        // Clamp to the remaining bulk (the manual path passes ∞, so never clamps).
+        let buying = if (quantity as f64) <= bulk_left {
+            quantity
+        } else {
+            bulk_left as i64
+        };
+        // The original charges the price of the *unclamped* top group regardless of
+        // clamping (`Decimal.pow10(maxBought.logPrice)`), so mirror that exactly.
+        let log_price = (new_purchases - 1) as f64 * log_mult + log_base + 1.0;
+        let bought = 10 * buying;
+        let amount = self.dimensions[tier].amount + Decimal::from_float(bought as f64);
+        self.dimensions[tier].amount = amount.round();
+        self.dimensions[tier].bought += bought as u64;
+        self.spend_dim_currency(tier, Decimal::pow10(log_price));
+        count + bought as u64
     }
 
     /// Get the antimatter production per second (from AD1).
@@ -387,5 +476,57 @@ impl GameState {
         }
 
         production
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// "Buys max" at bulk 1 (the autobuyer's default) must complete a group of ten
+    /// atomically: with only part of the group affordable it buys nothing (never
+    /// leaving a partial group), matching the original's `isAffordableUntil10`
+    /// guard. Buying one-at-a-time here would wrongly stall mid-group.
+    #[test]
+    fn buy_max_bulk_one_is_all_or_nothing() {
+        let mut game = GameState::new();
+        // Sit exactly on a group boundary so the next group costs `cost × 10`.
+        game.dimensions[0].bought = 10;
+        let cost = game.dimension_cost(0);
+
+        // Enough for five individual buys but not the whole group: nothing happens.
+        game.antimatter = cost * Decimal::from_float(5.0);
+        assert_eq!(game.buy_max_dimension_bulk(0, 1.0), 0);
+        assert_eq!(game.dimensions[0].bought, 10);
+
+        // The whole group affordable: it completes to the next multiple of ten.
+        game.antimatter = cost * Decimal::from_float(10.0);
+        assert_eq!(game.buy_max_dimension_bulk(0, 1.0), 10);
+        assert_eq!(game.dimensions[0].bought, 20);
+    }
+
+    /// Bulk caps the number of groups: with ample antimatter, `bulk = 2` completes
+    /// the current group plus one more (20 dimensions), not everything affordable.
+    #[test]
+    fn buy_max_bulk_caps_group_count() {
+        let mut game = GameState::new();
+        game.antimatter = Decimal::from_float(1e9);
+        // From a clean start, bulk 2 buys exactly two groups of ten.
+        assert_eq!(game.buy_max_dimension_bulk(0, 2.0), 20);
+        assert_eq!(game.dimensions[0].bought, 20);
+    }
+
+    /// Unbounded bulk buys complete groups only (lands on a multiple of ten) and,
+    /// unlike a one-at-a-time loop, terminates in O(1) even for enormous balances.
+    #[test]
+    fn buy_max_unbounded_lands_on_group_boundary() {
+        let mut game = GameState::new();
+        game.antimatter = Decimal::new(1.0, 300);
+        let bought = game.buy_max_dimension(0);
+        assert!(bought > 0);
+        assert_eq!(bought % 10, 0);
+        assert_eq!(game.dimensions[0].bought % 10, 0);
+        // Charged no more than we had.
+        assert!(game.antimatter >= Decimal::ZERO);
     }
 }

@@ -161,6 +161,7 @@ pub fn allowlist() -> Vec<FieldRule> {
         R("auto.antimatterDims.all[].isBought", Exact),
         R("auto.antimatterDims.all[].mode", Exact),
         R("auto.antimatterDims.all[].interval", Number),
+        R("auto.antimatterDims.all[].bulk", Exact),
         R("auto.tickspeed.isActive", Exact),
         R("auto.tickspeed.isBought", Exact),
         R("auto.tickspeed.mode", Exact),

@@ -803,9 +803,9 @@ pub struct AntimatterDimsDTO {
 ///
 /// We read `isActive`/`isBought`/`mode` plus the interval-upgrade state
 /// (`interval`/`cost`), which round-trips now that interval upgrades are modelled
-/// (Feature 2.6). `bulk` is still ignored (its upgrades are Break-Infinity-era);
-/// `lastTick` is transient timer phase (an absolute timestamp in the original; an
-/// elapsed-time accumulator for us) reset to 0 on load.
+/// (Feature 2.6), and the AD-only `bulk` multiplier for "Buys max". `lastTick` is
+/// transient timer phase (an absolute timestamp in the original; an elapsed-time
+/// accumulator for us) reset to 0 on load.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutobuyerDTO {
@@ -817,6 +817,15 @@ pub struct AutobuyerDTO {
     pub interval: f64,
     /// IP cost of the next interval upgrade (a plain number).
     pub cost: f64,
+    /// "Buys max" bulk multiplier. AD entries carry it; the tickspeed autobuyer's
+    /// save has no `bulk`, so it defaults to 1.
+    #[serde(default = "default_dto_bulk")]
+    pub bulk: u32,
+}
+
+/// serde default for [`AutobuyerDTO::bulk`] — the tickspeed autobuyer save omits it.
+fn default_dto_bulk() -> u32 {
+    1
 }
 
 /// `player.options` — UI/UX preferences (modelled subset).
@@ -1314,6 +1323,8 @@ impl GameState {
             // Interval-upgrade state round-trips (Feature 2.6).
             ab.interval_ms = src.interval;
             ab.cost = src.cost;
+            // "Buys max" bulk multiplier.
+            ab.bulk = src.bulk;
         }
         // The tickspeed autobuyer's mode is locked to single pre-Infinity for us,
         // so only its active/bought flags (and interval-upgrade state) are taken.

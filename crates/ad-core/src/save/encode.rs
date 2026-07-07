@@ -476,8 +476,9 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     ae["clearOnReality"] = json!(state.options.automator_events.clear_on_reality);
     ae["clearOnRestart"] = json!(state.options.automator_events.clear_on_restart);
 
-    // Autobuyers. `lastTick`/`bulk` stay the template's derived state; we write the
-    // flags/modes plus the interval-upgrade state (interval + IP cost, Feature 2.6).
+    // Autobuyers. `lastTick` stays the template's derived state; we write the
+    // flags/modes plus the interval-upgrade state (interval + IP cost, Feature 2.6)
+    // and the AD-only "Buys max" bulk multiplier.
     player["auto"]["autobuyersOn"] = json!(state.autobuyers.enabled);
     for (tier, ab) in state.autobuyers.dimensions.iter().enumerate() {
         let entry = &mut player["auto"]["antimatterDims"]["all"][tier];
@@ -486,6 +487,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         entry["mode"] = json!(mode_to_raw(ab.mode));
         entry["interval"] = json!(ab.interval_ms);
         entry["cost"] = json!(ab.cost);
+        entry["bulk"] = json!(ab.bulk);
     }
     let tickspeed = &mut player["auto"]["tickspeed"];
     tickspeed["isActive"] = json!(state.autobuyers.tickspeed.is_active);
@@ -718,8 +720,25 @@ mod tests {
                 );
             }
             assert_eq!(reloaded.autobuyers.enabled, state.autobuyers.enabled);
+            for tier in 0..8 {
+                assert_eq!(
+                    reloaded.autobuyers.dimensions[tier].bulk,
+                    state.autobuyers.dimensions[tier].bulk
+                );
+            }
             assert_eq!(reloaded.options, state.options);
         }
+    }
+
+    #[test]
+    fn ad_autobuyer_bulk_round_trips() {
+        // A non-default bulk survives decode → encode → decode.
+        let mut state = decode_save(SAMPLE_SAVE.trim()).unwrap();
+        state.autobuyers.dimensions[0].bulk = 64;
+        state.autobuyers.dimensions[3].bulk = 512;
+        let reloaded = decode_save(&encode_save(&state, 1_700_000_000_000)).unwrap();
+        assert_eq!(reloaded.autobuyers.dimensions[0].bulk, 64);
+        assert_eq!(reloaded.autobuyers.dimensions[3].bulk, 512);
     }
 
     #[test]

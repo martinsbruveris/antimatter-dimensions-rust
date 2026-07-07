@@ -208,6 +208,11 @@ pub struct Autobuyer {
     /// save's number form is exact.
     #[cfg_attr(feature = "serde", serde(default = "default_autobuyer_cost"))]
     pub cost: f64,
+    /// "Buys max" bulk multiplier (`data.bulk`): how many groups of ten a single
+    /// `BuyMax` fire completes. Only the AD autobuyers use it; it doubles per bulk
+    /// upgrade up to [`AD_AUTOBUYER_BULK_CAP`]. Starts at 1.
+    #[cfg_attr(feature = "serde", serde(default = "default_autobuyer_bulk"))]
+    pub bulk: u32,
     /// Current timer tracking elapsed time since the last purchase.
     pub timer_ms: f64,
 }
@@ -218,6 +223,21 @@ fn default_autobuyer_cost() -> f64 {
     1.0
 }
 
+/// serde default for [`Autobuyer::bulk`] (1 group), matching the game's default
+/// and covering the tickspeed/prestige autobuyers, whose saves carry no `bulk`.
+#[cfg(feature = "serde")]
+fn default_autobuyer_bulk() -> u32 {
+    1
+}
+
+/// The bulk-multiplier cap for the AD autobuyers (`bulkCap`): upgrades stop
+/// doubling `bulk` here. Achievement 61 lifts the *effective* bulk to unlimited.
+pub const AD_AUTOBUYER_BULK_CAP: u32 = 512;
+
+/// The effective unlimited bulk granted by Achievement 61 (`1e100` in the
+/// original, "to avoid issues with Infinity").
+const AD_AUTOBUYER_UNLIMITED_BULK: f64 = 1e100;
+
 impl Autobuyer {
     pub fn new(interval_ms: f64, mode: AutobuyerMode) -> Self {
         Self {
@@ -226,6 +246,7 @@ impl Autobuyer {
             mode,
             interval_ms,
             cost: 1.0,
+            bulk: 1,
             timer_ms: 0.0,
         }
     }
@@ -385,6 +406,19 @@ impl GameState {
         if tier < 8 {
             let ab = &mut self.autobuyers.dimensions[tier];
             ab.is_active = !ab.is_active;
+        }
+    }
+
+    /// The effective "Buys max" bulk for the AD autobuyer of `tier` (`this.bulk`):
+    /// the stored `bulk` clamped to [`AD_AUTOBUYER_BULK_CAP`], or unlimited once
+    /// Achievement 61 (`hasUnlimitedBulk`) is earned.
+    pub fn ad_autobuyer_effective_bulk(&self, tier: usize) -> f64 {
+        if self.achievement_unlocked(61) {
+            AD_AUTOBUYER_UNLIMITED_BULK
+        } else {
+            self.autobuyers.dimensions[tier]
+                .bulk
+                .min(AD_AUTOBUYER_BULK_CAP) as f64
         }
     }
 
@@ -553,10 +587,12 @@ impl GameState {
                     AutobuyerMode::BuySingle => {
                         self.buy_dimension(tier);
                     }
-                    // BUY_10: with default bulk 1 the original fills the
-                    // current group of ten once per tick.
+                    // BUY_10: complete up to `bulk` groups of ten, but only when a
+                    // whole group is affordable (`buyMaxDimension` bails on
+                    // `!isAffordableUntil10`) — never a partial group.
                     AutobuyerMode::BuyMax => {
-                        self.buy_until_10_dimension(tier);
+                        let bulk = self.ad_autobuyer_effective_bulk(tier);
+                        self.buy_max_dimension_bulk(tier, bulk);
                     }
                 }
             }
@@ -868,6 +904,37 @@ mod tests {
         game.big_crunch();
         assert!(game.challenge_completed(1));
         game
+    }
+
+    #[test]
+    fn effective_bulk_clamps_to_cap_and_unlimited_via_ach61() {
+        let mut game = GameState::new();
+        // Default bulk is 1.
+        assert_eq!(game.ad_autobuyer_effective_bulk(0), 1.0);
+
+        // Clamped to the 512 cap.
+        game.autobuyers.dimensions[0].bulk = 4096;
+        assert_eq!(game.ad_autobuyer_effective_bulk(0), 512.0);
+
+        // Achievement 61 lifts the effective bulk to unlimited (1e100).
+        game.unlock_achievement(61);
+        assert_eq!(game.ad_autobuyer_effective_bulk(0), 1e100);
+    }
+
+    #[test]
+    fn buy_max_autobuyer_uses_bulk_multiplier() {
+        // The AD1 autobuyer in "Buys max" completes `bulk` groups of ten per fire.
+        let mut game = GameState::new();
+        game.antimatter = Decimal::from_float(1e12);
+        game.autobuyers.dimensions[0].is_bought = true;
+        game.autobuyers.dimensions[0].is_active = true;
+        game.autobuyers.dimensions[0].mode = AutobuyerMode::BuyMax;
+        game.autobuyers.dimensions[0].bulk = 3;
+        game.autobuyers.dimensions[0].interval_ms = 100.0;
+
+        game.tick_autobuyers(150.0);
+        // Three groups of ten in one fire.
+        assert_eq!(game.dimensions[0].bought, 30);
     }
 
     #[test]
