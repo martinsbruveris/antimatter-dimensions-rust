@@ -181,7 +181,24 @@ not the current state).
   flip so never complete), Space Theorems, and the `adPow` AD power
   (`dimensions.rs`). The Perk-Point goal reduction and the fastAutoEC/
   autoAutoClean/achievementBH/raUnlock reward effects are deferred. See
-  `../../docs/design/2026-07-06-celestials.md`.
+  `../../docs/design/2026-07-06-celestials.md`. `ra.rs` + `alchemy.rs`
+  (Feature 7.5): Ra's four Celestial-Memory pets (memories/chunks/levels/
+  upgrades, `ra_memory_tick` from real time in `tick.rs`), the 28 unlocks +
+  effect readers, Remembrance, the charged-Infinity-Upgrade count gate +
+  discharge (state only; the charged effect *variants* deferred), momentum +
+  peak-game-speed tracking, and Ra's Reality. Effects wired at their sites:
+  `continuousTTBoost` (replicanti/dilated-time/TT-gen/infinities/eternities),
+  `achievementPower` (`^1.5` in `achievements.rs`), `achievementTTMult`,
+  `unlockHardV` (→ `v_is_flipped`), `relicShardGlyphLevelBoost` (glyph level in
+  `reality.rs`). `alchemy.rs`: the 21 resources, caps, the reaction engine
+  (`apply_alchemy_reactions` per rewarded Reality in `reality.rs`), Glyph
+  *refinement* wired into `glyphs.rs::sacrifice_glyph`, and the effect readers
+  (power/infinity/time → AD/ID/TD power; replication; dilation; dimensionality;
+  effarig; momentum; force; exponential IP; inflation; synergism/
+  unpredictability/decoherence internal to reactions). Deferred: the `reality`
+  resource's Reality Glyph, `uncountability` passive generation (u32 realities),
+  `boundless`/`multiversal` (inert targets), and the QoL/automation unlocks. See
+  `../../docs/design/2026-07-07-ra.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant

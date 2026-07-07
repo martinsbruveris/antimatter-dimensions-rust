@@ -190,6 +190,8 @@ pub struct CelestialsDTO {
     pub enslaved: EnslavedDTO,
     #[serde(default)]
     pub v: VCelestialDTO,
+    #[serde(default)]
+    pub ra: RaDTO,
 }
 
 /// `player.celestials.teresa`. `timePoured` is a runtime accumulator (not in the
@@ -264,6 +266,103 @@ pub struct VCelestialDTO {
     pub st_spent: u32,
     #[serde(default)]
     pub run_records: Vec<f64>,
+}
+
+fn ra_pet_level_default() -> u32 {
+    1
+}
+fn f64_one() -> f64 {
+    1.0
+}
+
+/// `player.celestials.ra` (Feature 7.5).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RaDTO {
+    #[serde(default)]
+    pub pets: RaPetsDTO,
+    #[serde(default)]
+    pub unlock_bits: u32,
+    #[serde(default)]
+    pub run: bool,
+    /// `charged` — a Set of Infinity-Upgrade ids.
+    #[serde(default)]
+    pub charged: Vec<u32>,
+    #[serde(default, rename = "disCharge")]
+    pub dis_charge: bool,
+    #[serde(default = "f64_one")]
+    pub peak_gamespeed: f64,
+    #[serde(default)]
+    pub pet_with_remembrance: String,
+    #[serde(default)]
+    pub momentum_time: f64,
+    #[serde(default)]
+    pub alchemy: Vec<AlchemyResourceDTO>,
+    #[serde(default)]
+    pub highest_refinement_value: RefinementDTO,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct RaPetsDTO {
+    #[serde(default)]
+    pub teresa: RaPetDTO,
+    #[serde(default)]
+    pub effarig: RaPetDTO,
+    #[serde(default)]
+    pub enslaved: RaPetDTO,
+    #[serde(default)]
+    pub v: RaPetDTO,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RaPetDTO {
+    #[serde(default = "ra_pet_level_default")]
+    pub level: u32,
+    #[serde(default)]
+    pub memories: f64,
+    #[serde(default)]
+    pub memory_chunks: f64,
+    #[serde(default)]
+    pub memory_upgrades: u32,
+    #[serde(default)]
+    pub chunk_upgrades: u32,
+}
+
+impl Default for RaPetDTO {
+    fn default() -> Self {
+        Self {
+            level: 1,
+            memories: 0.0,
+            memory_chunks: 0.0,
+            memory_upgrades: 0,
+            chunk_upgrades: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct AlchemyResourceDTO {
+    #[serde(default)]
+    pub amount: f64,
+    #[serde(default)]
+    pub reaction: bool,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct RefinementDTO {
+    #[serde(default)]
+    pub power: f64,
+    #[serde(default)]
+    pub infinity: f64,
+    #[serde(default)]
+    pub time: f64,
+    #[serde(default)]
+    pub replication: f64,
+    #[serde(default)]
+    pub dilation: f64,
+    #[serde(default)]
+    pub effarig: f64,
 }
 
 /// `player.reality` (modelled subset). The glyph inventory lives under
@@ -1277,11 +1376,61 @@ impl GameState {
                 v.run_records[i] = *x;
             }
 
+            let mut ra = crate::celestials::RaState::new();
+            {
+                use crate::celestials::alchemy::AlchemyResource;
+                use crate::celestials::ra::{PET_ENSLAVED, PET_TERESA, PET_V};
+                let r = &cel.ra;
+                let map_pet = |p: &RaPetDTO| crate::celestials::ra::RaPet {
+                    level: p.level.max(1),
+                    memories: p.memories,
+                    memory_chunks: p.memory_chunks,
+                    memory_upgrades: p.memory_upgrades,
+                    chunk_upgrades: p.chunk_upgrades,
+                };
+                ra.pets[PET_TERESA] = map_pet(&r.pets.teresa);
+                ra.pets[crate::celestials::ra::PET_EFFARIG] = map_pet(&r.pets.effarig);
+                ra.pets[PET_ENSLAVED] = map_pet(&r.pets.enslaved);
+                ra.pets[PET_V] = map_pet(&r.pets.v);
+                ra.unlock_bits = r.unlock_bits;
+                ra.run = r.run;
+                ra.dis_charge = r.dis_charge;
+                ra.peak_gamespeed = r.peak_gamespeed;
+                ra.momentum_time = r.momentum_time;
+                for id in &r.charged {
+                    if *id < 16 {
+                        ra.charged |= 1u16 << *id;
+                    }
+                }
+                ra.pet_with_remembrance = match r.pet_with_remembrance.as_str() {
+                    "teresa" => PET_TERESA as i8,
+                    "effarig" => crate::celestials::ra::PET_EFFARIG as i8,
+                    "enslaved" => PET_ENSLAVED as i8,
+                    "v" => PET_V as i8,
+                    _ => -1,
+                };
+                for (i, a) in r.alchemy.iter().take(ra.alchemy.len()).enumerate() {
+                    ra.alchemy[i] = AlchemyResource {
+                        amount: a.amount,
+                        reaction: a.reaction,
+                    };
+                }
+                ra.highest_refinement_value = [
+                    r.highest_refinement_value.power,
+                    r.highest_refinement_value.infinity,
+                    r.highest_refinement_value.time,
+                    r.highest_refinement_value.replication,
+                    r.highest_refinement_value.dilation,
+                    r.highest_refinement_value.effarig,
+                ];
+            }
+
             crate::celestials::CelestialsState {
                 teresa,
                 effarig,
                 enslaved,
                 v,
+                ra,
             }
         };
 

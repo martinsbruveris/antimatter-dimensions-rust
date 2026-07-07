@@ -143,6 +143,10 @@ impl GameState {
                 (self.records.best_reality.time_ms / 60_000.0).clamp(1.0 / 12.0, 15.0);
             mult *= (15.0 / best_minutes).min(180.0);
         }
+        // Ra: Alchemy `replication` speed × and the `continuousTTBoost.replicanti`
+        // boost (both fold into the replicanti speed multiplier).
+        mult *= self.alchemy_replication_speed();
+        mult *= self.ra_tt_boost_replicanti().to_f64();
         mult
     }
 

@@ -367,6 +367,52 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         v["goalReductionSteps"] = json!(cel.v.goal_reduction_steps);
         v["STSpent"] = json!(cel.v.st_spent);
         v["runRecords"] = json!(cel.v.run_records);
+
+        // Ra (Feature 7.5): pets, unlocks, charged set, alchemy, refinement.
+        let ra = &cel.ra;
+        let ra_json = &mut player["celestials"]["ra"];
+        for (key, i) in [
+            ("teresa", crate::celestials::ra::PET_TERESA),
+            ("effarig", crate::celestials::ra::PET_EFFARIG),
+            ("enslaved", crate::celestials::ra::PET_ENSLAVED),
+            ("v", crate::celestials::ra::PET_V),
+        ] {
+            let p = &ra.pets[i];
+            let pet = &mut ra_json["pets"][key];
+            pet["level"] = json!(p.level);
+            pet["memories"] = json!(p.memories);
+            pet["memoryChunks"] = json!(p.memory_chunks);
+            pet["memoryUpgrades"] = json!(p.memory_upgrades);
+            pet["chunkUpgrades"] = json!(p.chunk_upgrades);
+        }
+        ra_json["unlockBits"] = json!(ra.unlock_bits);
+        ra_json["run"] = json!(ra.run);
+        ra_json["disCharge"] = json!(ra.dis_charge);
+        ra_json["peakGamespeed"] = json!(ra.peak_gamespeed);
+        ra_json["momentumTime"] = json!(ra.momentum_time);
+        ra_json["charged"] = json!((0..16u32)
+            .filter(|id| ra.charged & (1u16 << id) != 0)
+            .collect::<Vec<_>>());
+        ra_json["petWithRemembrance"] = json!(match ra.pet_with_remembrance {
+            0 => "teresa",
+            1 => "effarig",
+            2 => "enslaved",
+            3 => "v",
+            _ => "",
+        });
+        ra_json["alchemy"] = json!(ra
+            .alchemy
+            .iter()
+            .map(|a| json!({ "amount": a.amount, "reaction": a.reaction }))
+            .collect::<Vec<_>>());
+        ra_json["highestRefinementValue"] = json!({
+            "power": ra.highest_refinement_value[0],
+            "infinity": ra.highest_refinement_value[1],
+            "time": ra.highest_refinement_value[2],
+            "replication": ra.highest_refinement_value[3],
+            "dilation": ra.highest_refinement_value[4],
+            "effarig": ra.highest_refinement_value[5],
+        });
     }
 
     // Black Holes.

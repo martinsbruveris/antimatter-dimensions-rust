@@ -25,6 +25,12 @@ impl GameState {
         // release injects its burst as raw game time.
         let dt_ms = self.enslaved_apply_time_flow(real_dt_ms, self.game_speed_factor());
 
+        // Ra's real-time mechanics (`realTimeMechanics`): pet Memories accrue
+        // from real time (chunk generation is off while storing real time), and
+        // the peak game-speed / momentum-time accumulators advance.
+        self.ra_memory_tick(real_dt_ms, !self.celestials.enslaved.is_storing_real);
+        self.ra_tick(real_dt_ms);
+
         // Advance the per-run challenge accumulators first, matching the original
         // game loop (`updateNormalAndInfinityChallenges` runs before autobuyers
         // and production).

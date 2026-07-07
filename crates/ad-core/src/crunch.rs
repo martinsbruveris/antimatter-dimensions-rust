@@ -117,6 +117,15 @@ impl GameState {
             base = base.min(&Decimal::new_unchecked(1.0, 200));
         }
         let mut ip = base * self.total_ip_mult();
+        // Ra Alchemy `exponential`: IP × Replicanti^p.
+        let exp_pow = self.alchemy_exponential();
+        if exp_pow != 0.0 {
+            ip *= self
+                .replicanti
+                .amount
+                .max(&Decimal::ONE)
+                .pow(&Decimal::from_float(exp_pow));
+        }
         // Celestial run modifiers: Teresa `^0.55`, V `^0.5` (mutually
         // exclusive; the Effarig eternity-stage cap is applied in the Effarig
         // task at its site).

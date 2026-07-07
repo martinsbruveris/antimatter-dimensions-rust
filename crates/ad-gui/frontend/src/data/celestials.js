@@ -116,3 +116,69 @@ export const V_REWARD_DESCRIPTIONS = {
   5: "Achievement multiplier affects Black Hole power.",
   6: "Reduce the Space Theorem cost of Time Studies by 2. Unlock Ra.",
 };
+
+// Ra pets (`secret-formula/celestials/ra.js`), keyed by engine index
+// (teresa/effarig/enslaved/v). Colours + "based on" tooltips are vendored.
+export const RA_PETS = [
+  { id: 0, name: "Teresa", color: "#8596ea", chunkGain: "Eternity Points", memoryGain: "current RM" },
+  { id: 1, name: "Effarig", color: "#ea8585", chunkGain: "Relic Shards gained", memoryGain: "best Glyph level" },
+  { id: 2, name: "Nameless", color: "#f1aa7f", chunkGain: "Time Shards", memoryGain: "total time played" },
+  { id: 3, name: "V", color: "#ead584", chunkGain: "Infinity Power", memoryGain: "total Memory levels" },
+];
+
+// Ra unlock rewards (`secret-formula/celestials/ra.js`), keyed by unlock id.
+export const RA_UNLOCK_DESCRIPTIONS = {
+  0: "Tachyon Particles are given immediately when Time Dilation is active.",
+  1: "Unlock Charged Infinity Upgrades (one more max every 2 levels).",
+  2: "Memory Chunks produce more Memories based on Reality Machines.",
+  3: "Unlock Altered Glyphs (new effects based on Glyph Sacrifice).",
+  4: "Unlock Effarig's Memories.",
+  5: "Purchase caps are raised in Teresa's Perk Point Shop.",
+  6: "Gain Tachyon Particles as if reaching √(total antimatter) in Dilation.",
+  7: "Get x2 Glyph choices; Relic Shard rarity bonus is always maximal.",
+  8: "Unlock Glyph Alchemy (a new Reality tab).",
+  9: "Memory Chunks produce more Memories based on highest Glyph level.",
+  10: "Glyphs always have 4 effects; Effarig Glyphs up to 7.",
+  11: "Unlock Nameless's Memories.",
+  12: "Glyph level is increased based on Relic Shards gained.",
+  13: "Glyphs always 100% rarity; Glyph Sacrifice raised by Relic Shards.",
+  14: "Unlock Black Hole power upgrade autobuyers.",
+  15: "Stored game time is amplified; store more real time (Nameless levels).",
+  16: "Memory Chunks produce more Memories based on total time played.",
+  17: "Black Hole charging uses 99% of game speed; auto-discharge.",
+  18: "Unlock V's Memories.",
+  19: "Gain more Dilated Time based on peak game speed in each Reality.",
+  20: "All basic Glyphs gain the Time-Glyph game-speed effect.",
+  21: "Rebuyable Reality upgrades auto-bought; Auto-EC instant.",
+  22: "Time Dilation auto-unlocks for free at its Time-Theorem requirement.",
+  23: "Memory Chunks produce more Memories based on total Celestial levels.",
+  24: "Unlock Hard V-Achievements + a Triad Study every 6 levels.",
+  25: "Time Theorems boost all continuous non-dimension production.",
+  26: "Achievement multiplier applies to Time Theorem generation.",
+  27: "Achievement multiplier is raised ^1.5.",
+};
+
+// Glyph Alchemy resources (`secret-formula/celestials/alchemy.js`), keyed by id.
+export const ALCHEMY_RESOURCES = [
+  { id: 0, name: "Power", symbol: "Ω", effect: "Antimatter Dimension multipliers (power)" },
+  { id: 1, name: "Infinity", symbol: "∞", effect: "Infinity Dimension multipliers (power)" },
+  { id: 2, name: "Time", symbol: "Δ", effect: "Time Dimension multipliers (power)" },
+  { id: 3, name: "Replication", symbol: "Ξ", effect: "Replication speed" },
+  { id: 4, name: "Dilation", symbol: "Ψ", effect: "Dilated Time production" },
+  { id: 5, name: "Cardinality", symbol: "α", effect: "Reduces Replicanti slowdown above cap" },
+  { id: 6, name: "Eternity", symbol: "τ", effect: "Eternity generation (power)" },
+  { id: 7, name: "Dimensionality", symbol: "ρ", effect: "Large multiplier to all Dimensions" },
+  { id: 8, name: "Inflation", symbol: "λ", effect: "Extra power for very large AD multipliers" },
+  { id: 9, name: "Alternation", symbol: "ω", effect: "Tachyon Galaxy strength from Replicanti" },
+  { id: 10, name: "Effarig", symbol: "Ϙ", effect: "Relic Shard gain" },
+  { id: 11, name: "Synergism", symbol: "π", effect: "Alchemy Reaction efficiency" },
+  { id: 12, name: "Momentum", symbol: "μ", effect: "All-Dimension power that grows over time" },
+  { id: 13, name: "Decoherence", symbol: "ξ", effect: "Refining spills to all base resources" },
+  { id: 14, name: "Exponential", symbol: "Γ", effect: "IP multiplied by Replicanti" },
+  { id: 15, name: "Force", symbol: "Φ", effect: "AD multiplied by Reality Machines" },
+  { id: 16, name: "Uncountability", symbol: "Θ", effect: "Passive Realities & Perk Points" },
+  { id: 17, name: "Boundless", symbol: "Π", effect: "Stronger Tesseracts" },
+  { id: 18, name: "Multiversal", symbol: "Σ", effect: "Each Reality simulates more Realities" },
+  { id: 19, name: "Unpredictability", symbol: "Λ", effect: "Reactions may trigger twice" },
+  { id: 20, name: "Reality", symbol: "Ϟ", effect: "Consumed to create Reality Glyphs" },
+];

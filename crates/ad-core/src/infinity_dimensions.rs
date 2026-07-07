@@ -246,6 +246,8 @@ impl GameState {
                 .pow(&Decimal::from_float(completions * 0.1))
                 .min(&Decimal::new_unchecked(1.0, 400));
         }
+        // Ra Alchemy `dimensionality` (all-dim ×10^(5·amount)).
+        mult *= Decimal::pow10(self.alchemy_dimensionality_log10());
         mult
     }
 
@@ -282,6 +284,15 @@ impl GameState {
         let infinitypow = self.glyph_effect_infinitypow();
         if infinitypow != 1.0 {
             mult = mult.pow(&Decimal::from_float(infinitypow));
+        }
+        // Ra Alchemy `infinity` (ID `^(1 + amount/200000)`) then `momentumValue`.
+        let alch_inf = self.alchemy_dimension_power(crate::celestials::alchemy::INFINITY);
+        if alch_inf != 1.0 {
+            mult = mult.pow(&Decimal::from_float(alch_inf));
+        }
+        let momentum = self.ra_momentum_value();
+        if momentum != 1.0 {
+            mult = mult.pow(&Decimal::from_float(momentum));
         }
         if self.dilation.active {
             mult = self.dilated_value_of(mult);

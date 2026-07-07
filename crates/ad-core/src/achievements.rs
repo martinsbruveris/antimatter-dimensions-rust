@@ -106,7 +106,9 @@ impl GameState {
         }
         let power =
             1.25f64.powi(completed_rows as i32) * 1.03f64.powi(total_unlocked as i32);
-        Decimal::from_float(power)
+        // Ra's `achievementPower` unlock (V pet level 25) raises the whole
+        // multiplier `^1.5`; the exponent is 1 until then.
+        Decimal::from_float(power.powf(self.ra_achievement_power_exponent()))
     }
 
     /// Antimatter to reset to after a dimension boost, galaxy, or Big Crunch.

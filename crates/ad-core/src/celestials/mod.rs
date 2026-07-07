@@ -11,13 +11,16 @@
 
 use crate::state::GameState;
 
+pub mod alchemy;
 pub mod effarig;
 pub mod enslaved;
+pub mod ra;
 pub mod teresa;
 pub mod v;
 
 pub use effarig::EffarigState;
 pub use enslaved::EnslavedState;
+pub use ra::RaState;
 pub use teresa::TeresaState;
 pub use v::VState;
 
@@ -29,6 +32,7 @@ pub enum Celestial {
     Effarig,
     Enslaved,
     V,
+    Ra,
 }
 
 /// `player.celestials` — one sub-struct per implemented celestial. Ra, Lai'tela
@@ -45,6 +49,8 @@ pub struct CelestialsState {
     pub enslaved: EnslavedState,
     #[cfg_attr(feature = "serde", serde(default))]
     pub v: VState,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub ra: RaState,
 }
 
 impl CelestialsState {
@@ -54,6 +60,7 @@ impl CelestialsState {
             effarig: EffarigState::new(),
             enslaved: EnslavedState::new(),
             v: VState::new(),
+            ra: RaState::new(),
         }
     }
 }
@@ -65,6 +72,7 @@ impl GameState {
             || self.celestials.effarig.run
             || self.celestials.enslaved.run
             || self.celestials.v.run
+            || self.celestials.ra.run
     }
 
     /// `clearCelestialRuns()`: clear every celestial run flag. Called at the
@@ -75,6 +83,7 @@ impl GameState {
         self.celestials.effarig.run = false;
         self.celestials.enslaved.run = false;
         self.celestials.v.run = false;
+        self.celestials.ra.run = false;
     }
 
     /// Whether the Celestials tab / features are available. The original gates
@@ -96,6 +105,7 @@ impl GameState {
             Celestial::Effarig => self.effarig_run_unlocked(),
             Celestial::Enslaved => self.enslaved_run_unlocked(),
             Celestial::V => self.v_celestial_unlocked(),
+            Celestial::Ra => self.ra_run_unlocked(),
         }
     }
 
@@ -120,6 +130,7 @@ impl GameState {
             }
             Celestial::Enslaved => self.celestials.enslaved.run = true,
             Celestial::V => self.celestials.v.run = true,
+            Celestial::Ra => self.celestials.ra.run = true,
         }
         true
     }
@@ -202,6 +213,19 @@ mod tests {
         game.celestials.v.goal_reduction_steps = [0, 100, 0, 0, 0, 0, 0, 0, 0];
         game.celestials.v.st_spent = 4;
         game.celestials.v.run_records[4] = 9500.0;
+        // Ra state.
+        game.celestials.ra.unlock_bits = 0b1010;
+        game.celestials.ra.run = true;
+        game.celestials.ra.pets[0].level = 12;
+        game.celestials.ra.pets[0].memories = 1234.5;
+        game.celestials.ra.pets[1].memory_upgrades = 3;
+        game.celestials.ra.charged = 0b101;
+        game.celestials.ra.peak_gamespeed = 1e95;
+        game.celestials.ra.pet_with_remembrance = 2;
+        game.celestials.ra.momentum_time = 7.7e6;
+        game.celestials.ra.alchemy[0].amount = 5000.0;
+        game.celestials.ra.alchemy[6].reaction = true;
+        game.celestials.ra.highest_refinement_value[0] = 9000.0;
 
         let encoded = crate::save::encode_save(&game, 0);
         let decoded = crate::save::decode_save(&encoded).expect("decode");
@@ -228,5 +252,18 @@ mod tests {
         );
         assert_eq!(decoded.celestials.v.st_spent, 4);
         assert_eq!(decoded.celestials.v.run_records[4], 9500.0);
+        // Ra round-trip.
+        assert_eq!(decoded.celestials.ra.unlock_bits, 0b1010);
+        assert!(decoded.celestials.ra.run);
+        assert_eq!(decoded.celestials.ra.pets[0].level, 12);
+        assert_eq!(decoded.celestials.ra.pets[0].memories, 1234.5);
+        assert_eq!(decoded.celestials.ra.pets[1].memory_upgrades, 3);
+        assert_eq!(decoded.celestials.ra.charged, 0b101);
+        assert_eq!(decoded.celestials.ra.peak_gamespeed, 1e95);
+        assert_eq!(decoded.celestials.ra.pet_with_remembrance, 2);
+        assert_eq!(decoded.celestials.ra.momentum_time, 7.7e6);
+        assert_eq!(decoded.celestials.ra.alchemy[0].amount, 5000.0);
+        assert!(decoded.celestials.ra.alchemy[6].reaction);
+        assert_eq!(decoded.celestials.ra.highest_refinement_value[0], 9000.0);
     }
 }

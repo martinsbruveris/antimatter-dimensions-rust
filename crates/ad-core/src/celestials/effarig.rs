@@ -182,7 +182,8 @@ impl GameState {
         }
         let exp = self.eternity_points.exponent() as f64;
         let amount = self.effarig_glyph_effect_amount();
-        (exp / 7500.0).powi(amount as i32).floor()
+        // Ra's Alchemy `effarig` resource multiplies Relic-Shard gain.
+        (exp / 7500.0).powi(amount as i32).floor() * self.alchemy_effarig_mult()
     }
 
     /// `giveRealityRewards`: add the run's Relic Shards on a rewarded Reality.

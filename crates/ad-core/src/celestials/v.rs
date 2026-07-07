@@ -193,10 +193,10 @@ impl GameState {
         }
     }
 
-    /// Whether V's achievements are "flipped" (Ra's hard-V unlock) — always
-    /// false in frontier, so the hard achievements never complete.
+    /// Whether V's achievements are "flipped" (Ra's `unlockHardV`) — enables the
+    /// hard achievements once Ra's V pet reaches level 6.
     fn v_is_flipped(&self) -> bool {
-        false
+        self.ra_hard_v_unlocked()
     }
 
     // --- Per-tick unlock checks (`V.checkForUnlocks`) ---------------------------

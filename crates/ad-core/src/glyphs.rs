@@ -830,6 +830,20 @@ impl GameState {
         self.reality_upgrade_bought(19)
     }
 
+    /// The Alchemy resource a basic Glyph type refines into. Note the type→
+    /// resource order differs from `basic_index` (Time/Replication are swapped).
+    fn glyph_type_alchemy_res(&self, kind: GlyphType) -> Option<usize> {
+        use crate::celestials::alchemy;
+        match kind {
+            GlyphType::Power => Some(alchemy::POWER),
+            GlyphType::Infinity => Some(alchemy::INFINITY),
+            GlyphType::Time => Some(alchemy::TIME),
+            GlyphType::Replication => Some(alchemy::REPLICATION),
+            GlyphType::Dilation => Some(alchemy::DILATION),
+            _ => None,
+        }
+    }
+
     /// The sacrifice value of a glyph (`glyphSacrificeGain`); 0 before RU19.
     pub fn glyph_sacrifice_gain(&self, glyph: &Glyph) -> f64 {
         if !self.can_sacrifice_glyphs() || glyph.kind == GlyphType::Companion {
@@ -864,6 +878,20 @@ impl GameState {
         if let (true, Some(index)) =
             (self.can_sacrifice_glyphs(), glyph.kind.basic_index())
         {
+            // Ra's Glyph Alchemy (`attemptRefineGlyph`): once unlocked, a basic
+            // generated Glyph is *refined* into its type's Alchemy resource
+            // instead of sacrificed, provided the refinement is beneficial.
+            let rarity = strength_to_rarity(glyph.strength);
+            if let Some(res) = self.glyph_type_alchemy_res(glyph.kind) {
+                if self.alchemy_resource_unlocked(res)
+                    && (self.glyph_raw_refinement_gain(glyph.level, rarity) > 0.0
+                        || self.alchemy_decoherence() > 0.0)
+                {
+                    self.alchemy_refine_glyph(res, glyph.level, rarity);
+                    self.reality.glyphs.inventory.remove(pos);
+                    return true;
+                }
+            }
             self.reality.glyphs.sac[index] += self.glyph_sacrifice_gain(&glyph);
         }
         self.reality.glyphs.inventory.remove(pos);

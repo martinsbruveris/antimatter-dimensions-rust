@@ -316,11 +316,16 @@ impl GameState {
     pub(crate) fn tick_reality_upgrade_generation(&mut self, dt_ms: f64) {
         let dt_s = dt_ms / 1000.0;
         if self.reality_upgrade_bought(11) {
-            let gain = self.gained_infinities() * Decimal::from_float(0.1 * dt_s);
+            // Ra's `continuousTTBoost.infinity` boosts continuous Infinity gen.
+            let gain = self.gained_infinities()
+                * Decimal::from_float(0.1 * dt_s)
+                * self.ra_tt_boost_infinities();
             self.infinities += gain;
         }
         if self.reality_upgrade_bought(14) && self.reality.realities > 0 {
-            self.eternities += Decimal::from_float(self.reality.realities as f64 * dt_s);
+            // Ra's `continuousTTBoost.eternity` boosts continuous Eternity gen.
+            self.eternities += Decimal::from_float(self.reality.realities as f64 * dt_s)
+                * self.ra_tt_boost_eternities();
         }
     }
 

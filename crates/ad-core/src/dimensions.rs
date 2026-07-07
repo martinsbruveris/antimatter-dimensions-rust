@@ -367,6 +367,14 @@ impl GameState {
         // The `powermult` glyph effect (`applyNDMultipliers`).
         mult *= self.glyph_effect_powermult();
 
+        // Ra Alchemy: `dimensionality` (×10^(5·amount) all-dim) and `force`
+        // (×RM^(5·amount)).
+        mult *= Decimal::pow10(self.alchemy_dimensionality_log10());
+        let force = self.alchemy_force();
+        if force != 0.0 {
+            mult *= self.reality.machines.pow(&Decimal::from_float(force));
+        }
+
         // Infinity Power (from the Infinity Dimensions) gives an `^7` all-tier
         // multiplier (`infinityPower.pow(powerConversionRate).max(1)`) — except
         // under EC9, where it multiplies Time Dimensions instead.
@@ -391,9 +399,16 @@ impl GameState {
         } else {
             mult.pow(&Decimal::from_float(power))
         };
-        let glyph_pow = self.glyph_effect_powerpow();
+        // Ra's `momentumValue` folds into the glyph power exponent
+        // (`applyNDPowers`).
+        let glyph_pow = self.glyph_effect_powerpow() * self.ra_momentum_value();
         if glyph_pow != 1.0 {
             mult = mult.pow(&Decimal::from_float(glyph_pow));
+        }
+        // Ra Alchemy `power`: AD multiplier `^(1 + amount/200000)`.
+        let alch_power = self.alchemy_dimension_power(crate::celestials::alchemy::POWER);
+        if alch_power != 1.0 {
+            mult = mult.pow(&Decimal::from_float(alch_power));
         }
         // V's `adPow` reward: a persistent AD power `1 + √ST/100`
         // (`applyNDPowers`' `VUnlocks.adPow`).
@@ -429,6 +444,14 @@ impl GameState {
             mult = self.effarig_multiplier(mult);
         } else if self.celestials.v.run {
             mult = mult.pow(&Decimal::from_float(0.5));
+        }
+
+        // Ra Alchemy `inflation`: AD multipliers above `10^threshold` are raised
+        // `^1.05`. Intentionally after all nerfs (matches the original comment).
+        if let Some(threshold_log) = self.alchemy_inflation_log10() {
+            if mult.pos_log10() >= threshold_log {
+                mult = mult.pow(&Decimal::from_float(1.05));
+            }
         }
         mult
     }

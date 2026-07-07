@@ -27,6 +27,7 @@ import TeresaTab from "../components/tabs/celestials/TeresaTab.vue";
 import EffarigTab from "../components/tabs/celestials/EffarigTab.vue";
 import EnslavedTab from "../components/tabs/celestials/EnslavedTab.vue";
 import VTab from "../components/tabs/celestials/VTab.vue";
+import RaTab from "../components/tabs/celestials/RaTab.vue";
 import AutobuyersTab from "../components/tabs/AutobuyersTab.vue";
 import OptionsSavingTab from "../components/tabs/OptionsSavingTab.vue";
 import OptionsVisualTab from "../components/tabs/OptionsVisualTab.vue";
@@ -225,6 +226,14 @@ export const TABS = [
         component: VTab,
         condition: (s) => Boolean(s?.celestials?.v?.unlocked),
         hideId: [9, 4],
+      },
+      {
+        key: "ra",
+        name: "Ra",
+        symbol: "<i class='fas fa-sun'></i>",
+        component: RaTab,
+        condition: (s) => Boolean(s?.celestials?.ra?.unlocked),
+        hideId: [9, 5],
       },
     ],
   },

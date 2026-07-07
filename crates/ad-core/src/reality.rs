@@ -337,9 +337,10 @@ impl GameState {
         let mut scaled = instability_softcap(base_level, 1000.0, 500.0);
         scaled = instability_softcap(scaled, 4000.0, 400.0);
 
-        // Static post-instability adders: +1 per fully-bought Reality
-        // Upgrade row (the achievement adders 148/166 are out of frontier).
-        let inc = self.reality_upgrade_row_factor() as f64;
+        // Static post-instability adders: +1 per fully-bought Reality Upgrade
+        // row, plus Ra's `relicShardGlyphLevelBoost` (the achievement adders
+        // 148/166 are out of frontier).
+        let inc = self.reality_upgrade_row_factor() as f64 + self.ra_relic_shard_glyph_level();
         (base_level + inc, (scaled + inc).max(1.0))
     }
 
@@ -457,6 +458,10 @@ impl GameState {
         self.effarig_gain_relic_shards();
         self.celestial_reality_completion_hooks();
 
+        // Ra: run the Glyph-Alchemy reactions once per rewarded Reality
+        // (`Ra.applyAlchemyReactions`, gated on Effarig's Memories).
+        self.apply_alchemy_reactions();
+
         self.reality_reset_internal();
 
         // The Automator's REALITY_RESET_AFTER handling: the prestige
@@ -482,6 +487,14 @@ impl GameState {
         // `clearCelestialRuns()`: a Reality (rewarded or forced) always exits
         // any celestial run.
         self.clear_celestial_runs();
+
+        // Ra: discharge the charged Infinity Upgrades if flagged, and reset the
+        // per-Reality peak game-speed accumulator (both on every Reality).
+        if self.celestials.ra.dis_charge {
+            self.celestials.ra.charged = 0;
+            self.celestials.ra.dis_charge = false;
+        }
+        self.ra_on_reality_reset();
 
         if self.reality.respec {
             self.unequip_all_glyphs();

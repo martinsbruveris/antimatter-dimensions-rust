@@ -975,6 +975,57 @@ struct CelestialsView {
     effarig: EffarigView,
     enslaved: EnslavedView,
     v: VView,
+    ra: RaView,
+}
+
+/// Ra subtab (Feature 7.5).
+#[derive(Serialize)]
+struct RaView {
+    unlocked: bool,
+    is_running: bool,
+    can_start_run: bool,
+    total_pet_level: u32,
+    remembrance_unlocked: bool,
+    total_charges: u32,
+    charges_used: u32,
+    alchemy_unlocked: bool,
+    pets: Vec<RaPetView>,
+    unlocks: Vec<RaUnlockView>,
+    alchemy: Vec<AlchemyResourceView>,
+}
+
+#[derive(Serialize)]
+struct RaPetView {
+    id: u8,
+    unlocked: bool,
+    level: u32,
+    memories: Num,
+    memory_chunks: Num,
+    required_memories: Num,
+    memory_upgrade_cost: Num,
+    chunk_upgrade_cost: Num,
+    memory_upgrade_capped: bool,
+    chunk_upgrade_capped: bool,
+    has_remembrance: bool,
+}
+
+#[derive(Serialize)]
+struct RaUnlockView {
+    id: u8,
+    pet: u8,
+    level: u32,
+    unlocked: bool,
+}
+
+#[derive(Serialize)]
+struct AlchemyResourceView {
+    id: u8,
+    unlocked: bool,
+    unlocked_at: u32,
+    is_base: bool,
+    amount: Num,
+    cap: Num,
+    reaction_active: bool,
 }
 
 /// V subtab (Feature 7.4).
@@ -1174,6 +1225,66 @@ fn build_celestials_view(game: &GameState) -> CelestialsView {
         effarig: build_effarig_view(game),
         enslaved: build_enslaved_view(game),
         v: build_v_view(game),
+        ra: build_ra_view(game),
+    }
+}
+
+/// Build the Ra subtab view (pets, unlocks, Alchemy).
+fn build_ra_view(game: &GameState) -> RaView {
+    use ad_core::celestials::ra::{RA_UNLOCK_COUNT, RA_UNLOCK_REQS};
+    let f = |x: f64| num(&Decimal::from_float(x.min(1e300)));
+    let pets = (0..ad_core::celestials::ra::PET_COUNT)
+        .map(|p| {
+            let pet = &game.celestials.ra.pets[p];
+            RaPetView {
+                id: p as u8,
+                unlocked: game.ra_pet_unlocked(p),
+                level: game.ra_pet_level(p),
+                memories: f(pet.memories),
+                memory_chunks: f(pet.memory_chunks),
+                required_memories: f(game.ra_required_memories_for_level(pet.level)),
+                memory_upgrade_cost: f(game.ra_memory_upgrade_cost(p)),
+                chunk_upgrade_cost: f(game.ra_chunk_upgrade_cost(p)),
+                memory_upgrade_capped: game.ra_memory_upgrade_capped(p),
+                chunk_upgrade_capped: game.ra_chunk_upgrade_capped(p),
+                has_remembrance: game.celestials.ra.pet_with_remembrance == p as i8,
+            }
+        })
+        .collect();
+    let unlocks = (0..RA_UNLOCK_COUNT)
+        .map(|id| {
+            let (pet, level) = RA_UNLOCK_REQS[id as usize];
+            RaUnlockView {
+                id,
+                pet: pet as u8,
+                level,
+                unlocked: game.ra_has_unlock(id),
+            }
+        })
+        .collect();
+    let alchemy = (0..ad_core::celestials::alchemy::ALCHEMY_COUNT)
+        .map(|id| AlchemyResourceView {
+            id: id as u8,
+            unlocked: game.alchemy_resource_unlocked(id),
+            unlocked_at: game.alchemy_unlocked_at(id),
+            is_base: game.alchemy_is_base(id),
+            amount: f(game.alchemy_amount(id)),
+            cap: f(game.alchemy_cap(id)),
+            reaction_active: game.celestials.ra.alchemy[id].reaction,
+        })
+        .collect();
+    RaView {
+        unlocked: game.ra_is_unlocked(),
+        is_running: game.ra_is_running(),
+        can_start_run: game.can_start_celestial_reality(ad_core::Celestial::Ra),
+        total_pet_level: game.ra_total_pet_level(),
+        remembrance_unlocked: game.ra_remembrance_unlocked(),
+        total_charges: game.ra_total_charges(),
+        charges_used: game.ra_charges_used(),
+        alchemy_unlocked: game.alchemy_unlocked(),
+        pets,
+        unlocks,
+        alchemy,
     }
 }
 
@@ -2644,9 +2755,35 @@ fn start_celestial_reality(celestial: String, state: State<'_, Mutex<GameState>>
         "effarig" => ad_core::Celestial::Effarig,
         "enslaved" => ad_core::Celestial::Enslaved,
         "v" => ad_core::Celestial::V,
+        "ra" => ad_core::Celestial::Ra,
         _ => return,
     };
     state.lock().unwrap().start_celestial_reality(cel);
+}
+
+#[tauri::command]
+fn ra_level_up(pet: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().ra_level_up_max(pet);
+}
+
+#[tauri::command]
+fn ra_buy_memory_upgrade(pet: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().ra_purchase_memory_upgrade(pet);
+}
+
+#[tauri::command]
+fn ra_buy_chunk_upgrade(pet: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().ra_purchase_chunk_upgrade(pet);
+}
+
+#[tauri::command]
+fn ra_set_remembrance(pet: i8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().ra_set_remembrance(pet);
+}
+
+#[tauri::command]
+fn alchemy_toggle_reaction(id: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().alchemy_toggle_reaction(id);
 }
 
 #[tauri::command]
@@ -4028,6 +4165,11 @@ pub fn run() {
             buy_enslaved_unlock,
             v_unlock_celestial,
             start_celestial_reality,
+            ra_level_up,
+            ra_buy_memory_upgrade,
+            ra_buy_chunk_upgrade,
+            ra_set_remembrance,
+            alchemy_toggle_reaction,
             unlock_black_hole,
             buy_black_hole_upgrade,
             toggle_black_hole_pause,

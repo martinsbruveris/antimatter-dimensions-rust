@@ -254,6 +254,26 @@ export const useGameStore = defineStore("game", {
       await invoke("v_unlock_celestial");
       this.snapshot = await this.getState();
     },
+    async raLevelUp(pet) {
+      await invoke("ra_level_up", { pet });
+      this.snapshot = await this.getState();
+    },
+    async raBuyMemoryUpgrade(pet) {
+      await invoke("ra_buy_memory_upgrade", { pet });
+      this.snapshot = await this.getState();
+    },
+    async raBuyChunkUpgrade(pet) {
+      await invoke("ra_buy_chunk_upgrade", { pet });
+      this.snapshot = await this.getState();
+    },
+    async raSetRemembrance(pet) {
+      await invoke("ra_set_remembrance", { pet });
+      this.snapshot = await this.getState();
+    },
+    async alchemyToggleReaction(id) {
+      await invoke("alchemy_toggle_reaction", { id });
+      this.snapshot = await this.getState();
+    },
     async unlockBlackHole() {
       await invoke("unlock_black_hole");
       this.snapshot = await this.getState();

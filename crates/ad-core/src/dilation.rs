@@ -296,6 +296,11 @@ impl GameState {
                 .pow(&Decimal::from(self.dilation.rebuyables[0] as u64));
         // RU1 (Temporal Amplifier): ×3 per purchase.
         rate *= self.reality_rebuyable_effect(1);
+        // Ra: Alchemy `dilation`, `continuousTTBoost.dilatedTime`, and
+        // `peakGamespeedDT` (all multiply the DT rate at the tachyon base).
+        rate *= Decimal::from_float(self.alchemy_dilation_mult());
+        rate *= self.ra_tt_boost_dilated_time();
+        rate *= Decimal::from_float(self.ra_peak_gamespeed_dt());
         rate *= self.glyph_effect_dilation_dt();
         // replicationdtgain: ×max(log10(replicanti) · effect, 1).
         let dtgain = self.glyph_effect_replicationdtgain();
@@ -342,10 +347,14 @@ impl GameState {
 
         self.update_tachyon_galaxies();
 
+        // Ra boosts to TT generation: `continuousTTBoost.ttGen` (10^(5b)) and
+        // `achievementTTMult` (Achievements.power).
+        let tt_boost = self.ra_tt_boost_tt_gen() * self.ra_achievement_tt_mult();
         // `ttGenerator` (upgrade 10): TT += TP/20000 per second.
         if self.dilation_upgrade_bought(10) {
             let gain = self.dilation.tachyon_particles / Decimal::from_float(20_000.0)
-                * Decimal::from_float(dt_s);
+                * Decimal::from_float(dt_s)
+                * tt_boost;
             self.add_time_theorems_decimal(gain);
         }
         // The `dilationTTgen` glyph effect streams TT too — disabled inside
@@ -353,7 +362,9 @@ impl GameState {
         if !self.celestials.teresa.run && !self.celestials.enslaved.run {
             let glyph_ttgen = self.glyph_effect_dilation_ttgen();
             if glyph_ttgen > 0.0 {
-                self.add_time_theorems_decimal(Decimal::from_float(glyph_ttgen * dt_s));
+                self.add_time_theorems_decimal(
+                    Decimal::from_float(glyph_ttgen * dt_s) * tt_boost,
+                );
             }
         }
     }

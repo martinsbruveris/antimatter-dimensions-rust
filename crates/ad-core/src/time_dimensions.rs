@@ -241,6 +241,8 @@ impl GameState {
             let exponent = (1.0 + 2.0 * (days + 1.0).log10()).powf(1.6);
             mult *= Decimal::pow10(exponent);
         }
+        // Ra Alchemy `dimensionality` (all-dim ×10^(5·amount)).
+        mult *= Decimal::pow10(self.alchemy_dimensionality_log10());
         mult
     }
 
@@ -278,6 +280,15 @@ impl GameState {
         let timepow = self.glyph_effect_timepow();
         if timepow != 1.0 {
             mult = mult.pow(&Decimal::from_float(timepow));
+        }
+        // Ra Alchemy `time` (TD `^(1 + amount/200000)`) then `momentumValue`.
+        let alch_time = self.alchemy_dimension_power(crate::celestials::alchemy::TIME);
+        if alch_time != 1.0 {
+            mult = mult.pow(&Decimal::from_float(alch_time));
+        }
+        let momentum = self.ra_momentum_value();
+        if momentum != 1.0 {
+            mult = mult.pow(&Decimal::from_float(momentum));
         }
         if self.dilation.active {
             mult = self.dilated_value_of(mult);
