@@ -3,7 +3,9 @@
 
 use std::fmt::Write as _;
 
+use crate::compare::FieldDiff;
 use crate::run::{Outcome, RunResult};
+use crate::trace::TraceResult;
 
 /// The maximum number of field diffs printed per failing cell in verbose mode
 /// (a single off-by-one discrete event can diverge the whole state vector —
@@ -66,11 +68,7 @@ pub fn verbose(result: &RunResult) -> String {
                         diffs.len()
                     );
                     for d in diffs.iter().take(MAX_DIFFS_PER_CELL) {
-                        let _ = writeln!(
-                            out,
-                            "    {:<40}  JS={:<24}  Rust={:<24}  {}",
-                            d.path, d.expected, d.actual, d.detail
-                        );
+                        diff_line(&mut out, d);
                     }
                     if diffs.len() > MAX_DIFFS_PER_CELL {
                         let _ = writeln!(
@@ -96,6 +94,65 @@ pub fn verbose(result: &RunResult) -> String {
         }
     }
     out
+}
+
+/// Render the first-divergence scan (`ad-fidelity trace <id>`): the earliest
+/// tick that diverged and the fields that broke, or a clean-run line.
+pub fn trace_scan(result: &TraceResult) -> String {
+    let mut out = String::new();
+    match &result.first_divergence {
+        None => {
+            let _ = writeln!(
+                out,
+                "{}: no divergence over {} tick(s)",
+                result.name, result.max_horizon
+            );
+        }
+        Some((horizon, diffs)) => {
+            let _ = writeln!(
+                out,
+                "{}: first divergence at tick {} — {} field(s) diverged",
+                result.name,
+                horizon,
+                diffs.len()
+            );
+            for d in diffs.iter().take(MAX_DIFFS_PER_CELL) {
+                diff_line(&mut out, d);
+            }
+            if diffs.len() > MAX_DIFFS_PER_CELL {
+                let _ = writeln!(out, "    … {} more", diffs.len() - MAX_DIFFS_PER_CELL);
+            }
+            let _ = writeln!(out, "\ninspect this tick:  … trace --tick {horizon} <id>");
+        }
+    }
+    out
+}
+
+/// Render the field diffs at one specific tick (`ad-fidelity trace --tick X`).
+pub fn trace_at(name: &str, horizon: u32, diffs: &[FieldDiff]) -> String {
+    let mut out = String::new();
+    if diffs.is_empty() {
+        let _ = writeln!(out, "{name}: no divergence at tick {horizon}");
+        return out;
+    }
+    let _ = writeln!(
+        out,
+        "{name}: {} field(s) diverged at tick {horizon}",
+        diffs.len()
+    );
+    for d in diffs {
+        diff_line(&mut out, d);
+    }
+    out
+}
+
+/// One field-diff line, shared by the verbose grid and the trace renderers.
+fn diff_line(out: &mut String, d: &FieldDiff) {
+    let _ = writeln!(
+        out,
+        "    {:<40}  JS={:<24}  Rust={:<24}  {}",
+        d.path, d.expected, d.actual, d.detail
+    );
 }
 
 /// Column header for a horizon: `rt` for the round-trip baseline, else the tick

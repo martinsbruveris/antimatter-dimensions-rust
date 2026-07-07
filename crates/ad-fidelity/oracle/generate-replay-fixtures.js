@@ -11,11 +11,25 @@
 //
 //   GAME_URL=http://localhost:8080 node generate-replay-fixtures.js
 //
+// Modes (pass CLI flags after `--` so npm forwards them):
+//
+//   npm run generate                         # every capture -> saves/fixtures
+//   npm run generate -- --save 1             # just capture id 1 -> saves/fixtures
+//   npm run generate -- --save 1 --trace t.json
+//                                            # dense trace (ticks 1..1000) of
+//                                            #   capture id 1 -> saves/traces/t.json
+//
+// `--save` restricts the run to one capture (resolved by the shared id
+// convention: a path, saves/captures/<id>, or the glob 0*<id>-*.txt). `--trace`
+// writes one fixture carrying *every* tick up to 1000 (for the Rust harness's
+// `ad-fidelity trace`), and requires `--save`.
+//
 // Prerequisite: the original game must be reachable at GAME_URL (e.g. run
 // `npm run serve` in ../../../../antimatter-dimensions, or serve a built dist).
 
 const fs = require("fs");
 const path = require("path");
+const { parseArgs } = require("node:util");
 const { chromium } = require("playwright");
 
 const GAME_URL = process.env.GAME_URL || "http://localhost:8080";
@@ -25,8 +39,53 @@ const SAVES_DIR = path.resolve(
 const OUT_DIR = path.resolve(
   process.env.OUT_DIR || path.join(__dirname, "..", "saves", "fixtures")
 );
+const TRACES_DIR = path.resolve(
+  process.env.TRACES_DIR || path.join(__dirname, "..", "saves", "traces")
+);
 const TICK_MS = Number(process.env.TICK_MS || 50); // §10: 50 ms granularity (parameter)
 const HORIZONS = (process.env.HORIZONS || "1,10,100,1000").split(",").map(Number);
+// Dense-trace horizon: every tick 1..TRACE_HORIZON.
+const TRACE_HORIZON = Number(process.env.TRACE_HORIZON || 1000);
+
+const { values: cli } = parseArgs({
+  options: {
+    save: { type: "string" },
+    trace: { type: "string" },
+  },
+  allowPositionals: false,
+});
+
+// Resolve a short save/fixture id to one file, mirroring src/resolve.rs:
+// a path, then <dir>/<id>, then the unambiguous glob 0*<id>-*.<ext>.
+function resolveId(id, dir, ext) {
+  if (fs.existsSync(id) && fs.statSync(id).isFile()) return path.resolve(id);
+  const joined = path.join(dir, id);
+  if (fs.existsSync(joined) && fs.statSync(joined).isFile()) return joined;
+
+  const suffix = `.${ext}`;
+  const matches = fs
+    .readdirSync(dir)
+    .filter((name) => {
+      if (!name.endsWith(suffix)) return false;
+      const num = name.split("-")[0];
+      const significant = num.replace(/^0+/, "") || "0";
+      return significant === id;
+    })
+    .sort();
+  if (matches.length === 0) {
+    throw new Error(
+      `no file matching id "${id}" (looked for path "${id}", ` +
+        `${dir}/${id}, and ${dir}/0*${id}-*.${ext})`
+    );
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `id "${id}" is ambiguous — ${matches.length} candidates: ` +
+        `${matches.join(", ")}. Use a longer id or a full path.`
+    );
+  }
+  return path.join(dir, matches[0]);
+}
 
 // A normal desktop Chrome UA so the game's browserCheck() passes and init()
 // runs (headless Chrome's default "HeadlessChrome" UA would fail the regex).
@@ -104,19 +163,45 @@ function replayInPage(args) {
 }
 
 async function main() {
+  const traceMode = cli.trace != null;
+  if (traceMode && cli.save == null) {
+    console.error("--trace requires --save (a dense trace is single-save)");
+    process.exit(2);
+  }
+
   if (!fs.existsSync(SAVES_DIR)) {
     console.error(`saves dir not found: ${SAVES_DIR}`);
     process.exit(1);
   }
-  const saveFiles = fs
-    .readdirSync(SAVES_DIR)
-    .filter((f) => /\.txt$/.test(f))
-    .sort();
-  if (saveFiles.length === 0) {
-    console.error(`no .txt saves in ${SAVES_DIR}`);
-    process.exit(1);
+
+  // Which captures to run: one resolved id, or every .txt in the captures dir.
+  let saveFiles; // absolute paths
+  if (cli.save != null) {
+    try {
+      saveFiles = [resolveId(cli.save, SAVES_DIR, "txt")];
+    } catch (e) {
+      console.error(e.message);
+      process.exit(2);
+    }
+  } else {
+    saveFiles = fs
+      .readdirSync(SAVES_DIR)
+      .filter((f) => /\.txt$/.test(f))
+      .sort()
+      .map((f) => path.join(SAVES_DIR, f));
+    if (saveFiles.length === 0) {
+      console.error(`no .txt saves in ${SAVES_DIR}`);
+      process.exit(1);
+    }
   }
-  fs.mkdirSync(OUT_DIR, { recursive: true });
+
+  // Trace mode: every tick 1..TRACE_HORIZON into saves/traces. Otherwise the
+  // standard horizons into saves/fixtures.
+  const horizons = traceMode
+    ? Array.from({ length: TRACE_HORIZON }, (_, i) => i + 1)
+    : HORIZONS;
+  const outDir = traceMode ? TRACES_DIR : OUT_DIR;
+  fs.mkdirSync(outDir, { recursive: true });
 
   console.log(`launching headless Chromium; game at ${GAME_URL}`);
   const browser = await chromium.launch();
@@ -141,18 +226,19 @@ async function main() {
   });
 
   for (const file of saveFiles) {
-    const input = fs.readFileSync(path.join(SAVES_DIR, file), "utf8").trim();
-    process.stdout.write(`  ${file} … `);
+    const base = path.basename(file);
+    const input = fs.readFileSync(file, "utf8").trim();
+    process.stdout.write(`  ${base} … `);
     const expected = await page.evaluate(replayInPage, {
       save: input,
-      horizons: HORIZONS,
+      horizons,
       tickMs: TICK_MS,
     });
     const fixture = {
       meta: {
-        sourceSave: file,
+        sourceSave: base,
         tickMs: TICK_MS,
-        horizons: HORIZONS,
+        horizons,
         generatedAt: new Date().toISOString(),
         notes:
           "offline disabled; deterministic clock + Math.random; " +
@@ -161,16 +247,17 @@ async function main() {
       input,
       expected,
     };
-    const outName = file.replace(/\.txt$/, ".json");
+    // Trace mode writes to the caller-named file; otherwise <save>.json.
+    const outName = traceMode ? cli.trace : base.replace(/\.txt$/, ".json");
     fs.writeFileSync(
-      path.join(OUT_DIR, outName),
+      path.join(outDir, outName),
       JSON.stringify(fixture, null, 2) + "\n"
     );
-    console.log(`ok -> ${outName}`);
+    console.log(`ok -> ${path.join(outDir, outName)}`);
   }
 
   await browser.close();
-  console.log(`done. fixtures in ${OUT_DIR}`);
+  console.log(`done. ${traceMode ? "trace" : "fixtures"} in ${outDir}`);
 }
 
 main().catch((e) => {

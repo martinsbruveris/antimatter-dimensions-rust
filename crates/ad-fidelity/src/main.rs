@@ -4,37 +4,58 @@
 //! ```text
 //! ad-fidelity [DIR] [--tests 1,3,12] [--ticks 1,10] [--tick-ms 50]
 //!             [--epsilon 1e-6] [--roundtrip] [--verbose]
+//! ad-fidelity trace <ID> [--tick X] [--epsilon 1e-6] [--tick-ms 50]
 //! ```
 //!
-//! Default (no flags): compare every fixture in `DIR` at every horizon it
+//! Default (no subcommand): compare every fixture in `DIR` at every horizon it
 //! carries, printing a pass/fail table (rows = fixtures, columns = tick counts).
 //! `--verbose` adds, per failing cell, the fields that diverged with their JS /
 //! Rust values and the delta.
+//!
+//! `trace` takes one *dense* fixture (the oracle's `--trace` output, every tick
+//! up to 1000) and reports the earliest tick that diverges; `--tick X` then dumps
+//! the full field diff at that tick. `<ID>` resolves under `saves/traces` by the
+//! shared id convention (see [`ad_fidelity::resolve`]).
+//!
+//! Note: pass CLI args after `--` so cargo forwards them, e.g.
+//! `cargo run -p ad-fidelity -- trace 1`.
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
 
 use ad_fidelity::allowlist::allowlist;
 use ad_fidelity::compare::Tolerance;
-use ad_fidelity::fixture::{load_dir, Fixture};
-use ad_fidelity::report::{table, verbose};
+use ad_fidelity::fixture::{load_dir, load_fixture, Fixture};
+use ad_fidelity::report::{table, trace_at, trace_scan, verbose};
+use ad_fidelity::resolve::resolve;
 use ad_fidelity::run::{run, RunConfig};
+use ad_fidelity::trace::{compare_at, trace};
 
 /// The oracle's default fixture output directory (`saves/fixtures`, relative to
 /// this crate).
 const DEFAULT_FIXTURES_DIR: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/saves/fixtures");
 
+/// Where dense trace fixtures live (`saves/traces`), shared with the oracle's
+/// `--trace` output. `trace <ID>` resolves ids here.
+const DEFAULT_TRACES_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/saves/traces");
+
 #[derive(Parser, Debug)]
 #[command(
     name = "ad-fidelity",
     about = "Replay saves through ad-core and diff against the JS oracle fixtures",
     long_about = None,
+    args_conflicts_with_subcommands = true,
+    subcommand_negates_reqs = true,
 )]
 struct Cli {
+    /// A subcommand (currently only `trace`); omit it for the grid comparison.
+    #[command(subcommand)]
+    command: Option<Command>,
+
     /// Directory of oracle fixture `*.json` files.
     #[arg(default_value = DEFAULT_FIXTURES_DIR)]
     dir: PathBuf,
@@ -69,8 +90,37 @@ struct Cli {
     verbose: bool,
 }
 
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Scan one dense trace fixture for its first divergent tick.
+    Trace(TraceArgs),
+}
+
+#[derive(Args, Debug)]
+struct TraceArgs {
+    /// Trace fixture id (resolved under `saves/traces`) or a path.
+    id: String,
+
+    /// Inspect exactly this tick — dump the full field diff instead of scanning
+    /// for the first divergence.
+    #[arg(long)]
+    tick: Option<u32>,
+
+    /// Log-space (and relative) comparison epsilon.
+    #[arg(long, default_value_t = 1e-6)]
+    epsilon: f64,
+
+    /// Override the fixture's `meta.tickMs`. Must match the oracle.
+    #[arg(long)]
+    tick_ms: Option<f64>,
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
+
+    if let Some(Command::Trace(args)) = &cli.command {
+        return run_trace(args);
+    }
 
     let all = match load_dir(&cli.dir) {
         Ok(f) => f,
@@ -122,6 +172,65 @@ fn main() -> ExitCode {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+/// The `trace` subcommand: resolve the fixture, then either scan for the first
+/// divergent tick or (with `--tick X`) dump the field diff at exactly tick `X`.
+///
+/// Exit codes mirror grid mode: `1` on divergence, `2` on a resolution/load
+/// error, `0` when clean.
+fn run_trace(args: &TraceArgs) -> ExitCode {
+    let path = match resolve(&args.id, Path::new(DEFAULT_TRACES_DIR), "json") {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(2);
+        }
+    };
+    let fixture = match load_fixture(&path) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("could not load trace fixture {}: {e}", path.display());
+            return ExitCode::from(2);
+        }
+    };
+
+    let tolerance = Tolerance::with_log_eps(args.epsilon);
+    let rules = allowlist();
+    let tick_ms = args.tick_ms.unwrap_or(fixture.tick_ms);
+
+    match args.tick {
+        Some(tick) => {
+            let diffs = match compare_at(&fixture, tick, tick_ms, &tolerance, &rules) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("{e}");
+                    return ExitCode::from(2);
+                }
+            };
+            print!("{}", trace_at(&fixture.name, tick, &diffs));
+            if diffs.is_empty() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
+        }
+        None => {
+            let result = match trace(&fixture, tick_ms, &tolerance, &rules) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("{e}");
+                    return ExitCode::from(2);
+                }
+            };
+            print!("{}", trace_scan(&result));
+            if result.first_divergence.is_some() {
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
     }
 }
 

@@ -1,0 +1,9 @@
+{
+  "name": "ad-fidelity",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Launcher: run the Playwright oracle from the crate root (deps live in oracle/)",
+  "scripts": {
+    "generate": "node oracle/generate-replay-fixtures.js"
+  }
+}

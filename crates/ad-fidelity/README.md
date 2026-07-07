@@ -25,14 +25,17 @@ The harness has three stages:
 
 ```
 ad-fidelity/
+├── package.json           # Launcher: `npm run generate` from the crate root
 ├── src/
 │   ├── lib.rs              # Crate root + re-exports
-│   ├── main.rs             # `ad-fidelity` CLI (table / verbose comparison)
+│   ├── main.rs             # `ad-fidelity` CLI (grid comparison + `trace`)
 │   ├── compare.rs          # Tolerant per-field diff walker + comparison modes
 │   ├── allowlist.rs        # The player-tree fields that are compared (design §5)
 │   ├── fixture.rs          # Loading oracle fixtures + replaying saves via ad-core
 │   ├── run.rs              # (fixtures × horizons) comparison grid orchestration
-│   ├── report.rs           # Table + verbose renderers
+│   ├── trace.rs            # First-divergence scan of one dense fixture
+│   ├── resolve.rs          # Short save/fixture id -> file path (shared convention)
+│   ├── report.rs           # Table + verbose + trace renderers
 │   └── tolerance.rs        # Log-space comparison primitives
 ├── tests/
 │   └── replay_smoke.rs     # End-to-end plumbing tests (no Node needed)
@@ -43,7 +46,8 @@ ad-fidelity/
 │   └── generate-replay-fixtures.js
 └── saves/                 # Data (git-ignored)
     ├── captures/           # Captured savefiles + index.jsonl
-    └── fixtures/           # Oracle reference fixtures (<save>.json)
+    ├── fixtures/           # Oracle reference fixtures (<save>.json)
+    └── traces/             # Dense per-tick trace fixtures (debugging)
 ```
 
 ## Prerequisites
@@ -67,11 +71,20 @@ headless Chromium, ticks each captured save forward deterministically, and write
 resulting savefiles as fixtures the Rust harness will diff against.
 
 ```bash
+# One-time install (deps live in oracle/):
 cd crates/ad-fidelity/oracle
 npm install                 # pulls Playwright
 npx playwright install chromium
-npm run generate            # reads ../saves/captures, writes ../saves/fixtures
+
+# Generate — from the crate root, via the launcher package.json:
+cd crates/ad-fidelity
+npm run generate            # reads saves/captures, writes saves/fixtures
 ```
+
+The `crates/ad-fidelity/package.json` is a thin launcher (`node oracle/…`); Node
+resolves Playwright from `oracle/node_modules` regardless of the launch directory,
+so `npm run generate` works from the crate root and mirrors `cargo run -p
+ad-fidelity`.
 
 ## Rust comparison (the `ad-fidelity` binary)
 
@@ -89,8 +102,8 @@ The default output is a grid — one row per fixture, one column per horizon
 
 ```
 #  fixture              1     10    100   1000
-1  01_pre_big_crunch    ok    ok    FAIL  FAIL
-2  …
+0  01_pre_big_crunch    ok    ok    FAIL  FAIL
+1  …
 
 7/8 cells passed (1 diverged)
 ```
@@ -110,6 +123,39 @@ Options:
 | `--epsilon 1e-6` | Log-space / relative comparison epsilon. |
 | `--roundtrip` | Add an `rt` column: Rust decode→encode of the input vs the input itself — the identity guard (design §6) that isolates encode/decode bugs from tick bugs. |
 | `-v`, `--verbose` | Per-field failure detail. |
+
+> Pass args after `--` so cargo forwards them to the binary:
+> `cargo run -p ad-fidelity -- --verbose`.
+
+### Debugging a 1000-tick divergence (`trace`)
+
+When a fixture fails at a far horizon, narrow it to the *first* tick that breaks.
+All three steps run from `crates/ad-fidelity` (the `npm run generate` launcher and
+`cargo run -p ad-fidelity` are symmetric — same directory):
+
+```bash
+cd crates/ad-fidelity
+
+# 1. Generate a dense trace (every tick 1..1000) for one capture:
+npm run generate -- --save 1 --trace t.json      # -> saves/traces/t.json
+
+# 2. Find the first divergent tick and the fields that broke:
+cargo run -p ad-fidelity -- trace t.json
+
+# 3. Inspect that tick in full (X = the tick reported above):
+cargo run -p ad-fidelity -- trace --tick X t.json
+```
+
+`trace <ID>` resolves `<ID>` under `saves/traces` by the shared id convention
+(`src/resolve.rs`): a path, `saves/traces/<ID>`, or the glob `0*<ID>-*.json`.
+Divergence uses the same allowlist and `--epsilon` as the grid, so a tick that
+passes here would pass a grid cell at that horizon. Exit codes match the grid:
+`1` on divergence, `2` on a resolution/load error, `0` when clean — so
+`git bisect run cargo run -p ad-fidelity -- trace t.json` walks history to the
+commit that introduced the divergence.
+
+The scan currently replays from scratch at each tick (naive O(n²)); a single-pass
+version is a later optimization.
 
 ### What is compared
 

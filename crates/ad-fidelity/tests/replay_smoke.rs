@@ -6,15 +6,17 @@
 //! diff walker, fixture loading, and rendering — works end-to-end on a real save
 //! tree, and that the Rust save round-trip preserves every allowlisted field.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
 use ad_core::save::encode_save;
 use ad_fidelity::allowlist::allowlist;
 use ad_fidelity::compare::{compare_trees, Tolerance};
-use ad_fidelity::fixture::{decode_expected, load_dir, replay_rust};
+use ad_fidelity::fixture::{decode_expected, load_dir, replay_rust, Fixture};
 use ad_fidelity::report::{table, verbose};
 use ad_fidelity::run::{run, RunConfig};
+use ad_fidelity::trace::{compare_at, trace};
 
 fn real_save() -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -130,4 +132,86 @@ fn full_run_over_a_fabricated_fixture() {
     assert!(v.is_empty(), "no failures → empty verbose output");
 
     let _ = fs::remove_dir_all(&dir);
+}
+
+/// Build a dense trace fixture (every horizon in `horizons`) whose expected saves
+/// are Rust's own re-encodes — self-consistent by construction, so the scan sees
+/// no divergence unless we deliberately corrupt one horizon.
+fn dense_fixture(save: &str, horizons: &[u32]) -> Fixture {
+    use ad_core::save::decode_save;
+    let mut expected = BTreeMap::new();
+    for &h in horizons {
+        let mut state = decode_save(save).expect("decode");
+        state.ticks(50.0, h);
+        expected.insert(h, encode_save(&state, 0));
+    }
+    Fixture {
+        name: "trace-test".to_string(),
+        path: PathBuf::new(),
+        tick_ms: 50.0,
+        input: save.to_string(),
+        expected,
+    }
+}
+
+/// A self-consistent dense fixture must report no divergence, and `compare_at`
+/// must agree at an arbitrary tick.
+#[test]
+fn trace_reports_no_divergence_when_self_consistent() {
+    let save = real_save();
+    let fixture = dense_fixture(&save, &[1, 2, 3, 4, 5]);
+    let rules = allowlist();
+    let tol = Tolerance::default();
+
+    let result = trace(&fixture, 50.0, &tol, &rules).expect("trace");
+    assert!(
+        result.first_divergence.is_none(),
+        "self-consistent fixture diverged at {:?}",
+        result.first_divergence.map(|(h, _)| h)
+    );
+    assert_eq!(result.max_horizon, 5);
+
+    assert!(compare_at(&fixture, 3, 50.0, &tol, &rules)
+        .expect("compare_at")
+        .is_empty());
+}
+
+/// Corrupting the expected save at one horizon makes the scan stop at exactly
+/// that tick (earlier ticks still match), and name the field that diverged.
+#[test]
+fn trace_finds_the_first_corrupted_tick() {
+    use ad_core::save::decode_save;
+
+    let save = real_save();
+    let mut fixture = dense_fixture(&save, &[1, 2, 3, 4, 5]);
+
+    // Replace tick 3's expected with a far-future state (500 ticks): tick 3's
+    // antimatter is now wildly wrong, while ticks 1–2 still match.
+    let mut future = decode_save(&save).expect("decode");
+    future.ticks(50.0, 500);
+    fixture.expected.insert(3, encode_save(&future, 0));
+
+    let rules = allowlist();
+    let tol = Tolerance::default();
+    let result = trace(&fixture, 50.0, &tol, &rules).expect("trace");
+
+    let (horizon, diffs) = result
+        .first_divergence
+        .expect("expected a divergence at the corrupted tick");
+    assert_eq!(horizon, 3, "first divergence should be the corrupted tick");
+    assert!(
+        diffs.iter().any(|d| d.path == "antimatter"),
+        "expected an antimatter diff, got: {:?}",
+        diffs.iter().map(|d| &d.path).collect::<Vec<_>>()
+    );
+}
+
+/// `compare_at` at a horizon the fixture lacks is an error, not a silent pass.
+#[test]
+fn compare_at_missing_horizon_errors() {
+    let save = real_save();
+    let fixture = dense_fixture(&save, &[1, 2]);
+    let err = compare_at(&fixture, 7, 50.0, &Tolerance::default(), &allowlist())
+        .expect_err("tick 7 is absent");
+    assert!(err.contains("no expected save at tick 7"), "{err}");
 }

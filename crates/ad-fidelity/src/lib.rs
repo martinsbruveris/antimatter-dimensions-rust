@@ -16,7 +16,9 @@
 //!   §5).
 //! - [`fixture`] — loading oracle fixtures and replaying saves through `ad-core`.
 //! - [`run`] — orchestrating a (fixtures × horizons) comparison grid.
-//! - [`report`] — rendering that grid as a table or verbose field listing.
+//! - [`trace`] — scanning one dense fixture for its first divergent tick.
+//! - [`resolve`] — turning a short save/fixture id into a concrete file path.
+//! - [`report`] — rendering the grid / trace as a table or field listing.
 //! - [`tolerance`] — the underlying log-space comparison primitives.
 //!
 //! The `ad-fidelity` binary ([`main`](../main/index.html)) wires these into a CLI.
@@ -25,12 +27,16 @@ pub mod allowlist;
 pub mod compare;
 pub mod fixture;
 pub mod report;
+pub mod resolve;
 pub mod run;
 pub mod tolerance;
+pub mod trace;
 
 pub use allowlist::allowlist;
 pub use compare::{compare_trees, Compare, FieldDiff, FieldRule, Tolerance};
 pub use fixture::{
     decode_expected, load_dir, load_fixture, replay_rust, Fixture, LoadError,
 };
+pub use resolve::{resolve, ResolveError};
 pub use run::{run, CellResult, FixtureResult, Outcome, RunConfig, RunResult};
+pub use trace::{compare_at, trace, TraceResult};

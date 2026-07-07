@@ -24,10 +24,16 @@ the shipped bundle with zero API gaps. See design §10.
 
    ```bash
    cd crates/ad-fidelity/oracle
-   npm install                 # pulls Playwright
+   npm install                 # pulls Playwright (deps live here)
    npx playwright install chromium
    npm run generate            # reads ../saves/captures, writes ../saves/fixtures
    ```
+
+   The dependencies must be installed here in `oracle/`, but the `generate`
+   script can be launched from either directory: here, or from the crate root
+   `crates/ad-fidelity` via its launcher `package.json` (`npm run generate`,
+   symmetric with `cargo run -p ad-fidelity`). Node resolves Playwright from
+   `oracle/node_modules` either way. Paths below are written relative to `oracle/`.
 
 Output: one `fixtures/<save>.json` per input, containing the input save and the
 expected savefile after each horizon:
@@ -40,13 +46,35 @@ expected savefile after each horizon:
 }
 ```
 
+### One save, and dense traces (`--save` / `--trace`)
+
+Pass CLI flags **after `--`** so npm forwards them to the script (bare `--save`
+would be eaten by npm itself):
+
+```bash
+npm run generate -- --save 1               # just capture id 1 -> ../saves/fixtures
+npm run generate -- --save 1 --trace t.json  # dense trace -> ../saves/traces/t.json
+```
+
+- `--save <id>` restricts the run to one capture. `<id>` is resolved by the
+  shared id convention (see `src/resolve.rs`): a path, `../saves/captures/<id>`,
+  or the glob `0*<id>-*.txt` (so `--save 1` matches `00001-…txt`; ambiguous or
+  missing ids error). Without `--trace`, this just rebuilds that one fixture.
+- `--trace <name>` writes a single **dense** fixture — the same schema, but with
+  `expected` carrying *every* tick `1..1000` — to `../saves/traces/<name>`. It
+  requires `--save`. This is the input to `ad-fidelity trace <name>`, which scans
+  it for the first tick that diverges from Rust. The two sides share
+  `saves/traces/`, so `--trace t.json` here pairs with `ad-fidelity trace t.json`.
+
 ## Configuration (env vars)
 
 - `GAME_URL` — where the game is served (default `http://localhost:8080`).
 - `SAVES_DIR` — input saves (default `../saves/captures`).
 - `OUT_DIR` — fixture output (default `../saves/fixtures`, git-ignored).
+- `TRACES_DIR` — dense-trace output (default `../saves/traces`, git-ignored).
 - `TICK_MS` — tick granularity, default 50 (design §10; a parameter).
-- `HORIZONS` — comma list, default `1,10,100,1000`.
+- `HORIZONS` — comma list, default `1,10,100,1000` (non-trace runs).
+- `TRACE_HORIZON` — max tick for `--trace` runs, default `1000`.
 
 ## Determinism controls (design §10)
 
