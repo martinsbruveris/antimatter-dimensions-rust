@@ -363,6 +363,8 @@ impl GameState {
             crate::celestials::singularity::GAMESPEED_FROM_SINGULARITIES,
             1.0,
         );
+        // Pelle: the `timeSpeedMult` rebuyable (while doomed).
+        factor *= self.pelle_time_speed_mult();
         // Effarig's Reality compresses game speed too (`getGameSpeedupFactor`
         // NERFS block).
         if self.celestials.effarig.run {

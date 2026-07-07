@@ -380,6 +380,11 @@ impl GameState {
             mult *= self.reality.machines.pow(&Decimal::from_float(force));
         }
 
+        // Pelle: the `antimatterDimensionMult` rebuyable (while doomed).
+        if self.is_doomed() {
+            mult *= self.pelle_ad_mult();
+        }
+
         // Infinity Power (from the Infinity Dimensions) gives an `^7` all-tier
         // multiplier (`infinityPower.pow(powerConversionRate).max(1)`) — except
         // under EC9, where it multiplies Time Dimensions instead.
@@ -420,6 +425,16 @@ impl GameState {
         let ad_pow = self.v_ad_pow();
         if ad_pow != 1.0 {
             mult = mult.pow(&Decimal::from_float(ad_pow));
+        }
+        // Pelle: the Infinity Strike raises AD multipliers `^0.5`; the Paradox
+        // rift gives an all-Dimension power.
+        if self.is_doomed() {
+            if self.pelle_has_strike(1) {
+                mult = mult.pow(&Decimal::from_float(0.5));
+            }
+            if self.pelle_rift_unlocked(crate::celestials::pelle::RIFT_PARADOX) {
+                mult = mult.pow(&self.pelle_rift_effect(crate::celestials::pelle::RIFT_PARADOX));
+            }
         }
 
         // Time Dilation compresses the final multiplier (raised to the

@@ -453,6 +453,73 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         .map(|(i, &n)| ((i + 1).to_string(), n))
         .collect::<std::collections::HashMap<_, _>>());
 
+    // Pelle (Feature 7.7).
+    {
+        let p = &state.celestials.pelle;
+        let pj = &mut player["celestials"]["pelle"];
+        pj["doomed"] = json!(p.doomed);
+        pj["remnants"] = json!(p.remnants);
+        pj["realityShards"] = json!(p.reality_shards.to_string());
+        pj["records"] = json!({
+            "totalAntimatter": p.records.total_antimatter.to_string(),
+            "totalInfinityPoints": p.records.total_infinity_points.to_string(),
+            "totalEternityPoints": p.records.total_eternity_points.to_string(),
+        });
+        pj["upgrades"] = json!((0..23u32)
+            .filter(|id| p.upgrades & (1u32 << id) != 0)
+            .collect::<Vec<_>>());
+        pj["progressBits"] = json!(p.progress_bits);
+        let rb_keys = [
+            "antimatterDimensionMult",
+            "timeSpeedMult",
+            "glyphLevels",
+            "infConversion",
+            "galaxyPower",
+        ];
+        let gg_keys = [
+            "galaxyGeneratorAdditive",
+            "galaxyGeneratorMultiplicative",
+            "galaxyGeneratorAntimatterMult",
+            "galaxyGeneratorIPMult",
+            "galaxyGeneratorEPMult",
+        ];
+        let mut rebuyables = serde_json::Map::new();
+        for (i, k) in rb_keys.iter().enumerate() {
+            rebuyables.insert(k.to_string(), json!(p.rebuyables[i]));
+        }
+        for (i, k) in gg_keys.iter().enumerate() {
+            rebuyables.insert(k.to_string(), json!(p.gg_rebuyables[i]));
+        }
+        pj["rebuyables"] = serde_json::Value::Object(rebuyables);
+        for (i, key) in ["vacuum", "decay", "chaos", "recursion", "paradox"]
+            .iter()
+            .enumerate()
+        {
+            let r = &p.rifts[i];
+            let rift = &mut pj["rifts"][*key];
+            // Chaos stores `fill` as a number; the others as a string.
+            rift["fill"] = if i == 2 {
+                json!(r.fill.to_f64())
+            } else {
+                json!(r.fill.to_string())
+            };
+            rift["active"] = json!(r.active);
+            rift["reducedTo"] = json!(r.reduced_to);
+            if i == 1 {
+                rift["percentageSpent"] = json!(r.percentage_spent);
+            }
+        }
+        let g = &p.galaxy_generator;
+        pj["galaxyGenerator"] = json!({
+            "unlocked": g.unlocked,
+            "spentGalaxies": g.spent_galaxies,
+            "generatedGalaxies": g.generated_galaxies,
+            "phase": g.phase,
+            "sacrificeActive": g.sacrifice_active,
+        });
+    }
+    player["isGameEnd"] = json!(state.is_game_end);
+
     // Black Holes.
     player["blackHole"] = json!(state
         .black_holes

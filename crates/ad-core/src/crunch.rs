@@ -179,6 +179,8 @@ impl GameState {
         // `handle_challenge_completion` keeps it active and the reset starts fresh.
         let entering_challenge =
             self.options.retry_challenge && self.in_antimatter_challenge();
+        // Pelle's Infinity Strike unlocks the Vacuum rift.
+        self.pelle_trigger_strike(1);
         self.big_crunch_reset(false, entering_challenge);
         true
     }

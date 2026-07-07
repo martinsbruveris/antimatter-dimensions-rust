@@ -250,3 +250,50 @@ export const IMAGINARY_REBUYABLE_DESCRIPTIONS = {
   9: "Increase Galaxy strength",
   10: "Increase Singularity gain",
 };
+
+// Pelle rift names + primary effect labels (`secret-formula/celestials/
+// rifts.js`), keyed by engine rift id.
+export const PELLE_RIFTS = [
+  { id: 0, name: "Vacuum", drain: "IP", effect: "IP gain" },
+  { id: 1, name: "Decay", drain: "Replicanti", effect: "Replicanti speed" },
+  { id: 2, name: "Chaos", drain: "Decay", effect: "Time Dimensions" },
+  { id: 3, name: "Recursion", drain: "EP", effect: "EP formula divisor" },
+  { id: 4, name: "Paradox", drain: "Dilated Time", effect: "All Dimensions (power)" },
+];
+
+// Pelle rebuyable descriptions, keyed by id 0-4.
+export const PELLE_REBUYABLE_DESCRIPTIONS = {
+  0: "Multiplier to Antimatter Dimensions",
+  1: "Multiplier to game speed",
+  2: "Increase the Glyph level allowed in Pelle",
+  3: "Increase Infinity Power conversion rate",
+  4: "Multiply Galaxy power",
+};
+
+// Pelle one-time upgrade descriptions (`secret-formula/celestials/
+// pelle-upgrades.js`), keyed by id 0-22.
+export const PELLE_UPGRADE_DESCRIPTIONS = {
+  0: "Permanent Autobuyers for Antimatter Dimensions 1-4",
+  1: "Permanent Autobuyer for Dimension Boosts",
+  2: "Autobuyer upgrades no longer reset on Armageddon",
+  3: "Permanent Autobuyers for Antimatter Dimensions 5-8",
+  4: "Permanent Autobuyer for Antimatter Galaxies",
+  5: "Permanent Autobuyer for Tickspeed upgrades",
+  6: "Infinity Upgrades no longer reset on Armageddon",
+  7: "Dimension Boosts no longer reset anything",
+  8: "Break Infinity Upgrades no longer reset on Armageddon",
+  9: "Permanent Autobuyers for Infinity Dimensions",
+  10: "Infinity Challenges no longer reset on Armageddon",
+  11: "Galaxies no longer reset Dimension Boosts",
+  12: "Permanent Autobuyers for Replicanti Upgrades",
+  13: "Replicanti Galaxies no longer reset on Infinity",
+  14: "Eternities no longer reset on Armageddon",
+  15: "Time Studies and Theorems no longer reset on Armageddon",
+  16: "Replicanti is permanently unlocked",
+  17: "Eternity Upgrades no longer reset on Armageddon",
+  18: "Permanent Autobuyers for Time Dimensions",
+  19: "Eternity Challenges no longer reset on Armageddon",
+  20: "Dilation Upgrades no longer reset on Armageddon",
+  21: "Tachyon Particles no longer reset on Armageddon",
+  22: "Replicanti Galaxies no longer reset anything",
+};

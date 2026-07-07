@@ -123,6 +123,8 @@ impl GameState {
         // 26: buy an Antimatter Galaxy (fires before the reset, like the
         // original's GALAXY_RESET_BEFORE).
         self.unlock_achievement(26);
+        // Pelle's power-up-Galaxies Strike unlocks the Decay rift.
+        self.pelle_trigger_strike(2);
         self.galaxies += 1;
         self.galaxy_reset();
         // 27: have ≥ 2 Antimatter Galaxies (after the increment).

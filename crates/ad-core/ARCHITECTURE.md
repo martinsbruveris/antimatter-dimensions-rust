@@ -215,7 +215,19 @@ not the current state).
   iU19 annihilation unlock). Deferred: the Continuum super-exponential branch, the
   DMD/annihilation/condense autobuyers, the deep imaginary-upgrade requirements
   (11–14/22–24), and the tesseract-linked effects. iU25 (Pelle unlock) lands with
-  7.7. See `../../docs/design/2026-07-07-laitela.md`.
+  7.7. See `../../docs/design/2026-07-07-laitela.md`. `pelle.rs` (Feature 7.7):
+  Pelle's `PelleState` — dooming (`doom_reality`, gated on Imaginary Upgrade 25) +
+  Armageddon, Remnants (`remnants_gain` from the doomed records) → Reality Shards
+  (`pelle_tick` in `tick.rs`), the 5 Rifts (fill/percentage/effect/milestones,
+  drained from IP/Replicanti/EP/DT), Strikes (`pelle_trigger_strike` from crunch/
+  eternity/galaxy/dilate + the 115-TT check), Pelle Upgrades (5 rebuyable + 23
+  one-time), the Galaxy Generator (`galaxy_generator_loop`, phases + sacrifice),
+  and the antimatter game-end (`game_end_state` → `is_game_end`). Effects wired:
+  the doomed `antimatterDimensionMult` + `timeSpeedMult` rebuyables, the Infinity-
+  Strike AD `^0.5` penalty, and the Paradox all-dim power. **The full `isDisabled`
+  disable-everything sweep is a documented cut** (`pelle_is_disabled` is a query;
+  only a subset of sites consult it); the credits/song/`zalgo` finale is cut. See
+  `../../docs/design/2026-07-07-pelle.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant

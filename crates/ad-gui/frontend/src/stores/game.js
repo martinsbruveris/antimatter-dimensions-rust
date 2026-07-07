@@ -310,6 +310,30 @@ export const useGameStore = defineStore("game", {
       await invoke("buy_imaginary_rebuyable", { id });
       this.snapshot = await this.getState();
     },
+    async doomReality() {
+      await invoke("doom_reality");
+      this.snapshot = await this.getState();
+    },
+    async pelleArmageddon() {
+      await invoke("pelle_armageddon");
+      this.snapshot = await this.getState();
+    },
+    async pelleToggleRift(rift) {
+      await invoke("pelle_toggle_rift", { rift });
+      this.snapshot = await this.getState();
+    },
+    async buyPelleUpgrade(id) {
+      await invoke("buy_pelle_upgrade", { id });
+      this.snapshot = await this.getState();
+    },
+    async buyPelleRebuyable(id) {
+      await invoke("buy_pelle_rebuyable", { id });
+      this.snapshot = await this.getState();
+    },
+    async pelleStartSacrifice() {
+      await invoke("pelle_start_sacrifice");
+      this.snapshot = await this.getState();
+    },
     async unlockBlackHole() {
       await invoke("unlock_black_hole");
       this.snapshot = await this.getState();

@@ -174,6 +174,9 @@ pub struct PlayerDTO {
     /// sub-objects are unmodelled and round-trip via the encode template.
     #[serde(default)]
     pub celestials: CelestialsDTO,
+    /// `player.isGameEnd` — Pelle's finale reached.
+    #[serde(default)]
+    pub is_game_end: bool,
 }
 
 /// `player.celestials` (modelled subset). Each sub-object defaults so a partial
@@ -194,6 +197,8 @@ pub struct CelestialsDTO {
     pub ra: RaDTO,
     #[serde(default)]
     pub laitela: LaitelaDTO,
+    #[serde(default)]
+    pub pelle: PelleDTO,
 }
 
 /// `player.celestials.teresa`. `timePoured` is a runtime accumulator (not in the
@@ -416,6 +421,129 @@ pub struct DarkMatterDimensionDTO {
     pub time_since_last_update: f64,
     #[serde(default)]
     pub ascension_count: u32,
+}
+
+/// A Decimal stored as either a JSON string (most rift fills) or a number
+/// (chaos's `fill`, `reducedTo`, etc.).
+mod decimal_str_or_num {
+    use break_infinity::Decimal;
+    use serde::{Deserialize, Deserializer};
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Decimal, D::Error> {
+        let v = serde_json::Value::deserialize(d)?;
+        Ok(match v {
+            serde_json::Value::String(s) => s.parse().unwrap_or(Decimal::ZERO),
+            serde_json::Value::Number(n) => Decimal::from_float(n.as_f64().unwrap_or(0.0)),
+            _ => Decimal::ZERO,
+        })
+    }
+}
+
+fn decimal_zero() -> Decimal {
+    Decimal::ZERO
+}
+
+/// `player.celestials.pelle` (Feature 7.7).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PelleDTO {
+    #[serde(default)]
+    pub doomed: bool,
+    #[serde(default)]
+    pub remnants: f64,
+    #[serde(
+        default = "decimal_zero",
+        deserialize_with = "decimal_str_or_num::deserialize"
+    )]
+    pub reality_shards: Decimal,
+    #[serde(default)]
+    pub records: PelleRecordsDTO,
+    /// One-time upgrade ids (a Set).
+    #[serde(default)]
+    pub upgrades: Vec<u32>,
+    #[serde(default)]
+    pub rebuyables: std::collections::HashMap<String, u32>,
+    #[serde(default)]
+    pub rifts: PelleRiftsDTO,
+    #[serde(default)]
+    pub progress_bits: u32,
+    #[serde(default)]
+    pub galaxy_generator: GalaxyGeneratorDTO,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PelleRecordsDTO {
+    #[serde(
+        default = "decimal_zero",
+        deserialize_with = "decimal_str_or_num::deserialize"
+    )]
+    pub total_antimatter: Decimal,
+    #[serde(
+        default = "decimal_zero",
+        deserialize_with = "decimal_str_or_num::deserialize"
+    )]
+    pub total_infinity_points: Decimal,
+    #[serde(
+        default = "decimal_zero",
+        deserialize_with = "decimal_str_or_num::deserialize"
+    )]
+    pub total_eternity_points: Decimal,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PelleRiftsDTO {
+    #[serde(default)]
+    pub vacuum: PelleRiftDTO,
+    #[serde(default)]
+    pub decay: PelleRiftDTO,
+    #[serde(default)]
+    pub chaos: PelleRiftDTO,
+    #[serde(default)]
+    pub recursion: PelleRiftDTO,
+    #[serde(default)]
+    pub paradox: PelleRiftDTO,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PelleRiftDTO {
+    #[serde(
+        default = "decimal_zero",
+        deserialize_with = "decimal_str_or_num::deserialize"
+    )]
+    pub fill: Decimal,
+    #[serde(default)]
+    pub active: bool,
+    #[serde(default = "f64_one")]
+    pub reduced_to: f64,
+    #[serde(default)]
+    pub percentage_spent: f64,
+}
+
+impl Default for PelleRiftDTO {
+    fn default() -> Self {
+        Self {
+            fill: Decimal::ZERO,
+            active: false,
+            reduced_to: 1.0,
+            percentage_spent: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalaxyGeneratorDTO {
+    #[serde(default)]
+    pub unlocked: bool,
+    #[serde(default)]
+    pub spent_galaxies: f64,
+    #[serde(default)]
+    pub generated_galaxies: f64,
+    #[serde(default)]
+    pub phase: u32,
+    #[serde(default)]
+    pub sacrifice_active: bool,
 }
 
 /// `player.reality` (modelled subset). The glyph inventory lives under
@@ -1528,6 +1656,63 @@ impl GameState {
                 }
             }
 
+            let mut pelle = crate::celestials::PelleState::new();
+            {
+                use crate::celestials::pelle::{
+                    GalaxyGenerator, PelleRecords, Rift,
+                };
+                let p = &cel.pelle;
+                pelle.doomed = p.doomed;
+                pelle.remnants = p.remnants;
+                pelle.reality_shards = p.reality_shards;
+                pelle.records = PelleRecords {
+                    total_antimatter: p.records.total_antimatter,
+                    total_infinity_points: p.records.total_infinity_points,
+                    total_eternity_points: p.records.total_eternity_points,
+                };
+                for id in &p.upgrades {
+                    if *id < 32 {
+                        pelle.upgrades |= 1u32 << id;
+                    }
+                }
+                let rb = |k: &str| p.rebuyables.get(k).copied().unwrap_or(0);
+                pelle.rebuyables = [
+                    rb("antimatterDimensionMult"),
+                    rb("timeSpeedMult"),
+                    rb("glyphLevels"),
+                    rb("infConversion"),
+                    rb("galaxyPower"),
+                ];
+                pelle.gg_rebuyables = [
+                    rb("galaxyGeneratorAdditive"),
+                    rb("galaxyGeneratorMultiplicative"),
+                    rb("galaxyGeneratorAntimatterMult"),
+                    rb("galaxyGeneratorIPMult"),
+                    rb("galaxyGeneratorEPMult"),
+                ];
+                let map_rift = |r: &PelleRiftDTO| Rift {
+                    fill: r.fill,
+                    active: r.active,
+                    reduced_to: r.reduced_to,
+                    percentage_spent: r.percentage_spent,
+                };
+                pelle.rifts = [
+                    map_rift(&p.rifts.vacuum),
+                    map_rift(&p.rifts.decay),
+                    map_rift(&p.rifts.chaos),
+                    map_rift(&p.rifts.recursion),
+                    map_rift(&p.rifts.paradox),
+                ];
+                pelle.progress_bits = p.progress_bits;
+                pelle.galaxy_generator = GalaxyGenerator {
+                    unlocked: p.galaxy_generator.unlocked,
+                    spent_galaxies: p.galaxy_generator.spent_galaxies,
+                    generated_galaxies: p.galaxy_generator.generated_galaxies,
+                    phase: p.galaxy_generator.phase,
+                    sacrifice_active: p.galaxy_generator.sacrifice_active,
+                };
+            }
+
             crate::celestials::CelestialsState {
                 teresa,
                 effarig,
@@ -1535,6 +1720,7 @@ impl GameState {
                 v,
                 ra,
                 laitela,
+                pelle,
             }
         };
 
@@ -1887,6 +2073,7 @@ impl GameState {
             celestials,
             autobuyers,
             options,
+            is_game_end: dto.is_game_end,
         })
     }
 }

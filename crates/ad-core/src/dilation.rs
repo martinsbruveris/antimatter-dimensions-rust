@@ -198,6 +198,8 @@ impl GameState {
             self.eternity_reset();
         }
         self.dilation.active = true;
+        // Pelle's Dilation Strike unlocks the Paradox rift (and resets records).
+        self.pelle_trigger_strike(5);
         true
     }
 

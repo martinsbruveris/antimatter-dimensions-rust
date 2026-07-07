@@ -977,6 +977,50 @@ struct CelestialsView {
     v: VView,
     ra: RaView,
     laitela: LaitelaView,
+    pelle: PelleView,
+}
+
+/// Pelle subtab (Feature 7.7).
+#[derive(Serialize)]
+struct PelleView {
+    unlocked: bool,
+    doomed: bool,
+    remnants: f64,
+    remnants_gain: f64,
+    can_armageddon: bool,
+    reality_shards: Num,
+    reality_shard_per_second: Num,
+    is_game_end: bool,
+    game_end_progress: f64,
+    galaxy_generator_unlocked: bool,
+    galaxy_generator_galaxies: f64,
+    rifts: Vec<RiftView>,
+    rebuyables: Vec<PelleRebuyableView>,
+    upgrades: Vec<PelleUpgradeView>,
+}
+
+#[derive(Serialize)]
+struct RiftView {
+    id: usize,
+    unlocked: bool,
+    active: bool,
+    percentage: f64,
+    milestones: Vec<bool>,
+}
+
+#[derive(Serialize)]
+struct PelleRebuyableView {
+    id: usize,
+    cost: Num,
+    count: u32,
+    cap: u32,
+}
+
+#[derive(Serialize)]
+struct PelleUpgradeView {
+    id: u32,
+    cost: Num,
+    bought: bool,
 }
 
 /// Lai'tela subtab (Feature 7.6).
@@ -1298,6 +1342,53 @@ fn build_celestials_view(game: &GameState) -> CelestialsView {
         v: build_v_view(game),
         ra: build_ra_view(game),
         laitela: build_laitela_view(game),
+        pelle: build_pelle_view(game),
+    }
+}
+
+/// Build the Pelle subtab view.
+fn build_pelle_view(game: &GameState) -> PelleView {
+    use ad_core::celestials::pelle::RIFT_COUNT;
+    let p = &game.celestials.pelle;
+    let rifts = (0..RIFT_COUNT)
+        .map(|i| RiftView {
+            id: i,
+            unlocked: game.pelle_rift_unlocked(i),
+            active: p.rifts[i].active,
+            percentage: game.pelle_rift_percentage(i).clamp(0.0, 1.0),
+            milestones: (0..3).map(|m| game.pelle_rift_milestone(i, m)).collect(),
+        })
+        .collect();
+    let rebuyables = (0..5)
+        .map(|id| PelleRebuyableView {
+            id,
+            cost: num(&game.pelle_rebuyable_cost(id)),
+            count: p.rebuyables[id],
+            cap: GameState::PELLE_REBUYABLE_CAPS[id],
+        })
+        .collect();
+    let upgrades = (0..23u32)
+        .map(|id| PelleUpgradeView {
+            id,
+            cost: num(&game.pelle_upgrade_cost(id)),
+            bought: game.pelle_upgrade_bought(id),
+        })
+        .collect();
+    PelleView {
+        unlocked: game.pelle_unlocked(),
+        doomed: game.is_doomed(),
+        remnants: p.remnants,
+        remnants_gain: game.remnants_gain(),
+        can_armageddon: game.can_armageddon(),
+        reality_shards: num(&p.reality_shards),
+        reality_shard_per_second: num(&game.reality_shard_gain_per_second()),
+        is_game_end: game.is_game_end,
+        game_end_progress: game.game_end_state().min(1.0),
+        galaxy_generator_unlocked: game.galaxy_generator_unlocked(),
+        galaxy_generator_galaxies: game.galaxy_generator_galaxies(),
+        rifts,
+        rebuyables,
+        upgrades,
     }
 }
 
@@ -2988,6 +3079,36 @@ fn buy_imaginary_rebuyable(id: u8, state: State<'_, Mutex<GameState>>) {
 }
 
 #[tauri::command]
+fn doom_reality(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().doom_reality();
+}
+
+#[tauri::command]
+fn pelle_armageddon(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().armageddon(true);
+}
+
+#[tauri::command]
+fn pelle_toggle_rift(rift: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().pelle_toggle_rift(rift);
+}
+
+#[tauri::command]
+fn buy_pelle_upgrade(id: u32, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_pelle_upgrade(id);
+}
+
+#[tauri::command]
+fn buy_pelle_rebuyable(id: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_pelle_rebuyable(id);
+}
+
+#[tauri::command]
+fn pelle_start_sacrifice(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().galaxy_generator_start_sacrifice();
+}
+
+#[tauri::command]
 fn unlock_black_hole(state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().unlock_black_hole();
 }
@@ -4380,6 +4501,12 @@ pub fn run() {
             laitela_change_singularity_cap,
             buy_imaginary_upgrade,
             buy_imaginary_rebuyable,
+            doom_reality,
+            pelle_armageddon,
+            pelle_toggle_rift,
+            buy_pelle_upgrade,
+            buy_pelle_rebuyable,
+            pelle_start_sacrifice,
             unlock_black_hole,
             buy_black_hole_upgrade,
             toggle_black_hole_pause,

@@ -38,6 +38,10 @@ impl GameState {
         self.laitela_reality_tick(real_dt_ms);
         self.tick_imaginary_machines(real_dt_ms);
 
+        // Pelle (while doomed): Reality Shards, rift fills, the Galaxy
+        // Generator, and the game-end check.
+        self.pelle_tick(real_dt_ms);
+
         // Advance the per-run challenge accumulators first, matching the original
         // game loop (`updateNormalAndInfinityChallenges` runs before autobuyers
         // and production).

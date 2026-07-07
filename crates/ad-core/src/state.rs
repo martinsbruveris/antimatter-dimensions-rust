@@ -455,6 +455,9 @@ pub struct GameState {
     /// are **not** reset by a Big Crunch; they persist for the whole save.
     #[cfg_attr(feature = "serde", serde(default))]
     pub options: Options,
+    /// Whether the game has ended (`player.isGameEnd`, Pelle's finale).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub is_game_end: bool,
 }
 
 impl GameState {
@@ -526,6 +529,7 @@ impl GameState {
             celestials: crate::celestials::CelestialsState::new(),
             autobuyers: AutobuyerState::new(),
             options: Options::new(),
+            is_game_end: false,
         }
     }
 

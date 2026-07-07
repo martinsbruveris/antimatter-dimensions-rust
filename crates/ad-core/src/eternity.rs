@@ -124,6 +124,8 @@ impl GameState {
         if !self.can_eternity() {
             return false;
         }
+        // Pelle's Eternity Strike unlocks the Chaos rift.
+        self.pelle_trigger_strike(3);
 
         // ETERNITY_RESET_BEFORE requirement checks (RU6/8/10), before the
         // rewards clear the `noEternities` flag.

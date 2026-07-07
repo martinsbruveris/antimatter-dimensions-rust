@@ -16,6 +16,7 @@ pub mod effarig;
 pub mod enslaved;
 pub mod imaginary_upgrades;
 pub mod laitela;
+pub mod pelle;
 pub mod ra;
 pub mod singularity;
 pub mod teresa;
@@ -24,6 +25,7 @@ pub mod v;
 pub use effarig::EffarigState;
 pub use enslaved::EnslavedState;
 pub use laitela::LaitelaState;
+pub use pelle::PelleState;
 pub use ra::RaState;
 pub use teresa::TeresaState;
 pub use v::VState;
@@ -58,6 +60,8 @@ pub struct CelestialsState {
     pub ra: RaState,
     #[cfg_attr(feature = "serde", serde(default))]
     pub laitela: LaitelaState,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub pelle: PelleState,
 }
 
 impl CelestialsState {
@@ -69,6 +73,7 @@ impl CelestialsState {
             v: VState::new(),
             ra: RaState::new(),
             laitela: LaitelaState::new(),
+            pelle: PelleState::new(),
         }
     }
 }
@@ -252,6 +257,23 @@ mod tests {
         game.celestials.laitela.dimensions[1].ascension_count = 4;
         game.reality.imaginary_upgrade_bits = (1 << 15) | (1 << 19);
         game.reality.imaginary_rebuyables[7] = 6;
+        // Pelle state.
+        game.celestials.pelle.doomed = true;
+        game.celestials.pelle.remnants = 42.0;
+        game.celestials.pelle.reality_shards = Decimal::new(1.0, 12);
+        game.celestials.pelle.records.total_antimatter = Decimal::new(1.0, 5000);
+        game.celestials.pelle.upgrades = (1 << 2) | (1 << 5);
+        game.celestials.pelle.rebuyables = [3, 1, 0, 2, 4];
+        game.celestials.pelle.gg_rebuyables = [1, 2, 0, 0, 0];
+        game.celestials.pelle.progress_bits = 0b101010;
+        game.celestials.pelle.rifts[0].fill = Decimal::new(1.0, 20);
+        game.celestials.pelle.rifts[0].active = true;
+        game.celestials.pelle.rifts[2].fill = Decimal::from_float(3.5);
+        game.celestials.pelle.rifts[1].percentage_spent = 0.15;
+        game.celestials.pelle.galaxy_generator.unlocked = true;
+        game.celestials.pelle.galaxy_generator.generated_galaxies = 500.0;
+        game.celestials.pelle.galaxy_generator.phase = 2;
+        game.is_game_end = false;
 
         let encoded = crate::save::encode_save(&game, 0);
         let decoded = crate::save::decode_save(&encoded).expect("decode");
@@ -305,5 +327,27 @@ mod tests {
             (1 << 15) | (1 << 19)
         );
         assert_eq!(decoded.reality.imaginary_rebuyables[7], 6);
+        // Pelle round-trip.
+        assert!(decoded.celestials.pelle.doomed);
+        assert_eq!(decoded.celestials.pelle.remnants, 42.0);
+        assert_eq!(decoded.celestials.pelle.reality_shards, Decimal::new(1.0, 12));
+        assert_eq!(
+            decoded.celestials.pelle.records.total_antimatter,
+            Decimal::new(1.0, 5000)
+        );
+        assert_eq!(decoded.celestials.pelle.upgrades, (1 << 2) | (1 << 5));
+        assert_eq!(decoded.celestials.pelle.rebuyables, [3, 1, 0, 2, 4]);
+        assert_eq!(decoded.celestials.pelle.gg_rebuyables, [1, 2, 0, 0, 0]);
+        assert_eq!(decoded.celestials.pelle.progress_bits, 0b101010);
+        assert_eq!(decoded.celestials.pelle.rifts[0].fill, Decimal::new(1.0, 20));
+        assert!(decoded.celestials.pelle.rifts[0].active);
+        assert_eq!(decoded.celestials.pelle.rifts[2].fill, Decimal::from_float(3.5));
+        assert_eq!(decoded.celestials.pelle.rifts[1].percentage_spent, 0.15);
+        assert!(decoded.celestials.pelle.galaxy_generator.unlocked);
+        assert_eq!(
+            decoded.celestials.pelle.galaxy_generator.generated_galaxies,
+            500.0
+        );
+        assert_eq!(decoded.celestials.pelle.galaxy_generator.phase, 2);
     }
 }
