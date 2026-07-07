@@ -193,8 +193,12 @@ impl GameState {
 
         // Complete the current group (the original's "buy any remaining until 10
         // before attempting to bulk-buy"). The affordability check above guarantees
-        // every buy in it succeeds, landing on the next multiple of ten.
+        // every buy in it succeeds, landing on the next multiple of ten. Unlike the
+        // manual "buy until 10" (`buyManyDimension`), `buyMaxDimension` finishes the
+        // group via `buyUntilTen`, which *rounds* the dimension amount — so mirror
+        // that here (the fractional stock from production would otherwise linger).
         let mut count = self.buy_until_10_dimension(tier);
+        self.dimensions[tier].amount = self.dimensions[tier].amount.round();
         let mut bulk_left = bulk - 1.0;
         if bulk_left <= 0.0 {
             return count;
@@ -208,6 +212,7 @@ impl GameState {
                 && self.dimension_cost(tier) < goal
             {
                 count += self.buy_until_10_dimension(tier);
+                self.dimensions[tier].amount = self.dimensions[tier].amount.round();
                 bulk_left -= 1.0;
             }
             return count;
