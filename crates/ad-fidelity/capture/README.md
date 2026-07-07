@@ -9,7 +9,7 @@ Two pieces:
 
 - **`userscript.js`** — injected into the running original game. Adds a small
   panel with **speed buttons** (fast-forward the manual playthrough) and
-  **time-based capture** (export the savefile on a *game-time* cadence and POST
+  **time-based capture** (export the savefile on a *real-time* cadence and POST
   it to the local server). Event-driven capture is deferred to phase 2.
 - **`save-server.js`** — a tiny local HTTP server that receives the POSTed saves
   and writes them, sequenced, to a directory (plus an `index.jsonl` of metadata).
@@ -69,22 +69,24 @@ Open <http://localhost:8080>. A panel appears bottom-right:
 
 ```
 AD Fidelity Capture
-[1×] [5×] [25×] [100×] [1000×]
-[Start capture]  [Save now]
+[1×] [10×] [100×] [1000×]
+since save —  [Start capture]  [Save now]
 speed 1× · capture off · 0 saved
 ```
 
 - **Speed buttons** — fast-forward the game (see *How speed works* below). The
   active speed is shown in bold.
 - **Start / Stop capture** — toggles the time-based cadence. On start, it
-  captures immediately, then every `CAPTURE_GAME_MS` of **game** time.
+  captures immediately, then every `CAPTURE_REAL_MS` of **real** time.
 - **Save now** — capture a single savefile on demand (tagged `manual`).
+- **since save** — live counter of the real time elapsed since the last
+  successful save (`—` until the first one).
 - **Status line** — current speed, whether capture is on, and the running count.
 
 Play the game normally, pick a speed your machine can sustain, and click
-**Start capture**. Savefiles land in `captures/` as `NNNNN-HHH-MM-SS-timed.txt`,
-where `HHH-MM-SS` is the game time elapsed at capture; on-demand saves are
-`NNNNN-HHH-MM-SS-manual.txt`. Metadata for every capture is appended to
+**Start capture**. Savefiles land in `captures/` as `NNNNN-HHHH-MM-SS-timed.txt`,
+where `HHHH-MM-SS` is the game time elapsed at capture; on-demand saves are
+`NNNNN-HHHH-MM-SS-manual.txt`. Metadata for every capture is appended to
 `captures/index.jsonl`.
 
 ## Configuration
@@ -96,9 +98,9 @@ Edit the constants at the top of the file:
 | Constant | Default | Meaning |
 |----------|---------|---------|
 | `SERVER_URL` | `http://localhost:8899` | Where captures are POSTed. Must match the save server. |
-| `CAPTURE_GAME_MS` | `60_000` | Game-time between captures (ms). Lower = denser sampling. |
+| `CAPTURE_REAL_MS` | `60_000` | Real-time between captures (ms). Lower = denser sampling. |
 | `POLL_MS` | `500` | How often (real time) the cadence is checked. |
-| `SPEEDS` | `[1, 5, 25, 100, 1000]` | Speed-button multipliers. |
+| `SPEEDS` | `[1, 10, 100, 1000]` | Speed-button multipliers. |
 
 The `@match` lines in the `// ==UserScript==` header control which pages the
 script runs on. It ships matching `http://localhost:8080/*`,
@@ -126,14 +128,15 @@ port, or a built `dist/` served statically):
 
 ## Output format
 
-- `captures/NNNNN-HHH-MM-SS-<tag>.txt` — the raw savefile string, exactly as the
+- `captures/NNNNN-HHHH-MM-SS-<tag>.txt` — the raw savefile string, exactly as the
   game's export produces it (importable back into the game, and decodable by the
-  Rust save codec). `NNNNN` is the capture sequence; `HHH-MM-SS` is the game time
-  elapsed at capture (hours-minutes-seconds).
+  Rust save codec). `NNNNN` is the capture sequence; `HHHH-MM-SS` is the game time
+  elapsed at capture (hours-minutes-seconds). The capture *cadence* is real time,
+  but this timestamp is game time, so it marks the run's progression.
 - `captures/index.jsonl` — one JSON object per capture:
 
   ```json
-  {"file":"00007-001-00-00-timed.txt","tag":"timed","wall":1751799600000,
+  {"file":"00007-0001-00-00-timed.txt","tag":"timed","wall":1751799600000,
    "bytes":7043,"meta":{"gameTime":3600000,"speed":25}}
   ```
 
@@ -173,7 +176,8 @@ game's progression rather than clustered where you spent real time.
 - Speed control stops the game's own `gameLoop` interval and drives
   `window.gameLoop(updateRate)` *m* times per real tick — i.e. more ticks of the
   normal step size, not one giant tick. This keeps tick granularity faithful.
-- The cadence is measured in **game time** (`records.totalTimePlayed`), so
-  coverage stays even regardless of the chosen speed.
+- The cadence is measured in **real time**, so captures land on a steady
+  wall-clock schedule regardless of the chosen speed (the filename timestamp is
+  still game time — `records.totalTimePlayed` — marking the run's progression).
 - `captures/` is git-ignored; the curated subset used by tests is selected from a
   capture run separately.

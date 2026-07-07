@@ -11,8 +11,8 @@
 //   PORT=8899 CAPTURE_DIR=captures node save-server.js
 //
 // POST /save  body: {"tag": "...", "wall": <ms>, "save": "<savefile>", "meta": {...}}
-//   -> writes NNNNN_<tag>.txt containing the savefile, and appends a metadata
-//      line to index.jsonl. The sequence continues across restarts.
+//   -> writes NNNNN-HHHH-MM-SS-<tag>.txt containing the savefile, and appends a
+//      metadata line to index.jsonl. The sequence continues across restarts.
 
 const http = require("http");
 const fs = require("fs");
@@ -42,15 +42,15 @@ function sanitizeTag(tag) {
     .slice(0, 60);
 }
 
-// Game time elapsed (ms) -> "HHH-MM-SS" (hours zero-padded to 3 digits; wider
-// if a run exceeds 999 h).
+// Game time elapsed (ms) -> "HHHH-MM-SS" (hours zero-padded to 4 digits; wider
+// if a run exceeds 9999 h).
 function formatGameTime(ms) {
   const totalSec = Math.floor((Number(ms) || 0) / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
   return (
-    `${String(h).padStart(3, "0")}-` +
+    `${String(h).padStart(4, "0")}-` +
     `${String(m).padStart(2, "0")}-` +
     `${String(s).padStart(2, "0")}`
   );

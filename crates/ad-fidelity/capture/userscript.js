@@ -2,7 +2,7 @@
 // @name         AD Fidelity Capture
 // @namespace    ad-fidelity
 // @version      0.1
-// @description  Speed controls + time-based savefile capture for the AD fidelity harness
+// @description  Speed controls + real-time savefile capture for the AD fidelity harness
 // @match        http://localhost:8080/*
 // @match        https://ivark.github.io/*
 // @match        https://*.antimatterdimensions.com/*
@@ -13,9 +13,9 @@
 // Injected into the *original* Antimatter Dimensions game (run it locally, e.g.
 // `npm run serve` in ../antimatter-dimensions, then load this via Tampermonkey/
 // Violentmonkey). Adds a small panel with:
-//   - speed buttons (1×/5×/25×/100×/1000×): run the game loop faster, in the
+//   - speed buttons (1×/10×/100×/1000×): run the game loop faster, in the
 //     game's normal `updateRate`-sized steps (no giant single ticks);
-//   - time-based capture: exports the savefile on a *game-time* cadence and
+//   - time-based capture: exports the savefile on a *real-time* cadence and
 //     POSTs it to the local save-server (save-server.js).
 // Event-driven capture is deferred to phase 2 (see the design doc).
 
@@ -24,15 +24,16 @@
 
   // ---- config ----
   const SERVER_URL = "http://localhost:8899";
-  const CAPTURE_GAME_MS = 60_000; // capture every 60 s of *game* time
-  const POLL_MS = 500; // how often (real time) to check the game-time cadence
-  const SPEEDS = [1, 5, 25, 100, 1000];
+  const CAPTURE_REAL_MS = 60_000; // capture every 60 s of *real* time
+  const POLL_MS = 500; // how often (real time) to check the capture cadence
+  const SPEEDS = [1, 10, 100, 1000];
 
   // ---- state ----
   let speed = 1;
   let fastTimer = null;
   let capturing = false;
-  let nextCaptureAt = null;
+  let nextCaptureWall = null; // wall-clock ms of the next scheduled capture
+  let lastCaptureWall = null; // wall-clock ms of the last successful capture
   let captureCount = 0;
 
   function ready() {
@@ -91,30 +92,58 @@
     })
       .then(() => {
         captureCount++;
+        lastCaptureWall = Date.now();
         render();
       })
       .catch((e) => console.warn("[ad-fidelity] POST failed", e));
   }
 
-  // Game-time cadence: poll in real time, capture whenever game time has
-  // advanced past the next multiple of CAPTURE_GAME_MS. Robust to speed changes
-  // (fast-forward simply crosses more thresholds per poll).
+  // Real-time cadence: poll and capture whenever wall-clock time has advanced
+  // past the next multiple of CAPTURE_REAL_MS. Independent of game speed, so a
+  // fast-forwarded run is sampled on the same real-time schedule.
   setInterval(() => {
     if (!capturing || !ready()) return;
-    const gt = window.player.records.totalTimePlayed;
-    if (nextCaptureAt === null) nextCaptureAt = gt; // capture immediately on enable
-    if (gt >= nextCaptureAt) {
+    const now = Date.now();
+    if (nextCaptureWall === null) nextCaptureWall = now; // capture immediately on enable
+    if (now >= nextCaptureWall) {
       capture("timed");
       do {
-        nextCaptureAt += CAPTURE_GAME_MS;
-      } while (gt >= nextCaptureAt);
+        nextCaptureWall += CAPTURE_REAL_MS;
+      } while (now >= nextCaptureWall);
     }
   }, POLL_MS);
 
+  // Keep the "since save" counter ticking even between captures.
+  setInterval(renderSince, 1000);
+
   // ---- UI ----
   let panel;
+
+  // Real-time duration (ms) -> "M:SS" or "H:MM:SS".
+  function formatDuration(ms) {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const mm = String(m).padStart(2, "0");
+    const ss = String(s).padStart(2, "0");
+    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+  }
+
+  // Live "time since last successful save" counter, next to the buttons.
+  function renderSince() {
+    if (!panel) return;
+    const el = panel.querySelector("#adf-since");
+    if (!el) return;
+    el.textContent =
+      lastCaptureWall === null
+        ? "since save —"
+        : `since save ${formatDuration(Date.now() - lastCaptureWall)}`;
+  }
+
   function render() {
     if (!panel) return;
+    
     panel.querySelector("#adf-status").textContent =
       `speed ${speed}× · capture ${capturing ? "ON" : "off"} · ${captureCount} saved`;
     panel.querySelectorAll("[data-speed]").forEach((b) => {
@@ -122,6 +151,7 @@
     });
     const t = panel.querySelector("#adf-toggle");
     if (t) t.textContent = capturing ? "Stop capture" : "Start capture";
+    renderSince();
   }
 
   function buildPanel() {
@@ -136,6 +166,7 @@
       `<div style="margin-bottom:4px">AD Fidelity Capture</div>` +
       `<div style="margin-bottom:4px">${speeds}</div>` +
       `<div style="margin-bottom:4px">` +
+      `<span id="adf-since" style="margin-right:4px">since save —</span>` +
       `<button id="adf-toggle">Start capture</button> ` +
       `<button id="adf-now">Save now</button></div>` +
       `<div id="adf-status"></div>`;
@@ -147,7 +178,7 @@
       );
     panel.querySelector("#adf-toggle").addEventListener("click", () => {
       capturing = !capturing;
-      nextCaptureAt = null;
+      nextCaptureWall = null;
       render();
     });
     panel.querySelector("#adf-now").addEventListener("click", () => capture("manual"));
