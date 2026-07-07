@@ -148,6 +148,22 @@ impl GameState {
         self.dim_currency_amount(tier) >= self.dimension_cost_until_10(tier)
     }
 
+    /// Whether a *single* purchase of `tier` is affordable (`isAffordable`): the
+    /// spending currency covers one unit's `cost`. Mirrors the original's guards —
+    /// never while Continuum is active, and pre-break not once the cost passes
+    /// `NUMBER_MAX_VALUE`. This is the AD autobuyer's `canTick` readiness gate (it
+    /// checks the single cost even in "Buys max" mode).
+    pub fn dim_single_affordable(&self, tier: usize) -> bool {
+        if self.continuum_active() {
+            return false;
+        }
+        let cost = self.dimension_cost(tier);
+        if !self.broke_infinity && cost > Decimal::NUMBER_MAX_VALUE {
+            return false;
+        }
+        self.dim_currency_amount(tier) >= cost
+    }
+
     /// Faithful port of the original `buyMaxDimension(tier, bulk)` — the "Buys
     /// max" (`BUY_10`) action for both the manual button (`bulk = ∞`) and the AD
     /// autobuyer (`bulk` = its bulk-multiplier setting). It always buys in

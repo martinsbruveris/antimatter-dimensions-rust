@@ -78,10 +78,30 @@ firing on the first `tick(interval)`). Updated to the faithful model:
 - `cargo test -p ad-core --features serde`: 507 pass. `-p ad-fidelity`: pass.
 - fmt + clippy clean on the four touched files.
 
-## Notes / follow-ups
-- A distinct, still-latent difference remains out of scope: JS's AD `canTick`
-  gates the `lastTick` reset on `isAffordable` (single-cost), so an autobuyer
-  that cannot afford even one dimension keeps accruing phase; our `advance`
-  resets the timer whenever the interval elapses regardless of affordability. It
-  does not bite this fixture (single-cost is always affordable there), but could
-  in very early-game states.
+## Follow-up (same session) — readiness-gated timer reset
+The latent difference noted below turned out to matter for the broader grid, so
+it was fixed in the same session. Every interval autobuyer's JS `canTick`
+overrides gate on action-readiness (AD/Tickspeed `isAvailableForPurchase &&
+isAffordable`, Dim Boost/Galaxy `canBeBought && requirement.isSatisfied`, Big
+Crunch `Player.canCrunch`), and `tick()` (which resets `lastTick`) only runs when
+`canTick` holds. Our `advance` reset the timer whenever the interval elapsed,
+regardless of readiness — so an autobuyer waiting to afford a purchase would
+restart its phase each interval instead of carrying it, then fire an interval
+late once ready.
+
+`advance` now takes a `ready` flag and only fires (resets) when `ready`, while
+the phase still accrues every tick. `tick_autobuyers` builds `ready` per
+autobuyer (active + unlocked + the action-specific condition), reusing existing
+predicates (`can_dim_boost`, `can_buy_galaxy`, `can_big_crunch`) and two new
+ones (`dim_single_affordable`, `tickspeed_available` / `tickspeed_affordable`
+mirroring the JS getters, including the Continuum / `NUMBER_MAX_VALUE` guards).
+Big Crunch keeps the split the original has: the reset is gated on `canCrunch`,
+the crunch itself additionally on `willInfinity` (`will_auto_crunch`).
+
+Grid 38 → **39**, trace still clean over 1000 ticks. Two tickspeed integration
+tests now set up a 2nd dimension, since the faithful readiness gate (unlike our
+lenient `buy_tickspeed`) requires `Tickspeed.isUnlocked` (a 2nd AD owned).
+
+Still out of scope: our `buy_tickspeed` itself doesn't check
+`isAvailableForPurchase` (only EC9 + affordability), so the manual path stays
+more lenient than the original — a separate, pre-existing faithfulness gap.

@@ -55,6 +55,22 @@ impl GameState {
         self.tickspeed.bought + self.total_tick_gained
     }
 
+    /// Whether a Tickspeed upgrade can currently be purchased
+    /// (`Tickspeed.isAvailableForPurchase`): unlocked, not under EC9 or Continuum,
+    /// and (pre-break) its cost still within `NUMBER_MAX_VALUE`.
+    pub fn tickspeed_available(&self) -> bool {
+        self.tickspeed_unlocked()
+            && !self.ec_running(9)
+            && !self.continuum_active()
+            && (self.broke_infinity || self.tickspeed.cost < Decimal::NUMBER_MAX_VALUE)
+    }
+
+    /// Whether antimatter covers the next Tickspeed upgrade
+    /// (`Tickspeed.isAffordable`).
+    pub fn tickspeed_affordable(&self) -> bool {
+        self.antimatter >= self.tickspeed.cost
+    }
+
     /// Compute the current tickspeed in milliseconds:
     /// `INITIAL_TICKSPEED_MS × multiplier^totalUpgrades`. A `Decimal` because
     /// free Tickspeed upgrades push the count far past what `f64` can hold

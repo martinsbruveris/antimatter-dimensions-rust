@@ -258,30 +258,28 @@ impl Autobuyer {
 
     /// Advance the timer, firing when the accumulated phase reaches
     /// `effective_interval_ms` (the stored interval after the `autobuyerSpeed`
-    /// Break Infinity Upgrade's halving). Does nothing (and never fires) while
-    /// inactive. The *unlocked* check lives in the caller
-    /// ([`GameState::tick_autobuyers`]) via `autobuyer_is_unlocked`, since some
-    /// autobuyers unlock by challenge rather than the `is_bought` flag.
+    /// Break Infinity Upgrade's halving) *and* the autobuyer is `ready` — the
+    /// caller-supplied form of `canTick` minus the interval test (active,
+    /// unlocked, and the action-specific conditions like availability /
+    /// affordability / requirement). See [`GameState::tick_autobuyers`].
     ///
     /// This mirrors the original `IntervaledAutobuyerState`, whose `canTick`
     /// compares `realTimePlayed - lastTick >= interval` using the `realTimePlayed`
     /// *before* the game loop advances it, and whose `tick()` sets
     /// `lastTick = realTimePlayed` — resetting the phase to 0 and discarding any
-    /// overshoot. So we test the phase held over from prior ticks *before* adding
-    /// this tick's `dt`, then add `dt` (the loop's real-time advance). A fresh
-    /// timer (phase 0) therefore does not fire on the very first tick unless it
-    /// already carried a full interval — matching the original, where a
-    /// just-reset autobuyer waits a full interval before firing again.
+    /// overshoot. Real time always advances, so the phase accrues *every* tick
+    /// (even when not `ready`); only a fire resets it. A fire is gated on `ready`
+    /// because the original only calls `tick()` when `canTick` holds, so an
+    /// autobuyer that is waiting to afford its purchase keeps its elapsed time
+    /// rather than restarting each interval. We therefore test the carried phase
+    /// *before* adding this tick's `dt`: a fresh timer (phase 0) does not fire on
+    /// its first tick unless it already carried a full interval.
     ///
     /// `timer_ms` is the elapsed-time form of the original's
     /// `timeSinceLastTick` (`= realTimePlayed - lastTick`); the save codec
     /// converts between the two on load/store.
-    fn advance(&mut self, dt_ms: f64, effective_interval_ms: f64) -> bool {
-        if !self.is_active {
-            return false;
-        }
-
-        let fired = self.timer_ms >= effective_interval_ms;
+    fn advance(&mut self, dt_ms: f64, effective_interval_ms: f64, ready: bool) -> bool {
+        let fired = ready && self.timer_ms >= effective_interval_ms;
         if fired {
             // `lastTick = realTimePlayed`: the phase resets to 0, dropping the
             // overshoot (the original does not carry the remainder forward).
@@ -589,12 +587,22 @@ impl GameState {
         // effective interval.
         let speedup = self.break_infinity_autobuyer_speedup();
 
-        // Antimatter dimension autobuyers.
+        // Each interval autobuyer's `ready` is its `canTick` minus the interval
+        // test: active + unlocked + the action-specific readiness the original
+        // gates on (so the phase keeps accruing while it waits to afford — it does
+        // not restart each interval). `advance` resets the phase only on a fire.
+
+        // Antimatter dimension autobuyers: `isAvailableForPurchase &&
+        // isAffordable` (the single-cost affordability, even in "Buys max").
         for tier in 0..8 {
-            let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::AdTier(tier));
+            let ready = self.autobuyers.dimensions[tier].is_active
+                && self.autobuyer_is_unlocked(AutobuyerTarget::AdTier(tier))
+                && self.dim_available_for_purchase(tier)
+                && self.dim_single_affordable(tier);
             let eff = self.autobuyers.dimensions[tier].interval_ms * speedup;
-            if unlocked && self.autobuyers.dimensions[tier].advance(dt_ms, eff) {
-                match self.autobuyers.dimensions[tier].mode {
+            let mode = self.autobuyers.dimensions[tier].mode;
+            if self.autobuyers.dimensions[tier].advance(dt_ms, eff, ready) {
+                match mode {
                     AutobuyerMode::BuySingle => {
                         self.buy_dimension(tier);
                     }
@@ -609,11 +617,15 @@ impl GameState {
             }
         }
 
-        // Tickspeed autobuyer.
-        let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::Tickspeed);
+        // Tickspeed autobuyer: `isAvailableForPurchase && isAffordable`.
+        let ready = self.autobuyers.tickspeed.is_active
+            && self.autobuyer_is_unlocked(AutobuyerTarget::Tickspeed)
+            && self.tickspeed_available()
+            && self.tickspeed_affordable();
         let eff = self.autobuyers.tickspeed.interval_ms * speedup;
-        if unlocked && self.autobuyers.tickspeed.advance(dt_ms, eff) {
-            match self.autobuyers.tickspeed.mode {
+        let mode = self.autobuyers.tickspeed.mode;
+        if self.autobuyers.tickspeed.advance(dt_ms, eff, ready) {
+            match mode {
                 AutobuyerMode::BuySingle => {
                     self.buy_tickspeed();
                 }
@@ -623,28 +635,33 @@ impl GameState {
             }
         }
 
-        // Prestige autobuyers (unlocked by completing NC10/11/12). Each fires its
-        // fixed action, which is a no-op when its precondition isn't met — the
-        // original gates the tick on the same `canBeBought`/`canCrunch` conditions.
-        let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost);
+        // Prestige autobuyers (unlocked by completing NC10/11/12). Their readiness
+        // is exactly the buy/reset condition, so the phase resets only when the
+        // action can actually happen (matching the original's `canTick`).
+        let ready = self.autobuyers.dim_boost.is_active
+            && self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost)
+            && self.can_dim_boost();
         let eff = self.autobuyers.dim_boost.interval_ms * speedup;
-        if unlocked && self.autobuyers.dim_boost.advance(dt_ms, eff) {
+        if self.autobuyers.dim_boost.advance(dt_ms, eff, ready) {
             self.buy_dim_boost();
         }
 
-        let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy);
+        let ready = self.autobuyers.galaxy.is_active
+            && self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy)
+            && self.can_buy_galaxy();
         let eff = self.autobuyers.galaxy.interval_ms * speedup;
-        if unlocked && self.autobuyers.galaxy.advance(dt_ms, eff) {
+        if self.autobuyers.galaxy.advance(dt_ms, eff, ready) {
             self.buy_galaxy();
         }
 
-        // Big Crunch: pre-break `willInfinity` is always true, so it crunches as
-        // soon as the goal is reached (`big_crunch` no-ops otherwise); post-break
-        // the configured goal mode gates the crunch.
-        let unlocked = self.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch);
+        // Big Crunch: `canTick` is `Player.canCrunch` (at the goal), so the phase
+        // resets whenever a crunch is possible; the crunch *itself* additionally
+        // needs the configured goal mode (`willInfinity`, always true pre-break).
+        let ready = self.autobuyers.big_crunch.is_active
+            && self.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch)
+            && self.can_big_crunch();
         let eff = self.autobuyers.big_crunch.interval_ms * speedup;
-        if unlocked
-            && self.autobuyers.big_crunch.advance(dt_ms, eff)
+        if self.autobuyers.big_crunch.advance(dt_ms, eff, ready)
             && self.will_auto_crunch()
         {
             self.big_crunch();

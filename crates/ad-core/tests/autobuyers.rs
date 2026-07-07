@@ -254,6 +254,9 @@ fn test_multiple_dimension_autobuyers() {
 fn test_tickspeed_autobuyer_buys_single() {
     let mut game = GameState::new();
     game.antimatter = Decimal::from_float(1e6);
+    // Tickspeed is available for purchase only once a 2nd dimension is owned
+    // (`Tickspeed.isUnlocked`), which the autobuyer's readiness now requires.
+    game.dimensions[1].bought = 1;
     game.autobuyers.tickspeed.is_bought = true;
     game.autobuyers.tickspeed.mode = AutobuyerMode::BuySingle;
     arm(&mut game.autobuyers.tickspeed);
@@ -268,6 +271,8 @@ fn test_tickspeed_autobuyer_buys_single() {
 fn test_tickspeed_autobuyer_buys_max() {
     let mut game = GameState::new();
     game.antimatter = Decimal::from_float(1e10);
+    // Tickspeed is unlocked for purchase once a 2nd dimension is owned.
+    game.dimensions[1].bought = 1;
     game.autobuyers.tickspeed.is_bought = true;
     game.autobuyers.tickspeed.mode = AutobuyerMode::BuyMax;
     arm(&mut game.autobuyers.tickspeed);

@@ -258,10 +258,16 @@ not the current state).
   lastTick`); `Autobuyer::advance` mirrors `IntervaledAutobuyerState` — it tests
   the phase held over from prior ticks *before* adding the current `dt` (the
   original compares against the pre-advance `realTimePlayed`) and resets to 0 on
-  a fire (dropping overshoot, like `lastTick = realTimePlayed`). The save codec
-  converts `lastTick ↔ timer_ms` on load/store (see `save/dto.rs` /
-  `save/encode.rs`); discarding it desynchronises every autobuyer's firing phase
-  on replay. See `../../docs/design/2026-07-03-autobuyers.md`.
+  a fire (dropping overshoot, like `lastTick = realTimePlayed`). A fire is gated
+  on the autobuyer's `ready` flag — its `canTick` minus the interval test, which
+  `tick_autobuyers` builds per autobuyer (active + unlocked + the action-specific
+  condition: AD/Tickspeed `isAvailableForPurchase && isAffordable`, Dim Boost /
+  Galaxy `canBeBought && requirement`, Big Crunch `Player.canCrunch`) — so the
+  phase keeps accruing while an autobuyer waits to afford its purchase instead of
+  restarting each interval. The save codec converts `lastTick ↔ timer_ms` on
+  load/store (see `save/dto.rs` / `save/encode.rs`); discarding it desynchronises
+  every autobuyer's firing phase on replay. See
+  `../../docs/design/2026-07-03-autobuyers.md`.
 - `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
   `player.options`), held in `GameState`, preserved across a Big Crunch.
   Includes the per-action `Confirmations` toggles (boost/galaxy/sacrifice/crunch),
