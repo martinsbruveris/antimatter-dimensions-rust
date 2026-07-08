@@ -294,7 +294,13 @@ impl GameState {
         } else {
             1.0
         };
-        infinity_boost * self.break_infinity_galaxy_boost() * ic5
+        // Achievement 86: all Galaxies 1% stronger.
+        let ach86 = if self.achievement_unlocked(86) {
+            1.01
+        } else {
+            1.0
+        };
+        infinity_boost * self.break_infinity_galaxy_boost() * ic5 * ach86
     }
 
     /// Amount subtracted from the Dimension-Boost and Antimatter-Galaxy

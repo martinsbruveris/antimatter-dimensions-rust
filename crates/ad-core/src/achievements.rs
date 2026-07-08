@@ -52,7 +52,10 @@ pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] = &[
     41, 42, 43, 44, 45, 46, 47, 48, // row 4
     51, 52, 53, 54, 55, 56, 57, 58, // row 5
     63, 64, 66, 67, 68, // row 6 (61/62/65 deferred)
-    71, 72, 73, 75, 76, 77, 78,  // row 7 (74 deferred)
+    71, 72, 73, 75, 76, 77, 78, // row 7 (74 deferred)
+    81, 82, 83, 84, 85, 86, 87, 88, // row 8
+    91, 92, 93, 94, 95, 96, 97, 98, // row 9
+    101, 102, 103, 104, // row 10 (105–108 pending)
     136, // dilate time
 ];
 
@@ -204,6 +207,26 @@ impl GameState {
             let days = self.records.total_time_played_ms / 86_400_000.0;
             mult *= Decimal::from_float((days / 2.0).powf(0.05).max(1.0));
         }
+        // 84: multiplier based on current (unspent) antimatter (`AM^0.00002 + 1`).
+        if self.achievement_unlocked(84) {
+            mult *= self.antimatter.pow(&Decimal::from_float(0.00002)) + Decimal::ONE;
+        }
+        // 91: strong boost in the first 5 seconds of an Infinity
+        // (`max((5 - sec) × 60, 1)`).
+        if self.achievement_unlocked(91) {
+            let seconds = self.records.this_infinity.time_ms / 1000.0;
+            if seconds < 5.0 {
+                mult *= Decimal::from_float(((5.0 - seconds) * 60.0).max(1.0));
+            }
+        }
+        // 92: strong boost in the first 60 seconds of an Infinity
+        // (`max((1 - min) × 100, 1)`).
+        if self.achievement_unlocked(92) {
+            let minutes = self.records.this_infinity.time_ms / 60_000.0;
+            if minutes < 1.0 {
+                mult *= Decimal::from_float(((1.0 - minutes) * 100.0).max(1.0));
+            }
+        }
         mult
     }
 
@@ -322,6 +345,40 @@ impl GameState {
         if self.infinity_power.exponent() >= 6 {
             self.unlock_achievement(77);
         }
+        // 84: reach 1e35000 antimatter.
+        if self.antimatter.exponent() >= 35_000 {
+            self.unlock_achievement(84);
+        }
+        // 86: tickspeed 1000× faster per upgrade (`multiplier.recip() ≥ 1000`).
+        if !self.achievement_unlocked(86)
+            && 1.0 / self.tickspeed_purchase_multiplier() >= 1000.0
+        {
+            self.unlock_achievement(86);
+        }
+        // 87: Infinity 2e6 times.
+        if self.infinities > Decimal::new(2.0, 6) {
+            self.unlock_achievement(87);
+        }
+        // 94: reach 1e260 Infinity Power.
+        if self.infinity_power.exponent() >= 260 {
+            self.unlock_achievement(94);
+        }
+        // 98: unlock the 8th Infinity Dimension.
+        if self.infinity_dimensions[7].is_unlocked {
+            self.unlock_achievement(98);
+        }
+        // 102: reach every Eternity milestone.
+        if !self.achievement_unlocked(102)
+            && crate::eternity_milestones::ETERNITY_MILESTONES
+                .iter()
+                .all(|m| self.eternity_milestone_reached(m.eternities))
+        {
+            self.unlock_achievement(102);
+        }
+        // 103: reach 1e1000 Infinity Points.
+        if self.infinity_points.exponent() >= 1000 {
+            self.unlock_achievement(103);
+        }
         // 52: max the interval for the AD and Tickspeed autobuyers. The original
         // fires this on REALITY_RESET_AFTER / REALITY_UPGRADE_TEN_BOUGHT, but a
         // Reality clears autobuyer intervals, so it is only truly reachable while
@@ -394,6 +451,29 @@ impl GameState {
         {
             self.unlock_achievement(71);
         }
+        // 81: beat Infinity Challenge 5 in ≤ 15 seconds.
+        if self.infinity_challenge_running(5) && secs <= 15.0 {
+            self.unlock_achievement(81);
+        }
+        // The pending crunch's IP exponent, for the "Big Crunch for Xe IP"
+        // achievements (85/91/92/93).
+        let gained_ip_exp = self.gained_infinity_points().exponent();
+        // 85: Big Crunch for 1e150 IP.
+        if gained_ip_exp >= 150 {
+            self.unlock_achievement(85);
+        }
+        // 91: Big Crunch for 1e200 IP in ≤ 2 seconds.
+        if gained_ip_exp >= 200 && secs <= 2.0 {
+            self.unlock_achievement(91);
+        }
+        // 92: Big Crunch for 1e250 IP in ≤ 20 seconds.
+        if gained_ip_exp >= 250 && secs <= 20.0 {
+            self.unlock_achievement(92);
+        }
+        // 93: Big Crunch for 1e300 IP.
+        if gained_ip_exp >= 300 {
+            self.unlock_achievement(93);
+        }
     }
 
     /// BIG_CRUNCH_AFTER conditions, checked at the end of a rewarded crunch.
@@ -402,7 +482,51 @@ impl GameState {
         if self.infinities >= Decimal::from_float(10.0) {
             self.unlock_achievement(33);
         }
+        // 97: sum of Infinity Challenge best times under 6.66 seconds. Uncompleted
+        // ICs hold the `f64::MAX` sentinel, so the sum stays huge until all eight
+        // are completed quickly.
+        let ic_sum: f64 = self.ic_best_times_ms.iter().sum();
+        if ic_sum < 6_660.0 {
+            self.unlock_achievement(97);
+        }
         self.check_challenge_completion_achievements();
+    }
+
+    /// SACRIFICE_RESET_BEFORE conditions, checked before a performed sacrifice.
+    pub(crate) fn check_sacrifice_before_achievements(&mut self) {
+        // 88: a single Dimensional Sacrifice worth ≥ Number.MAX_VALUE.
+        if self.next_sacrifice_boost() >= Decimal::NUMBER_MAX_VALUE {
+            self.unlock_achievement(88);
+        }
+    }
+
+    /// REPLICANTI_TICK_AFTER conditions, checked after Replicanti grow.
+    pub(crate) fn check_replicanti_after_achievements(&mut self) {
+        // 95: reach Number.MAX_VALUE Replicanti (or hold a Replicanti Galaxy)
+        // within 1 hour (real time) of the Infinity. Reward (keep Replicanti +
+        // 1 RG on Infinity) is read in `big_crunch_reset`.
+        if !self.achievement_unlocked(95)
+            && self.records.this_infinity.real_time_ms <= 3_600_000.0
+            && (self.replicanti.amount >= Decimal::NUMBER_MAX_VALUE
+                || self.replicanti.galaxies > 0)
+        {
+            self.unlock_achievement(95);
+        }
+    }
+
+    /// ETERNITY_RESET_BEFORE conditions, checked at a rewarded Eternity before
+    /// the reset (pre-reset run flags / this-eternity timing apply).
+    pub(crate) fn check_eternity_before_achievements(&mut self) {
+        // 96: "Time is relative" — go Eternal.
+        self.unlock_achievement(96);
+        // 101: Eternity without buying Antimatter Dimensions 1–7.
+        if self.requirement_checks.eternity_only_ad8 {
+            self.unlock_achievement(101);
+        }
+        // 104: Eternity in under 30 seconds (game time).
+        if self.records.this_eternity.time_ms <= 30_000.0 {
+            self.unlock_achievement(104);
+        }
     }
 
     /// GALAXY_RESET_BEFORE conditions (checked before the galaxy's reset).
@@ -421,6 +545,10 @@ impl GameState {
         // 27: have 2 Antimatter Galaxies.
         if self.galaxies >= 2 {
             self.unlock_achievement(27);
+        }
+        // 83: have 50 Antimatter Galaxies.
+        if self.galaxies >= 50 {
+            self.unlock_achievement(83);
         }
     }
 
@@ -441,6 +569,12 @@ impl GameState {
             .any(|id| self.infinity_challenge_completed(id))
         {
             self.unlock_achievement(67);
+        }
+        // 82: complete all 8 Infinity Challenges.
+        if (1..=crate::INFINITY_CHALLENGE_COUNT)
+            .all(|id| self.infinity_challenge_completed(id))
+        {
+            self.unlock_achievement(82);
         }
     }
 
@@ -850,5 +984,116 @@ mod tests {
         let mut game = GameState::new();
         game.complete_infinity_challenge(3);
         assert!(game.achievement_unlocked(67));
+    }
+
+    // ---- Batch 3 (ids 81–104) ----
+
+    #[test]
+    fn achievements_85_93_multiply_ip_gain() {
+        let mut game = GameState::new();
+        assert_eq!(game.total_ip_mult(), Decimal::ONE);
+        game.unlock_achievement(85);
+        assert_eq!(game.total_ip_mult(), Decimal::from_float(4.0));
+        game.unlock_achievement(93);
+        assert_eq!(game.total_ip_mult(), Decimal::from_float(16.0));
+    }
+
+    #[test]
+    fn achievement_87_raises_infinities_gain_after_five_seconds() {
+        let mut game = GameState::new();
+        game.unlock_achievement(87);
+        // Only counts once the Infinity is longer than 5 seconds.
+        game.records.this_infinity.time_ms = 4000.0;
+        assert_eq!(game.gained_infinities(), Decimal::ONE);
+        game.records.this_infinity.time_ms = 6000.0;
+        assert_eq!(game.gained_infinities(), Decimal::from_float(250.0));
+    }
+
+    #[test]
+    fn achievement_94_doubles_first_infinity_dimension() {
+        let mut game = GameState::new();
+        let before = game.id_multiplier(0);
+        game.unlock_achievement(94);
+        assert_eq!(game.id_multiplier(0), before * Decimal::from_float(2.0));
+    }
+
+    #[test]
+    fn achievement_83_unlocks_at_50_galaxies_and_speeds_tickspeed() {
+        let mut game = GameState::new();
+        game.galaxies = 50;
+        game.check_galaxy_after_achievements();
+        assert!(game.achievement_unlocked(83));
+        // The 0.95^galaxies base-tickspeed factor speeds production up.
+        let mut without = GameState::new();
+        without.galaxies = 50;
+        let mut with = without.clone();
+        with.unlock_achievement(83);
+        assert!(with.tickspeed_effect() > without.tickspeed_effect());
+    }
+
+    #[test]
+    fn achievement_88_needs_a_number_max_value_sacrifice() {
+        let mut game = GameState::new();
+        // IC2 completed drops the log10 from the sacrifice formula, so a very
+        // large AD1 can push nextBoost past Number.MAX_VALUE.
+        game.complete_infinity_challenge(2);
+        game.dimensions[0].amount = Decimal::new(1.0, 40_000);
+        game.sacrificed = Decimal::ONE;
+        game.check_sacrifice_before_achievements();
+        assert!(game.achievement_unlocked(88));
+    }
+
+    #[test]
+    fn achievement_95_keeps_replicanti_on_infinity() {
+        let mut game = GameState::new();
+        game.replicanti.unlocked = true;
+        game.replicanti.galaxies = 1;
+        game.records.this_infinity.real_time_ms = 0.0;
+        game.check_replicanti_after_achievements();
+        assert!(game.achievement_unlocked(95));
+    }
+
+    #[test]
+    fn achievement_98_and_102_from_tick() {
+        let mut game = GameState::new();
+        game.infinity_dimensions[7].is_unlocked = true;
+        game.eternities = Decimal::from_float(1000.0); // past every milestone (max 1000)
+        game.check_tick_achievements(50.0);
+        assert!(game.achievement_unlocked(98));
+        assert!(game.achievement_unlocked(102));
+    }
+
+    #[test]
+    fn achievement_97_from_fast_infinity_challenges() {
+        let mut game = GameState::new();
+        // All eight IC best times tiny → sum well under 6.66 s.
+        game.ic_best_times_ms = [100.0; 8];
+        game.check_crunch_after_achievements();
+        assert!(game.achievement_unlocked(97));
+    }
+
+    #[test]
+    fn eternity_unlocks_96_101_104_and_104_sets_starting_ip() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.infinity_points = crate::ETERNITY_GOAL;
+        game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        game.requirement_checks.eternity_only_ad8 = true;
+        // Fast (game time 0) eternity → 104.
+        assert!(game.eternity());
+        assert!(game.achievement_unlocked(96));
+        assert!(game.achievement_unlocked(101));
+        assert!(game.achievement_unlocked(104));
+        // 104 → start Eternities with 5e25 IP.
+        assert_eq!(game.infinity_points, Decimal::new(5.0, 25));
+    }
+
+    #[test]
+    fn achievement_82_needs_all_infinity_challenges() {
+        let mut game = GameState::new();
+        for id in 1..=crate::INFINITY_CHALLENGE_COUNT {
+            game.complete_infinity_challenge(id);
+        }
+        assert!(game.achievement_unlocked(82));
     }
 }

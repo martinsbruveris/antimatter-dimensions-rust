@@ -130,6 +130,9 @@ impl GameState {
         // ETERNITY_RESET_BEFORE requirement checks (RU6/8/10), before the
         // rewards clear the `noEternities` flag.
         self.check_reality_upgrade_reqs_on_eternity_before();
+        // ETERNITY_RESET_BEFORE achievements (96, 101, 104), from the pre-reset
+        // run flags / this-eternity timing.
+        self.check_eternity_before_achievements();
 
         // Rewards (`giveEternityRewards`), read from the pre-reset state.
         self.records.best_eternity.time_ms = self
@@ -463,6 +466,9 @@ mod tests {
     #[test]
     fn eternity_at_goal_awards_ep_and_resets() {
         let mut game = game_at_eternity_goal();
+        // A slow eternity (> 30 s) so achievement 104 doesn't raise the starting
+        // IP off zero — this test checks the pure reset.
+        game.records.this_eternity.time_ms = 60_000.0;
         assert!(game.can_eternity());
 
         // At exactly 1.8e308 max IP the formula gives 5^(log10(maxIP+1)/308-0.7)

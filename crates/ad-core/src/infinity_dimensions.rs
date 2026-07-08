@@ -274,6 +274,11 @@ impl GameState {
         }
         let mut mult = self.id_common_multiplier()
             * Decimal::from_float(power_mult).pow(&Decimal::from(purchases));
+        // Achievement 94: double the 1st Infinity Dimension (doubles Infinity
+        // Power gain).
+        if tier == 0 && self.achievement_unlocked(94) {
+            mult *= Decimal::from_float(2.0);
+        }
         // EC2's reward: 1st-ID multiplier from Infinity Power.
         if tier == 0 && self.ec_completed(2) {
             let completions = self.eternity_challenge_completions(2) as f64;

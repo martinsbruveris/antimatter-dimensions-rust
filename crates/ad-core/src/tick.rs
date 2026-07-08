@@ -130,6 +130,8 @@ impl GameState {
         // Replicanti grow (multiplying Infinity Dimensions on the next tick, matching
         // the original's `replicantiLoop` running after the dimension ticks).
         self.tick_replicanti(dt_ms);
+        // REPLICANTI_TICK_AFTER achievements (95, 106).
+        self.check_replicanti_after_achievements();
 
         // Eternity-Milestone per-tick effects: auto-complete Infinity
         // Challenges (autoIC, 7 eternities) and auto-unlock Infinity

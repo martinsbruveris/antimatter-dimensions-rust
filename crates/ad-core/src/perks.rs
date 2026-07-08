@@ -457,7 +457,8 @@ impl GameState {
     }
 
     /// The starting Infinity Points after an Eternity/Reality
-    /// (`Currency.infinityPoints.startingValue`; Achievement 104 deferred).
+    /// (`Currency.infinityPoints.startingValue = Effects.max(0, Perk.startIP1,
+    /// Perk.startIP2, Achievement(104) = 5e25)`).
     pub(crate) fn starting_ip(&self) -> Decimal {
         let mut value = Decimal::ZERO;
         if self.perk_bought(12) {
@@ -465,6 +466,9 @@ impl GameState {
         }
         if self.perk_bought(13) {
             value = value.max(&Decimal::new(5.0, 130));
+        }
+        if self.achievement_unlocked(104) {
+            value = value.max(&Decimal::new(5.0, 25));
         }
         value
     }
@@ -571,9 +575,11 @@ mod tests {
         game.buy_perk(12);
         assert_eq!(game.infinity_points, Decimal::new(5.0, 15));
 
-        // Eternity starts with the perk IP.
+        // Eternity starts with the perk IP. Slow eternity (> 30 s) so
+        // achievement 104's 5e25 starting IP doesn't mask the perk's 5e15.
         game.infinity_points = crate::ETERNITY_GOAL;
         game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        game.records.this_eternity.time_ms = 60_000.0;
         assert!(game.eternity());
         assert_eq!(game.infinity_points, Decimal::new(5.0, 15));
         assert_eq!(game.records.this_eternity.max_ip, Decimal::new(5.0, 15));

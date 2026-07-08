@@ -172,6 +172,10 @@ impl GameState {
             return false;
         }
 
+        // SACRIFICE_RESET_BEFORE achievements (88), read from the pre-sacrifice
+        // `nextBoost`.
+        self.check_sacrifice_before_achievements();
+
         // A Sacrifice breaks the "no Sacrifice since last Galaxy" flag
         // (`sacrifice.js`).
         self.requirement_checks.infinity_no_sacrifice = false;

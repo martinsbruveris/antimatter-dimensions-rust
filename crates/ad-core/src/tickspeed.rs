@@ -178,6 +178,10 @@ impl GameState {
         if self.achievement_unlocked(66) {
             mult *= 0.98;
         }
+        // 83: tickspeed ×0.95 per Antimatter Galaxy (`0.95^galaxies`).
+        if self.achievement_unlocked(83) {
+            mult *= 0.95_f64.powi(self.galaxies as i32);
+        }
         mult
     }
 

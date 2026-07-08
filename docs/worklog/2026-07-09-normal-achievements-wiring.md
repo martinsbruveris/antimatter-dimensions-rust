@@ -153,3 +153,57 @@ Effects:
   common, 73 AM-scaling, 63/77, 67).
 - Full `ad-core` suite green. Fidelity unchanged at 34 (these achievements don't
   fire in the early-game fixtures).
+
+---
+
+## Batch 3 — ids 81–104
+
+### What shipped
+
+Conditions + effects for all 20 (rows 8–10): 81–88, 91–98, 101–104.
+
+- **Crunch-before**: 81 (IC5 ≤15 s), 85/91/92/93 (pending-crunch IP thresholds,
+  91/92 also time-gated).
+- **Crunch-after**: 97 (IC best-times sum < 6.66 s, from `ic_best_times_ms`).
+- **Tick**: 84 (1e35000 AM), 86 (tickspeed recip ≥1000), 87 (2e6 infinities),
+  94 (1e260 IP power), 98 (8th ID), 102 (all Eternity milestones), 103 (1e1000 IP).
+- **Galaxy-after**: 83 (50 galaxies).
+- **IC-completion**: 82 (all 8 ICs).
+- **Sacrifice-before**: 88 (nextBoost ≥ `NUMBER_MAX_VALUE`).
+- **Replicanti-tick** (new seam in `tick`): 95.
+- **Eternity-before** (new seam): 96 (go Eternal), 101 (only-AD8), 104 (≤30 s).
+
+New effect sites:
+- IP multiplier (`total_ip_mult`): 85/93 ×4 each.
+- IP formula divisor (`ip_gain_divisor`): 103 → 307.8.
+- Gained infinities (`gained_infinities`): 87 base → 250 (Infinity > 5 s).
+- Galaxy strength (`galaxy_strength_effect`): 86 ×1.01.
+- 1st Infinity Dimension (`id_multiplier`): 94 ×2.
+- ID common mult (`id_common_multiplier`): 75 (batch 2) already; sacrifice
+  exponent 88 (postIC2 +0.1, slot from batch 1).
+- Starting tickspeed: 83 (×0.95^galaxies). Starting IP (`starting_ip`): 104 (5e25).
+- AD common mult: 84/91/92.
+
+### Decisions & why
+
+- **85/93 self-boost their unlocking crunch's IP.** Conditions run in
+  BIG_CRUNCH_BEFORE, then `big_crunch_reset` computes the reward IP — which now
+  includes the freshly-unlocked ×4. The original's `totalIPMult` is cached and
+  invalidated only on the next game-loop update, so JS awards the ×4 one crunch
+  later. We follow the engine's compute-fresh (no-cache) philosophy; the
+  difference is one crunch, only past 1e150 IP, and the fixtures never reach it.
+- **88 is reachable only via the IC2-completed sacrifice formula.** With the
+  i64 Decimal exponent, the normal `log10(AD1)/10` pre-power caps around 1e18, so
+  `nextBoost` can't reach `NUMBER_MAX_VALUE`; but IC2-completed drops the log10,
+  making it reachable. Kept in `IMPLEMENTED_ACHIEVEMENTS`.
+
+### Surprises
+
+- Fast eternities now trip 104 (5e25 starting IP); two eternity/perk tests were
+  asserting a zero/perk-only starting IP, so gave them >30 s eternities.
+
+### Tests
+
+- 10 new unit tests (85/93 IP mult, 87 infinities, 94 ID1, 83 galaxies+tickspeed,
+  88 sacrifice, 95 replicanti, 98/102 tick, 97 IC-sum, 96/101/104 eternity, 82).
+- Full suite green. Fidelity unchanged at 34.

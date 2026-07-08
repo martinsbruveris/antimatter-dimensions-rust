@@ -25,19 +25,22 @@ impl GameState {
     }
 
     /// The Infinity-Point formula divisor (`Effects.min(308, Achievement(103),
-    /// TimeStudy(111))`). TS111 lowers it to 285; Achievement 103 is a later
-    /// feature.
+    /// TimeStudy(111))`). Achievement 103 lowers it to 307.8, TS111 to 285.
     fn ip_gain_divisor(&self) -> f64 {
-        if self.time_study_bought(111) {
-            285.0
-        } else {
-            308.0
+        // `Effects.min(308, Achievement(103) = 307.8, TimeStudy(111) = 285)`.
+        let mut div: f64 = 308.0;
+        if self.achievement_unlocked(103) {
+            div = div.min(307.8);
         }
+        if self.time_study_bought(111) {
+            div = div.min(285.0);
+        }
+        div
     }
 
     /// The global Infinity-Point multiplier (`totalIPMult`): Time Studies
-    /// 41/51/141/142/143. The IP-mult Infinity Upgrade and achievements
-    /// 85/93/116/125 are later features. Read by
+    /// 41/51/141/142/143 and the ×4 achievements 85/93 (116/125 are later
+    /// features). The IP-mult Infinity Upgrade is not modelled. Read by
     /// [`GameState::generate_passive_ip`] too.
     pub(crate) fn total_ip_mult(&self) -> Decimal {
         // Effarig's Infinity stage nullifies every IP multiplier (`totalIPMult`
@@ -49,6 +52,13 @@ impl GameState {
             return Decimal::ONE;
         }
         let mut mult = Decimal::ONE;
+        // Achievements 85 and 93 each multiply IP gain ×4.
+        if self.achievement_unlocked(85) {
+            mult *= Decimal::from_float(4.0);
+        }
+        if self.achievement_unlocked(93) {
+            mult *= Decimal::from_float(4.0);
+        }
         // TS41: ×1.2 per galaxy of any kind.
         if self.time_study_bought(41) {
             let galaxies = self.effective_galaxies();
@@ -145,7 +155,12 @@ impl GameState {
         if self.ec_running(4) {
             return Decimal::ONE;
         }
+        // Base `Effects.max(1, Achievement(87) = 250)`: achievement 87 raises the
+        // base gain to 250, but only for Infinities longer than 5 seconds.
         let mut gain = Decimal::ONE;
+        if self.achievement_unlocked(87) && self.records.this_infinity.time_ms > 5000.0 {
+            gain = gain.max(&Decimal::from_float(250.0));
+        }
         if self.time_study_bought(32) {
             gain *= Decimal::from((self.dim_boosts as u64).max(1));
         }
