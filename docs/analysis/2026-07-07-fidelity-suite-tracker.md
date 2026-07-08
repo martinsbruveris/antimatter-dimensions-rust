@@ -20,7 +20,7 @@ Commits that don't change the count are omitted.
 | 2026-07-07 | `21d2f2a` | Restored the autobuyer timer phase from the save's `lastTick` on load (was reset to 0) and aligned `advance` with the JS pre-increment interval check | 38 (+3) |
 | 2026-07-07 | `8dcda3e` | Gated each interval autobuyer's timer reset on its `canTick` readiness, so phase accrues while waiting to afford instead of restarting each interval | 39 (+1) |
 | 2026-07-07 | `650d255` | Rounded the dimension amount after a "Buys max" group purchase (mirroring `buyUntilTen`), dropping lingering fractional production stock | 40 (+1) |
-| 2026-07-07 | `e3268f4` | Widening coverage, verifying ~60 more fields per cell. Fixed some small issues involving non-modelled fields. Obtaining new baseline. | 32 (−8) |
+| 2026-07-07 | `1bff354` | Widening coverage, verifying ~60 more fields per cell. Fixed some small issues involving non-modelled fields. Obtaining new baseline. | 32 (−8) |
 
 ## Method
 
