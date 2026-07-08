@@ -174,6 +174,10 @@ impl GameState {
         if self.achievement_unlocked(45) {
             mult *= 0.98;
         }
+        // 66: multiply starting tickspeed by 0.98.
+        if self.achievement_unlocked(66) {
+            mult *= 0.98;
+        }
         mult
     }
 

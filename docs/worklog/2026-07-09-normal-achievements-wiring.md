@@ -100,3 +100,56 @@ Effects wired into their consumption sites:
 - Full `ad-core` suite green (`--features serde`).
 - Fidelity suite: **32 → 34** passing cells (the sacrifice/tickspeed/starting-AM
   effects now match the oracle on two more fixtures).
+
+---
+
+## Batch 2 — ids 55–78
+
+### What shipped
+
+Conditions + effects for: 55, 56, 57, 58, 63, 64, 66, 67, 68, 71, 72, 73, 75,
+76, 77, 78. (61, 62, 65, 74 deferred — see below.)
+
+- **Crunch-before** (fast/challenge infinities): 55 (≤1 min), 78 (≤250 ms),
+  56/57/58 (NC2/NC8/NC9 in ≤3 min), 68 (NC3 in ≤10 s), 64 (challenge, no
+  boosts/galaxies), 71 (NC2, one AD1, no boosts/galaxies).
+- **Tick**: 63 / 77 (Infinity Power ≥ 1 / 1e6), 66 (tickspeed), 72 (all AD
+  multipliers ≥ `NUMBER_MAX_VALUE`), 73 (9.9999e9999 antimatter), 75 (4th ID
+  unlocked), 76 (8 days played), 61 (guarded — see below).
+- **IC completion**: 67 (new `check_infinity_challenge_completed_achievements`,
+  hooked in `complete_infinity_challenge`).
+
+Effects:
+- AD common multiplier (`achievement_ad_common_mult`): 56, 65, 72, 73, 74, 76.
+- AD per-tier: 64 (AD1–4 ×1.25), 68 (AD1 ×1.5), 71 (AD1 ×3).
+- Buy-10 multiplier: 58 (×1.01).
+- Infinity-Dimension common multiplier: 75 (folds in `achievement_power`).
+- Tickspeed base: 66 (×0.98). Sacrifice exponent: 57 (+0.1 preIC2, slot from
+  batch 1). Starting antimatter: 55/78 (batch-1 `Effects.max` chain).
+
+### Deferrals (unmodelled dependencies)
+
+- **62** — `bestRunIPPM` needs a recent-infinities ring; `records` has recent
+  *eternities*/*realities* but no recent *infinities*. No effect, so excluded.
+- **65 / 74** — condition is `Time.challengeSum` (sum of Normal-Challenge best
+  times); the engine tracks IC best times but not Normal-Challenge best times.
+  Their **effects are wired** (gated on the bit) so an auto-achieved unlock still
+  works; only the natural unlock is deferred.
+- **61** — condition (all AD autobuyers at bulk cap) is wired and checked per
+  tick, but the engine has no bulk-*upgrade* action, so it is only reachable via
+  a loaded save. Excluded from `IMPLEMENTED_ACHIEVEMENTS`.
+
+### Surprises
+
+- A zero-time crunch now trips all four fast-Infinity achievements (37/54/55/78),
+  so the starting antimatter jumps to 5e25; updated the batch-1 test.
+- `NormalChallenge.isOnlyActiveChallenge` is `player.challenge.normal.current
+  === id` — deliberately *not* the IC1-shared `challenge_running`; used the
+  direct field check.
+
+### Tests
+
+- 8 new unit tests (64/68/71 effects, 58 buy-10, 66 tickspeed, 75 ID bonus, 72
+  common, 73 AM-scaling, 63/77, 67).
+- Full `ad-core` suite green. Fidelity unchanged at 34 (these achievements don't
+  fire in the early-game fixtures).

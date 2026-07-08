@@ -40,15 +40,19 @@ pub const ACHIEVEMENTS_PER_ROW: u16 = 8;
 /// achievements" requirement is checked against this set until achievement
 /// coverage reaches rows 1–13 (see `docs/design/2026-07-05-reality.md`).
 ///
-/// Excludes achievement 22 (News — unmodelled) and 35 (6-hour offline — no
-/// wall-clock model), which the engine cannot earn naturally and are only ever
-/// set via Reality auto-achievement or the ACHNR reality upgrade.
+/// Excludes achievements the engine cannot earn naturally, which are only ever
+/// set via Reality auto-achievement or the ACHNR reality upgrade: 22 (News),
+/// 35 (6-hour offline), 61 (autobuyer bulk has no in-engine upgrade), 62
+/// (`bestRunIPPM` needs the unmodelled recent-infinities ring), and 65/74 (the
+/// Normal-Challenge best-times sum is unmodelled).
 pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] = &[
     11, 12, 13, 14, 15, 16, 17, 18, // row 1
     21, 23, 24, 25, 26, 27, 28, // row 2 (22 = News, deferred)
     31, 32, 33, 34, 36, 37, 38, // row 3 (35 = offline, deferred)
     41, 42, 43, 44, 45, 46, 47, 48, // row 4
-    51, 52, 53, 54,  // row 5 (55–58 pending)
+    51, 52, 53, 54, 55, 56, 57, 58, // row 5
+    63, 64, 66, 67, 68, // row 6 (61/62/65 deferred)
+    71, 72, 73, 75, 76, 77, 78,  // row 7 (74 deferred)
     136, // dilate time
 ];
 
@@ -169,7 +173,53 @@ impl GameState {
         if self.achievement_unlocked(48) {
             mult *= Decimal::from_float(1.1);
         }
+        // 56: boost in the first 3 minutes of an Infinity (max(6/(min+3), 1)).
+        if self.achievement_unlocked(56) {
+            let minutes = self.records.this_infinity.time_ms / 60_000.0;
+            if minutes < 3.0 {
+                mult *= Decimal::from_float((6.0 / (minutes + 3.0)).max(1.0));
+            }
+        }
+        // 65: like 56 but only inside a challenge (max(4/(min+1), 1)).
+        if self.achievement_unlocked(65) && self.is_in_any_challenge() {
+            let minutes = self.records.this_infinity.time_ms / 60_000.0;
+            if minutes < 3.0 {
+                mult *= Decimal::from_float((4.0 / (minutes + 1.0)).max(1.0));
+            }
+        }
+        // 72: every AD multiplier over Number.MAX_VALUE — all ×1.1.
+        if self.achievement_unlocked(72) {
+            mult *= Decimal::from_float(1.1);
+        }
+        // 73: multiplier based on current antimatter (`AM^0.00002 + 1`).
+        if self.achievement_unlocked(73) {
+            mult *= self.antimatter.pow(&Decimal::from_float(0.00002)) + Decimal::ONE;
+        }
+        // 74: all ADs ×1.4, but only inside a challenge.
+        if self.achievement_unlocked(74) && self.is_in_any_challenge() {
+            mult *= Decimal::from_float(1.4);
+        }
+        // 76: tiny multiplier based on time played (`max((days/2)^0.05, 1)`).
+        if self.achievement_unlocked(76) {
+            let days = self.records.total_time_played_ms / 86_400_000.0;
+            mult *= Decimal::from_float((days / 2.0).powf(0.05).max(1.0));
+        }
         mult
+    }
+
+    /// `Player.isInAnyChallenge`: any Antimatter Challenge or Eternity Challenge
+    /// is running.
+    fn is_in_any_challenge(&self) -> bool {
+        self.in_any_antimatter_challenge() || self.any_ec_running()
+    }
+
+    /// Whether every AD autobuyer's "Buys max" bulk is at the cap (achievement
+    /// 61's `hasMaxedBulk` over the zero-indexed AD autobuyers).
+    fn all_ad_autobuyers_bulk_maxed(&self) -> bool {
+        self.autobuyers
+            .dimensions
+            .iter()
+            .all(|ab| ab.bulk >= crate::autobuyers::AD_AUTOBUYER_BULK_CAP)
     }
 
     /// Whether `id` is the sole running normal challenge — the original's
@@ -235,6 +285,43 @@ impl GameState {
         if self.dimensions[6].amount.exponent() >= 12 {
             self.unlock_achievement(46);
         }
+        // 61: all AD autobuyers have maxed bulk. The reward (unlimited bulk)
+        // affects production; the original fires this on Reality / save-convert,
+        // but the engine has no bulk-upgrade action, so a guarded per-tick check
+        // catches a loaded save that already has maxed bulk.
+        if !self.achievement_unlocked(61) && self.all_ad_autobuyers_bulk_maxed() {
+            self.unlock_achievement(61);
+        }
+        // 63: begin generating Infinity Power.
+        if self.infinity_power > Decimal::ONE {
+            self.unlock_achievement(63);
+        }
+        // 66: over 1e58 ticks/second (tickspeed interval ≤ 1e-55 ms).
+        if self.current_tickspeed_ms().exponent() <= -55 {
+            self.unlock_achievement(66);
+        }
+        // 72: every AD multiplier at least Number.MAX_VALUE.
+        if !self.achievement_unlocked(72)
+            && (0..8).all(|t| self.dimension_multiplier(t) >= Decimal::NUMBER_MAX_VALUE)
+        {
+            self.unlock_achievement(72);
+        }
+        // 73: reach 9.9999e9999 antimatter.
+        if self.antimatter >= Decimal::new(9.9999, 9999) {
+            self.unlock_achievement(73);
+        }
+        // 75: unlock the 4th Infinity Dimension.
+        if self.infinity_dimensions[3].is_unlocked {
+            self.unlock_achievement(75);
+        }
+        // 76: play for 8 days (game time).
+        if self.records.total_time_played_ms >= 8.0 * 86_400_000.0 {
+            self.unlock_achievement(76);
+        }
+        // 77: reach 1e6 Infinity Power.
+        if self.infinity_power.exponent() >= 6 {
+            self.unlock_achievement(77);
+        }
         // 52: max the interval for the AD and Tickspeed autobuyers. The original
         // fires this on REALITY_RESET_AFTER / REALITY_UPGRADE_TEN_BOUGHT, but a
         // Reality clears autobuyer intervals, so it is only truly reachable while
@@ -269,6 +356,43 @@ impl GameState {
         // 54: Infinity in 10 minutes or less (real time).
         if self.records.this_infinity.real_time_ms <= 10.0 * 60_000.0 {
             self.unlock_achievement(54);
+        }
+        // 55: Infinity in 1 minute or less (real time).
+        if self.records.this_infinity.real_time_ms <= 60_000.0 {
+            self.unlock_achievement(55);
+        }
+        // 78: Infinity in under 250 ms (real time).
+        if self.records.this_infinity.real_time_ms <= 250.0 {
+            self.unlock_achievement(78);
+        }
+        let secs = self.records.this_infinity.real_time_ms / 1000.0;
+        // 56: complete the NC2 (AD Autobuyer) challenge in ≤ 3 minutes.
+        if self.is_only_active_normal_challenge(2) && secs <= 180.0 {
+            self.unlock_achievement(56);
+        }
+        // 57: complete the NC8 (AD8 Autobuyer) challenge in ≤ 3 minutes.
+        if self.is_only_active_normal_challenge(8) && secs <= 180.0 {
+            self.unlock_achievement(57);
+        }
+        // 58: complete the NC9 (Tickspeed Autobuyer) challenge in ≤ 3 minutes.
+        if self.is_only_active_normal_challenge(9) && secs <= 180.0 {
+            self.unlock_achievement(58);
+        }
+        // 68: complete the NC3 challenge in ≤ 10 seconds.
+        if self.is_only_active_normal_challenge(3) && secs <= 10.0 {
+            self.unlock_achievement(68);
+        }
+        // 64: Infinity in a Normal Challenge with no Boosts or Galaxies.
+        if self.galaxies == 0 && self.dim_boosts == 0 && self.any_challenge_running() {
+            self.unlock_achievement(64);
+        }
+        // 71: Infinity with a single 1st AD, no Boosts/Galaxies, in NC2.
+        if self.is_only_active_normal_challenge(2)
+            && self.dimensions[0].amount == Decimal::ONE
+            && self.dim_boosts == 0
+            && self.galaxies == 0
+        {
+            self.unlock_achievement(71);
         }
     }
 
@@ -307,6 +431,16 @@ impl GameState {
             && self.sacrifice_multiplier() >= Decimal::from_float(600.0)
         {
             self.unlock_achievement(32);
+        }
+    }
+
+    /// INFINITY_CHALLENGE_COMPLETED conditions (checked when an IC is completed).
+    pub(crate) fn check_infinity_challenge_completed_achievements(&mut self) {
+        // 67: complete an Infinity Challenge.
+        if (1..=crate::INFINITY_CHALLENGE_COUNT)
+            .any(|id| self.infinity_challenge_completed(id))
+        {
+            self.unlock_achievement(67);
         }
     }
 
@@ -509,15 +643,18 @@ mod tests {
     }
 
     #[test]
-    fn fast_crunch_unlocks_37_54_and_raises_starting_antimatter() {
+    fn fast_crunch_unlocks_speed_achievements_and_raises_starting_antimatter() {
         let mut game = GameState::new();
-        // Zero real time: under 10 minutes and under 2 hours → 37 and 54.
+        // Zero real time trips every "fast Infinity" achievement: 37 (≤2 h),
+        // 54 (≤10 min), 55 (≤1 min), 78 (≤250 ms).
         game.antimatter = crate::data::constants::BIG_CRUNCH_THRESHOLD;
         assert!(game.big_crunch());
         assert!(game.achievement_unlocked(37));
         assert!(game.achievement_unlocked(54));
-        // startingValue = max(100, 5000, 5e5) = 5e5.
-        assert_eq!(game.antimatter, Decimal::new(5.0, 5));
+        assert!(game.achievement_unlocked(55));
+        assert!(game.achievement_unlocked(78));
+        // startingValue = max(100, 5000, 5e5, 5e10, 5e25) = 5e25.
+        assert_eq!(game.antimatter, Decimal::new(5.0, 25));
     }
 
     #[test]
@@ -619,5 +756,99 @@ mod tests {
             game.dimension_multiplier(0),
             baseline.dimension_multiplier(0) * Decimal::from_float(1.05)
         );
+    }
+
+    // ---- Batch 2 (ids 55–78) ----
+
+    /// Compare a per-tier effect against a same-unlock-count baseline (achievement
+    /// 11 has no multiplier effect), cancelling the ×1.03 achievement-power bump.
+    fn tier_mult_with_only(id: u16, tier: usize) -> (Decimal, Decimal) {
+        let mut baseline = GameState::new();
+        baseline.unlock_achievement(11);
+        let mut game = GameState::new();
+        game.unlock_achievement(id);
+        (
+            game.dimension_multiplier(tier),
+            baseline.dimension_multiplier(tier),
+        )
+    }
+
+    #[test]
+    fn achievements_64_68_71_boost_dimensions() {
+        // 68: AD1 ×1.5, 71: AD1 ×3.
+        let (g, b) = tier_mult_with_only(68, 0);
+        assert_eq!(g, b * Decimal::from_float(1.5));
+        let (g, b) = tier_mult_with_only(71, 0);
+        assert_eq!(g, b * Decimal::from_float(3.0));
+        // 64: AD1–4 ×1.25, AD5 unaffected.
+        let (g, b) = tier_mult_with_only(64, 3);
+        assert_eq!(g, b * Decimal::from_float(1.25));
+        let (g, b) = tier_mult_with_only(64, 4);
+        assert_eq!(g, b);
+    }
+
+    #[test]
+    fn achievement_58_boosts_buy_ten_multiplier() {
+        let mut game = GameState::new();
+        let before = game.buy_ten_multiplier();
+        game.unlock_achievement(58);
+        assert_eq!(
+            game.buy_ten_multiplier(),
+            before * Decimal::from_float(1.01)
+        );
+    }
+
+    #[test]
+    fn achievement_66_speeds_tickspeed() {
+        let mut game = GameState::new();
+        game.dimensions[1].bought = 5; // some tickspeed context
+        let before = game.tickspeed_effect();
+        game.unlock_achievement(66);
+        assert!(game.tickspeed_effect() > before);
+    }
+
+    #[test]
+    fn achievement_75_extends_achievement_bonus_to_infinity_dimensions() {
+        let mut game = GameState::new();
+        assert_eq!(game.id_common_multiplier(), Decimal::ONE);
+        game.unlock_achievement(75);
+        // Only 75 unlocked → achievement_power = 1.03^1, applied to ID mult.
+        assert_eq!(game.id_common_multiplier(), Decimal::from_float(1.03));
+    }
+
+    #[test]
+    fn achievement_72_boosts_all_dimensions() {
+        let mut game = GameState::new();
+        game.unlock_achievement(72);
+        assert_eq!(game.achievement_ad_common_mult(), Decimal::from_float(1.1));
+    }
+
+    #[test]
+    fn achievement_73_scales_with_antimatter() {
+        let mut game = GameState::new();
+        game.antimatter = Decimal::new(1.0, 5);
+        game.unlock_achievement(73);
+        // AM^0.00002 + 1 > 2 for any AM > 1.
+        assert!(game.achievement_ad_common_mult() > Decimal::from_float(2.0));
+    }
+
+    #[test]
+    fn achievements_63_and_77_track_infinity_power() {
+        let mut game = GameState::new();
+        game.infinity_power = Decimal::from_float(2.0);
+        game.check_tick_achievements(50.0);
+        assert!(game.achievement_unlocked(63));
+        assert!(!game.achievement_unlocked(77));
+
+        game.infinity_power = Decimal::new(1.0, 6);
+        game.check_tick_achievements(50.0);
+        assert!(game.achievement_unlocked(77));
+    }
+
+    #[test]
+    fn achievement_67_unlocks_on_infinity_challenge_completion() {
+        let mut game = GameState::new();
+        game.complete_infinity_challenge(3);
+        assert!(game.achievement_unlocked(67));
     }
 }

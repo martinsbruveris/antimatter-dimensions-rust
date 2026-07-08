@@ -130,6 +130,8 @@ impl GameState {
     pub(crate) fn complete_infinity_challenge(&mut self, id: u8) {
         if (1..=INFINITY_CHALLENGE_COUNT).contains(&id) {
             self.infinity_challenge.completed |= 1u16 << id;
+            // INFINITY_CHALLENGE_COMPLETED achievements (67, 82).
+            self.check_infinity_challenge_completed_achievements();
         }
     }
 

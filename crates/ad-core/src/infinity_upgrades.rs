@@ -229,6 +229,10 @@ impl GameState {
         if self.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult) {
             mult *= Decimal::from_float(1.1);
         }
+        // Achievement 58 (NC9 in ≤ 3 min): +1% to the buy-10 multiplier.
+        if self.achievement_unlocked(58) {
+            mult *= Decimal::from_float(1.01);
+        }
         // The `powerbuy10` glyph effect multiplies the base.
         mult *= Decimal::from_float(self.glyph_effect_powerbuy10());
         mult

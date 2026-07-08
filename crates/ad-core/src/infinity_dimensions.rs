@@ -200,6 +200,11 @@ impl GameState {
     /// (The achievement/time-study terms are later features.)
     pub fn id_common_multiplier(&self) -> Decimal {
         let mut mult = Decimal::ONE;
+        // Achievement 75: the global achievement bonus also affects Infinity
+        // Dimensions (`infinityDimensionCommonMultiplier` `timesEffectsOf`).
+        if self.achievement_unlocked(75) {
+            mult *= self.achievement_power();
+        }
         if self.infinity_challenge_completed(1) {
             let completed = (1..=8u8)
                 .filter(|&id| self.infinity_challenge_completed(id))

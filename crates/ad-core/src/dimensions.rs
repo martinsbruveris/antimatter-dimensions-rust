@@ -396,6 +396,12 @@ impl GameState {
             if self.achievement_unlocked(31) {
                 mult *= Decimal::from_float(1.05);
             }
+            if self.achievement_unlocked(68) {
+                mult *= Decimal::from_float(1.5);
+            }
+            if self.achievement_unlocked(71) {
+                mult *= Decimal::from_float(3.0);
+            }
         }
         // 8th dimension (tier 7): 23.
         if tier == 7 && self.achievement_unlocked(23) {
@@ -404,6 +410,10 @@ impl GameState {
         // 34: Antimatter Dimensions 1–7 (tier < 8) ×1.02.
         if tier < 7 && self.achievement_unlocked(34) {
             mult *= Decimal::from_float(1.02);
+        }
+        // 64: Antimatter Dimensions 1–4 (tier ≤ 3) ×1.25.
+        if tier <= 3 && self.achievement_unlocked(64) {
+            mult *= Decimal::from_float(1.25);
         }
         // 43: every dimension gains a boost proportional to its (1-indexed) tier.
         if self.achievement_unlocked(43) {
