@@ -97,6 +97,22 @@ impl GameState {
         self.post_c4_tier = tier as u8 + 1;
         self.records.this_infinity.last_buy_time_ms = self.records.this_infinity.time_ms;
 
+        // Reality-upgrade requirement flags (`antimatter-dimension.js`): buying a
+        // non-8th tier breaks "only AD8", a non-1st breaks "only AD1", and buying
+        // AD1 breaks "no AD1" (tier is 0-indexed: AD1 == 0, AD8 == 7).
+        if tier != 7 {
+            self.requirement_checks.eternity_only_ad8 = false;
+        }
+        if tier != 0 {
+            self.requirement_checks.eternity_only_ad1 = false;
+        }
+        if tier == 0 {
+            self.requirement_checks.eternity_no_ad1 = false;
+        }
+        if tier == 7 {
+            self.requirement_checks.infinity_no_ad8 = false;
+        }
+
         // 11–18: buy a 1st..8th Antimatter Dimension (tier is 0-indexed).
         self.unlock_achievement(11 + tier as u16);
         // 23: have exactly 99 eighth dimensions (only buying AD8 can reach it).

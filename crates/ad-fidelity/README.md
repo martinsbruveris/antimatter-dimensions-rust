@@ -161,9 +161,14 @@ version is a later optimization.
 
 Only the persisted `player`-tree fields on the **allowlist** (`src/allowlist.rs`,
 design §5) — the AM economy, Infinity/Eternity/Replicanti/Dilation, the
-unlock-gating records, autobuyer settings, and (partially) Reality/black holes.
-Everything else (options/UI, unported systems, `Date.now`/real-time and game-time
-bookkeeping, values derived from a primary) is intentionally ignored. Each field
+unlock-gating records, autobuyer settings, (partially) Reality/black holes, and
+the Celestials (Teresa/Effarig/Enslaved/V/Ra/Lai'tela/Pelle + Imaginary
+Upgrades). Everything else (options/UI, unported systems, `Date.now`/real-time and
+game-time bookkeeping, values derived from a primary) is intentionally ignored.
+The allowlist lists every field that must match at **full fidelity**, including
+ones `ad-core` does not model yet: the encoder emits an unmodelled field as a
+fresh-start default, so a rule over it *showcases* the gap (`Rust = default` vs
+`JS = real`) rather than hiding it — which is the harness's purpose. Each field
 has a comparison mode (`src/compare.rs`, design §8): `Exact` (ints/bools/bitmasks,
 compared by numeric *value* so `0` and `0.0` agree), `Decimal` (log-space
 relative tolerance), `Number` (relative tolerance), `IdSet` (order-insensitive),

@@ -244,10 +244,11 @@ fn select_fixtures(
     };
     let mut selected = Vec::new();
     for &i in indices {
-        if i == 0 || i > all.len() {
+        if i >= all.len() {
             return Err(format!(
-                "--tests index {i} out of range (have {} fixtures)",
-                all.len()
+                "--tests index {i} out of range (have {} fixtures, 0..{})",
+                all.len(),
+                all.len() - 1
             ));
         }
         selected.push(all[i].clone());

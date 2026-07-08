@@ -169,6 +169,34 @@ impl Default for RealityState {
 pub struct RequirementChecks {
     /// No Replicanti Galaxy bought this eternity (`eternity.noRG`).
     pub eternity_no_rg: bool,
+    /// Only 8th Antimatter Dimensions bought this eternity (`eternity.onlyAD8`);
+    /// cleared when any other tier is purchased.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub eternity_only_ad8: bool,
+    /// Only 1st Antimatter Dimensions bought this eternity (`eternity.onlyAD1`);
+    /// cleared when any other tier is purchased.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub eternity_only_ad1: bool,
+    /// No 1st Antimatter Dimension bought this eternity (`eternity.noAD1`);
+    /// cleared on an AD1 purchase or whenever AD1 has a nonzero amount.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub eternity_no_ad1: bool,
+    /// No antimatter gained this reality (`reality.noAM`); cleared on any
+    /// antimatter gain.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub reality_no_am: bool,
+    /// A "Max All" was used this infinity (`infinity.maxAll`); a latch set only
+    /// by the manual Max All action (never reset), so it round-trips unchanged.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub infinity_max_all: bool,
+    /// No 8th Antimatter Dimension bought this eternity (`infinity.noAD8`);
+    /// cleared on an AD8 purchase.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub infinity_no_ad8: bool,
+    /// No Sacrifice performed since the last Galaxy (`infinity.noSacrifice`);
+    /// cleared on a Sacrifice, restored on a Galaxy.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub infinity_no_sacrifice: bool,
     /// No manual Infinity this reality (`reality.noInfinities`).
     pub reality_no_infinities: bool,
     /// No manual Eternity this reality (`reality.noEternities`).
@@ -194,6 +222,13 @@ impl RequirementChecks {
     pub fn new() -> Self {
         Self {
             eternity_no_rg: true,
+            eternity_only_ad8: true,
+            eternity_only_ad1: true,
+            eternity_no_ad1: true,
+            reality_no_am: true,
+            infinity_max_all: false,
+            infinity_no_ad8: true,
+            infinity_no_sacrifice: true,
             reality_no_infinities: true,
             reality_no_eternities: true,
             reality_max_glyphs: 0,

@@ -177,6 +177,14 @@ pub struct ThisReality {
     pub time_ms: f64,
     /// Real time elapsed in this reality (ms).
     pub real_time_ms: f64,
+    /// Peak antimatter reached this reality (`thisReality.maxAM`); maintained by
+    /// the antimatter setter in the original (`currency.js`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub max_am: Decimal,
+    /// Peak Infinity Points reached this reality (`thisReality.maxIP`);
+    /// maintained by the IP setter in the original (`currency.js`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub max_ip: Decimal,
     /// Peak Eternity Points reached this reality (`thisReality.maxEP`).
     /// Maintained by the EP setter in the original; advanced in `tick` and on
     /// EP awards here. Gates the Reality study/availability and feeds the RM
@@ -195,6 +203,8 @@ impl ThisReality {
         Self {
             time_ms: 0.0,
             real_time_ms: 0.0,
+            max_am: Decimal::ZERO,
+            max_ip: Decimal::ZERO,
             max_ep: Decimal::ZERO,
             max_replicanti: Decimal::ZERO,
             max_dt: Decimal::ZERO,

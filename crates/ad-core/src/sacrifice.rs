@@ -162,6 +162,10 @@ impl GameState {
             return false;
         }
 
+        // A Sacrifice breaks the "no Sacrifice since last Galaxy" flag
+        // (`sacrifice.js`).
+        self.requirement_checks.infinity_no_sacrifice = false;
+
         if self.challenge_running(8) {
             if self.chall8_total_sacrifice >= BIG_CRUNCH_THRESHOLD {
                 return false;

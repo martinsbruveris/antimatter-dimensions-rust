@@ -84,6 +84,12 @@ impl GameState {
             self.dimensions[producer - offset].amount += produced;
         }
 
+        // Any 1st Antimatter Dimension stock breaks the "no AD1" run flag
+        // (`antimatter-dimension.js` checks this after dimension production).
+        if self.dimensions[0].amount > Decimal::ZERO {
+            self.requirement_checks.eternity_no_ad1 = false;
+        }
+
         // The 1st dimension (and the 2nd under NC12) makes antimatter at the full
         // interval, reading its amount after the chain above has fed into it.
         // `total_antimatter` (monotonic, survives crunches) counts all antimatter
@@ -94,6 +100,11 @@ impl GameState {
         }
         self.antimatter += am_gain;
         self.total_antimatter += am_gain;
+        // Any antimatter gain breaks the "no antimatter this reality" flag
+        // (`Currency.antimatter.add`, currency.js).
+        if am_gain > Decimal::ZERO {
+            self.requirement_checks.reality_no_am = false;
+        }
 
         // Cap antimatter at the current goal while a crunch goal is in force:
         // pre-break the player must Crunch to progress, and even post-break any
@@ -151,10 +162,15 @@ impl GameState {
         // in-tick IP source is the passive `ipGen` upgrade).
         self.records.this_eternity.max_ip =
             self.records.this_eternity.max_ip.max(&self.infinity_points);
+        self.records.this_reality.max_ip =
+            self.records.this_reality.max_ip.max(&self.infinity_points);
         // Track the peak antimatter this infinity (capped value), mirroring the
-        // antimatter setter's `thisInfinity.maxAM = maxAM.max(value)`.
+        // antimatter setter's `thisInfinity.maxAM = maxAM.max(value)`. The same
+        // setter also updates the this-reality peak.
         self.records.this_infinity.max_am =
             self.records.this_infinity.max_am.max(&self.antimatter);
+        self.records.this_reality.max_am =
+            self.records.this_reality.max_am.max(&self.antimatter);
         // Peak antimatter this eternity (persists across crunches; gates Infinity
         // Challenge unlocks).
         let prev_peak = self.records.this_eternity.max_am;

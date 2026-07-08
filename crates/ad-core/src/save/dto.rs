@@ -149,6 +149,10 @@ pub struct PlayerDTO {
     /// `player.matter` — normal matter for NC11 (a Decimal string).
     #[serde(with = "break_infinity::serde_string")]
     pub matter: Decimal,
+    /// `player.postC4Tier` — tier of the last AD bought (gates IC4 production).
+    /// Defaults to `0` (the original's fresh-save value) when absent.
+    #[serde(default)]
+    pub post_c4_tier: u8,
     /// `player.replicanti` — the Replicanti state (Feature 3.2).
     pub replicanti: ReplicantiDTO,
     /// `player.tabNotifications` — tabs currently showing the `!` badge, as
@@ -444,6 +448,10 @@ fn decimal_zero() -> Decimal {
     Decimal::ZERO
 }
 
+fn bool_true() -> bool {
+    true
+}
+
 /// `player.celestials.pelle` (Feature 7.7).
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -695,6 +703,30 @@ pub struct ReqLockDTO {
 pub struct RequirementChecksDTO {
     pub eternity: EternityChecksDTO,
     pub reality: RealityChecksDTO,
+    #[serde(default)]
+    pub infinity: InfinityChecksDTO,
+}
+
+/// `player.requirementChecks.infinity` (modelled subset).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InfinityChecksDTO {
+    #[serde(rename = "maxAll", default)]
+    pub max_all: bool,
+    #[serde(rename = "noAD8", default = "bool_true")]
+    pub no_ad8: bool,
+    #[serde(default = "bool_true")]
+    pub no_sacrifice: bool,
+}
+
+impl Default for InfinityChecksDTO {
+    fn default() -> Self {
+        Self {
+            max_all: false,
+            no_ad8: true,
+            no_sacrifice: true,
+        }
+    }
 }
 
 /// `player.requirementChecks.eternity` (modelled subset).
@@ -703,6 +735,12 @@ pub struct RequirementChecksDTO {
 pub struct EternityChecksDTO {
     #[serde(rename = "noRG")]
     pub no_rg: bool,
+    #[serde(rename = "onlyAD8", default = "bool_true")]
+    pub only_ad8: bool,
+    #[serde(rename = "onlyAD1", default = "bool_true")]
+    pub only_ad1: bool,
+    #[serde(rename = "noAD1", default = "bool_true")]
+    pub no_ad1: bool,
 }
 
 /// `player.requirementChecks.reality` (modelled subset).
@@ -712,6 +750,8 @@ pub struct RealityChecksDTO {
     pub no_infinities: bool,
     pub no_eternities: bool,
     pub max_glyphs: i32,
+    #[serde(rename = "noAM", default = "bool_true")]
+    pub no_am: bool,
 }
 
 /// `player.replicanti` (modelled subset). The sub-interval `timer` is transient and
@@ -913,6 +953,18 @@ pub struct RecordsDTO {
 pub struct ThisRealityDTO {
     pub time: f64,
     pub real_time: f64,
+    #[serde(
+        rename = "maxAM",
+        default = "decimal_zero",
+        with = "break_infinity::serde_string"
+    )]
+    pub max_am: Decimal,
+    #[serde(
+        rename = "maxIP",
+        default = "decimal_zero",
+        with = "break_infinity::serde_string"
+    )]
+    pub max_ip: Decimal,
     #[serde(rename = "maxEP", with = "break_infinity::serde_string")]
     pub max_ep: Decimal,
     #[serde(with = "break_infinity::serde_string")]
@@ -1449,6 +1501,8 @@ impl GameState {
             this_reality: crate::records::ThisReality {
                 time_ms: dto.records.this_reality.time,
                 real_time_ms: dto.records.this_reality.real_time,
+                max_am: dto.records.this_reality.max_am,
+                max_ip: dto.records.this_reality.max_ip,
                 max_ep: dto.records.this_reality.max_ep,
                 max_replicanti: dto.records.this_reality.max_replicanti,
                 max_dt: dto.records.this_reality.max_dt,
@@ -1544,6 +1598,13 @@ impl GameState {
         };
         let requirement_checks = crate::reality::RequirementChecks {
             eternity_no_rg: dto.requirement_checks.eternity.no_rg,
+            eternity_only_ad8: dto.requirement_checks.eternity.only_ad8,
+            eternity_only_ad1: dto.requirement_checks.eternity.only_ad1,
+            eternity_no_ad1: dto.requirement_checks.eternity.no_ad1,
+            reality_no_am: dto.requirement_checks.reality.no_am,
+            infinity_max_all: dto.requirement_checks.infinity.max_all,
+            infinity_no_ad8: dto.requirement_checks.infinity.no_ad8,
+            infinity_no_sacrifice: dto.requirement_checks.infinity.no_sacrifice,
             reality_no_infinities: dto.requirement_checks.reality.no_infinities,
             reality_no_eternities: dto.requirement_checks.reality.no_eternities,
             reality_max_glyphs: dto.requirement_checks.reality.max_glyphs,
@@ -2077,9 +2138,11 @@ impl GameState {
                 current: dto.challenge.infinity.current,
                 completed: dto.challenge.infinity.completed_bits,
             },
-            // Transient per-run challenge counters (re-established on the next
-            // purchase / tick); defaulted rather than round-tripped.
-            post_c4_tier: 1,
+            // `postC4Tier` round-trips from the save (last-bought AD tier, gates
+            // IC4 production); re-set on the next purchase.
+            post_c4_tier: dto.post_c4_tier,
+            // Transient per-run challenge counter; defaulted rather than
+            // round-tripped.
             ic2_count: 0.0,
             chall8_total_sacrifice: dto.chall8_total_sacrifice,
             chall2_pow: dto.chall2_pow,

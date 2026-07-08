@@ -140,6 +140,8 @@ impl GameState {
     fn galaxy_reset(&mut self) {
         self.dim_boosts = 0;
         self.soft_reset(false);
+        // Restored per-Galaxy (not per-Infinity), matching `galaxyReset`.
+        self.requirement_checks.infinity_no_sacrifice = true;
     }
 
     /// Get the dimension boost requirement for the next boost.

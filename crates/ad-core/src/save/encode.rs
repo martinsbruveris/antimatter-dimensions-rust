@@ -294,6 +294,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     let records = &mut player["records"];
     records["thisReality"]["time"] = json!(state.records.this_reality.time_ms);
     records["thisReality"]["realTime"] = json!(state.records.this_reality.real_time_ms);
+    records["thisReality"]["maxAM"] = decimal(&state.records.this_reality.max_am);
+    records["thisReality"]["maxIP"] = decimal(&state.records.this_reality.max_ip);
     records["thisReality"]["maxEP"] = decimal(&state.records.this_reality.max_ep);
     records["thisReality"]["maxReplicanti"] =
         decimal(&state.records.this_reality.max_replicanti);
@@ -322,12 +324,27 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         .collect::<Vec<_>>());
     player["requirementChecks"]["eternity"]["noRG"] =
         json!(state.requirement_checks.eternity_no_rg);
+    player["requirementChecks"]["eternity"]["onlyAD8"] =
+        json!(state.requirement_checks.eternity_only_ad8);
+    player["requirementChecks"]["eternity"]["onlyAD1"] =
+        json!(state.requirement_checks.eternity_only_ad1);
+    player["requirementChecks"]["eternity"]["noAD1"] =
+        json!(state.requirement_checks.eternity_no_ad1);
+    player["requirementChecks"]["reality"]["noAM"] =
+        json!(state.requirement_checks.reality_no_am);
+    player["requirementChecks"]["infinity"]["maxAll"] =
+        json!(state.requirement_checks.infinity_max_all);
+    player["requirementChecks"]["infinity"]["noAD8"] =
+        json!(state.requirement_checks.infinity_no_ad8);
+    player["requirementChecks"]["infinity"]["noSacrifice"] =
+        json!(state.requirement_checks.infinity_no_sacrifice);
     player["requirementChecks"]["reality"]["noInfinities"] =
         json!(state.requirement_checks.reality_no_infinities);
     player["requirementChecks"]["reality"]["noEternities"] =
         json!(state.requirement_checks.reality_no_eternities);
     player["requirementChecks"]["reality"]["maxGlyphs"] =
         json!(state.requirement_checks.reality_max_glyphs);
+    player["postC4Tier"] = json!(state.post_c4_tier);
 
     // Celestials (Phase 7). Modelled sub-fields are overwritten in place; the
     // unmodelled ones (quote bits, glyph weights, Ra/Laitela/Pelle) stay at
