@@ -207,3 +207,60 @@ New effect sites:
 - 10 new unit tests (85/93 IP mult, 87 infinities, 94 ID1, 83 galaxies+tickspeed,
   88 sacrifice, 95 replicanti, 98/102 tick, 97 IC-sum, 96/101/104 eternity, 82).
 - Full suite green. Fidelity unchanged at 34.
+
+---
+
+## Batch 4 — ids 105–128
+
+### What shipped
+
+Conditions + effects for rows 10–12: 105–108, 112–116, 118, 121–128 (111/117
+conditions deferred — see below).
+
+- **Tick**: 105 (308 free ticks), 121 (1e30008 IP), 124 (marathon2 — Infinity
+  Power/s > Infinity Power for 60 s), 125 (1e90 IP, no infinities/AD1), 126
+  (180× RG:AG), 127 (`NUMBER_MAX_VALUE` EP), 128 (1e22000 IP, no studies).
+- **Crunch-after**: 112 (IC best-times sum < 750 ms).
+- **Replicanti-tick**: 106 (10 RGs within 15 s).
+- **Eternity-before**: 107 (<10 infinities), 108 (exactly 9 Replicanti), 113
+  (≤250 ms), 116 (≤1 infinity), 122 (only-AD1).
+- **Eternity-after** (new seam): 123 (50 EC completions).
+- **Challenge-failed** (new seam in `ec_try_fail`): 114.
+- **IC-start** (inline in `start_infinity_challenge`): 115.
+
+New effect sites:
+- Time-Dimension common mult: 105 (`perSecond^0.000005`), 128 (× study count).
+- Gained eternities: 113 (×2).
+- Soft reset (`galaxy.rs`): split the ANR gate — 111 keeps *antimatter*, perk 30
+  keeps antimatter *and* dimensions (matching the original's two separate checks).
+- Dimension-Boost power: 117 (×1.01).
+- Sacrifice: 118 skips the AD reset (both the NC8 and normal paths).
+- IP multiplier (`total_ip_mult`): 116 (`infinitiesTotal^(log10 2/4)`, ^TS31),
+  125 (`2^(ln t · min(t^0.11,500))`) — both capped by the new
+  `effarig_eternity_cap` (1e50 during Effarig's Eternity stage).
+
+### Decisions & why
+
+- **113 doubles its own eternity** (like the batch-3 85/93 case): the condition
+  runs in ETERNITY_RESET_BEFORE, and `gained_eternities` is computed after —
+  compute-fresh, no cache.
+- **111 / 117 conditions deferred, effects wired.** 111 needs the
+  recent-infinities ring (unmodelled); 117 needs a ≥750 bulk Dimension-Boost
+  purchase (the engine boosts one at a time). Both effects have real consumption
+  sites, so an auto-achieved unlock still behaves correctly.
+- **126's RG-divide reward deferred.** Rewiring Replicanti-Galaxy gain (multi-gain
+  + divide-by-`MAX`) is a larger change; the condition is wired (reachable) but
+  the behavioural reward is a follow-up. Noted here rather than half-done.
+
+### Surprises
+
+- 113's ×2 tipped several test eternities (set up with 0 ms) to 2 total
+  eternities, tripping the keepAutobuyers milestone; gave the shared
+  `game_at_eternity_goal` helper and two autobuyer tests realistic (>30 s / >250
+  ms) eternity times.
+
+### Tests
+
+- 10 new unit tests (128 TD, 111 AM-keep, 113 eternities, 117 dim-boost, 118
+  sacrifice, 116 IP mult, 107/108, 123, 114, 124 marathon).
+- Full suite green. Fidelity unchanged at 34.

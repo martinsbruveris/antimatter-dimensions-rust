@@ -109,6 +109,10 @@ impl GameState {
         let mut gain = Decimal::from_float(self.glyph_effect_timeetermult());
         // RU3 (Eternal Amplifier): ×3 per purchase.
         gain *= self.reality_rebuyable_effect(3);
+        // Achievement 113 (Eternity in ≤ 250 ms): ×2 Eternities.
+        if self.achievement_unlocked(113) {
+            gain *= Decimal::from_float(2.0);
+        }
         gain
     }
 
@@ -194,6 +198,8 @@ impl GameState {
         // ETERNITY_RESET_AFTER requirement checks (RU9/12/13/15/25) — the
         // awarded EP persists through the reset.
         self.check_reality_upgrade_reqs_on_eternity_after();
+        // ETERNITY_RESET_AFTER achievements (123).
+        self.check_eternity_after_achievements();
 
         // The Automator's ETERNITY_RESET_AFTER notification (`prestigeNotify`).
         self.automator_notify_prestige(
@@ -451,6 +457,10 @@ mod tests {
         game.replicanti.unlocked = true;
         game.replicanti.amount = Decimal::new(1.0, 100);
         game.replicanti.galaxies = 3;
+        // A slow eternity (> 30 s) by default, so the fast-eternity achievements
+        // 104 (5e25 starting IP) and 113 (×2 Eternities) don't perturb tests that
+        // don't opt into them.
+        game.records.this_eternity.time_ms = 60_000.0;
         game
     }
 

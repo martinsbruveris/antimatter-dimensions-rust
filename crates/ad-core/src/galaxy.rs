@@ -245,10 +245,16 @@ impl GameState {
     /// and no force, antimatter / dimensions / tickspeed / sacrifice are all
     /// kept (antimatter still bumps up to its starting value).
     fn soft_reset(&mut self, forced: bool) {
-        let keep = !forced && self.perk_bought(30);
+        // The original splits this into two gates: `Perk.antimatterNoReset` (30)
+        // keeps dimensions/tickspeed/sacrifice, while keeping *antimatter* also
+        // accepts Achievement 111 (`Achievement(111).isUnlocked ||
+        // Perk.antimatterNoReset`).
+        let keep_dimensions = !forced && self.perk_bought(30);
+        let keep_antimatter =
+            !forced && (self.perk_bought(30) || self.achievement_unlocked(111));
         // `resetChallengeStuff` runs regardless.
         self.reset_challenge_stuff();
-        if !keep {
+        if !keep_dimensions {
             self.sacrificed = Decimal::ZERO;
             for i in 0..8 {
                 self.dimensions[i] = DimensionTier::new();
@@ -258,7 +264,7 @@ impl GameState {
         // Original `softReset` also runs `skipResetsIfPossible`; a no-op unless a
         // skip level exceeds the just-incremented boost count.
         self.skip_resets_if_possible();
-        if keep {
+        if keep_antimatter {
             self.antimatter = self.antimatter.max(&self.starting_antimatter());
         } else {
             self.antimatter = self.starting_antimatter();

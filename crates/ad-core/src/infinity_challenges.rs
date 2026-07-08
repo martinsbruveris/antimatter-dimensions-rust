@@ -119,6 +119,12 @@ impl GameState {
         if !self.can_start_infinity_challenge(id) {
             return false;
         }
+        // 115: start an Infinity Challenge inside an Eternity Challenge (checked
+        // before the reset clears the running EC — matching the original's
+        // ACHIEVEMENT_EVENT_OTHER unlock in `startInfinityChallenge`).
+        if self.any_ec_running() {
+            self.unlock_achievement(115);
+        }
         self.big_crunch_reset(true, true);
         self.challenge.current = 0;
         self.infinity_challenge.current = id;

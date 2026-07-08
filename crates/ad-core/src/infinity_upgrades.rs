@@ -273,6 +273,10 @@ impl GameState {
                 .pow(&Decimal::from_float(0.3))
                 .max(&Decimal::ONE);
         }
+        // Achievement 117: the Dimension-Boost → AD multiplier is 1% higher.
+        if self.achievement_unlocked(117) {
+            boost *= Decimal::from_float(1.01);
+        }
         // The `powerdimboost` glyph effect (`GlyphEffect.dimBoostPower`).
         boost *= Decimal::from_float(self.glyph_effect_powerdimboost());
         boost

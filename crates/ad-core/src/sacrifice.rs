@@ -180,6 +180,10 @@ impl GameState {
         // (`sacrifice.js`).
         self.requirement_checks.infinity_no_sacrifice = false;
 
+        // Achievement 118 stops a Sacrifice from resetting the Antimatter
+        // Dimensions (`isAch118Unlocked`).
+        let keep_dimensions = self.achievement_unlocked(118);
+
         if self.challenge_running(8) {
             if self.chall8_total_sacrifice >= BIG_CRUNCH_THRESHOLD {
                 return false;
@@ -187,8 +191,10 @@ impl GameState {
             let next_boost = self.next_sacrifice_boost();
             self.chall8_total_sacrifice *= next_boost;
             self.sacrificed += self.dimensions[0].amount;
-            for i in 0..8 {
-                self.dimensions[i] = DimensionTier::new();
+            if !keep_dimensions {
+                for i in 0..8 {
+                    self.dimensions[i] = DimensionTier::new();
+                }
             }
             self.antimatter = self.starting_antimatter();
             self.check_sacrifice_after_achievements();
@@ -200,10 +206,12 @@ impl GameState {
 
         // Reset amounts for the lower dimensions (`resetAmountUpToTier`): up to
         // tier 7 (indices 0–6) normally, or tier 6 (indices 0–5, keeping AD7)
-        // under Normal Challenge 12.
-        let max_tier = if self.challenge_running(12) { 6 } else { 7 };
-        for i in 0..max_tier {
-            self.dimensions[i].amount = Decimal::ZERO;
+        // under Normal Challenge 12. Achievement 118 skips this reset entirely.
+        if !keep_dimensions {
+            let max_tier = if self.challenge_running(12) { 6 } else { 7 };
+            for i in 0..max_tier {
+                self.dimensions[i].amount = Decimal::ZERO;
+            }
         }
 
         // SACRIFICE_RESET_AFTER achievements (32, 118, …).

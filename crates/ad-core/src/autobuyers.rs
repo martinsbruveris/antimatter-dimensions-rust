@@ -1168,7 +1168,9 @@ mod tests {
         game.autobuyers.big_crunch_settings.mode = PrestigeAutobuyerMode::Time;
 
         // An Eternity keeps the mode while the milestone holds (5 + 1 ≥ 5)...
+        // Slow eternities (> 250 ms) so achievement 113 doesn't ×2 the gain.
         game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        game.records.this_eternity.time_ms = 60_000.0;
         assert!(game.eternity());
         assert_eq!(
             game.autobuyers.big_crunch_settings.mode,
@@ -1179,6 +1181,7 @@ mod tests {
         game.autobuyers.big_crunch_settings.mode = PrestigeAutobuyerMode::XHighest;
         game.eternities = Decimal::from_float(3.0);
         game.records.this_eternity.max_ip = crate::ETERNITY_GOAL;
+        game.records.this_eternity.time_ms = 60_000.0;
         assert!(game.eternity());
         assert_eq!(
             game.autobuyers.big_crunch_settings.mode,
@@ -1200,8 +1203,10 @@ mod tests {
         game.tick_autobuyers(50.0);
         assert_eq!(game.eternities, before);
 
-        // At the milestone it fires (amount 0 ≤ pending EP).
+        // At the milestone it fires (amount 0 ≤ pending EP). Slow eternity
+        // (> 250 ms) so achievement 113 doesn't ×2 the gain.
         game.eternities = Decimal::from_float(100.0);
+        game.records.this_eternity.time_ms = 60_000.0;
         game.tick_autobuyers(50.0);
         // The eternity reset takes eternities to 100 + gained (1).
         assert_eq!(game.eternities, Decimal::from_float(101.0));

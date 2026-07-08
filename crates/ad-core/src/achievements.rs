@@ -42,9 +42,11 @@ pub const ACHIEVEMENTS_PER_ROW: u16 = 8;
 ///
 /// Excludes achievements the engine cannot earn naturally, which are only ever
 /// set via Reality auto-achievement or the ACHNR reality upgrade: 22 (News),
-/// 35 (6-hour offline), 61 (autobuyer bulk has no in-engine upgrade), 62
-/// (`bestRunIPPM` needs the unmodelled recent-infinities ring), and 65/74 (the
-/// Normal-Challenge best-times sum is unmodelled).
+/// 35 (6-hour offline), 61 (autobuyer bulk has no in-engine upgrade), 62/111
+/// (`bestRunIPPM` / the recent-infinities ring is unmodelled), 65/74 (the
+/// Normal-Challenge best-times sum is unmodelled), and 117 (no ≥750 bulk
+/// Dimension-Boost purchase path). Their *effects* are still wired where they
+/// have a consumption site, so an auto-achieved unlock behaves correctly.
 pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] = &[
     11, 12, 13, 14, 15, 16, 17, 18, // row 1
     21, 23, 24, 25, 26, 27, 28, // row 2 (22 = News, deferred)
@@ -55,7 +57,9 @@ pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] = &[
     71, 72, 73, 75, 76, 77, 78, // row 7 (74 deferred)
     81, 82, 83, 84, 85, 86, 87, 88, // row 8
     91, 92, 93, 94, 95, 96, 97, 98, // row 9
-    101, 102, 103, 104, // row 10 (105–108 pending)
+    101, 102, 103, 104, 105, 106, 107, 108, // row 10
+    112, 113, 114, 115, 116, 118, // row 11 (111/117 deferred)
+    121, 122, 123, 124, 125, 126, 127, 128, // row 12
     136, // dilate time
 ];
 
@@ -379,6 +383,50 @@ impl GameState {
         if self.infinity_points.exponent() >= 1000 {
             self.unlock_achievement(103);
         }
+        // 105: 308 Tickspeed upgrades from Time Dimensions (free tick gained).
+        if self.total_tick_gained >= 308 {
+            self.unlock_achievement(105);
+        }
+        // 121: reach 1e30008 Infinity Points.
+        if self.infinity_points.exponent() >= 30008 {
+            self.unlock_achievement(121);
+        }
+        // 124: Infinity Power/s exceeds Infinity Power for 60 consecutive (game)
+        // seconds, outside EC7 (`AchievementTimers.marathon2`).
+        if !self.achievement_unlocked(124) {
+            if !self.ec_running(7)
+                && self.id_production_per_second(0) > self.infinity_power
+            {
+                self.ach_marathon2_ms += dt_ms;
+                if self.ach_marathon2_ms >= 60_000.0 {
+                    self.unlock_achievement(124);
+                }
+            } else {
+                self.ach_marathon2_ms = 0.0;
+            }
+        }
+        // 125: 1e90 IP with no Infinities or 1st ADs this Eternity.
+        if self.infinity_points.exponent() >= 90
+            && self.requirement_checks.eternity_no_ad1
+            && self.infinities == Decimal::ZERO
+        {
+            self.unlock_achievement(125);
+        }
+        // 126: 180× more Replicanti Galaxies than Antimatter Galaxies.
+        if self.galaxies > 0
+            && u64::from(self.replicanti.galaxies + self.extra_replicanti_galaxies())
+                >= 180 * self.galaxies as u64
+        {
+            self.unlock_achievement(126);
+        }
+        // 127: reach Number.MAX_VALUE Eternity Points.
+        if self.eternity_points >= Decimal::NUMBER_MAX_VALUE {
+            self.unlock_achievement(127);
+        }
+        // 128: reach 1e22000 Infinity Points without any Time Studies.
+        if self.infinity_points.exponent() >= 22000 && self.studies.is_empty() {
+            self.unlock_achievement(128);
+        }
         // 52: max the interval for the AD and Tickspeed autobuyers. The original
         // fires this on REALITY_RESET_AFTER / REALITY_UPGRADE_TEN_BOUGHT, but a
         // Reality clears autobuyer intervals, so it is only truly reachable while
@@ -489,6 +537,10 @@ impl GameState {
         if ic_sum < 6_660.0 {
             self.unlock_achievement(97);
         }
+        // 112: sum of Infinity Challenge best times below 750 ms.
+        if ic_sum < 750.0 {
+            self.unlock_achievement(112);
+        }
         self.check_challenge_completion_achievements();
     }
 
@@ -512,6 +564,13 @@ impl GameState {
         {
             self.unlock_achievement(95);
         }
+        // 106: 10 Replicanti Galaxies within 15 seconds (game time) of the
+        // Infinity.
+        if self.replicanti.galaxies + self.extra_replicanti_galaxies() >= 10
+            && self.records.this_infinity.time_ms <= 15_000.0
+        {
+            self.unlock_achievement(106);
+        }
     }
 
     /// ETERNITY_RESET_BEFORE conditions, checked at a rewarded Eternity before
@@ -527,6 +586,43 @@ impl GameState {
         if self.records.this_eternity.time_ms <= 30_000.0 {
             self.unlock_achievement(104);
         }
+        // 107: Eternity with fewer than 10 Infinities.
+        if self.infinities < Decimal::from_float(10.0) {
+            self.unlock_achievement(107);
+        }
+        // 108: Eternity with exactly 9 Replicanti.
+        if self.replicanti.amount.round() == Decimal::from_float(9.0) {
+            self.unlock_achievement(108);
+        }
+        // 113: Eternity in under 250 ms (game time). Reward (×2 Eternities) is
+        // read in `gained_eternities`, computed after this check.
+        if self.records.this_eternity.time_ms <= 250.0 {
+            self.unlock_achievement(113);
+        }
+        // 116: Eternity with only 1 Infinity.
+        if self.infinities <= Decimal::ONE {
+            self.unlock_achievement(116);
+        }
+        // 122: Eternity without buying Antimatter Dimensions 2–8.
+        if self.requirement_checks.eternity_only_ad1 {
+            self.unlock_achievement(122);
+        }
+    }
+
+    /// ETERNITY_RESET_AFTER conditions.
+    pub(crate) fn check_eternity_after_achievements(&mut self) {
+        // 123: complete 50 unique Eternity Challenge tiers.
+        let ec_completions: u32 =
+            self.eternity_challenges.iter().map(|&c| c as u32).sum();
+        if ec_completions >= 50 {
+            self.unlock_achievement(123);
+        }
+    }
+
+    /// CHALLENGE_FAILED conditions (an Eternity Challenge's restriction breaks).
+    pub(crate) fn check_challenge_failed_achievements(&mut self) {
+        // 114: fail an Eternity Challenge.
+        self.unlock_achievement(114);
     }
 
     /// GALAXY_RESET_BEFORE conditions (checked before the galaxy's reset).
@@ -1095,5 +1191,103 @@ mod tests {
             game.complete_infinity_challenge(id);
         }
         assert!(game.achievement_unlocked(82));
+    }
+
+    // ---- Batch 4 (ids 105–128) ----
+
+    #[test]
+    fn achievement_128_scales_time_dimensions_by_study_count() {
+        let mut game = GameState::new();
+        game.studies = vec![11, 21, 31]; // 3 studies (none with a TD effect)
+        assert_eq!(game.td_common_multiplier(), Decimal::ONE);
+        game.unlock_achievement(128);
+        assert_eq!(game.td_common_multiplier(), Decimal::from_float(3.0));
+    }
+
+    #[test]
+    fn achievement_111_keeps_antimatter_on_dimension_boost() {
+        let mut game = GameState::new();
+        game.dimensions[3].amount = Decimal::from_float(20.0); // first-boost req
+        game.antimatter = Decimal::new(1.0, 50);
+        game.unlock_achievement(111);
+        assert!(game.buy_dim_boost());
+        // Antimatter is kept (not reset to the starting value).
+        assert_eq!(game.antimatter, Decimal::new(1.0, 50));
+    }
+
+    #[test]
+    fn achievement_113_doubles_eternities() {
+        let mut game = GameState::new();
+        let before = game.gained_eternities();
+        game.unlock_achievement(113);
+        assert_eq!(game.gained_eternities(), before * Decimal::from_float(2.0));
+    }
+
+    #[test]
+    fn achievement_117_strengthens_dimension_boosts() {
+        let mut game = GameState::new();
+        let before = game.dim_boost_power();
+        game.unlock_achievement(117);
+        assert_eq!(game.dim_boost_power(), before * Decimal::from_float(1.01));
+    }
+
+    #[test]
+    fn achievement_118_keeps_dimensions_on_sacrifice() {
+        let mut game = GameState::new();
+        game.dim_boosts = 5;
+        game.dimensions[7].amount = Decimal::ONE;
+        game.dimensions[0].amount = Decimal::new(1.0, 20);
+        game.unlock_achievement(118);
+        assert!(game.sacrifice());
+        // AD1 is not wiped by the sacrifice.
+        assert_eq!(game.dimensions[0].amount, Decimal::new(1.0, 20));
+    }
+
+    #[test]
+    fn achievement_116_multiplies_ip_by_total_infinities() {
+        let mut game = GameState::new();
+        game.infinities = Decimal::new(1.0, 10);
+        assert_eq!(game.total_ip_mult(), Decimal::ONE);
+        game.unlock_achievement(116);
+        assert!(game.total_ip_mult() > Decimal::ONE);
+    }
+
+    #[test]
+    fn eternity_before_conditions_107_108() {
+        let mut game = GameState::new();
+        game.infinities = Decimal::from_float(5.0); // < 10, > 1
+        game.replicanti.amount = Decimal::from_float(9.0);
+        game.check_eternity_before_achievements();
+        assert!(game.achievement_unlocked(107));
+        assert!(game.achievement_unlocked(108));
+        assert!(!game.achievement_unlocked(116)); // needs infinities ≤ 1
+    }
+
+    #[test]
+    fn achievement_123_needs_50_ec_completions() {
+        let mut game = GameState::new();
+        game.eternity_challenges = [5; 12]; // 60 total
+        game.check_eternity_after_achievements();
+        assert!(game.achievement_unlocked(123));
+    }
+
+    #[test]
+    fn achievement_114_on_challenge_failed() {
+        let mut game = GameState::new();
+        game.check_challenge_failed_achievements();
+        assert!(game.achievement_unlocked(114));
+    }
+
+    #[test]
+    fn achievement_124_marathon_needs_sixty_seconds() {
+        let mut game = GameState::new();
+        game.infinity_dimensions[0].is_unlocked = true;
+        game.infinity_dimensions[0].amount = Decimal::new(1.0, 10);
+        game.infinity_power = Decimal::ZERO;
+        // Production/s exceeds Infinity Power; needs 60 game-seconds.
+        game.check_tick_achievements(30_000.0);
+        assert!(!game.achievement_unlocked(124));
+        game.check_tick_achievements(30_000.0);
+        assert!(game.achievement_unlocked(124));
     }
 }

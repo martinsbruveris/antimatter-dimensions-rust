@@ -59,6 +59,32 @@ impl GameState {
         if self.achievement_unlocked(93) {
             mult *= Decimal::from_float(4.0);
         }
+        // Achievement 116: IP multiplier from total Infinities
+        // (`infinitiesTotal^(log10(2)/4)`, powered by TS31, capped by Effarig's
+        // Eternity stage).
+        if self.achievement_unlocked(116) {
+            let base = self
+                .infinities_total()
+                .max(&Decimal::ONE)
+                .pow(&Decimal::from_float(std::f64::consts::LOG10_2 / 4.0));
+            let ts31 = if self.time_study_bought(31) { 4.0 } else { 1.0 };
+            let mut value = base.pow(&Decimal::from_float(ts31));
+            if let Some(cap) = self.effarig_eternity_cap() {
+                value = value.min(&cap);
+            }
+            mult *= value;
+        }
+        // Achievement 125: IP multiplier from time spent this Infinity
+        // (`2^(ln(t) × min(t^0.11, 500))`, `t = 10·seconds + 1`), same cap.
+        if self.achievement_unlocked(125) {
+            let t = self.records.this_infinity.time_ms / 1000.0 * 10.0 + 1.0;
+            let exponent = t.ln() * t.powf(0.11).min(500.0);
+            let mut value = Decimal::from_float(2.0).pow(&Decimal::from_float(exponent));
+            if let Some(cap) = self.effarig_eternity_cap() {
+                value = value.min(&cap);
+            }
+            mult *= value;
+        }
         // TS41: ×1.2 per galaxy of any kind.
         if self.time_study_bought(41) {
             let galaxies = self.effective_galaxies();
@@ -104,6 +130,19 @@ impl GameState {
         // The `infinityIP` glyph effect (`GlyphEffect.ipMult`).
         mult *= Decimal::from_float(self.glyph_effect_infinity_ip());
         mult
+    }
+
+    /// Effarig's `eternityCap`: caps achievements 116/125 (and other IP terms)
+    /// at `1e50` while its Eternity stage runs; no cap otherwise.
+    fn effarig_eternity_cap(&self) -> Option<Decimal> {
+        if self.celestials.effarig.run
+            && self.effarig_current_stage()
+                == crate::celestials::effarig::EffarigStage::Eternity
+        {
+            Some(Decimal::new_unchecked(1.0, 50))
+        } else {
+            None
+        }
     }
 
     /// Infinity Points a Big Crunch would grant right now. Mirrors

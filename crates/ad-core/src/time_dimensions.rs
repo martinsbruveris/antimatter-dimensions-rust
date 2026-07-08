@@ -188,6 +188,16 @@ impl GameState {
     /// 4.5.
     pub(crate) fn td_common_multiplier(&self) -> Decimal {
         let mut mult = Decimal::ONE;
+        // Achievement 105: TD multiplier from tickspeed (`perSecond^0.000005`,
+        // where `perSecond = 1000 / current tickspeed interval`).
+        if self.achievement_unlocked(105) {
+            let per_second = Decimal::from_float(1000.0) / self.current_tickspeed_ms();
+            mult *= per_second.pow(&Decimal::from_float(0.000_005));
+        }
+        // Achievement 128: TD multiplier equal to the number of Time Studies.
+        if self.achievement_unlocked(128) {
+            mult *= Decimal::from((self.studies.len() as u64).max(1));
+        }
         // TS93: tick upgrades gained ^0.25 (min 1).
         if self.time_study_bought(93) {
             mult *= Decimal::from(self.total_tick_gained)

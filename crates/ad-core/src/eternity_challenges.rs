@@ -293,6 +293,8 @@ impl GameState {
     pub(crate) fn ec_try_fail(&mut self, id: u8) -> bool {
         if self.ec_running(id) && !self.ec_within_restriction(id) {
             self.exit_eternity_challenge();
+            // CHALLENGE_FAILED achievement (114).
+            self.check_challenge_failed_achievements();
             return true;
         }
         false
