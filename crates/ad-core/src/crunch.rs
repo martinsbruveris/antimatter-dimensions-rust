@@ -199,6 +199,8 @@ impl GameState {
             return false;
         }
         self.broke_infinity = true;
+        // 51: "Limit Break" — break Infinity (the original's BREAK_INFINITY event).
+        self.unlock_achievement(51);
         // Breaking Infinity points the player at the Infinity Challenges tab
         // (mirrors game.js `breakInfinity`).
         self.try_trigger_tab_notification(TabNotificationId::IcUnlock);
@@ -230,10 +232,10 @@ impl GameState {
             // trigger's condition is "Infinity not yet unlocked").
             self.try_trigger_tab_notification(TabNotificationId::FirstInfinity);
 
-            // 21: "To infinity!" — unlocks on the crunch itself (the original's
-            // BIG_CRUNCH_BEFORE), so the post-reset starting antimatter already
-            // reflects its 100-antimatter reward.
-            self.unlock_achievement(21);
+            // BIG_CRUNCH_BEFORE achievements (21, 34, 36, 37, 54, …), read from
+            // the pre-reset state; 21 ("To infinity!") makes the post-reset
+            // starting antimatter reflect its 100-antimatter reward.
+            self.check_crunch_before_achievements();
 
             // Award rewards from the pre-reset state (IP reads `thisInfinity.maxAM`
             // once Break Infinity lands; both persist across the crunch).
@@ -335,6 +337,9 @@ impl GameState {
         // Infinity stage unlocks it and forces a reward-free Reality exit.
         if at_goal {
             self.effarig_on_big_crunch();
+            // BIG_CRUNCH_AFTER achievements (33, 47, 48, …), after the rewards
+            // (infinities) and challenge-completion bookkeeping.
+            self.check_crunch_after_achievements();
         }
     }
 }
@@ -361,6 +366,9 @@ mod tests {
         game.tickspeed.bought = 50;
         game.dimensions[0].bought = 30;
         game.dimensions[0].amount = Decimal::from_float(1e20);
+        // A slow infinity (>2 h real time) so none of the fast-crunch
+        // achievements (37/54/…) fire and inflate the starting antimatter.
+        game.records.this_infinity.real_time_ms = 3.0 * 3_600_000.0;
         game.antimatter = BIG_CRUNCH_THRESHOLD;
 
         assert!(game.can_big_crunch());

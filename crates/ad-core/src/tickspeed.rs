@@ -86,6 +86,7 @@ impl GameState {
             self.total_tickspeed_upgrades() as f64
         };
         let base = Decimal::from_float(INITIAL_TICKSPEED_MS)
+            * Decimal::from_float(self.starting_tickspeed_mult())
             * Decimal::from_float(multiplier).pow(&Decimal::from_float(upgrades));
         // Effarig's Reality replaces the tickspeed value with a compressed one
         // (`Tickspeed.current`: `Effarig.isRunning ? Effarig.tickspeed : base`).
@@ -157,6 +158,23 @@ impl GameState {
             (galaxy_base * TICKSPEED_GALAXY_DECAY.powf(adjusted - 2.0))
                 .max(TICKSPEED_MULTIPLIER_MIN)
         }
+    }
+
+    /// The "starting tickspeed" multiplier folded into `baseValue`
+    /// (`Tickspeed.baseValue.timesEffectsOf(Achievement 36/45/66/83)`). Each
+    /// factor is < 1, shrinking the base tickspeed interval (faster ticks).
+    /// 66 (0.98) and 83 (0.95^galaxies) are wired with their achievement batches.
+    fn starting_tickspeed_mult(&self) -> f64 {
+        let mut mult = 1.0;
+        // 36: multiply starting tickspeed by 1/1.02.
+        if self.achievement_unlocked(36) {
+            mult /= 1.02;
+        }
+        // 45: multiply starting tickspeed by 0.98.
+        if self.achievement_unlocked(45) {
+            mult *= 0.98;
+        }
+        mult
     }
 
     /// Compute the effective production multiplier from

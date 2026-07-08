@@ -218,11 +218,10 @@ impl GameState {
         self.notify_ic_unlock(prev_peak);
         self.notify_new_autobuyer();
 
-        // 24: "Antimatter Apocalypse" — reach 1e80 antimatter (original's
-        // GAME_TICK_AFTER check).
-        if self.antimatter.exponent() >= 80 {
-            self.unlock_achievement(24);
-        }
+        // Normal-achievement GAME_TICK_AFTER checks (24, 31, 42–46, and the
+        // later-batch tick achievements). `dt_ms` is the game-time step (drives
+        // the marathon timers).
+        self.check_tick_achievements(dt_ms);
 
         // V's per-tick unlock checks (`V.checkForUnlocks`): the ST-gated
         // rewards and, while running, the V-achievement completions.

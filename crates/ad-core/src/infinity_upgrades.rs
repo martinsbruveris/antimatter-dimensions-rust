@@ -188,6 +188,17 @@ impl GameState {
         }
         self.infinity_points -= upgrade.cost();
         self.infinity_upgrades |= upgrade.bit();
+        // Achievement 41: buy 16 Infinity Upgrades. The original counts
+        // `player.infinityUpgrades.size`, which holds both the grid upgrades and
+        // the Break Infinity upgrades (a single string set); here they are two
+        // bitmasks, so sum their popcounts. Its reward (two extra upgrades) is
+        // unmodelled, so the unlock has no numeric effect.
+        if self.infinity_upgrades.count_ones()
+            + self.break_infinity_upgrades.count_ones()
+            >= 16
+        {
+            self.unlock_achievement(41);
+        }
         if matches!(
             upgrade,
             InfinityUpgrade::SkipReset1

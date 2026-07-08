@@ -120,17 +120,15 @@ impl GameState {
         // Clear the GALAXY tutorial highlight on the purchase (the original's
         // requestGalaxyReset calls turnOffEffect before the reset).
         self.tutorial_turn_off(crate::tutorial::state::GALAXY);
-        // 26: buy an Antimatter Galaxy (fires before the reset, like the
-        // original's GALAXY_RESET_BEFORE).
-        self.unlock_achievement(26);
+        // GALAXY_RESET_BEFORE achievements (26, 38), before the reset (and before
+        // `galaxy_reset` restores `infinity_no_sacrifice`).
+        self.check_galaxy_before_achievements();
         // Pelle's power-up-Galaxies Strike unlocks the Decay rift.
         self.pelle_trigger_strike(2);
         self.galaxies += 1;
         self.galaxy_reset();
-        // 27: have ≥ 2 Antimatter Galaxies (after the increment).
-        if self.galaxies >= 2 {
-            self.unlock_achievement(27);
-        }
+        // GALAXY_RESET_AFTER achievements (27, …), after the galaxy increment.
+        self.check_galaxy_after_achievements();
         true
     }
 

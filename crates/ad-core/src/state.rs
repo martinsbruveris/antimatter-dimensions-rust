@@ -458,6 +458,17 @@ pub struct GameState {
     /// Whether the game has ended (`player.isGameEnd`, Pelle's finale).
     #[cfg_attr(feature = "serde", serde(default))]
     pub is_game_end: bool,
+    /// Accumulated game-time (ms) that achievement 44's marathon condition
+    /// (antimatter/s exceeds antimatter) has held continuously. Mirrors the
+    /// original's `AchievementTimers.marathon1`, a transient module-level timer
+    /// that is **not** part of the save (reset to 0 on load). See `achievements.rs`.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub ach_marathon1_ms: f64,
+    /// Accumulated game-time (ms) that achievement 124's marathon condition
+    /// (Infinity Power/s exceeds Infinity Power, outside EC7) has held
+    /// continuously (`AchievementTimers.marathon2`). Transient, not saved.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub ach_marathon2_ms: f64,
 }
 
 impl GameState {
@@ -530,6 +541,8 @@ impl GameState {
             autobuyers: AutobuyerState::new(),
             options: Options::new(),
             is_game_end: false,
+            ach_marathon1_ms: 0.0,
+            ach_marathon2_ms: 0.0,
         }
     }
 

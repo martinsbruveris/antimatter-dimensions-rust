@@ -39,8 +39,18 @@ pub const ACHIEVEMENTS_PER_ROW: u16 = 8;
 /// exists at the relevant seam). The Reality study's "all pre-Reality
 /// achievements" requirement is checked against this set until achievement
 /// coverage reaches rows 1–13 (see `docs/design/2026-07-05-reality.md`).
-pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] =
-    &[11, 12, 18, 21, 23, 24, 25, 26, 27, 28, 136];
+///
+/// Excludes achievement 22 (News — unmodelled) and 35 (6-hour offline — no
+/// wall-clock model), which the engine cannot earn naturally and are only ever
+/// set via Reality auto-achievement or the ACHNR reality upgrade.
+pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] = &[
+    11, 12, 13, 14, 15, 16, 17, 18, // row 1
+    21, 23, 24, 25, 26, 27, 28, // row 2 (22 = News, deferred)
+    31, 32, 33, 34, 36, 37, 38, // row 3 (35 = offline, deferred)
+    41, 42, 43, 44, 45, 46, 47, 48, // row 4
+    51, 52, 53, 54,  // row 5 (55–58 pending)
+    136, // dilate time
+];
 
 impl GameState {
     /// `(row_index, column_bitmask)` for an achievement id, where
@@ -112,18 +122,238 @@ impl GameState {
     }
 
     /// Antimatter to reset to after a dimension boost, galaxy, or Big Crunch.
-    /// Mirrors `Currency.antimatter.startingValue` = `Effects.max(10,
-    /// Achievement(21) = 100, …)`; pre-Infinity only achievement 21 applies.
+    /// Mirrors `Currency.antimatter.startingValue = Effects.max(10, Perk.startAM,
+    /// Achievement(21) = 100, Achievement(37) = 5000, Achievement(54) = 5e5,
+    /// Achievement(55) = 5e10, Achievement(78) = 5e25)`.
     pub fn starting_antimatter(&self) -> Decimal {
-        // The SAM perk (`Perk.startAM`): start every reset with 5e130.
+        // The SAM perk (`Perk.startAM`): start every reset with 5e130 — larger
+        // than every achievement term, so it dominates the `Effects.max`.
         if self.perk_bought(10) {
             return Decimal::new(5.0, 130);
         }
+        let mut value = Decimal::from_float(INITIAL_ANTIMATTER);
         if self.achievement_unlocked(21) {
-            Decimal::from_float(100.0)
-        } else {
-            Decimal::from_float(INITIAL_ANTIMATTER)
+            value = value.max(&Decimal::from_float(100.0));
         }
+        if self.achievement_unlocked(37) {
+            value = value.max(&Decimal::from_float(5000.0));
+        }
+        if self.achievement_unlocked(54) {
+            value = value.max(&Decimal::new(5.0, 5));
+        }
+        if self.achievement_unlocked(55) {
+            value = value.max(&Decimal::new(5.0, 10));
+        }
+        if self.achievement_unlocked(78) {
+            value = value.max(&Decimal::new(5.0, 25));
+        }
+        value
+    }
+}
+
+/// Achievement unlock conditions ported from the original's `checkEvent` /
+/// `checkRequirement` pairs. The original registers each on an event bus; we
+/// have no bus, so we call the relevant `check_*_achievements` at the equivalent
+/// action seam (once per tick, at a crunch/galaxy/eternity/reality reset, etc.),
+/// matching *when* the original's event fires. Each condition is guarded by a
+/// plain `if` and calls the idempotent [`unlock_achievement`](GameState::unlock_achievement).
+impl GameState {
+    /// The all-tier achievement multiplier applied to every Antimatter
+    /// Dimension — the achievement terms of the original's
+    /// `antimatterDimensionCommonMultiplier`. The global achievement *power*
+    /// (`achievement_power`) and the per-tier terms (28/31/23/34/43/64/68/71)
+    /// are applied separately in [`dimension_multiplier`](GameState::dimension_multiplier).
+    pub(crate) fn achievement_ad_common_mult(&self) -> Decimal {
+        let mut mult = Decimal::ONE;
+        // 48: complete all Normal Challenges — all Dimensions ×1.1.
+        if self.achievement_unlocked(48) {
+            mult *= Decimal::from_float(1.1);
+        }
+        mult
+    }
+
+    /// Whether `id` is the sole running normal challenge — the original's
+    /// `NormalChallenge(id).isOnlyActiveChallenge` (`player.challenge.normal
+    /// .current === id`), which — unlike [`challenge_running`](GameState::challenge_running)
+    /// — is **not** satisfied by Infinity Challenge 1 running the challenge.
+    fn is_only_active_normal_challenge(&self, id: u8) -> bool {
+        self.challenge.current == id
+    }
+
+    /// Number of completed Normal Challenges (`NormalChallenges.all.countWhere`).
+    fn completed_normal_challenge_count(&self) -> u32 {
+        (1..=crate::NORMAL_CHALLENGE_COUNT)
+            .filter(|&id| self.challenge_completed(id))
+            .count() as u32
+    }
+
+    /// GAME_TICK_AFTER conditions, checked once per tick (from [`tick`](GameState::tick)).
+    /// `dt_ms` is the game-time step, used by the marathon timers (the original's
+    /// `AchievementTimers`, which advance on `Time.deltaTime`).
+    pub(crate) fn check_tick_achievements(&mut self, dt_ms: f64) {
+        // 24: reach 1e80 antimatter.
+        if self.antimatter.exponent() >= 80 {
+            self.unlock_achievement(24);
+        }
+        // 31: any Antimatter Dimension multiplier over 1e31.
+        if !self.achievement_unlocked(31)
+            && (0..8).any(|t| self.dimension_multiplier(t).exponent() >= 31)
+        {
+            self.unlock_achievement(31);
+        }
+        // 42: antimatter/s exceeds current antimatter, above 1e63.
+        if self.antimatter.exponent() >= 63
+            && self.antimatter_per_second() > self.antimatter
+        {
+            self.unlock_achievement(42);
+        }
+        // 43: the 8 AD multipliers are strictly increasing by tier.
+        if !self.achievement_unlocked(43) {
+            let mults: Vec<Decimal> =
+                (0..8).map(|t| self.dimension_multiplier(t)).collect();
+            if mults.windows(2).all(|w| w[0] < w[1]) {
+                self.unlock_achievement(43);
+            }
+        }
+        // 44: antimatter/s exceeds antimatter for 30 consecutive (game) seconds
+        // (`AchievementTimers.marathon1`).
+        if !self.achievement_unlocked(44) {
+            if self.antimatter_per_second() > self.antimatter {
+                self.ach_marathon1_ms += dt_ms;
+                if self.ach_marathon1_ms >= 30_000.0 {
+                    self.unlock_achievement(44);
+                }
+            } else {
+                self.ach_marathon1_ms = 0.0;
+            }
+        }
+        // 45: over 1e29 ticks/second (tickspeed interval ≤ 1e-26 ms).
+        if self.current_tickspeed_ms().exponent() <= -26 {
+            self.unlock_achievement(45);
+        }
+        // 46: reach 1e12 of the 7th Antimatter Dimension.
+        if self.dimensions[6].amount.exponent() >= 12 {
+            self.unlock_achievement(46);
+        }
+        // 52: max the interval for the AD and Tickspeed autobuyers. The original
+        // fires this on REALITY_RESET_AFTER / REALITY_UPGRADE_TEN_BOUGHT, but a
+        // Reality clears autobuyer intervals, so it is only truly reachable while
+        // a run is in progress. Checked per tick here (it carries no production
+        // effect, so the unlock timing has no numeric consequence).
+        if !self.achievement_unlocked(52) && self.ad_and_tickspeed_autobuyers_maxed() {
+            self.unlock_achievement(52);
+        }
+        // 53: max the intervals for all upgradeable normal autobuyers.
+        if !self.achievement_unlocked(53) && self.all_upgradeable_autobuyers_maxed() {
+            self.unlock_achievement(53);
+        }
+    }
+
+    /// BIG_CRUNCH_BEFORE conditions, checked at a rewarded crunch before the
+    /// reset (so pre-reset galaxies / dimensions / this-infinity timing apply).
+    pub(crate) fn check_crunch_before_achievements(&mut self) {
+        // 21: "To infinity!" — go Infinite.
+        self.unlock_achievement(21);
+        // 34: Infinity without any 8th Antimatter Dimensions.
+        if self.dimensions[7].amount <= Decimal::ZERO {
+            self.unlock_achievement(34);
+        }
+        // 36: Infinity with exactly 1 Antimatter Galaxy.
+        if self.galaxies == 1 {
+            self.unlock_achievement(36);
+        }
+        // 37: Infinity in under 2 hours (real time).
+        if self.records.this_infinity.real_time_ms <= 2.0 * 3_600_000.0 {
+            self.unlock_achievement(37);
+        }
+        // 54: Infinity in 10 minutes or less (real time).
+        if self.records.this_infinity.real_time_ms <= 10.0 * 60_000.0 {
+            self.unlock_achievement(54);
+        }
+    }
+
+    /// BIG_CRUNCH_AFTER conditions, checked at the end of a rewarded crunch.
+    pub(crate) fn check_crunch_after_achievements(&mut self) {
+        // 33: reach Infinity 10 times.
+        if self.infinities >= Decimal::from_float(10.0) {
+            self.unlock_achievement(33);
+        }
+        self.check_challenge_completion_achievements();
+    }
+
+    /// GALAXY_RESET_BEFORE conditions (checked before the galaxy's reset).
+    pub(crate) fn check_galaxy_before_achievements(&mut self) {
+        // 26: buy an Antimatter Galaxy.
+        self.unlock_achievement(26);
+        // 38: buy an Antimatter Galaxy without Dimensional Sacrificing (since the
+        // last Galaxy).
+        if self.requirement_checks.infinity_no_sacrifice {
+            self.unlock_achievement(38);
+        }
+    }
+
+    /// GALAXY_RESET_AFTER conditions (checked after the galaxy count increments).
+    pub(crate) fn check_galaxy_after_achievements(&mut self) {
+        // 27: have 2 Antimatter Galaxies.
+        if self.galaxies >= 2 {
+            self.unlock_achievement(27);
+        }
+    }
+
+    /// SACRIFICE_RESET_AFTER conditions (checked after a performed sacrifice).
+    pub(crate) fn check_sacrifice_after_achievements(&mut self) {
+        // 32: total Dimensional Sacrifice multiplier over 600, outside Challenge 8.
+        if !self.is_only_active_normal_challenge(8)
+            && self.sacrifice_multiplier() >= Decimal::from_float(600.0)
+        {
+            self.unlock_achievement(32);
+        }
+    }
+
+    /// 47/48 check (Normal Challenge completion counts). The original also
+    /// registers these on REALITY_RESET_AFTER, but a Reality clears challenge
+    /// completions, so the meaningful seam is the crunch that banks the
+    /// completion.
+    fn check_challenge_completion_achievements(&mut self) {
+        let completed = self.completed_normal_challenge_count();
+        // 47: complete 3 Normal Challenges.
+        if completed >= 3 {
+            self.unlock_achievement(47);
+        }
+        // 48: complete all 12 Normal Challenges.
+        if completed >= crate::NORMAL_CHALLENGE_COUNT as u32 {
+            self.unlock_achievement(48);
+        }
+    }
+
+    /// Whether every AD autobuyer and the Tickspeed autobuyer are unlocked and at
+    /// their minimum interval (achievement 52).
+    fn ad_and_tickspeed_autobuyers_maxed(&self) -> bool {
+        use crate::AutobuyerTarget;
+        let mut targets: Vec<AutobuyerTarget> =
+            (0..8).map(AutobuyerTarget::AdTier).collect();
+        targets.push(AutobuyerTarget::Tickspeed);
+        targets.iter().all(|&t| {
+            self.autobuyer_is_unlocked(t) && self.autobuyer_has_maxed_interval(t)
+        })
+    }
+
+    /// Whether every upgradeable normal autobuyer (dimensions, tickspeed,
+    /// dimension boost, galaxy, big crunch) is unlocked and interval-maxed
+    /// (achievement 53).
+    fn all_upgradeable_autobuyers_maxed(&self) -> bool {
+        use crate::AutobuyerTarget;
+        let mut targets: Vec<AutobuyerTarget> =
+            (0..8).map(AutobuyerTarget::AdTier).collect();
+        targets.extend([
+            AutobuyerTarget::Tickspeed,
+            AutobuyerTarget::DimBoost,
+            AutobuyerTarget::Galaxy,
+            AutobuyerTarget::BigCrunch,
+        ]);
+        targets.iter().all(|&t| {
+            self.autobuyer_is_unlocked(t) && self.autobuyer_has_maxed_interval(t)
+        })
     }
 }
 
@@ -239,5 +469,155 @@ mod tests {
         assert!(game.big_crunch());
         // Bits survive the reset (unlike dim_boosts/galaxies).
         assert!(game.achievement_unlocked(18));
+    }
+
+    /// Crunch to the goal with a 3-hour infinity: only 21 fires among the
+    /// starting-antimatter achievements, so it stays 100.
+    fn crunch_slow(game: &mut GameState) {
+        game.records.this_infinity.real_time_ms = 3.0 * 3_600_000.0;
+        game.antimatter = crate::data::constants::BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+    }
+
+    #[test]
+    fn achievement_33_unlocks_at_ten_infinities() {
+        let mut game = GameState::new();
+        game.infinities = Decimal::from_float(9.0); // +1 on this crunch → 10
+        crunch_slow(&mut game);
+        assert!(game.achievement_unlocked(33));
+    }
+
+    #[test]
+    fn achievement_34_needs_no_eighth_dimension_at_crunch() {
+        let mut game = GameState::new();
+        game.dimensions[7].amount = Decimal::ONE;
+        crunch_slow(&mut game);
+        assert!(!game.achievement_unlocked(34));
+
+        let mut game = GameState::new();
+        // No 8th dimension held → "you didn't need it anyway".
+        crunch_slow(&mut game);
+        assert!(game.achievement_unlocked(34));
+    }
+
+    #[test]
+    fn achievement_36_needs_exactly_one_galaxy_at_crunch() {
+        let mut game = GameState::new();
+        game.galaxies = 1;
+        crunch_slow(&mut game);
+        assert!(game.achievement_unlocked(36));
+    }
+
+    #[test]
+    fn fast_crunch_unlocks_37_54_and_raises_starting_antimatter() {
+        let mut game = GameState::new();
+        // Zero real time: under 10 minutes and under 2 hours → 37 and 54.
+        game.antimatter = crate::data::constants::BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+        assert!(game.achievement_unlocked(37));
+        assert!(game.achievement_unlocked(54));
+        // startingValue = max(100, 5000, 5e5) = 5e5.
+        assert_eq!(game.antimatter, Decimal::new(5.0, 5));
+    }
+
+    #[test]
+    fn achievement_38_needs_galaxy_without_sacrifice() {
+        let mut game = GameState::new();
+        game.requirement_checks.infinity_no_sacrifice = true;
+        game.check_galaxy_before_achievements();
+        assert!(game.achievement_unlocked(38));
+
+        let mut game = GameState::new();
+        game.requirement_checks.infinity_no_sacrifice = false;
+        game.check_galaxy_before_achievements();
+        assert!(!game.achievement_unlocked(38));
+    }
+
+    #[test]
+    fn achievement_46_unlocks_at_1e12_seventh_dimension() {
+        let mut game = GameState::new();
+        game.dimensions[6].amount = Decimal::new(1.0, 12);
+        game.check_tick_achievements(50.0);
+        assert!(game.achievement_unlocked(46));
+    }
+
+    #[test]
+    fn achievement_44_marathon_needs_thirty_seconds() {
+        let mut game = GameState::new();
+        // AD1 stock huge, antimatter tiny → antimatter/s exceeds antimatter.
+        game.antimatter = Decimal::ONE;
+        game.dimensions[0].amount = Decimal::new(1.0, 10);
+        game.dimensions[0].bought = 1;
+        game.check_tick_achievements(15_000.0);
+        assert!(!game.achievement_unlocked(44));
+        game.check_tick_achievements(15_000.0); // 30 s total
+        assert!(game.achievement_unlocked(44));
+    }
+
+    #[test]
+    fn achievement_44_marathon_resets_when_condition_breaks() {
+        let mut game = GameState::new();
+        game.antimatter = Decimal::ONE;
+        game.dimensions[0].amount = Decimal::new(1.0, 10);
+        game.dimensions[0].bought = 1;
+        game.check_tick_achievements(20_000.0);
+        // Condition breaks: antimatter now dwarfs production.
+        game.antimatter = Decimal::new(1.0, 40);
+        game.check_tick_achievements(20_000.0);
+        assert_eq!(game.ach_marathon1_ms, 0.0);
+        assert!(!game.achievement_unlocked(44));
+    }
+
+    #[test]
+    fn achievement_48_all_challenges_unlocks_and_boosts_dimensions() {
+        let mut game = GameState::new();
+        for id in 1..=crate::NORMAL_CHALLENGE_COUNT {
+            game.complete_challenge(id);
+        }
+        game.check_crunch_after_achievements();
+        assert!(game.achievement_unlocked(47));
+        assert!(game.achievement_unlocked(48));
+        // 48 contributes ×1.1 to the all-tier common multiplier.
+        assert_eq!(game.achievement_ad_common_mult(), Decimal::from_float(1.1));
+    }
+
+    #[test]
+    fn achievement_32_strengthens_sacrifice_and_unlocks() {
+        let mut game = GameState::new();
+        // A large sacrificed total so totalBoost = (log10/10)^2 = 30^2 = 900 ≥ 600.
+        game.sacrificed = Decimal::new(1.0, 300);
+        let before = game.sacrifice_multiplier();
+        game.check_sacrifice_after_achievements();
+        assert!(game.achievement_unlocked(32));
+        // Exponent rose from 2 to 2.2, so the boost strengthens.
+        let after = game.sacrifice_multiplier();
+        assert!(after > before);
+    }
+
+    #[test]
+    fn achievement_51_unlocks_on_break_infinity() {
+        use crate::AutobuyerTarget;
+        let mut game = GameState::new();
+        game.complete_challenge(12);
+        game.infinity_points = Decimal::from_float(1e9);
+        for _ in 0..50 {
+            game.upgrade_autobuyer_interval(AutobuyerTarget::BigCrunch);
+        }
+        assert!(game.break_infinity());
+        assert!(game.achievement_unlocked(51));
+    }
+
+    #[test]
+    fn achievement_31_boosts_first_dimension() {
+        // Isolate 31's ×1.05 from the global achievement-power bump each unlock
+        // gives: compare against a game with an equal-count, no-effect unlock (11).
+        let mut baseline = GameState::new();
+        baseline.unlock_achievement(11); // buys-a-1st-dim: no multiplier effect
+        let mut game = GameState::new();
+        game.unlock_achievement(31);
+        assert_eq!(
+            game.dimension_multiplier(0),
+            baseline.dimension_multiplier(0) * Decimal::from_float(1.05)
+        );
     }
 }

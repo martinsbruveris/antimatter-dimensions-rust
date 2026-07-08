@@ -2169,6 +2169,10 @@ impl GameState {
             autobuyers,
             options,
             is_game_end: dto.is_game_end,
+            // Transient achievement marathon timers (not persisted; the original
+            // keeps them in a module-level `AchievementTimers`, reset on load).
+            ach_marathon1_ms: 0.0,
+            ach_marathon2_ms: 0.0,
         })
     }
 }

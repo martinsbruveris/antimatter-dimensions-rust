@@ -384,13 +384,30 @@ impl GameState {
         }
 
         // Achievement effects. The global achievement power applies to every
-        // dimension; achievements 28 / 23 boost the 1st / 8th dimension by 10%.
+        // dimension; the rest are per-tier or all-tier multipliers ported from
+        // `antimatterDimensionCommonMultiplier` / `applyNDMultipliers`.
         mult *= self.achievement_power();
-        if tier == 0 && self.achievement_unlocked(28) {
-            mult *= Decimal::from_float(1.1);
+        mult *= self.achievement_ad_common_mult();
+        // 1st dimension (tier 0): 28 / 31 / 68 / 71.
+        if tier == 0 {
+            if self.achievement_unlocked(28) {
+                mult *= Decimal::from_float(1.1);
+            }
+            if self.achievement_unlocked(31) {
+                mult *= Decimal::from_float(1.05);
+            }
         }
+        // 8th dimension (tier 7): 23.
         if tier == 7 && self.achievement_unlocked(23) {
             mult *= Decimal::from_float(1.1);
+        }
+        // 34: Antimatter Dimensions 1–7 (tier < 8) ×1.02.
+        if tier < 7 && self.achievement_unlocked(34) {
+            mult *= Decimal::from_float(1.02);
+        }
+        // 43: every dimension gains a boost proportional to its (1-indexed) tier.
+        if self.achievement_unlocked(43) {
+            mult *= Decimal::from_float(1.0 + (tier as f64 + 1.0) / 100.0);
         }
 
         // Infinity Upgrade multipliers: the common (all-tier) time multipliers and
