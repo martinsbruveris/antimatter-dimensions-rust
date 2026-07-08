@@ -123,6 +123,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     records["thisInfinity"]["time"] = json!(state.records.this_infinity.time_ms);
     records["thisInfinity"]["realTime"] =
         json!(state.records.this_infinity.real_time_ms);
+    records["thisInfinity"]["lastBuyTime"] =
+        json!(state.records.this_infinity.last_buy_time_ms);
     records["thisInfinity"]["maxAM"] = decimal(&state.records.this_infinity.max_am);
     records["thisInfinity"]["bestIPmin"] =
         decimal(&state.records.this_infinity.best_ip_min);

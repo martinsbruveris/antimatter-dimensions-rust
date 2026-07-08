@@ -47,6 +47,17 @@ pub enum Compare {
     /// trailing zero row. The shorter side is zero-padded before an element-wise
     /// exact compare. The path points at the array.
     PaddedBits,
+    /// The Automator run mode (`reality.automator.state.mode`): 1 pause / 2 run /
+    /// 3 step. JS omits the key entirely on a save whose Automator never ran (an
+    /// undefined enum member that reads as *paused*), while Rust always writes a
+    /// value; so an absent side is treated as `1` before an exact compare.
+    AutomatorMode,
+    /// The Automator execution stack (`reality.automator.state.stack`): an ordered
+    /// array of `{lineNumber, commandState}` frames. Compared depth- and
+    /// order-sensitively; `lineNumber` and the `commandState` shape are exact, but
+    /// a WAIT frame's `commandState.timeMs` is a real-time accumulator and is
+    /// compared with numeric tolerance.
+    AutomatorStack,
 }
 
 /// One row of the comparison allowlist: a JS/save-key path and its mode.
@@ -244,6 +255,17 @@ fn compare_leaf(
         return;
     }
 
+    if mode == Compare::AutomatorMode {
+        // JS omits `mode` on a never-run Automator (an undefined enum member that
+        // reads as paused); Rust always writes 1/2/3. Treat an absent side as `1`
+        // before comparing by value, so a fresh save (JS absent vs Rust 1) agrees.
+        let val = |v: Option<&Value>| v.and_then(Value::as_i64).unwrap_or(1);
+        if val(exp) != val(act) {
+            out.push(diff(path, exp, act, "values differ".to_string()));
+        }
+        return;
+    }
+
     let (e, a) = match (exp, act) {
         (None, None) => return,
         (Some(e), Some(a)) => (e, a),
@@ -254,7 +276,7 @@ fn compare_leaf(
     };
 
     match mode {
-        Compare::Exact => unreachable!("handled above"),
+        Compare::Exact | Compare::AutomatorMode => unreachable!("handled above"),
         Compare::Decimal => {
             if e == a {
                 return;
@@ -305,6 +327,109 @@ fn compare_leaf(
             }
             _ => out.push(diff(path, exp, act, "not an array".to_string())),
         },
+        Compare::AutomatorStack => {
+            compare_automator_stack(e, a, tol, horizon, path, out)
+        }
+    }
+}
+
+/// Compare two Automator execution stacks (`reality.automator.state.stack`):
+/// ordered `{lineNumber, commandState}` frames. Depth- and order-sensitive;
+/// `lineNumber` and the `commandState` shape are exact, but a WAIT frame's
+/// `commandState.timeMs` (a real-time accumulator) is compared with numeric
+/// tolerance.
+fn compare_automator_stack(
+    exp: &Value,
+    act: &Value,
+    tol: &Tolerance,
+    horizon: u32,
+    path: &str,
+    out: &mut Vec<FieldDiff>,
+) {
+    let (ea, aa) = match (exp.as_array(), act.as_array()) {
+        (Some(x), Some(y)) => (x, y),
+        _ => {
+            out.push(diff(
+                path,
+                Some(exp),
+                Some(act),
+                "not a stack array".to_string(),
+            ));
+            return;
+        }
+    };
+    if ea.len() != aa.len() {
+        out.push(diff(
+            path,
+            Some(exp),
+            Some(act),
+            format!("stack depth differs: JS={}, Rust={}", ea.len(), aa.len()),
+        ));
+        return;
+    }
+    for (i, (ef, af)) in ea.iter().zip(aa).enumerate() {
+        let fp = format!("{path}[{i}]");
+        compare_leaf(
+            ef.get("lineNumber"),
+            af.get("lineNumber"),
+            Compare::Exact,
+            tol,
+            horizon,
+            &format!("{fp}.lineNumber"),
+            out,
+        );
+        compare_command_state(
+            ef.get("commandState"),
+            af.get("commandState"),
+            tol,
+            horizon,
+            &format!("{fp}.commandState"),
+            out,
+        );
+    }
+}
+
+/// Compare a single Automator frame's `commandState`: `null`/absent on both sides
+/// agree; otherwise the objects are compared key-by-key with `timeMs` (a WAIT
+/// accumulator) numerically tolerant and every other key exact.
+fn compare_command_state(
+    exp: Option<&Value>,
+    act: Option<&Value>,
+    tol: &Tolerance,
+    horizon: u32,
+    path: &str,
+    out: &mut Vec<FieldDiff>,
+) {
+    let is_empty = |v: Option<&Value>| matches!(v, None | Some(Value::Null));
+    if is_empty(exp) && is_empty(act) {
+        return;
+    }
+    match (exp, act) {
+        (Some(Value::Object(e)), Some(Value::Object(a))) => {
+            let keys: BTreeSet<&String> = e.keys().chain(a.keys()).collect();
+            for k in keys {
+                let mode = if k == "timeMs" {
+                    Compare::Number
+                } else {
+                    Compare::Exact
+                };
+                compare_leaf(
+                    e.get(k),
+                    a.get(k),
+                    mode,
+                    tol,
+                    horizon,
+                    &format!("{path}.{k}"),
+                    out,
+                );
+            }
+        }
+        _ => out.push(diff(
+            path,
+            exp,
+            act,
+            "commandState shape differs".to_string(),
+        )),
     }
 }
 

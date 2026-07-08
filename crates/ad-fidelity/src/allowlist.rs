@@ -1,13 +1,18 @@
 //! The comparison allowlist over the `player` save tree (design §5).
 //!
 //! Include-only: a rule here is a field that must match at **full fidelity**.
-//! The end goal is byte-parity with the original on every engine-relevant field;
-//! anything *not* listed is intentionally out of scope — options/UI inputs a tick
-//! never mutates, `Date.now`/real-time and game-time bookkeeping (timers, time
-//! played, best-time sentinels), and values derived from a primary (costs
-//! recomputed from purchase counts). Paths are JS/save keys (the comparison runs
-//! on the serialized form). A `[]` suffix iterates an array element-wise;
-//! [`Compare::IdSet`]/[`Compare::Glyphs`] rules name the container directly.
+//! The end goal is byte-parity with the original on every engine-relevant field.
+//! The include test is "does it affect the simulation" — crucially, a *time-based*
+//! field that **feeds a mechanic** (a game-speed timer, a completion timer gating a
+//! reward, a resource banked over time) is engine-relevant and is compared; the
+//! harness feeds both engines the same diff, so such fields are reproducible.
+//! Only three things stay out of scope: (1) options/UI inputs a tick never mutates,
+//! (2) *pure* real-time bookkeeping nothing reads (`realTimePlayed`, `this*.realTime`)
+//! and `Date.now`/wall-clock snapshots (`lastUpdate`, `backupTimer`), and (3) values
+//! derived from a primary (costs recomputed from purchase counts). Paths are
+//! JS/save keys (the comparison runs on the serialized form). A `[]` suffix iterates
+//! an array element-wise; [`Compare::IdSet`]/[`Compare::Glyphs`] rules name the
+//! container directly.
 //!
 //! **Listing a field ad-core does not model yet is intentional — it *showcases*
 //! the gap.** The write path (`ad-core/src/save/encode.rs`) overlays the modelled
@@ -79,6 +84,11 @@ pub fn allowlist() -> Vec<FieldRule> {
         R("challenge.normal.completedBits", Exact), // (gap)
         R("challenge.infinity.current", Exact),
         R("challenge.infinity.completedBits", Exact),
+        // Best challenge *game*-times (written from `thisInfinity.time`, not the
+        // clock): gate the Break-Infinity `worstChallenge` and Eternity-Upgrade-4
+        // `infinityChallengeSum` reward multipliers. MAX_VALUE = never completed.
+        R("challenge.normal.bestTimes[]", Number), // (gap) NC best-times not modelled
+        R("challenge.infinity.bestTimes[]", Number), // modelled (ic_best_times_ms)
     ]);
 
     // --- Eternity ---
@@ -93,6 +103,14 @@ pub fn allowlist() -> Vec<FieldRule> {
         R("timestudy.ipBought", Exact),
         R("timestudy.epBought", Exact),
         R("timestudy.studies", IdSet),
+        // Automator-consumed study config: `presets` (loaded by `studies load
+        // preset`) is modelled; `preferredPaths` (engine-written on split picks,
+        // read by `buyStudiesUntil`) is a gap. `shopMinimized` stays skip (UI).
+        R("timestudy.presets", Exact),
+        R("timestudy.preferredPaths", Exact), // (gap)
+        // `player.respec` — clears the study tree on the next Eternity; the
+        // Automator sets it (`studies respec`).
+        R("respec", Exact),
         R("dimensions.time[].amount", Decimal),
         R("dimensions.time[].bought", Exact),
         R("eternityUpgrades", IdSet),
@@ -158,16 +176,45 @@ pub fn allowlist() -> Vec<FieldRule> {
         // separate field.
         R("reality.imaginaryUpgradeBits", Exact),
         R("reality.imaginaryRebuyables", Exact),
+        // Reality-upgrade req locks + auto-achievement state (modelled).
+        R("reality.reqLock.reality", Exact),
+        R("reality.respec", Exact), // glyph respec on Reality; Automator-settable
+        R("reality.autoAchieve", Exact),
+        R("reality.gainedAutoAchievements", Exact),
+        // Glyph-automation + EC-automation toggles that change the run (gaps).
+        R("reality.autoEC", Exact), // (gap) auto-complete ECs
+        R("reality.autoAutoClean", Exact), // (gap) auto-purge glyphs
+        R("reality.applyFilterToPurge", Exact), // (gap)
+        R("reality.hasCheckedFilter", Exact), // (gap) reality-autobuyer state
+        R("reality.autoSort", Exact), // (gap) inventory ordering
+        R("reality.autoCollapse", Exact), // (gap) inventory ordering
+        R("reality.moveGlyphsOnProtection", Exact), // (gap) inventory ordering
+        // Automator run-state (modelled). Scripts/constants (program input) are
+        // left out; editor/UI sub-fields stay skip.
+        R("reality.automator.forceUnlock", Exact),
+        R("reality.automator.state.topLevelScript", Exact),
+        R("reality.automator.state.repeat", Exact),
+        R("reality.automator.state.forceRestart", Exact),
+        R("reality.automator.state.mode", AutomatorMode),
+        R("reality.automator.execTimer", Number),
+        R("reality.automator.state.stack", AutomatorStack),
     ]);
 
-    // --- Black holes (partial) ---
+    // --- Black holes ---
+    // The phase/pause fields drive the active state → game-speed multiplier, so
+    // they're mechanics, not bookkeeping, despite being real-time-driven.
     v.extend([
         R("blackHole[].unlocked", Exact),
         R("blackHole[].active", Exact),
         R("blackHole[].intervalUpgrades", Exact),
         R("blackHole[].powerUpgrades", Exact),
         R("blackHole[].durationUpgrades", Exact),
-        R("blackHoleNegative", Number), // (gap) inversion factor
+        R("blackHole[].phase", Number), // cycle position (drives activation)
+        R("blackHole[].activations", Exact), // cycle-crossing count
+        R("blackHolePause", Exact),
+        R("blackHolePauseTime", Number), // feeds the post-unpause speed ramp
+        R("blackHoleAutoPauseMode", Exact), // (gap) auto-pause not modelled
+        R("blackHoleNegative", Number),  // (gap) inversion factor
     ]);
 
     // --- Achievements + requirement checks ---
@@ -223,6 +270,25 @@ pub fn allowlist() -> Vec<FieldRule> {
         R("records.bestInfinity.bestIPminReality", Decimal),
         R("records.bestEternity.bestEPminReality", Decimal),
         R("records.fullGameCompletions", Exact),
+        // Game-time records: reproducible (harness feeds the same diff) and they
+        // exercise the game-speed/time-scaling path (EC12, black holes, dilation).
+        // Real-time (`*.realTime`, `realTimePlayed`) and wall-clock snapshots
+        // (`gameCreatedTime`) stay skip.
+        R("records.totalTimePlayed", Number),
+        R("records.timePlayedAtBHUnlock", Number), // (gap) game-time snapshot
+        R("records.thisInfinity.time", Number),
+        R("records.thisEternity.time", Number),
+        R("records.thisReality.time", Number),
+        R("records.thisInfinity.lastBuyTime", Number),
+        R("records.bestInfinity.time", Number),
+        R("records.bestEternity.time", Number),
+        R("records.bestReality.time", Number),
+        // The recent-prestige rings feed glyph fast-reality, achievements, and the
+        // Automator. All-numeric tuples `[gameTime, realTime, gain, …]` → Decimal
+        // (handles huge gains + MAX_VALUE placeholders); `[][]` is order-sensitive.
+        R("records.recentInfinities[][]", Decimal), // (gap) ring not modelled
+        R("records.recentEternities[][]", Decimal),
+        R("records.recentRealities[][]", Decimal),
     ]);
 
     // --- Autobuyers (mutable state; the Automator can change them at runtime) ---
@@ -259,6 +325,27 @@ pub fn allowlist() -> Vec<FieldRule> {
         R("auto.reality.rm", Decimal),
         R("auto.reality.glyph", Exact),
         R("auto.reality.time", Number),
+        // `lastTick` = the autobuyer phase, encoded as `realTimePlayed - timer_ms`
+        // (reproducible; JS = realTimePlayed at last tick). Modelled for the five
+        // core autobuyers. Coarse under relative tolerance at high realTimePlayed.
+        R("auto.antimatterDims.all[].lastTick", Number),
+        R("auto.tickspeed.lastTick", Number),
+        R("auto.dimBoost.lastTick", Number),
+        R("auto.galaxy.lastTick", Number),
+        R("auto.bigCrunch.lastTick", Number),
+        // Galaxy/DimBoost caps shape what the autobuyer buys (like AD mode/bulk).
+        R("auto.galaxy.limitGalaxies", Exact), // (gap)
+        R("auto.galaxy.maxGalaxies", Exact),   // (gap)
+        R("auto.galaxy.buyMax", Exact),        // (gap)
+        R("auto.galaxy.buyMaxInterval", Number), // (gap)
+        R("auto.dimBoost.limitDimBoosts", Exact), // (gap)
+        R("auto.dimBoost.maxDimBoosts", Exact), // (gap)
+        R("auto.dimBoost.limitUntilGalaxies", Exact), // (gap)
+        R("auto.dimBoost.galaxies", Exact),    // (gap)
+        R("auto.dimBoost.buyMaxInterval", Number), // (gap)
+        // Gates Lai'tela continuum → continuous dimension buying. Modelled, but
+        // encode doesn't write `auto.disableContinuum` back → write-side gap.
+        R("auto.disableContinuum", Exact), // (gap)
     ]);
 
     // --- Autobuyer gaps (subsystems not yet modelled) ---
@@ -294,6 +381,13 @@ pub fn allowlist() -> Vec<FieldRule> {
         R("auto.singularity.isActive", Exact),
         R("auto.ipMultBuyer.isActive", Exact),
         R("auto.epMultBuyer.isActive", Exact),
+        // Their timer phases (gaps, alongside the isActive gaps above).
+        R("auto.infinityDims.all[].lastTick", Number),
+        R("auto.timeDims.all[].lastTick", Number),
+        R("auto.replicantiUpgrades.all[].lastTick", Number),
+        R("auto.dilationUpgrades.all[].lastTick", Number),
+        R("auto.darkMatterDims.lastTick", Number),
+        R("auto.ascension.lastTick", Number),
     ]);
 
     // --- Celestials (Phase 7) ---
@@ -303,13 +397,13 @@ pub fn allowlist() -> Vec<FieldRule> {
     // listed too, and diverge as `Rust = fresh-default` vs `JS = real` to
     // showcase the gap. Rows marked "(gap)" below are those not-yet-overlaid.
     //
-    // The skips are the real-time / game-time accumulators that a tick advances
-    // from the injected diff but that are timekeeping, not mechanics (design §5,
-    // "time fields → skip"): Teresa `timePoured`, Enslaved `storedReal`, Ra
-    // `momentumTime`, Lai'tela `thisCompletion`/`fastestCompletion` and the Dark
-    // Matter Dimensions' transient `timeSinceLastUpdate`. Resources that merely
-    // *accrue* on a real-time schedule (Ra Memories, Dark Matter/Energy, Relic
-    // Shards) are mechanics and are compared like the rest of the economy.
+    // Time-based fields that *feed a mechanic* are included, not skipped: Enslaved
+    // `storedReal` (spent to amplify Realities), Ra `momentumTime` (momentum
+    // multiplier), Lai'tela `thisCompletion`/`fastestCompletion` (reality-reward
+    // multiplier) and the DMD `timeSinceLastUpdate` (production timer). Only pure
+    // bookkeeping / UI is skipped: Teresa `timePoured` (transient, not saved), the
+    // `quoteBits`, glyph loadout snapshots (`teresa.bestAMSet`, `v.runGlyphs`), the
+    // Enslaved hint system, and the Lai'tela/Pelle display toggles.
 
     // Teresa.
     v.extend([
@@ -321,20 +415,27 @@ pub fn allowlist() -> Vec<FieldRule> {
         R("celestials.teresa.lastRepeatedMachines", Decimal), // (gap)
     ]);
 
-    // Effarig.
+    // Effarig. `glyphWeights` drive the auto-glyph-processor's keep/sacrifice and
+    // Effarig effect weighting, and gate an Imaginary Upgrade requirement.
     v.extend([
         R("celestials.effarig.relicShards", Number),
         R("celestials.effarig.unlockBits", Exact),
         R("celestials.effarig.run", Exact),
+        R("celestials.effarig.glyphWeights", Exact), // (gap) {ep,repl,dt,eternities}
+        R("celestials.effarig.autoAdjustGlyphWeights", Exact), // (gap)
     ]);
 
-    // Enslaved (The Nameless Ones). `stored` is banked *game* time (a spendable
-    // resource driving the release burst); `storedReal` is banked *real* time
-    // and is skipped.
+    // Enslaved (The Nameless Ones). Both `stored` (banked *game* time) and
+    // `storedReal` (banked *real* time, spent to amplify Realities) are spendable
+    // resources. `autoStoreReal`/`isAutoReleasing` gate the storage/release tick.
+    // The hint system stays skip (display-only; `zeroHintTime` uses Date.now).
     v.extend([
         R("celestials.enslaved.isStoring", Exact),
         R("celestials.enslaved.stored", Number),
         R("celestials.enslaved.isStoringReal", Exact),
+        R("celestials.enslaved.storedReal", Number),
+        R("celestials.enslaved.autoStoreReal", Exact), // (gap)
+        R("celestials.enslaved.isAutoReleasing", Exact), // (gap)
         R("celestials.enslaved.run", Exact),
         R("celestials.enslaved.completed", Exact),
         R("celestials.enslaved.tesseracts", Exact),
@@ -364,6 +465,7 @@ pub fn allowlist() -> Vec<FieldRule> {
         R("celestials.ra.charged", IdSet),
         R("celestials.ra.disCharge", Exact),
         R("celestials.ra.peakGamespeed", Number),
+        R("celestials.ra.momentumTime", Number), // → momentum memory-gain multiplier
         R("celestials.ra.petWithRemembrance", Exact),
         R("celestials.ra.alchemy[].amount", Number),
         R("celestials.ra.alchemy[].reaction", Exact),
@@ -405,11 +507,20 @@ pub fn allowlist() -> Vec<FieldRule> {
         R("celestials.laitela.entropy", Number),
         R("celestials.laitela.difficultyTier", Exact),
         R("celestials.laitela.upgrades", Exact), // (gap) id-keyed object
+        // Completion timers feed the reality-reward multiplier `(360/fastest)^2`
+        // and gate the difficulty tier.
+        R("celestials.laitela.thisCompletion", Number),
+        R("celestials.laitela.fastestCompletion", Number),
         R("celestials.laitela.dimensions[].amount", Decimal),
         R("celestials.laitela.dimensions[].intervalUpgrades", Exact),
         R("celestials.laitela.dimensions[].powerDMUpgrades", Exact),
         R("celestials.laitela.dimensions[].powerDEUpgrades", Exact),
         R("celestials.laitela.dimensions[].ascensionCount", Exact),
+        // DMD production timer (accumulates realDiff, produces on interval).
+        R(
+            "celestials.laitela.dimensions[].timeSinceLastUpdate",
+            Number,
+        ),
     ]);
 
     // Pelle (the Doomed reality). Rifts are an object keyed by name; only Decay

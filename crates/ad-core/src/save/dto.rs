@@ -1031,6 +1031,10 @@ pub struct ThisInfinityDTO {
     pub time: f64,
     /// Real time in this infinity (ms).
     pub real_time: f64,
+    /// Game time of the last Antimatter Dimension purchase this infinity
+    /// (`lastBuyTime`); gates IC8's per-run purchase timing.
+    #[serde(default)]
+    pub last_buy_time: f64,
     /// Peak antimatter this infinity. The save key is `maxAM` (capital AM),
     /// which `camelCase` would render as `maxAm`, so it is renamed explicitly.
     #[serde(rename = "maxAM", with = "break_infinity::serde_string")]
@@ -1477,7 +1481,7 @@ impl GameState {
                 max_am: dto.records.this_infinity.max_am,
                 // Transient IC8 decay timer: start it at the current time on load so
                 // production isn't spuriously decayed before the next purchase.
-                last_buy_time_ms: dto.records.this_infinity.time,
+                last_buy_time_ms: dto.records.this_infinity.last_buy_time,
                 best_ip_min: dto.records.this_infinity.best_ip_min,
                 best_ip_min_val: dto.records.this_infinity.best_ip_min_val,
             },
