@@ -95,8 +95,13 @@ impl GameState {
     }
 
     fn black_hole_raw_interval(&self, index: usize) -> f64 {
-        (3600.0 / 10f64.powi(index as i32))
-            * 0.8f64.powi(self.black_holes.holes[index].interval_upgrades as i32)
+        let mut interval = (3600.0 / 10f64.powi(index as i32))
+            * 0.8f64.powi(self.black_holes.holes[index].interval_upgrades as i32);
+        // Achievement 145: Black Hole intervals are 10% shorter.
+        if self.achievement_unlocked(145) {
+            interval *= 0.9;
+        }
+        interval
     }
 
     /// A hole's game-speed power while active (`180/2^id × 1.35^upgrades`).
@@ -142,6 +147,8 @@ impl GameState {
         self.reality.machines -= BH1_UNLOCK_COST;
         self.black_holes.holes[0].unlocked = true;
         self.records.time_played_at_bh_unlock_ms = self.records.total_time_played_ms;
+        // BLACK_HOLE_UNLOCKED achievements (144).
+        self.check_black_hole_unlocked_achievements();
         true
     }
 
@@ -219,6 +226,9 @@ impl GameState {
         if self.black_hole_is_permanent(index) {
             self.black_holes.holes[index].active = true;
         }
+        // BLACK_HOLE_UPGRADE_BOUGHT achievements (145, and 155/158's effects rely
+        // on the unlock).
+        self.check_black_hole_upgrade_achievements();
         true
     }
 

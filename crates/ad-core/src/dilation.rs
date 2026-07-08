@@ -263,7 +263,18 @@ impl GameState {
             let factor = (self.ep_mult_effect().pos_log10().sqrt() / 9.0).max(1.0);
             mult *= Decimal::from_float(factor);
         }
+        // Achievement 132: TP gain multiplier from Antimatter Galaxies.
+        mult *= self.achievement_132_dilation_mult();
         mult
+    }
+
+    /// Achievement 132's shared TP/DT multiplier (`1.22 × max(galaxies^0.04, 1)`).
+    fn achievement_132_dilation_mult(&self) -> Decimal {
+        if self.achievement_unlocked(132) {
+            Decimal::from_float(1.22 * (self.galaxies as f64).powf(0.04).max(1.0))
+        } else {
+            Decimal::ONE
+        }
     }
 
     /// TP a dilated Eternity would grant now, over the current amount
@@ -298,6 +309,12 @@ impl GameState {
                 .pow(&Decimal::from(self.dilation.rebuyables[0] as u64));
         // RU1 (Temporal Amplifier): ×3 per purchase.
         rate *= self.reality_rebuyable_effect(1);
+        // Achievement 132: DT rate multiplier from Antimatter Galaxies.
+        rate *= self.achievement_132_dilation_mult();
+        // Achievement 137: ×2 Dilated Time while Dilated.
+        if self.achievement_unlocked(137) && self.dilation.active {
+            rate *= Decimal::from_float(2.0);
+        }
         // Ra: Alchemy `dilation`, `continuousTTBoost.dilatedTime`, and
         // `peakGamespeedDT` (all multiply the DT rate at the tachyon base).
         rate *= Decimal::from_float(self.alchemy_dilation_mult());

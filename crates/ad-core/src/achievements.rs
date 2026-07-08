@@ -60,7 +60,9 @@ pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] = &[
     101, 102, 103, 104, 105, 106, 107, 108, // row 10
     112, 113, 114, 115, 116, 118, // row 11 (111/117 deferred)
     121, 122, 123, 124, 125, 126, 127, 128, // row 12
-    136, // dilate time
+    131, 132, 133, 134, 135, 136, 137, 138, // row 13
+    141, 142, 143, 144, 145, 146, 147, 148, // row 14
+    151, 152, 153, 154, // row 15 (155–158 pending)
 ];
 
 impl GameState {
@@ -427,6 +429,45 @@ impl GameState {
         if self.infinity_points.exponent() >= 22000 && self.studies.is_empty() {
             self.unlock_achievement(128);
         }
+        // 133: reach 1e200000 IP without buying any Infinity Dimensions or the
+        // ×2 IP multiplier (the latter is unmodelled, hence always satisfied).
+        if self.infinity_points.exponent() >= 200_000
+            && self.infinity_dimensions.iter().all(|d| d.purchases() == 0)
+        {
+            self.unlock_achievement(133);
+        }
+        // 134: reach 1e18000 Replicanti.
+        if self.replicanti.amount.exponent() >= 18000 {
+            self.unlock_achievement(134);
+        }
+        // 135: over 1e8296262 ticks/second.
+        if self.current_tickspeed_ms().exponent() <= -8_296_262 {
+            self.unlock_achievement(135);
+        }
+        // 137: 1e260000 antimatter within 1 minute (game time) while Dilated.
+        if self.dilation.active
+            && self.antimatter.exponent() >= 260_000
+            && self.records.this_eternity.time_ms <= 60_000.0
+        {
+            self.unlock_achievement(137);
+        }
+        // 138: 1e26000 IP with no Time Studies while Dilated.
+        if self.dilation.active
+            && self.studies.is_empty()
+            && self.infinity_points.exponent() >= 26000
+        {
+            self.unlock_achievement(138);
+        }
+        // 142: unlock the Automator (the original fires on Reality/perk/black-hole
+        // events; a guarded per-tick check covers all of them).
+        if !self.achievement_unlocked(142) && self.automator_unlocked() {
+            self.unlock_achievement(142);
+        }
+        // 152: have 100 Glyphs in the inventory (a GLYPHS_CHANGED achievement,
+        // checked per tick here).
+        if self.reality.glyphs.inventory.len() >= 100 {
+            self.unlock_achievement(152);
+        }
         // 52: max the interval for the AD and Tickspeed autobuyers. The original
         // fires this on REALITY_RESET_AFTER / REALITY_UPGRADE_TEN_BOUGHT, but a
         // Reality clears autobuyer intervals, so it is only truly reachable while
@@ -617,6 +658,72 @@ impl GameState {
         if ec_completions >= 50 {
             self.unlock_achievement(123);
         }
+        // 131: 2e9 Banked Infinities.
+        if self.infinities_banked > Decimal::new(2.0, 9) {
+            self.unlock_achievement(131);
+        }
+        // 143: each of the last 10 Eternities gave ≥ Number.MAX_VALUE× the EP of
+        // the previous one (a filled ring, newest first).
+        let recent = &self.records.recent_eternities;
+        let filled = recent.iter().all(|r| r.time_ms != f64::MAX);
+        if filled
+            && recent
+                .windows(2)
+                .all(|w| w[0].ep >= w[1].ep * Decimal::NUMBER_MAX_VALUE)
+        {
+            self.unlock_achievement(143);
+        }
+    }
+
+    /// REALITY_RESET_BEFORE conditions (read the pre-reset run state).
+    pub(crate) fn check_reality_before_achievements(&mut self) {
+        // 141: make a new Reality.
+        self.unlock_achievement(141);
+        // 148: Reality with one of each basic Glyph type equipped.
+        if crate::glyphs::BASIC_GLYPH_TYPES
+            .iter()
+            .all(|&t| self.reality.glyphs.active.iter().any(|g| g.kind == t))
+        {
+            self.unlock_achievement(148);
+        }
+        // 153: Reality without producing antimatter.
+        if self.requirement_checks.reality_no_am {
+            self.unlock_achievement(153);
+        }
+        // 154: Reality in under 5 seconds (game time).
+        if self.records.this_reality.time_ms <= 5_000.0 {
+            self.unlock_achievement(154);
+        }
+    }
+
+    /// PERK_BOUGHT conditions.
+    pub(crate) fn check_perk_bought_achievements(&mut self) {
+        // 146: have all Perks bought.
+        if self.reality.perks.len() >= crate::perks::PERKS.len() {
+            self.unlock_achievement(146);
+        }
+    }
+
+    /// REALITY_UPGRADE_BOUGHT conditions.
+    pub(crate) fn check_reality_upgrade_bought_achievements(&mut self) {
+        // 147: have all (one-time) Reality Upgrades bought.
+        if (6..=25).all(|id| self.reality_upgrade_bought(id)) {
+            self.unlock_achievement(147);
+        }
+    }
+
+    /// BLACK_HOLE_UNLOCKED conditions.
+    pub(crate) fn check_black_hole_unlocked_achievements(&mut self) {
+        // 144: unlock the Black Hole.
+        self.unlock_achievement(144);
+    }
+
+    /// BLACK_HOLE_UPGRADE_BOUGHT conditions.
+    pub(crate) fn check_black_hole_upgrade_achievements(&mut self) {
+        // 145: either Black Hole interval smaller than its duration.
+        if (0..2).any(|i| self.black_hole_interval(i) < self.black_hole_duration(i)) {
+            self.unlock_achievement(145);
+        }
     }
 
     /// CHALLENGE_FAILED conditions (an Eternity Challenge's restriction breaks).
@@ -645,6 +752,15 @@ impl GameState {
         // 83: have 50 Antimatter Galaxies.
         if self.galaxies >= 50 {
             self.unlock_achievement(83);
+        }
+        // 132: 569 Antimatter Galaxies without gaining a Replicanti Galaxy this
+        // Eternity.
+        if self.galaxies >= 569 && self.requirement_checks.eternity_no_rg {
+            self.unlock_achievement(132);
+        }
+        // 151: 800 Antimatter Galaxies without buying an 8th AD this Infinity.
+        if self.galaxies >= 800 && self.requirement_checks.infinity_no_ad8 {
+            self.unlock_achievement(151);
         }
     }
 
@@ -1289,5 +1405,107 @@ mod tests {
         assert!(!game.achievement_unlocked(124));
         game.check_tick_achievements(30_000.0);
         assert!(game.achievement_unlocked(124));
+    }
+
+    // ---- Batch 5 (ids 131–154) ----
+
+    #[test]
+    fn achievement_131_doubles_infinities() {
+        let mut game = GameState::new();
+        let before = game.gained_infinities();
+        game.unlock_achievement(131);
+        assert_eq!(game.gained_infinities(), before * Decimal::from_float(2.0));
+    }
+
+    #[test]
+    fn achievement_141_multiplies_ip_and_buy_ten() {
+        let mut game = GameState::new();
+        let ip_before = game.total_ip_mult();
+        let buy10_before = game.buy_ten_multiplier();
+        game.unlock_achievement(141);
+        assert_eq!(game.total_ip_mult(), ip_before * Decimal::from_float(4.0));
+        // Buy-10 base rises by +0.1 (2.0 → 2.1).
+        assert_eq!(
+            game.buy_ten_multiplier(),
+            buy10_before + Decimal::from_float(0.1)
+        );
+    }
+
+    #[test]
+    fn achievement_142_strengthens_dimension_boosts() {
+        let mut game = GameState::new();
+        let before = game.dim_boost_power();
+        game.unlock_achievement(142);
+        assert_eq!(game.dim_boost_power(), before * Decimal::from_float(1.5));
+    }
+
+    #[test]
+    fn achievement_143_keeps_boosts_through_galaxy() {
+        let mut game = GameState::new();
+        game.dim_boosts = 4;
+        game.dimensions[7].amount = Decimal::new(1.0, 6); // clears galaxy req
+        game.unlock_achievement(143);
+        assert!(game.buy_galaxy());
+        assert_eq!(game.galaxies, 1);
+        // Dimension Boosts survive the galaxy.
+        assert_eq!(game.dim_boosts, 4);
+    }
+
+    #[test]
+    fn achievement_145_shortens_black_hole_interval() {
+        let mut game = GameState::new();
+        let before = game.black_hole_interval(0);
+        game.unlock_achievement(145);
+        assert!(game.black_hole_interval(0) < before);
+    }
+
+    #[test]
+    fn achievement_132_multiplies_tachyon_gain() {
+        let mut game = GameState::new();
+        game.galaxies = 100;
+        let before = game.tachyon_gain_multiplier();
+        game.unlock_achievement(132);
+        assert!(game.tachyon_gain_multiplier() > before);
+    }
+
+    #[test]
+    fn achievement_137_doubles_dilated_time_while_dilated() {
+        let mut game = GameState::new();
+        game.dilation.tachyon_particles = Decimal::ONE;
+        game.dilation.active = true;
+        let before = game.dilation_gain_per_second();
+        game.unlock_achievement(137);
+        assert_eq!(
+            game.dilation_gain_per_second(),
+            before * Decimal::from_float(2.0)
+        );
+    }
+
+    #[test]
+    fn reality_before_conditions_141_153_154() {
+        let mut game = GameState::new();
+        game.requirement_checks.reality_no_am = true;
+        game.records.this_reality.time_ms = 0.0;
+        game.check_reality_before_achievements();
+        assert!(game.achievement_unlocked(141));
+        assert!(game.achievement_unlocked(153));
+        assert!(game.achievement_unlocked(154));
+    }
+
+    #[test]
+    fn achievement_144_on_black_hole_unlock() {
+        let mut game = GameState::new();
+        game.check_black_hole_unlocked_achievements();
+        assert!(game.achievement_unlocked(144));
+    }
+
+    #[test]
+    fn achievement_147_needs_all_reality_upgrades() {
+        let mut game = GameState::new();
+        for id in 6..=25 {
+            game.reality.upgrade_bits |= 1u32 << id;
+        }
+        game.check_reality_upgrade_bought_achievements();
+        assert!(game.achievement_unlocked(147));
     }
 }

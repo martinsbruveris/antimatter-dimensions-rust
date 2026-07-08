@@ -59,6 +59,10 @@ impl GameState {
         if self.achievement_unlocked(93) {
             mult *= Decimal::from_float(4.0);
         }
+        // Achievement 141 (make a Reality): ×4 IP gain.
+        if self.achievement_unlocked(141) {
+            mult *= Decimal::from_float(4.0);
+        }
         // Achievement 116: IP multiplier from total Infinities
         // (`infinitiesTotal^(log10(2)/4)`, powered by TS31, capped by Effarig's
         // Eternity stage).
@@ -209,6 +213,10 @@ impl GameState {
         gain *= self.reality_rebuyable_effect(5);
         if self.reality_upgrade_bought(7) {
             gain *= Decimal::from_float(1.0 + self.galaxies as f64 / 30.0);
+        }
+        // Achievement 131: ×2 Infinities.
+        if self.achievement_unlocked(131) {
+            gain *= Decimal::from_float(2.0);
         }
         gain
     }

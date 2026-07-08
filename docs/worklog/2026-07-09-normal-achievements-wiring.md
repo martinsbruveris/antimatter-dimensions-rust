@@ -264,3 +264,51 @@ New effect sites:
 - 10 new unit tests (128 TD, 111 AM-keep, 113 eternities, 117 dim-boost, 118
   sacrifice, 116 IP mult, 107/108, 123, 114, 124 marathon).
 - Full suite green. Fidelity unchanged at 34.
+
+---
+
+## Batch 5 — ids 131–154 (136 already done)
+
+### What shipped
+
+Conditions for all 19, spanning rows 13–15 (deep infinity + reality + celestial
++ black-hole + glyph mechanics), plus the tractable effects.
+
+New seams:
+- **Reality-before** (`finish_process_reality`): 141, 148, 153, 154.
+- **Perk-bought** (`buy_perk`): 146.
+- **Reality-upgrade-bought** (`buy_reality_upgrade`): 147.
+- **Black-hole-unlocked** (`unlock_black_hole`): 144.
+- **Black-hole-upgrade** (`buy_black_hole_upgrade`): 145.
+- **Galaxy-after** additions: 132, 151. **Eternity-after** additions: 131, 143.
+- **Tick** additions: 133, 134, 135, 137, 138, 142 (automator), 152 (glyph count).
+
+Effects wired:
+- 131: ×2 Infinities (`gained_infinities`) + a second 5% bank on Eternity.
+- 132: `1.22 × max(galaxies^0.04, 1)` on both TP-gain and DT-rate.
+- 134: Replicanti grow 2× faster while under the cap.
+- 137: ×2 Dilated Time while Dilated (the "×2 TT" in its description isn't
+  applied to TT in the original — it only touches `dtRate` — so we match that).
+- 141: ×4 IP + `+0.1` to the buy-10 base.
+- 142: Dimension Boosts ×1.5.
+- 143: Antimatter Galaxies no longer reset Dimension Boosts.
+- 145: Black Hole intervals ×0.9.
+
+### Deferred effects (conditions wired, effect a follow-up)
+
+- 133 (start Eternities with ICs unlocked/completed), 138 (remove TS131/133
+  downsides), 146 (+1% glyph rarity), 148 (glyph-level bonus), 151 (unlock V),
+  154 (10% ×2-realities chance — RNG). 147's "unlock Teresa" is already covered
+  by the engine gating Teresa on `reality_unlocked`, so only its bit is set.
+
+### Surprises
+
+- 137's description says "×2 Dilated Time and Time Theorems" but the code only
+  multiplies `dtRate`; matched the code, not the tooltip.
+- `RealityUpgrades.allBought` is `(upgradeBits >> 6) + 1 === 1 << 20` — i.e.
+  one-time upgrades 6–25 all owned; ported as `(6..=25).all(bought)`.
+
+### Tests
+
+- 10 new unit tests (131, 141, 142, 143, 145, 132, 137, reality-before, 144, 147).
+- Full suite green. Fidelity unchanged at 34.

@@ -223,9 +223,15 @@ impl GameState {
             let value = (1.0 + self.dim_boosts as f64 / 5.0).min(2.0);
             return Decimal::from_float(value);
         }
-        // EC3's reward adds +0.72/completion to the base before the ×1.1.
+        // EC3's reward adds +0.72/completion to the base before the ×1.1;
+        // Achievement 141 adds a further +0.1 (`plusEffectsOf`).
+        let ach141 = if self.achievement_unlocked(141) {
+            0.1
+        } else {
+            0.0
+        };
         let mut mult =
-            Decimal::from_float(BUY_TEN_MULTIPLIER + self.ec3_buy_ten_bonus());
+            Decimal::from_float(BUY_TEN_MULTIPLIER + self.ec3_buy_ten_bonus() + ach141);
         if self.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult) {
             mult *= Decimal::from_float(1.1);
         }
@@ -276,6 +282,10 @@ impl GameState {
         // Achievement 117: the Dimension-Boost → AD multiplier is 1% higher.
         if self.achievement_unlocked(117) {
             boost *= Decimal::from_float(1.01);
+        }
+        // Achievement 142 (unlock the Automator): Dimension Boosts ×1.5.
+        if self.achievement_unlocked(142) {
+            boost *= Decimal::from_float(1.5);
         }
         // The `powerdimboost` glyph effect (`GlyphEffect.dimBoostPower`).
         boost *= Decimal::from_float(self.glyph_effect_powerdimboost());

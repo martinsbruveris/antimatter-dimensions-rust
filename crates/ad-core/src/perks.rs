@@ -414,6 +414,8 @@ impl GameState {
         self.reality.perk_points -= 1.0;
         self.reality.perks.insert(id);
         self.on_perk_purchased(id);
+        // PERK_BOUGHT achievements (146).
+        self.check_perk_bought_achievements();
         true
     }
 

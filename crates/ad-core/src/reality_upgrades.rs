@@ -143,6 +143,8 @@ impl GameState {
         if id == 20 {
             self.unlock_second_black_hole();
         }
+        // REALITY_UPGRADE_BOUGHT achievements (147).
+        self.check_reality_upgrade_bought_achievements();
         true
     }
 

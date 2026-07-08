@@ -165,6 +165,10 @@ impl GameState {
             interval *= OVER_CAP_SCALE_FACTOR.powf(increases);
         }
         interval /= self.replicanti_speed_mult();
+        // Achievement 134: Replicanti grow 2× faster while under the cap.
+        if !over_cap && self.achievement_unlocked(134) {
+            interval /= 2.0;
+        }
         // V's Reality squares the (post-speed) Replicanti interval.
         if self.celestials.v.run {
             interval = interval.powi(2);

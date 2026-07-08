@@ -174,11 +174,14 @@ impl GameState {
                 self.eternity_challenge_completions(ec) - before;
         }
 
-        // TS191: bank 5% of the Infinities on each Eternity (Achievement 131's
-        // extra share is a later feature).
+        // Bank 5% of the Infinities on each Eternity, once from TS191 and once
+        // more from Achievement 131 (the original `plusEffectsOf` adds both).
+        let five_percent = (self.infinities * Decimal::from_float(0.05)).floor();
+        if self.achievement_unlocked(131) {
+            self.infinities_banked += five_percent;
+        }
         if self.time_study_bought(191) {
-            self.infinities_banked +=
-                (self.infinities * Decimal::from_float(0.05)).floor();
+            self.infinities_banked += five_percent;
         }
 
         // `addEternityTime`: push this run onto the last-10-eternities ring.

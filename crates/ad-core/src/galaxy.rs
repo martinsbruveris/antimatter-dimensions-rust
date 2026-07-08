@@ -136,7 +136,11 @@ impl GameState {
     /// the shared soft reset (which the ANR perk can soften — antimatter /
     /// dimensions / tickspeed / sacrifice kept).
     fn galaxy_reset(&mut self) {
-        self.dim_boosts = 0;
+        // Achievement 143 (`galaxyReset`): Antimatter Galaxies no longer reset
+        // Dimension Boosts.
+        if !self.achievement_unlocked(143) {
+            self.dim_boosts = 0;
+        }
         self.soft_reset(false);
         // Restored per-Galaxy (not per-Infinity), matching `galaxyReset`.
         self.requirement_checks.infinity_no_sacrifice = true;

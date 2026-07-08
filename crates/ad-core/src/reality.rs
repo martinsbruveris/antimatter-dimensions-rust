@@ -473,6 +473,8 @@ impl GameState {
     pub(crate) fn finish_process_reality(&mut self) {
         // REALITY_RESET_BEFORE requirement checks (RU16–19/23/24).
         self.check_reality_upgrade_reqs_on_reality();
+        // REALITY_RESET_BEFORE achievements (141, 148, 153, 154).
+        self.check_reality_before_achievements();
 
         // -- Rewards (read from pre-reset state) --
         let final_ep = self.eternity_points + self.gained_eternity_points();
