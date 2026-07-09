@@ -910,3 +910,39 @@ Dropped the `.max(TICKSPEED_MULTIPLIER_MIN)` from the ≥3-galaxy branch of
   it was never floating point.
 - `cargo test -p ad-core --features serde`: 580 pass; fmt + clippy clean; round-trip
   clean.
+
+## Bug 29 — Dim Boost autobuyer `lastTick` mis-derived on two paths
+
+### Symptom
+Six of the nine remaining horizon-1 failures diverged *only* on
+`auto.dimBoost.lastTick` / `auto.galaxy.lastTick`:
+- `00118` (non-buy-max): Rust `dimBoost.lastTick = -50`, JS `= 0`.
+- `00126`/`00136` (buy-max): Rust zeroed *both* `dimBoost.lastTick` and
+  `galaxy.lastTick`; JS kept both at ≈ realTimePlayed.
+
+### Diagnosis (two independent bugs)
+1. **Double-advance after a Galaxy reset.** The Galaxy autobuyer precedes Dim
+   Boost in the pass. When it fires it emits `ANTIMATTER_GALAXY`, which
+   `reset_autobuyer_ticks` applied to the non-buy-max Dim Boost by setting its
+   `timer_ms = realTimePlayed_post`. But Dim Boost's own `advance` still runs
+   later that tick and adds `dt_ms`, pushing the derived
+   `lastTick = realTimePlayed_post - timer_ms` to `-dt` instead of `0`.
+2. **Wrong emitted event for the buy-max Dim Boost.** The buy-max branch emitted
+   `PRESTIGE_INFINITY` as the reset event. A dim boost emits a `DIMENSION_BOOST`
+   game event (`requestDimensionBoost` → `DIMBOOST_AFTER`); the buy-max
+   `resetTickOn = INFINITY` is a *separate* concern already handled inside
+   `reset_autobuyer_ticks` (`dim_boost_reset_on`). Emitting `INFINITY` wrongly
+   zeroed the Galaxy autobuyer's phase (and the Dim Boost's own).
+
+### Fix
+1. In `reset_autobuyer_ticks`, when the event is `ANTIMATTER_GALAXY` (emitted by
+   the Galaxy autobuyer, whose reset precedes Dim Boost's `advance`), target the
+   *pre-increment* realTimePlayed for Dim Boost so the trailing `advance` lands it
+   on `lastTick = 0`. Later events (INFINITY+) still use the post value.
+2. Buy-max Dim Boost now emits `PRESTIGE_DIMENSION_BOOST`.
+
+### Verification
+- Fidelity grid: 812 → **839** cells (+27). `00118`/`00126`/`00136` now match
+  `dimBoost`/`galaxy` `lastTick` to the digit.
+- `cargo test -p ad-core --features serde`: 582 pass (two new regression tests);
+  fmt + clippy clean; round-trip unchanged.

@@ -814,8 +814,16 @@ impl GameState {
             // The buy-max interval (`buyMaxInterval` seconds) overrides
             // `UpgradeableAutobuyerState.interval`, so the `autobuyerSpeed` Break
             // Infinity Upgrade's halving does *not* apply here (unlike every other
-            // autobuyer interval).
-            (ready, db_cfg.buy_max_interval * 1000.0, PRESTIGE_INFINITY)
+            // autobuyer interval). Firing still emits a `DIMENSION_BOOST` event
+            // (`requestDimensionBoost` → `DIMBOOST_AFTER`), not an Infinity — the
+            // buy-max `resetTickOn = INFINITY` is applied inside
+            // `reset_autobuyer_ticks`, so it must not leak into the emitted event
+            // (which would wrongly reset the Galaxy autobuyer's phase too).
+            (
+                ready,
+                db_cfg.buy_max_interval * 1000.0,
+                PRESTIGE_DIMENSION_BOOST,
+            )
         } else {
             let limit_condition = !db_cfg.limit_dim_boosts
                 || (self.dim_boosts as f64) < db_cfg.max_dim_boosts;
@@ -915,7 +923,17 @@ impl GameState {
         }
         self.autobuyers.tickspeed.timer_ms = rt;
         if event >= dim_boost_reset_on {
-            self.autobuyers.dim_boost.timer_ms = rt;
+            // When the reset is emitted by the *Galaxy* autobuyer, the Dim Boost
+            // autobuyer's own `advance` still runs later this tick (Galaxy precedes
+            // Dim Boost in the pass) and will add `dt_ms`; target the pre-increment
+            // realTimePlayed so the derived `lastTick` lands on exactly 0 after
+            // that. Any later-emitted event (INFINITY+) fires *after* Dim Boost has
+            // already advanced, so the post-tick value (`rt`) is correct there.
+            self.autobuyers.dim_boost.timer_ms = if event == PRESTIGE_ANTIMATTER_GALAXY {
+                self.records.real_time_played_ms
+            } else {
+                rt
+            };
         }
         if event >= PRESTIGE_INFINITY {
             self.autobuyers.galaxy.timer_ms = rt;
@@ -1302,6 +1320,92 @@ mod tests {
         // boost can't fire: one galaxy, boosts reset to the starting count (0).
         assert_eq!(game.galaxies, 1);
         assert_eq!(game.dim_boosts, 0);
+    }
+
+    /// When the Galaxy autobuyer fires it emits `ANTIMATTER_GALAXY`, which resets
+    /// the (non-buy-max) Dim Boost autobuyer's phase — but Dim Boost's own
+    /// `advance` still runs *after* it this tick and adds `dt_ms`. The reset must
+    /// target the pre-increment realTimePlayed so the derived `lastTick` lands on
+    /// exactly 0 (regression: it was landing on `-dt_ms`).
+    #[test]
+    fn dim_boost_lasttick_is_zero_after_a_galaxy_reset() {
+        let mut game = GameState::new();
+        game.broke_infinity = true;
+        for ab in game.autobuyers.dimensions.iter_mut() {
+            ab.is_active = false;
+        }
+        game.autobuyers.tickspeed.is_active = false;
+        for ab in [&mut game.autobuyers.galaxy, &mut game.autobuyers.dim_boost] {
+            ab.is_bought = true;
+            ab.is_active = true;
+            ab.interval_ms = 100.0;
+            ab.timer_ms = 100.0;
+        }
+        game.dim_boosts = 5;
+        game.galaxies = 0;
+        game.dimensions[7].amount = Decimal::from_float(1e6);
+        game.records.real_time_played_ms = 1_000_000.0;
+        assert!(!game.is_buy_max_dimboosts_unlocked());
+        assert!(game.can_buy_galaxy());
+
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.galaxies, 1, "the galaxy should have fired");
+        // The full tick increments realTimePlayed *after* the autobuyer pass.
+        game.records.real_time_played_ms += 50.0;
+        let last_tick =
+            game.records.real_time_played_ms - game.autobuyers.dim_boost.timer_ms;
+        assert_eq!(
+            last_tick, 0.0,
+            "dim_boost lastTick should be 0, got {last_tick}"
+        );
+    }
+
+    /// A buy-max Dim Boost fire emits a `DIMENSION_BOOST` event (not an Infinity),
+    /// so it must not reset the Galaxy autobuyer's phase — even though the buy-max
+    /// Dim Boost's own `resetTickOn` is `INFINITY` (handled separately inside
+    /// `reset_autobuyer_ticks`). Regression: the emitted event was `INFINITY`,
+    /// which zeroed the Galaxy autobuyer's `lastTick`.
+    #[test]
+    fn buy_max_dim_boost_does_not_reset_the_galaxy_phase() {
+        use crate::break_infinity_upgrades::BreakInfinityUpgrade;
+        let mut game = GameState::new();
+        game.broke_infinity = true;
+        game.break_infinity_upgrades |= BreakInfinityUpgrade::AutobuyMaxDimboosts.bit();
+        assert!(game.is_buy_max_dimboosts_unlocked());
+
+        for ab in game.autobuyers.dimensions.iter_mut() {
+            ab.is_active = false;
+        }
+        game.autobuyers.tickspeed.is_active = false;
+        // The Dim Boost autobuyer fires (buy-max interval 0 → fires immediately).
+        game.autobuyers.dim_boost.is_bought = true;
+        game.autobuyers.dim_boost.is_active = true;
+        game.autobuyers.dim_boost.timer_ms = 100.0;
+        // The Galaxy autobuyer is armed but cannot buy (no 8th dimension), so it
+        // only advances; its phase must survive the Dim Boost's reset intact.
+        game.autobuyers.galaxy.is_bought = true;
+        game.autobuyers.galaxy.is_active = true;
+        game.autobuyers.galaxy.interval_ms = 100.0;
+        game.autobuyers.galaxy.timer_ms = 40.0;
+        game.dim_boosts = 0;
+        for d in game.dimensions.iter_mut() {
+            d.amount = Decimal::from_float(1e6);
+        }
+        game.dimensions[7].amount = Decimal::ZERO; // block the galaxy
+        game.records.real_time_played_ms = 100_000.0;
+        assert!(!game.can_buy_galaxy());
+        assert!(game.can_dim_boost());
+
+        game.tick_autobuyers(50.0);
+        assert!(
+            game.dim_boosts > 0,
+            "the buy-max dim boost should have fired"
+        );
+        // The galaxy only advanced (40 + 50); it was *not* reset to `rt` (~100050).
+        assert_eq!(
+            game.autobuyers.galaxy.timer_ms, 90.0,
+            "galaxy phase must survive a buy-max dim boost"
+        );
     }
 
     #[test]

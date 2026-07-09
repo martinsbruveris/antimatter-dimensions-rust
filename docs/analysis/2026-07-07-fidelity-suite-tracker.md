@@ -48,6 +48,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Advanced the records time (`thisInfinity.time` etc.) before Dimension production instead of at the end of the tick, matching the game loop; time-based AD achievement multipliers (56/76/91/92) and IC8 decay now read this tick's time (fixed the general ~2e-4/tier AD-chain drift) | 706/1148 |
 | 2026-07-09 | (pending) | Capped pre-break Antimatter Dimension production at 1e315 (`cappedProductionInNormalChallenges`); bounds the Big-Crunch goal overshoot (`maxAM`/`totalAntimatter`) that was running away on repeatedly-crunching wall fixtures (`00079`/`00081`–`00085`) | 715/1148 |
 | 2026-07-09 | (pending) | Removed the 0.01 clamp on the Tickspeed per-purchase multiplier for ≥3 galaxies (the original only floors the <3 branch); deep-galaxy tickspeeds were e1888 too slow, driving the residual per-tier AD-chain drift on steady-state fixtures (`00232`) | 812/1148 |
+| 2026-07-09 | (pending) | Fixed the Dim Boost autobuyer `lastTick`: a Galaxy reset (which precedes Dim Boost's own `advance`) now targets the pre-increment realTimePlayed so `lastTick` lands on 0 not −dt (`00118`); and a buy-max Dim Boost emits `DIMENSION_BOOST` not `INFINITY`, so it no longer zeroes the Galaxy autobuyer's phase (`00126`/`00136`) | 839/1148 |
 
 ## Method
 
