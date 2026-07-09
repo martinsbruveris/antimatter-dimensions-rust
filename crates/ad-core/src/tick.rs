@@ -59,6 +59,14 @@ impl GameState {
         // Teresa's `epGen` unlock: passive EP from the peak EP/min.
         self.generate_teresa_ep(dt_ms);
 
+        // The original produces Time → Infinity → Antimatter Dimensions in that
+        // order each tick (`game.js`), so Antimatter Dimension production reads the
+        // Infinity Power (and free Tickspeed) generated *this* tick, not last tick.
+        // Time Dimensions produce Time Shards → free Tickspeed upgrades.
+        self.tick_time_dimensions(dt_ms);
+        // Infinity Dimensions produce Infinity Power (feeds the AD multiplier below).
+        self.tick_infinity_dimensions(dt_ms);
+
         // Production flows from higher dimensions to lower and, from the 1st
         // dimension, into antimatter (`AntimatterDimensions.tick`). Two subtleties
         // must match the original exactly:
@@ -134,13 +142,6 @@ impl GameState {
                 self.antimatter = goal;
             }
         }
-
-        // Time Dimensions produce Time Shards → free Tickspeed upgrades.
-        self.tick_time_dimensions(dt_ms);
-
-        // Infinity Dimensions produce Infinity Power (which feeds the AD multiplier
-        // on the next tick).
-        self.tick_infinity_dimensions(dt_ms);
 
         // Replicanti grow (multiplying Infinity Dimensions on the next tick, matching
         // the original's `replicantiLoop` running after the dimension ticks).
