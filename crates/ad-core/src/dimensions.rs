@@ -620,6 +620,17 @@ impl GameState {
             production *= self.chall3_pow;
         }
 
+        // `cappedProductionInNormalChallenges`: unless post-break (Infinity broken
+        // and outside a Normal Challenge, or inside an Infinity Challenge, or in
+        // Enslaved's Reality), each dimension's per-second production is capped at
+        // 1e315. This bounds the pre-break Big-Crunch overshoot (`maxAM`).
+        let post_break = (self.broke_infinity && self.challenge.current == 0)
+            || self.infinity_challenge.current != 0
+            || self.celestials.enslaved.run;
+        if !post_break {
+            production = production.min(&Decimal::new_unchecked(1.0, 315));
+        }
+
         production
     }
 }
@@ -697,6 +708,27 @@ mod tests {
             let ratio = with[t] / (without[t] * reward);
             assert!((ratio - 1.0).abs() < 1e-9, "tier {t}: ratio={ratio}");
         }
+    }
+
+    /// Pre-break (outside a challenge), each dimension's per-second production is
+    /// capped at 1e315 (`cappedProductionInNormalChallenges`); the cap lifts once
+    /// Infinity is broken.
+    #[test]
+    fn ad_production_capped_at_1e315_until_break() {
+        let mut game = GameState::new();
+        // A 1st dimension huge enough that raw production far exceeds the cap.
+        game.dimensions[0].bought = 100;
+        game.dimensions[0].amount = Decimal::new(1.0, 400);
+
+        assert!(!game.broke_infinity);
+        assert_eq!(
+            game.dimension_production_per_second(0),
+            Decimal::new(1.0, 315)
+        );
+
+        // Post-break the cap lifts and production runs uncapped.
+        game.broke_infinity = true;
+        assert!(game.dimension_production_per_second(0) > Decimal::new(1.0, 315));
     }
 
     /// Unbounded bulk buys complete groups only (lands on a multiple of ten) and,

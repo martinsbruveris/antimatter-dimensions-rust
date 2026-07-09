@@ -850,3 +850,31 @@ before Time/Infinity/Antimatter Dimension production, matching the game loop.
 - `cargo test -p ad-core --features serde`: 578 pass; fmt + clippy clean; round-trip
   clean (the autobuyer `lastTick` derivation is unaffected — the final
   `realTimePlayed` is the same, and the autobuyers still run before the increment).
+
+## Bug 27 — the pre-break 1e315 Antimatter Dimension production cap
+
+### Symptom
+A cohort of pre-break, near-the-wall fixtures (`00079`, `00081`–`00085`) failed at
+horizon 100/1000 only on the *peak/total* records: `records.totalAntimatter`,
+`records.thisEternity.maxAM`, `records.thisReality.maxAM`. JS's `maxAM` stayed
+frozen at ~5e313 across every Big Crunch, while Rust's grew unbounded (e315 → e327);
+the current antimatter and dimensions matched.
+
+### Diagnosis
+These saves repeatedly hit the Infinity wall and auto-crunch. On the tick antimatter
+crosses the goal it overshoots (recorded as `maxAM`) before being capped to the goal.
+JS's `productionPerSecond` ends with `.min(cappedProductionInNormalChallenges)`,
+which is `1e315` unless post-break (Infinity broken and outside a Normal Challenge,
+or inside an Infinity Challenge, or Enslaved). So pre-break each dimension produces
+at most 1e315/s, bounding the per-tick antimatter gain to 1e315·0.05 = 5e313 — exactly
+JS's frozen `maxAM`. Rust never applied the cap, so its overshoot (and thus the peak
+records) ran away near the super-exponential wall.
+
+### Fix
+Cap `dimension_production_per_second` at 1e315 unless post-break, mirroring
+`cappedProductionInNormalChallenges`.
+
+### Verification
+- Fidelity grid: 706 → **715** cells (+9). `00081` now passes all four horizons.
+- `cargo test -p ad-core --features serde`: 579 pass; fmt + clippy clean; round-trip
+  clean.
