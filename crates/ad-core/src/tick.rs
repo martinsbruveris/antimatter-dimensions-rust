@@ -162,6 +162,10 @@ impl GameState {
         // upgrade's TT stream.
         self.tick_dilation(dt_ms);
 
+        // Passive Infinity generation (`infinitiedGen` Break Infinity Upgrade),
+        // banking whole Infinities and carrying the fraction in `part_infinitied`.
+        self.generate_passive_infinities(dt_ms);
+
         // Advance time records. Pre-Infinity the game-speed multiplier is 1, so
         // game time and real time both advance by `dt_ms` (mirrors the original's
         // `records.totalTimePlayed += diff` in the game loop). Runs during offline
@@ -294,12 +298,17 @@ impl GameState {
         }
 
         // IC2: a Dimensional Sacrifice fires automatically every 400 ms (once an
-        // 8th dimension exists; `sacrifice` no-ops otherwise).
+        // 8th dimension exists; `sacrifice` no-ops otherwise). The original is an
+        // `if/else`: on the tick the counter reaches 400 it sacrifices and takes
+        // the modulo *without* also adding this tick's delta, and it accrues real
+        // time (`Date.now() - lastUpdate`, clamped to `[1, 6h]`; = `dt_ms` at
+        // game-speed 1) rather than the game-time step.
         if self.infinity_challenge_running(2) {
-            self.ic2_count += dt_ms;
             if self.ic2_count >= 400.0 {
                 self.sacrifice();
                 self.ic2_count %= 400.0;
+            } else {
+                self.ic2_count += dt_ms.clamp(1.0, 21_600_000.0);
             }
         }
     }

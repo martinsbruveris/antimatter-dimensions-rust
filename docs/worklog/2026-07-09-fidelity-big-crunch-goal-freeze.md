@@ -446,3 +446,29 @@ no longer masks structural divergences.
 - `00091`: round-trip + horizon 1 now pass.
 - Fidelity grid: 308 → **346** cells (+38). No early-game regression (284/312).
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 13 — early-Eternity per-tick accumulators (`partInfinitied`, `maxID1`, `ic2Count`)
+
+After the cost-scaling fix, the widest remaining structural divergences on the new
+(Infinity → early-Eternity) fixtures were three per-tick accumulators:
+
+- **`partInfinitied`** (fractional carry of passive Infinity generation). The
+  `infinitiedGen` Break Infinity Upgrade grants `0.5·dt/max(50, bestInfinity.time)`
+  Infinities per tick; we didn't model it. Added `GameState.part_infinitied`, the
+  `generate_passive_infinities` tick step, decode/encode, and Eternity/Reality
+  resets. (The RU5/RU7/Ra/glyph/RU11/Effarig factors are all 1/absent pre-Reality.)
+- **`requirementChecks.reality.maxID1`**. We modelled this as a bool
+  (`reality_had_id1`), but the original tracks the *peak 1st Infinity Dimension
+  amount* this Reality (a Decimal, `maxID1.clampMin(ID1.amount)` each ID tick).
+  Converted the field to `reality_max_id1: Decimal`, updated it in the ID tick,
+  wired decode/encode, and switched Imaginary-Upgrade-15's gate to `== 0`.
+- **`ic2Count`** (IC2 auto-sacrifice timer). The original is an `if/else`: on the
+  tick the counter reaches 400 it sacrifices and takes the modulo *without* adding
+  that tick's delta, and it accrues clamped real time. We added the delta
+  unconditionally before the check, firing the sacrifice a tick early. Matched the
+  `if/else` + `clamp(dt, 1, 6h)`.
+
+### Verification
+- Fidelity grid: 298 → **350** cells across this batch (new-fixture set), no
+  early-game regression (284/312).
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

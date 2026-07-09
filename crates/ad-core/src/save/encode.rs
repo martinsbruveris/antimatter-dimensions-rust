@@ -227,6 +227,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         .collect::<Vec<_>>());
     player["epmultUpgrades"] = json!(state.epmult_upgrades);
     player["IPMultPurchases"] = json!(state.ip_mult_purchases);
+    player["partInfinitied"] = json!(state.part_infinitied);
     // Infinity Challenge record times.
     player["challenge"]["infinity"]["bestTimes"] = json!(state.ic_best_times_ms);
     player["challenge"]["normal"]["bestTimes"] = json!(state.nc_best_times_ms);
@@ -359,6 +360,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         json!(state.requirement_checks.reality_no_eternities);
     player["requirementChecks"]["reality"]["maxGlyphs"] =
         json!(state.requirement_checks.reality_max_glyphs);
+    player["requirementChecks"]["reality"]["maxID1"] =
+        decimal(&state.requirement_checks.reality_max_id1);
     player["postC4Tier"] = json!(state.post_c4_tier);
 
     // Celestials (Phase 7). Modelled sub-fields are overwritten in place; the

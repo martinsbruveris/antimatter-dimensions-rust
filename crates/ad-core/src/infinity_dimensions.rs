@@ -166,11 +166,6 @@ impl GameState {
         d.cost = (cost * mult).round();
         d.amount += Decimal::from_float(10.0);
         d.base_amount += 10;
-        // A 1st Infinity Dimension purchase fails Imaginary Upgrade 15's
-        // "no ID1 this Reality" requirement.
-        if tier == 0 {
-            self.requirement_checks.reality_had_id1 = true;
-        }
         true
     }
 
@@ -373,6 +368,12 @@ impl GameState {
         } else {
             self.infinity_power += prod[0] * Decimal::from_float(dt_s);
         }
+        // Track the peak 1st Infinity Dimension amount this Reality
+        // (`reality.maxID1 = maxID1.clampMin(ID1.amount)`; gates Imaginary Up. 15).
+        self.requirement_checks.reality_max_id1 = self
+            .requirement_checks
+            .reality_max_id1
+            .max(&self.infinity_dimensions[0].amount);
     }
 
     /// Big-Crunch reset for Infinity Dimensions: Infinity Power → 0 and each tier's

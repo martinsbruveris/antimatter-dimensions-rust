@@ -149,7 +149,7 @@ impl GameState {
         match id {
             // 15: reach 1e1.5e12 AM with no ID1 this Reality.
             15 => {
-                !self.requirement_checks.reality_had_id1
+                self.requirement_checks.reality_max_id1 == break_infinity::Decimal::ZERO
                     && self.antimatter.exponent() as f64 >= 1.5e12
             }
             // 16: destabilize Lai'tela to ≤ dim 6 (difficulty ≥ 2).

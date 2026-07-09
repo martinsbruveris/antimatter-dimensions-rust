@@ -117,6 +117,9 @@ pub struct PlayerDTO {
     /// `player.IPMultPurchases` — rebuyable ×2 IP-multiplier purchases.
     #[serde(rename = "IPMultPurchases", default)]
     pub ip_mult_purchases: u32,
+    /// `player.partInfinitied` — fractional carry of passive Infinity generation.
+    #[serde(default)]
+    pub part_infinitied: f64,
     /// `player.infinityPower` — produced by the Infinity Dimensions.
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_power: Decimal,
@@ -755,6 +758,9 @@ pub struct RealityChecksDTO {
     pub max_glyphs: i32,
     #[serde(rename = "noAM", default = "bool_true")]
     pub no_am: bool,
+    /// Peak 1st Infinity Dimension amount this reality (`maxID1`).
+    #[serde(rename = "maxID1", default, with = "break_infinity::serde_string")]
+    pub max_id1: Decimal,
 }
 
 /// `player.replicanti` (modelled subset). The sub-interval `timer` is transient and
@@ -1670,7 +1676,7 @@ impl GameState {
             reality_no_infinities: dto.requirement_checks.reality.no_infinities,
             reality_no_eternities: dto.requirement_checks.reality.no_eternities,
             reality_max_glyphs: dto.requirement_checks.reality.max_glyphs,
-            reality_had_id1: false,
+            reality_max_id1: dto.requirement_checks.reality.max_id1,
             reality_max_studies: 0,
             reality_no_continuum: true,
         };
@@ -2202,6 +2208,7 @@ impl GameState {
             epmult_upgrades: dto.epmult_upgrades,
             ip_mult_purchases: dto.ip_mult_purchases,
             ip_offline_bought,
+            part_infinitied: dto.part_infinitied,
             ic_best_times_ms: {
                 let mut times = [f64::MAX; 8];
                 for (i, t) in

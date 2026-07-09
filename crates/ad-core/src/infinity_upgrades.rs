@@ -20,6 +20,7 @@
 
 use break_infinity::Decimal;
 
+use crate::break_infinity_upgrades::BreakInfinityUpgrade;
 use crate::data::constants::{BUY_TEN_MULTIPLIER, DIM_BOOST_MULTIPLIER};
 use crate::state::GameState;
 
@@ -467,6 +468,28 @@ impl GameState {
             self.part_infinity_point -= whole;
             self.infinity_points += Decimal::from_float(whole) * self.total_ip_mult();
         }
+    }
+
+    /// Passive Infinity generation (`game.js`, the `!EternityChallenge(4)` block):
+    /// the `infinitiedGen` Break Infinity Upgrade grants `0.5 × dt / max(50,
+    /// bestInfinity.time)` Infinities per tick; the whole part is banked and the
+    /// fraction carried in `part_infinitied`. The RealityUpgrade-5/7, Ra, glyph,
+    /// RU11, and Effarig terms are 1/absent for the pre-Reality saves this covers.
+    pub(crate) fn generate_passive_infinities(&mut self, dt_ms: f64) {
+        // The whole block (including the `part_infinitied` carry) is skipped in EC4.
+        if self.ec_running(4) {
+            return;
+        }
+        let mut inf_gen = 0.0;
+        if self.break_infinity_upgrade_bought(BreakInfinityUpgrade::InfinitiedGen) {
+            inf_gen += 0.5 * dt_ms / self.records.best_infinity.time_ms.max(50.0);
+        }
+        inf_gen += self.part_infinitied;
+        let whole = inf_gen.floor();
+        if whole > 0.0 {
+            self.infinities += Decimal::from_float(whole);
+        }
+        self.part_infinitied = inf_gen - whole;
     }
 }
 

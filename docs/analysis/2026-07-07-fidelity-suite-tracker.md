@@ -36,6 +36,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Modelled the `ipMult` ×2 Infinity Upgrade (`IPMultPurchases`): decode/encode, `2^purchases` in `total_ip_mult`, and the Eternity/Reality resets | 195 (+2) |
 | 2026-07-09 | (pending) | Applied the autobuyer `resetTick` (`lastTick`→0) on each prestige event and reset `postC4Tier` in `reset_challenge_stuff` — the missing prestige-reset behaviour (found via a dense `00059` trace) | 203 (+8) |
 | 2026-07-09 | (pending) | Added a second fixture batch (Infinity→early-Eternity), raised default tolerance to 1e-4, and modelled the super-exponential `ExponentialCostScaling` for AD/Tickspeed costs past `Number.MAX_VALUE` (`00086`: 28 diverged fields → 1) | 303/1148 |
+| 2026-07-09 | (pending) | Preserved `ipOffline`; aligned num-field epsilon to 1e-4; modelled the early-Eternity per-tick accumulators `partInfinitied` (passive `infinitiedGen`), `reality.maxID1` (bool→Decimal peak), and the `ic2Count` if/else timer | 350/1148 |
 
 ## Method
 

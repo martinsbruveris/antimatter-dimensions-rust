@@ -204,10 +204,10 @@ pub struct RequirementChecks {
     /// Peak simultaneously-equipped glyph count this reality
     /// (`reality.maxGlyphs`).
     pub reality_max_glyphs: i32,
-    /// Whether a 1st Infinity Dimension was purchased this reality
-    /// (`reality.maxID1` ≠ 0). Gates Imaginary Upgrade 15.
+    /// Peak 1st Infinity Dimension amount this reality (`reality.maxID1`), updated
+    /// each Infinity-Dimension tick. Gates Imaginary Upgrade 15 (`maxID1 == 0`).
     #[cfg_attr(feature = "serde", serde(default))]
-    pub reality_had_id1: bool,
+    pub reality_max_id1: Decimal,
     /// Peak Time Study count this reality (`reality.maxStudies`). Gates
     /// Imaginary Upgrade 19.
     #[cfg_attr(feature = "serde", serde(default))]
@@ -232,7 +232,7 @@ impl RequirementChecks {
             reality_no_infinities: true,
             reality_no_eternities: true,
             reality_max_glyphs: 0,
-            reality_had_id1: false,
+            reality_max_id1: Decimal::ZERO,
             reality_max_studies: 0,
             reality_no_continuum: true,
         }
@@ -622,6 +622,7 @@ impl GameState {
 
         self.epmult_upgrades = 0;
         self.ip_mult_purchases = 0;
+        self.part_infinitied = 0.0;
         self.eternities = Decimal::ZERO;
         self.records.this_eternity = ThisEternity::new();
         self.records.best_eternity = crate::records::BestEternity {

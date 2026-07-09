@@ -218,6 +218,10 @@ pub struct GameState {
     /// round-trip fidelity but has no in-tick effect.
     #[cfg_attr(feature = "serde", serde(default))]
     pub ip_offline_bought: bool,
+    /// Fractional carry of passively-generated Infinities (`player.partInfinitied`),
+    /// from the `infinitiedGen` Break Infinity Upgrade. Reset on Eternity/Reality.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub part_infinitied: f64,
     /// Current Eternity Points (`Currency.eternityPoints`): gained on an
     /// Eternity, cumulative, spent on Time Dimensions / Eternity Upgrades /
     /// Time Theorems. Reset only on Reality (out of frontier). See `eternity.rs`.
@@ -532,6 +536,7 @@ impl GameState {
             epmult_upgrades: 0,
             ip_mult_purchases: 0,
             ip_offline_bought: false,
+            part_infinitied: 0.0,
             ic_best_times_ms: [f64::MAX; 8],
             nc_best_times_ms: [f64::MAX; 11],
             dilation: DilationState::new(),
