@@ -226,11 +226,15 @@ impl GameState {
     }
 
     /// `synergism`: reaction efficiency `0.3 + 1.3·√(amount/25000)`, capped at 1
-    /// (Achievement 175 unbuilt).
+    /// unless Achievement 175 lifts the cap.
     pub(crate) fn alchemy_synergism(&self) -> f64 {
         if self.alchemy_resource_unlocked(SYNERGISM) {
             let raw = 0.3 + 1.3 * (self.amt(SYNERGISM) / 25000.0).sqrt();
-            raw.min(1.0)
+            if self.achievement_unlocked(175) {
+                raw
+            } else {
+                raw.min(1.0)
+            }
         } else {
             // Reactions still run before synergism unlocks — efficiency 0.3.
             0.3

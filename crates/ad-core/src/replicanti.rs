@@ -156,7 +156,8 @@ impl GameState {
     /// multiplier.
     fn replicanti_effective_interval(&self, over_cap: bool) -> f64 {
         let mut interval = self.replicanti.interval_ms;
-        if self.time_study_bought(133) || over_cap {
+        // Achievement 138 removes the TS133 ×10 downside.
+        if (self.time_study_bought(133) && !self.achievement_unlocked(138)) || over_cap {
             interval *= 10.0;
         }
         if over_cap {
@@ -328,7 +329,15 @@ impl GameState {
             return false;
         }
         self.replicanti.timer_ms = 0.0;
-        self.replicanti.amount = Decimal::ONE;
+        // Achievement 126: an RG divides Replicanti by 1.8e308 per galaxy gained
+        // instead of resetting them to 1 (not while Doomed).
+        self.replicanti.amount = if self.achievement_unlocked(126) && !self.is_doomed() {
+            Decimal::pow10(
+                self.replicanti.amount.log10() - Decimal::NUMBER_MAX_VALUE.log10(),
+            )
+        } else {
+            Decimal::ONE
+        };
         self.replicanti.galaxies += 1;
         // `player.requirementChecks.eternity.noRG = false` (spoils Reality
         // Upgrade 6's requirement for this eternity).

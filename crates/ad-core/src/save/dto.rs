@@ -765,6 +765,12 @@ pub struct RealityChecksDTO {
     /// Peak 1st Infinity Dimension amount this reality (`maxID1`).
     #[serde(rename = "maxID1", default, with = "break_infinity::serde_string")]
     pub max_id1: Decimal,
+    /// No Time Theorems purchased this reality (`noPurchasedTT`).
+    #[serde(rename = "noPurchasedTT", default = "bool_true")]
+    pub no_purchased_tt: bool,
+    /// No Triad Studies bought this reality (`noTriads`).
+    #[serde(rename = "noTriads", default = "bool_true")]
+    pub no_triads: bool,
 }
 
 /// `player.replicanti` (modelled subset). `galCost` is present in the save but
@@ -1777,6 +1783,8 @@ impl GameState {
             reality_max_id1: dto.requirement_checks.reality.max_id1,
             reality_max_studies: 0,
             reality_no_continuum: true,
+            reality_no_purchased_tt: dto.requirement_checks.reality.no_purchased_tt,
+            reality_no_triads: dto.requirement_checks.reality.no_triads,
         };
 
         // Celestials (Phase 7). Vec→array copies clamp to the modelled length,

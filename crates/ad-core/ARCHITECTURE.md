@@ -241,7 +241,7 @@ not the current state).
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, `starting_antimatter`, and the `achievement_ad_common_mult` term.
-  Rows 1–17 are wired: unlock conditions live in per-event `check_*_achievements`
+  Rows 1–18 are wired: unlock conditions live in per-event `check_*_achievements`
   dispatchers (`check_tick_achievements`, `check_crunch_before/after`,
   `check_galaxy_before/after`, `check_sacrifice_before/after`,
   `check_eternity_before/after`, `check_reality_before/after`,
@@ -250,9 +250,12 @@ not the current state).
   `check_singularity_before/after`, `check_annihilation`,
   `check_challenge_failed`) called at the matching action seam; effects live at
   their consumption sites across the engine. `IMPLEMENTED_ACHIEVEMENTS` lists the
-  naturally-awardable ids (its doc comment enumerates the deferred ones). Row 18
-  (Pelle) is never awarded. See `../../docs/design/2026-06-30-achievements.md` and
-  the `2026-07-09-normal-achievements-wiring` worklog.
+  naturally-awardable ids — every row (1–18, including Pelle) except 22 (News,
+  needs Feature 8.1); its doc comment records the documented approximations
+  (35's offline seam, 165's always-equal weights, 171's basic-only sacrifice
+  types, 172's unclearable `noTriads`). See
+  `../../docs/design/2026-06-30-achievements.md` and the
+  `2026-07-09-normal-achievements-wiring` worklog.
 - `src/tab_notifications.rs` — Tab notification badges: the pulsing yellow `!`
   on tab/subtab buttons pointing at newly relevant content. `tab_notifications`
   (the badged `tabKey + subtabKey` strings, ↔ `player.tabNotifications`) +

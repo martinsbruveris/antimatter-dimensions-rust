@@ -852,9 +852,15 @@ impl GameState {
         let level = glyph.level as f64;
         let pre10k = (level.min(10_000.0) + 10.0).powf(2.5);
         let post10k = 1.0 + (level - 10_000.0).max(0.0) / 100.0;
+        // Achievement 171: Glyph sacrifice is ×2 stronger.
+        let ach171 = if self.achievement_unlocked(171) {
+            2.0
+        } else {
+            1.0
+        };
         // Teresa's `runRewardMultiplier` (glyph-sacrifice bonus from the best
         // Teresa run); the Ra rarity/shard power is out of frontier.
-        pre10k * post10k * glyph.strength * self.teresa_run_reward_multiplier()
+        pre10k * post10k * glyph.strength * ach171 * self.teresa_run_reward_multiplier()
     }
 
     /// Sacrifice (with RU19) or simply delete an inventory glyph by id.

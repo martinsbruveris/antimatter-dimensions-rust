@@ -381,6 +381,10 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         json!(state.requirement_checks.reality_max_glyphs);
     player["requirementChecks"]["reality"]["maxID1"] =
         decimal(&state.requirement_checks.reality_max_id1);
+    player["requirementChecks"]["reality"]["noPurchasedTT"] =
+        json!(state.requirement_checks.reality_no_purchased_tt);
+    player["requirementChecks"]["reality"]["noTriads"] =
+        json!(state.requirement_checks.reality_no_triads);
     player["postC4Tier"] = json!(state.post_c4_tier);
 
     // Celestials (Phase 7). Modelled sub-fields are overwritten in place; the

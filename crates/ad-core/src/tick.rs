@@ -376,6 +376,12 @@ impl GameState {
     /// is not modelled (offline progress is always on here — the 8.8 gap in the
     /// port audit).
     pub fn offline_currency_gain(&mut self, away_ms: f64) {
+        // 35: be offline for over 6 hours (the original checks `Date.now() -
+        // lastUpdate` on the first tick back; the replayed away interval is the
+        // engine's view of that gap).
+        if away_ms >= 21_600_000.0 {
+            self.unlock_achievement(35);
+        }
         if self.ip_offline_bought && away_ms > 0.0 {
             self.infinity_points +=
                 self.records.this_eternity.best_ip_ms_without_max_all

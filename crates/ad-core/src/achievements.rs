@@ -40,34 +40,34 @@ pub const ACHIEVEMENTS_PER_ROW: u16 = 8;
 /// achievements" requirement is checked against this set until achievement
 /// coverage reaches rows 1–13 (see `docs/design/2026-07-05-reality.md`).
 ///
-/// Excludes achievements the engine cannot earn naturally, which are only ever
-/// set via Reality auto-achievement or the ACHNR reality upgrade: 22 (News),
-/// 35 (6-hour offline), 61 (autobuyer bulk has no in-engine upgrade), 62/111
-/// (`bestRunIPPM` / the recent-infinities ring is unmodelled), 65/74 (the
-/// Normal-Challenge best-times sum is unmodelled), 117 (no ≥750 bulk
-/// Dimension-Boost purchase path), 156 (`noPurchasedTT` unmodelled), 165 (the
-/// per-factor glyph-level weights are unmodelled), and 172 (`noTriads`
-/// unmodelled). Their *effects* are still wired where they have a consumption
-/// site, so an auto-achieved unlock behaves correctly. Row 18 (Pelle) is never
-/// awarded by design.
+/// The only exclusion is 22 (News): the News ticker (Feature 8.1) does not
+/// exist, so its condition has nothing to observe. It is still granted by the
+/// Reality auto-achievement machinery and the ACHNR reality upgrade. A few
+/// conditions carry documented approximations: 35 fires from the offline
+/// catch-up's replayed interval, 165's per-factor glyph-level weights always
+/// sit at the equal defaults, 171 currently requires only the 5 basic glyph
+/// sacrifice types (Effarig/Reality glyphs are a 6.2 gap), and 172's
+/// `noTriads` flag is carried but nothing can clear it (Triad Studies are
+/// unmodelled).
 pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] = &[
     11, 12, 13, 14, 15, 16, 17, 18, // row 1
     21, 23, 24, 25, 26, 27, 28, // row 2 (22 = News, deferred)
-    31, 32, 33, 34, 36, 37, 38, // row 3 (35 = offline, deferred)
+    31, 32, 33, 34, 35, 36, 37, 38, // row 3
     41, 42, 43, 44, 45, 46, 47, 48, // row 4
     51, 52, 53, 54, 55, 56, 57, 58, // row 5
-    63, 64, 66, 67, 68, // row 6 (61/62/65 deferred)
-    71, 72, 73, 75, 76, 77, 78, // row 7 (74 deferred)
+    61, 62, 63, 64, 65, 66, 67, 68, // row 6
+    71, 72, 73, 74, 75, 76, 77, 78, // row 7
     81, 82, 83, 84, 85, 86, 87, 88, // row 8
     91, 92, 93, 94, 95, 96, 97, 98, // row 9
     101, 102, 103, 104, 105, 106, 107, 108, // row 10
-    112, 113, 114, 115, 116, 118, // row 11 (111/117 deferred)
+    111, 112, 113, 114, 115, 116, 117, 118, // row 11
     121, 122, 123, 124, 125, 126, 127, 128, // row 12
     131, 132, 133, 134, 135, 136, 137, 138, // row 13
     141, 142, 143, 144, 145, 146, 147, 148, // row 14
-    151, 152, 153, 154, 155, 157, 158, // row 15 (156 deferred)
-    161, 162, 163, 164, 166, 167, 168, // row 16 (165 deferred)
-    171, 173, 174, 175, 176, 177, 178, // row 17 (172 deferred)
+    151, 152, 153, 154, 155, 156, 157, 158, // row 15
+    161, 162, 163, 164, 165, 166, 167, 168, // row 16
+    171, 172, 173, 174, 175, 176, 177, 178, // row 17
+    181, 182, 183, 184, 185, 186, 187, 188, // row 18 (Pelle)
 ];
 
 impl GameState {
@@ -319,10 +319,10 @@ impl GameState {
         if self.dimensions[6].amount.exponent() >= 12 {
             self.unlock_achievement(46);
         }
-        // 61: all AD autobuyers have maxed bulk. The reward (unlimited bulk)
-        // affects production; the original fires this on Reality / save-convert,
-        // but the engine has no bulk-upgrade action, so a guarded per-tick check
-        // catches a loaded save that already has maxed bulk.
+        // 61: all AD autobuyers have maxed bulk. Fired from
+        // `upgrade_ad_autobuyer_bulk`; this guarded per-tick check also catches
+        // a loaded save that already has maxed bulk (the original fires it on
+        // Reality / save-convert events).
         if !self.achievement_unlocked(61) && self.all_ad_autobuyers_bulk_maxed() {
             self.unlock_achievement(61);
         }
@@ -435,8 +435,9 @@ impl GameState {
             self.unlock_achievement(128);
         }
         // 133: reach 1e200000 IP without buying any Infinity Dimensions or the
-        // ×2 IP multiplier (the latter is unmodelled, hence always satisfied).
+        // ×2 IP multiplier.
         if self.infinity_points.exponent() >= 200_000
+            && self.ip_mult_purchases == 0
             && self.infinity_dimensions.iter().all(|d| d.purchases() == 0)
         {
             self.unlock_achievement(133);
@@ -530,6 +531,16 @@ impl GameState {
         // 173: reach 9.99999e999 Reality Machines.
         if self.reality.machines >= Decimal::new(9.99999, 999) {
             self.unlock_achievement(173);
+        }
+        // 182: permanently gain back all AD autobuyers (the Pelle one-time
+        // upgrades `antimatterDimAutobuyers1` (id 0) + `antimatterDimAutobuyers2`
+        // (id 3)).
+        if self.pelle_upgrade_bought(0) && self.pelle_upgrade_bought(3) {
+            self.unlock_achievement(182);
+        }
+        // 188: beat the game (the antimatter game-end past the threshold).
+        if self.is_game_end {
+            self.unlock_achievement(188);
         }
         // 52: max the interval for the AD and Tickspeed autobuyers. The original
         // fires this on REALITY_RESET_AFTER / REALITY_UPGRADE_TEN_BOUGHT, but a
@@ -634,6 +645,24 @@ impl GameState {
         if self.infinities >= Decimal::from_float(10.0) {
             self.unlock_achievement(33);
         }
+        // 62: reach 1e8 Infinity Points per minute (`bestRunIPPM`).
+        if self.best_run_ippm().exponent() >= 8 {
+            self.unlock_achievement(62);
+        }
+        // 65/74: the sum of all Normal Challenge best times under 3 minutes /
+        // 5 seconds (uncompleted entries hold `f64::MAX`, keeping the sum huge).
+        self.check_challenge_sum_achievements();
+        // 111: each of the last 10 Infinities gave ≥ Number.MAX_VALUE× the IP of
+        // the one before it (a filled ring, newest first).
+        let recent = &self.records.recent_infinities;
+        let filled = recent.iter().all(|r| r.time_ms != f64::MAX);
+        if filled
+            && recent
+                .windows(2)
+                .all(|w| w[0].ip >= w[1].ip * Decimal::NUMBER_MAX_VALUE)
+        {
+            self.unlock_achievement(111);
+        }
         // 97: sum of Infinity Challenge best times under 6.66 seconds. Uncompleted
         // ICs hold the `f64::MAX` sentinel, so the sum stays huge until all eight
         // are completed quickly.
@@ -646,6 +675,18 @@ impl GameState {
             self.unlock_achievement(112);
         }
         self.check_challenge_completion_achievements();
+    }
+
+    /// The `Time.challengeSum` achievements 65 (< 3 min) and 74 (< 5 s), fired
+    /// on BIG_CRUNCH_AFTER and REALITY_RESET_AFTER like the original.
+    fn check_challenge_sum_achievements(&mut self) {
+        let sum_ms: f64 = self.nc_best_times_ms.iter().sum();
+        if sum_ms < 180_000.0 {
+            self.unlock_achievement(65);
+        }
+        if sum_ms < 5_000.0 {
+            self.unlock_achievement(74);
+        }
     }
 
     /// SACRIFICE_RESET_BEFORE conditions, checked before a performed sacrifice.
@@ -757,16 +798,41 @@ impl GameState {
         if self.records.this_reality.time_ms <= 5_000.0 {
             self.unlock_achievement(154);
         }
+        // 156: Reality without buying Time Theorems.
+        if self.requirement_checks.reality_no_purchased_tt {
+            self.unlock_achievement(156);
+        }
+        // 165: a level-5000 Glyph with all level factors equally weighted. The
+        // per-factor weights are unmodelled and therefore always sit at the
+        // equal defaults, so only the level condition remains.
+        if self.gained_glyph_level().actual_level >= 5000 {
+            self.unlock_achievement(165);
+        }
         // 166: a Glyph with level exactly 6969.
         if self.gained_glyph_level().actual_level == 6969 {
             self.unlock_achievement(166);
         }
-        // 165 (level-5000 Glyph with equal Effarig weights) is deferred: the
-        // per-factor glyph-level weights are not modelled.
+        // 172: Reality for ≥ Number.MAX_VALUE RM with no Charged Infinity
+        // Upgrades, no equipped Glyphs (companion aside), and no Triad Studies
+        // (unmodelled, so the carried flag stays true).
+        if self.gained_reality_machines() >= Decimal::NUMBER_MAX_VALUE
+            && self.celestials.ra.charged == 0
+            && self.active_glyphs_without_companion().is_empty()
+            && self.requirement_checks.reality_no_triads
+        {
+            self.unlock_achievement(172);
+        }
     }
 
     /// REALITY_RESET_AFTER conditions.
     pub(crate) fn check_reality_after_achievements(&mut self) {
+        // 65/74 also fire on a Reality reset in the original (the best times
+        // have just been cleared, so this is normally a no-op).
+        self.check_challenge_sum_achievements();
+        // 181: Doom your Reality.
+        if self.is_doomed() {
+            self.unlock_achievement(181);
+        }
         // 175: all Alchemy Resources at the flat cap (25000).
         let cap = crate::celestials::alchemy::ALCHEMY_RESOURCE_CAP;
         if (0..crate::celestials::alchemy::ALCHEMY_COUNT)
@@ -917,6 +983,10 @@ impl GameState {
         {
             self.unlock_achievement(82);
         }
+        // 183: complete Infinity Challenge 5 while Doomed.
+        if self.is_doomed() && self.infinity_challenge_completed(5) {
+            self.unlock_achievement(183);
+        }
     }
 
     /// 47/48 check (Normal Challenge completion counts). The original also
@@ -969,6 +1039,138 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ach62_unlocks_from_best_run_ippm() {
+        let mut game = GameState::new();
+        // One recent infinity worth 1e9 IP over 1 minute → 1e9 IP/min ≥ 1e8.
+        game.records.recent_infinities[0] = crate::records::RecentInfinity {
+            time_ms: 60_000.0,
+            real_time_ms: 60_000.0,
+            ip: Decimal::new(1.0, 9),
+            infinities: Decimal::ONE,
+        };
+        game.check_crunch_after_achievements();
+        assert!(game.achievement_unlocked(62));
+    }
+
+    #[test]
+    fn ach65_and_74_unlock_from_challenge_time_sum() {
+        let mut game = GameState::new();
+        // Sentinel best times keep the sum huge → neither unlocks.
+        game.check_crunch_after_achievements();
+        assert!(!game.achievement_unlocked(65));
+
+        // 11 × 10 s = 110 s < 3 min but not < 5 s.
+        game.nc_best_times_ms = [10_000.0; 11];
+        game.check_crunch_after_achievements();
+        assert!(game.achievement_unlocked(65));
+        assert!(!game.achievement_unlocked(74));
+
+        game.nc_best_times_ms = [100.0; 11]; // 1.1 s total
+        game.check_crunch_after_achievements();
+        assert!(game.achievement_unlocked(74));
+    }
+
+    #[test]
+    fn ach111_needs_a_filled_geometric_ring() {
+        let mut game = GameState::new();
+        // Newest first: each run's IP ≥ NUMBER_MAX_VALUE × the previous run's.
+        for (i, run) in game.records.recent_infinities.iter_mut().enumerate() {
+            run.time_ms = 1000.0;
+            run.real_time_ms = 1000.0;
+            run.ip = Decimal::pow10(320.0 * (10 - i) as f64);
+        }
+        game.check_crunch_after_achievements();
+        assert!(game.achievement_unlocked(111));
+
+        // A placeholder (never-run) entry blocks it.
+        let mut fresh = GameState::new();
+        fresh.records.recent_infinities[9] =
+            crate::records::RecentInfinity::placeholder();
+        fresh.check_crunch_after_achievements();
+        assert!(!fresh.achievement_unlocked(111));
+    }
+
+    #[test]
+    fn ach61_unlocks_when_every_ad_bulk_is_maxed() {
+        let mut game = GameState::new();
+        game.infinity_points = Decimal::new(1.0, 100);
+        for tier in 0..8 {
+            // Max the interval first (the bulk upgrade's gate), then buy bulk
+            // doublings to the 512 cap.
+            game.autobuyers.dimensions[tier].interval_ms = 100.0;
+            game.complete_challenge(GameState::autobuyer_challenge(
+                crate::autobuyers::AutobuyerTarget::AdTier(tier),
+            ));
+            while game.upgrade_ad_autobuyer_bulk(tier) {}
+            assert!(game.ad_autobuyer_has_maxed_bulk(tier));
+        }
+        assert!(game.achievement_unlocked(61));
+    }
+
+    #[test]
+    fn ach126_reward_divides_replicanti_instead_of_reset() {
+        let mut game = GameState::new();
+        game.replicanti.unlocked = true;
+        game.replicanti.amount = Decimal::new(1.0, 400);
+        game.replicanti.galaxy_cap = 2;
+        game.antimatter = Decimal::new(1.0, 50);
+
+        game.unlock_achievement(126);
+        assert!(game.buy_replicanti_galaxy());
+        // 1e400 / 1.8e308 ≈ 5.6e91.
+        let left = game.replicanti.amount;
+        assert!(left.exponent() > 90 && left.exponent() < 93, "left={left}");
+    }
+
+    #[test]
+    fn ach133_reward_completes_and_unlocks_ics_on_eternity() {
+        let mut game = GameState::new();
+        game.unlock_achievement(133);
+        assert!(game.infinity_challenge_unlocked(8));
+        game.eternity_reset_core();
+        assert!((1..=8).all(|id| game.infinity_challenge_completed(id)));
+    }
+
+    #[test]
+    fn ach156_unlocks_only_without_purchased_tt() {
+        let mut game = GameState::new();
+        game.time_dimensions[0].bought = 1;
+        game.antimatter = Decimal::new(1.0, 30_000);
+        assert!(game.buy_tt_with_am());
+        game.check_reality_before_achievements();
+        assert!(!game.achievement_unlocked(156));
+
+        let mut clean = GameState::new();
+        clean.check_reality_before_achievements();
+        assert!(clean.achievement_unlocked(156));
+    }
+
+    #[test]
+    fn ach35_unlocks_from_a_six_hour_offline_gap() {
+        let mut game = GameState::new();
+        game.offline_currency_gain(3_600_000.0);
+        assert!(!game.achievement_unlocked(35));
+        game.offline_currency_gain(21_600_000.0);
+        assert!(game.achievement_unlocked(35));
+    }
+
+    #[test]
+    fn pelle_strikes_award_row_18() {
+        let mut game = GameState::new();
+        game.celestials.pelle.doomed = true;
+        game.pelle_trigger_strike(3);
+        assert!(game.achievement_unlocked(184));
+        game.pelle_trigger_strike(4);
+        assert!(game.achievement_unlocked(185));
+        game.pelle_trigger_strike(5);
+        assert!(game.achievement_unlocked(187));
+        // 183: IC5 completed while Doomed.
+        game.infinity_challenge.completed |= 1u16 << 5;
+        game.check_infinity_challenge_completed_achievements();
+        assert!(game.achievement_unlocked(183));
+    }
 
     #[test]
     fn id_maps_to_row_and_column_bit() {

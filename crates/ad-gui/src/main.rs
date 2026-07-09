@@ -110,6 +110,14 @@ struct AutobuyerView {
     /// Whether the mode can be changed. Pre-Infinity the tickspeed autobuyer is
     /// locked to single (the toggle needs a completed challenge).
     can_change_mode: bool,
+    /// "Buys max" bulk multiplier (AD autobuyers only; 1 elsewhere).
+    bulk: u32,
+    /// Whether the bulk is at its 512 cap (`hasMaxedBulk`).
+    has_maxed_bulk: bool,
+    /// Whether Achievement 61 lifted the bulk to unlimited (`hasUnlimitedBulk`).
+    has_unlimited_bulk: bool,
+    /// Whether the next bulk doubling is affordable (interval maxed, bulk not).
+    can_afford_bulk_upgrade: bool,
 }
 
 /// Serializable view of a single Infinity Upgrade for the grid.
@@ -1679,6 +1687,20 @@ fn build_autobuyer_view(
     let cost = Decimal::from_float(autobuyer.cost);
     let can_afford_upgrade =
         can_be_upgraded && !has_maxed_interval && game.infinity_points >= cost;
+    // Bulk-upgrade state (AD autobuyers only).
+    let (bulk, has_maxed_bulk, has_unlimited_bulk, can_afford_bulk_upgrade) =
+        if let AutobuyerTarget::AdTier(tier) = target {
+            (
+                autobuyer.bulk,
+                game.ad_autobuyer_has_maxed_bulk(tier),
+                game.achievement_unlocked(61),
+                has_maxed_interval
+                    && !game.ad_autobuyer_has_maxed_bulk(tier)
+                    && game.infinity_points >= cost,
+            )
+        } else {
+            (1, false, false, false)
+        };
 
     AutobuyerView {
         name,
@@ -1699,6 +1721,10 @@ fn build_autobuyer_view(
             AutobuyerMode::BuyMax => "max".to_string(),
         },
         can_change_mode,
+        bulk,
+        has_maxed_bulk,
+        has_unlimited_bulk,
+        can_afford_bulk_upgrade,
     }
 }
 
@@ -3400,6 +3426,15 @@ fn upgrade_autobuyer_interval(target: String, state: State<'_, Mutex<GameState>>
     }
 }
 
+/// Double an AD autobuyer's "Buys max" bulk (`upgradeBulk`), once its interval
+/// is maxed.
+#[tauri::command]
+fn upgrade_ad_autobuyer_bulk(tier: usize, state: State<'_, Mutex<GameState>>) {
+    if tier < 8 {
+        state.lock().unwrap().upgrade_ad_autobuyer_bulk(tier);
+    }
+}
+
 #[tauri::command]
 fn toggle_autobuyer(target: String, state: State<'_, Mutex<GameState>>) {
     // The Eternity / Reality autobuyers have no `AutobuyerTarget` (no
@@ -4624,6 +4659,7 @@ pub fn run() {
             toggle_autobuyers,
             set_all_autobuyers_active,
             upgrade_autobuyer_interval,
+            upgrade_ad_autobuyer_bulk,
             toggle_autobuyer,
             set_hotkeys,
             set_update_rate,

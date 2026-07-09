@@ -529,6 +529,10 @@ impl GameState {
         if alch_power != 1.0 {
             mult = mult.pow(&Decimal::from_float(alch_power));
         }
+        // Achievement 183 (IC5 while Doomed): all ADs `^1.0812403840463596`.
+        if self.achievement_unlocked(183) {
+            mult = mult.pow(&Decimal::from_float(1.0812403840463596));
+        }
         // V's `adPow` reward: a persistent AD power `1 + √ST/100`
         // (`applyNDPowers`' `VUnlocks.adPow`).
         let ad_pow = self.v_ad_pow();

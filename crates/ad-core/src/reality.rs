@@ -216,6 +216,15 @@ pub struct RequirementChecks {
     /// Gates Imaginary Upgrade 21.
     #[cfg_attr(feature = "serde", serde(default = "default_true"))]
     pub reality_no_continuum: bool,
+    /// No Time Theorems purchased this reality (`reality.noPurchasedTT`);
+    /// cleared by any TT purchase. Gates Achievement 156.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub reality_no_purchased_tt: bool,
+    /// No Triad Studies bought this reality (`reality.noTriads`). Triad studies
+    /// are unmodelled, so nothing clears it; carried for save fidelity and
+    /// Achievement 172.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub reality_no_triads: bool,
 }
 
 impl RequirementChecks {
@@ -235,6 +244,8 @@ impl RequirementChecks {
             reality_max_id1: Decimal::ZERO,
             reality_max_studies: 0,
             reality_no_continuum: true,
+            reality_no_purchased_tt: true,
+            reality_no_triads: true,
         }
     }
 }

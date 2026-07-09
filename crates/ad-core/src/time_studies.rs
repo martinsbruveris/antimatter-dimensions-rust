@@ -331,6 +331,9 @@ impl GameState {
         }
         self.tt_am_bought += 1;
         self.add_time_theorems(1.0);
+        // `player.requirementChecks.reality.noPurchasedTT = false` (any TT
+        // purchase, even a TTF-perk free one, spoils Achievement 156).
+        self.requirement_checks.reality_no_purchased_tt = false;
         true
     }
 
@@ -345,6 +348,7 @@ impl GameState {
         }
         self.tt_ip_bought += 1;
         self.add_time_theorems(1.0);
+        self.requirement_checks.reality_no_purchased_tt = false;
         true
     }
 
@@ -359,6 +363,7 @@ impl GameState {
         }
         self.tt_ep_bought += 1;
         self.add_time_theorems(1.0);
+        self.requirement_checks.reality_no_purchased_tt = false;
         true
     }
 
@@ -506,6 +511,10 @@ impl GameState {
             .requirement_checks
             .reality_max_studies
             .max(self.studies.len() as u32);
+        // Achievement 186: purchase Time Study 181 while Doomed.
+        if id == 181 && self.is_doomed() {
+            self.unlock_achievement(186);
+        }
         true
     }
 

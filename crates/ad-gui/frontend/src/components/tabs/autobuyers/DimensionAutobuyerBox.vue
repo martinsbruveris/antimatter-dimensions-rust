@@ -3,6 +3,7 @@ import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
 import AutobuyerBox from "./AutobuyerBox.vue";
+import DimensionBulkButton from "./DimensionBulkButton.vue";
 import IntervalUpgradeButton from "./IntervalUpgradeButton.vue";
 
 const props = defineProps({
@@ -27,6 +28,10 @@ const modeDisplay = computed(() =>
       <IntervalUpgradeButton
         :entry="entry"
         :target="`ad${tier}`"
+      />
+      <DimensionBulkButton
+        :entry="entry"
+        :tier="tier"
       />
     </template>
     <template #toggleSlot>

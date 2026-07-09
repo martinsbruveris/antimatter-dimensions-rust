@@ -70,7 +70,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 2.1 | Big Crunch (Infinity prestige) | ✅ | IP, infinities, records, save round-trip |
 | 2.2 | Infinity Upgrades (16-grid) | ✅ | all 16 + the Ach-41 bottom row (`ipMult` rebuyable with two-regime costs + buy-max + autobuyer, `ipOffline` offline IP award) |
 | 2.3 | Break Infinity + 12 upgrades | 🟡 | post-break IP formula + all 12 purchasable; **4 upgrade effects neutral/deferred** (post-infinity cost scaling ×2, passive IP gen) |
-| 2.4 | Achievements (normal, 144) | 🟡 | **rows 1–17 wired** (conditions + effects). Deferred tail: conditions on unmodelled state (22 News, 35 offline, 62/111 recent-infinities ring, 65/74 NC best-times, 156 `noPurchasedTT`, 165 glyph weights, 172 `noTriads`) + deferred effects (126, 133, 138, 168, 171, 175). Row 18 (Pelle) never awarded. Secret achievements → 8.6 |
+| 2.4 | Achievements (normal, 144) | 🟡 | **rows 1–18 wired** (conditions + effects), including the former deferred tail (35/61/62/65/74/111/117/156/165/172 + effects 126/133/138/168/171/175/183/187) and row 18 (Pelle). Remaining: 22 (News, needs 8.1); 165's weight-equality and 171's Effarig/Reality sac types await 6.2/7.2; 172's `noTriads` carried but unclearable. Secret achievements → 8.6 |
 | 2.5 | Normal Challenges (12) | ✅ | all 12 modifiers + reward→autobuyer wiring |
 | 2.6 | Autobuyers | ✅ | all AD/tickspeed + prestige autobuyers, modes, interval upgrades |
 | 2.7 | Infinity Challenges (8) | ✅ | all 8 restrictions + rewards |

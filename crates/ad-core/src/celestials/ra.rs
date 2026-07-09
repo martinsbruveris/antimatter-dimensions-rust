@@ -292,8 +292,13 @@ impl GameState {
 
     /// `Ra.productionPerMemoryChunk`.
     fn ra_production_per_memory_chunk(&self) -> f64 {
-        // Achievement 168 is not in our wired set → ×1.
-        let mut res = self.ra_continuous_tt_memory_factor();
+        // Achievement 168: 10% more memories.
+        let ach168 = if self.achievement_unlocked(168) {
+            1.1
+        } else {
+            1.0
+        };
+        let mut res = self.ra_continuous_tt_memory_factor() * ach168;
         for pet in 0..PET_COUNT {
             if self.ra_pet_unlocked(pet) {
                 res *= self.ra_memory_production_multiplier(pet);
@@ -608,7 +613,7 @@ impl GameState {
     }
 
     /// `Ra.momentumValue` — `min(1 + 0.005·hours, momentumCap)` (1 if momentum
-    /// locked). Achievement 175 (× the growth rate) is unbuilt → ×1.
+    /// locked). Achievement 175 speeds the accrual (see [`Self::ra_tick`]).
     pub(crate) fn ra_momentum_value(&self) -> f64 {
         if !self.alchemy_momentum_unlocked() {
             return 1.0;
@@ -630,7 +635,13 @@ impl GameState {
             self.celestials.ra.peak_gamespeed = speed;
         }
         if self.alchemy_momentum_unlocked() {
-            self.celestials.ra.momentum_time += real_diff_ms;
+            // Achievement 175: Momentum increases ×10 faster.
+            let mult = if self.achievement_unlocked(175) {
+                10.0
+            } else {
+                1.0
+            };
+            self.celestials.ra.momentum_time += real_diff_ms * mult;
         }
     }
 

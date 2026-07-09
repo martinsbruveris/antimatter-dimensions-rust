@@ -93,10 +93,15 @@ impl GameState {
     }
 
     /// Whether infinity challenge `id` is unlocked: the peak antimatter this
-    /// eternity has reached its `unlockAM`.
+    /// eternity has reached its `unlockAM`, or Achievement 133 keeps them all
+    /// unlocked (not while Doomed; the Pelle `keepInfinityChallenges` branch is
+    /// a documented 7.7 cut).
     pub fn infinity_challenge_unlocked(&self, id: u8) -> bool {
         if !(1..=INFINITY_CHALLENGE_COUNT).contains(&id) {
             return false;
+        }
+        if self.achievement_unlocked(133) && !self.is_doomed() {
+            return true;
         }
         self.records.this_eternity.max_am >= IC_UNLOCK_AM[(id - 1) as usize]
     }

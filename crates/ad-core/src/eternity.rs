@@ -287,6 +287,13 @@ impl GameState {
                 self.complete_challenge(id);
             }
         }
+        // Achievement 133: start with every Infinity Challenge completed
+        // (`InfinityChallenges.completeAll`, not while Doomed).
+        if self.achievement_unlocked(133) && !self.is_doomed() {
+            for id in 1..=crate::INFINITY_CHALLENGE_COUNT {
+                self.infinity_challenge.completed |= 1u16 << id;
+            }
+        }
 
         // `initializeResourcesAfterEternity`.
         self.sacrificed = Decimal::ZERO;

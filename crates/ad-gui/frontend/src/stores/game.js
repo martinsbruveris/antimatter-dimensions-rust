@@ -582,6 +582,10 @@ export const useGameStore = defineStore("game", {
     upgradeAutobuyerInterval(target) {
       return invoke("upgrade_autobuyer_interval", { target });
     },
+    // Double an AD autobuyer's "Buys max" bulk (once its interval is maxed).
+    upgradeAdAutobuyerBulk(tier) {
+      return invoke("upgrade_ad_autobuyer_bulk", { tier });
+    },
     // Toggle a prestige autobuyer (Dim Boost / Galaxy / Big Crunch / Eternity /
     // Reality) on/off.
     toggleAutobuyer(target) {

@@ -304,8 +304,15 @@ impl GameState {
     /// `getDilationGainPerSecond`: `TP × 2^dtGain × RU1 × dilationDT glyph ×
     /// the replicanti-count glyph term`.
     pub fn dilation_gain_per_second(&self) -> Decimal {
+        // The `dtGain` rebuyable's per-purchase base is 2, multiplied by
+        // Achievement 187 (×1.35; the `dilatedTimeFromSingularities` milestone
+        // term is a documented Lai'tela cut).
+        let mut dt_gain_base = 2.0;
+        if self.achievement_unlocked(187) {
+            dt_gain_base *= 1.35;
+        }
         let mut rate = self.dilation.tachyon_particles
-            * Decimal::from_float(2.0)
+            * Decimal::from_float(dt_gain_base)
                 .pow(&Decimal::from(self.dilation.rebuyables[0] as u64));
         // RU1 (Temporal Amplifier): ×3 per purchase.
         rate *= self.reality_rebuyable_effect(1);
@@ -366,9 +373,16 @@ impl GameState {
 
         self.update_tachyon_galaxies();
 
-        // Ra boosts to TT generation: `continuousTTBoost.ttGen` (10^(5b)) and
-        // `achievementTTMult` (Achievements.power).
-        let tt_boost = self.ra_tt_boost_tt_gen() * self.ra_achievement_tt_mult();
+        // `getTTPerSecond`'s ttMult: Ra's `continuousTTBoost.ttGen` (10^(5b)),
+        // `achievementTTMult` (Achievements.power), Achievement 137 (×2 while
+        // Dilated), and Achievement 156 (×2.5 generated TT).
+        let mut tt_boost = self.ra_tt_boost_tt_gen() * self.ra_achievement_tt_mult();
+        if self.achievement_unlocked(137) && self.dilation.active {
+            tt_boost *= Decimal::from_float(2.0);
+        }
+        if self.achievement_unlocked(156) {
+            tt_boost *= Decimal::from_float(2.5);
+        }
         // `ttGenerator` (upgrade 10): TT += TP/20000 per second.
         if self.dilation_upgrade_bought(10) {
             let gain = self.dilation.tachyon_particles / Decimal::from_float(20_000.0)

@@ -199,6 +199,9 @@ impl GameState {
         self.celestials.pelle.doomed = true;
         self.clear_celestial_runs();
         self.reset_reality();
+        // 181: Doom your Reality (REALITY_RESET_AFTER; the doom reset is not a
+        // rewarded Reality, so unlock it here directly).
+        self.unlock_achievement(181);
         true
     }
 
@@ -434,6 +437,14 @@ impl GameState {
             return;
         }
         self.celestials.pelle.progress_bits |= 1u32 << id;
+        // PELLE_STRIKE_UNLOCKED achievements: 184 (the third Strike, Eternity),
+        // 185 (the fourth, ECs), 187 (Dilation).
+        match id {
+            3 => self.unlock_achievement(184),
+            4 => self.unlock_achievement(185),
+            5 => self.unlock_achievement(187),
+            _ => {}
+        }
         if id == 5 {
             self.pelle_reset_records_for_dilation();
         }

@@ -340,6 +340,11 @@ impl GameState {
         if self.dim_boosts >= 10 {
             self.unlock_achievement(25);
         }
+        // 117: bulk-buy 750 Dimension Boosts at once (the original's
+        // DIMBOOST_AFTER event carries the bulk count).
+        if bulk >= 750 {
+            self.unlock_achievement(117);
+        }
         true
     }
 

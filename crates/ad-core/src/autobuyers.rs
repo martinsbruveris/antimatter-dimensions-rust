@@ -694,6 +694,37 @@ impl GameState {
         true
     }
 
+    /// Whether an AD autobuyer's bulk is at the cap (`hasMaxedBulk`).
+    pub fn ad_autobuyer_has_maxed_bulk(&self, tier: usize) -> bool {
+        self.autobuyers.dimensions[tier].bulk >= AD_AUTOBUYER_BULK_CAP
+    }
+
+    /// `AntimatterDimensionAutobuyerState.upgradeBulk`: once the interval is
+    /// maxed, further IP purchases double the "Buys max" bulk up to the 512 cap
+    /// (cost ×2.4 each, sharing the interval-upgrade `cost` field). Unlocking
+    /// every tier's maxed bulk awards Achievement 61.
+    pub fn upgrade_ad_autobuyer_bulk(&mut self, tier: usize) -> bool {
+        if !self.autobuyer_has_maxed_interval(AutobuyerTarget::AdTier(tier))
+            || self.ad_autobuyer_has_maxed_bulk(tier)
+        {
+            return false;
+        }
+        let cost = Decimal::from_float(self.autobuyers.dimensions[tier].cost);
+        if self.infinity_points < cost {
+            return false;
+        }
+        self.infinity_points -= cost;
+        let ab = &mut self.autobuyers.dimensions[tier];
+        ab.bulk = (ab.bulk * 2).min(AD_AUTOBUYER_BULK_CAP);
+        ab.cost = (2.4 * ab.cost).ceil();
+        // 61: all AD autobuyer bulks at the cap (also checked per tick for
+        // loaded saves).
+        if (0..8).all(|t| self.ad_autobuyer_has_maxed_bulk(t)) {
+            self.unlock_achievement(61);
+        }
+        true
+    }
+
     /// Advance all autobuyers by `dt_ms` and execute any triggered purchases.
     /// Does nothing if autobuyers are globally disabled.
     pub fn tick_autobuyers(&mut self, dt_ms: f64) {

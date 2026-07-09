@@ -67,3 +67,30 @@ progress is always on here, so the award is ungated (noted in the code).
 **Tests:** eight new unit tests (gating, cost curve, geometric-series buyMax,
 threshold crossing, cap, autobuyer bump, ipOffline award, milestone keeps).
 Fidelity grid unchanged (1118/1148).
+
+## 2.4 — The achievements tail (everything except 22 News)
+
+**What shipped:** every remaining achievement condition and effect, including
+row 18 (Pelle). Conditions: 35 (6-hour offline, fired from the offline
+catch-up's replayed interval), 61 (all AD autobuyer bulks maxed — this also
+added the missing `upgradeBulk` purchase path, engine + GUI button), 62
+(`bestRunIPPM` ≥ 1e8), 65/74 (NC best-time sums), 111 (the recent-infinities
+geometric ring), 117 (750-boost bulk purchase), 156 (`noPurchasedTT`), 165
+(level-5000 glyph), 172 (RM cap + no charged IUs/equipped glyphs/triads),
+181–188 (doom / Pelle upgrades / IC5-while-doomed / strikes / TS181 / game
+end). Effects: 126 (RG divides Replicanti by 1.8e308 instead of reset), 133
+(ICs stay unlocked + start Eternities completed), 138 (removes TS133's ×10
+downside), 156 (×2.5 generated TT — 137's ×2-while-dilated TT half was also
+missing and landed with it), 168 (×1.1 Ra memories), 171 (×2 glyph
+sacrifice), 175 (synergism uncapped + momentum ×10), 183 (AD `^1.0812…`),
+187 (dtGain base ×1.35). New `RequirementChecks` flags `noPurchasedTT` /
+`noTriads` with save round-trip.
+
+**Documented approximations:** 35 keys off the replayed away interval rather
+than wall-clock `lastUpdate`; 165's per-factor glyph weights always sit at the
+equal defaults (weights unmodelled); 171 still requires only the 5 basic
+sacrifice types until 6.2 adds Effarig/Reality glyphs; 172's `noTriads` can
+never be cleared (Triad Studies unmodelled).
+
+**Tests:** nine new unit tests across achievements/autobuyers seams. Fidelity:
+1118 → **1121/1148** (+3).
