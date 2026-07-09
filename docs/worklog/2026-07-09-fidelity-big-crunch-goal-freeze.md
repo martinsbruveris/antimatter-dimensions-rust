@@ -123,3 +123,61 @@ so it needs no modelling.)
 - Fidelity grid: 36 → **93** cells (+57) — these fields gated the record diff on
   many fixtures. No regressions.
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## The numerical-drift class (fixtures 15, 23 — investigated, not a discrete bug)
+
+After the records fixes, the first remaining failures were tiny relative drifts
+right at the tolerance boundary, not logic errors:
+- `00015-…` diverges only at horizon 1000: antimatter Δlog10 ≈ 1.6e-5 while the
+  dimension amounts drift only ~1e-8. JS freezes at the Infinity wall (identical
+  at 100 and 1000); the AD amounts match, but antimatter (fed by AD1) drifts.
+- `00023-…` diverges from horizon 1: antimatter Δlog10 ≈ 1.3e-6, dim0 ≈ 1.1e-6,
+  stable across horizons; round-trip is clean.
+
+Traced both by decoding the save and dumping every production-multiplier
+component. Confirmed tickspeed (`multiplier^upgrades`), the per-purchase
+tickspeed multiplier, `achievement_power`, `buy_ten_multiplier`, the dim-boost
+power, and sacrifice all match JS to ~1e-15; the tier-1 antimatter
+`pow10(log10(p)^effarigantimatter)` round-trip (with the glyph effect defaulting
+to 1) is a ~6e-14 near-identity. The residual seed is the accumulation of
+ULP-level differences between Rust's `f64`/`libm` and V8's across the ~15-factor
+multiplier product, amplified two ways: by `multiplier^totalUpgrades` (112 for
+`00023`) and by catastrophic cancellation when a large dimension/tickspeed
+purchase subtracts a near-equal cost from antimatter. Both are exactly what the
+1e-6 log-space tolerance was meant to absorb — but cancellation pushes a handful
+of cells just past it.
+
+Explored (and reverted) three faithful-but-ineffective candidates: the
+`break_infinity.js` middle `pow` branch, `achievement_power` `powi`→`powf`, and
+`Math.round` in `Decimal::add`. None moved the count; all are real JS behaviours
+but below the level that flips a cell here. Closing these boundary cells would
+need a dedicated bit-alignment pass over `break_infinity` (matching V8's `pow`,
+the `1eN` normalize table, add rounding, and every multiplication order) — a
+large, high-risk effort tracked separately. Moved on to the discrete bugs behind
+the *other* horizon-1 failures.
+
+## Bug 4 — Normal Challenge best times (`challenge.normal.bestTimes`) dropped
+
+### Symptom
+Many later fixtures (`00030`, `00040`, `00050`, `00060`, `00070`, …) diverged on
+`challenge.normal.bestTimes[i]`: JS held real completion times (~1.2e7 ms) while
+Rust held the `f64::MAX` "never" sentinel — a huge, discrete mismatch.
+
+### The bug
+`challenge.normal.bestTimes` (11 entries, NC2–12, indexed `id - 2`) was neither
+decoded, encoded, nor updated, so the loaded personal-best times were lost to the
+encode template's sentinel. The original maintains them in
+`NormalChallenge.updateChallengeTime()` — called on the active challenge from the
+crunch's `handleChallengeCompletion` — as `bestTimes[id-2] =
+min(bestTimes[id-2], thisInfinity.time)`. They persist forever (no Eternity /
+Reality reset).
+
+### The fix
+Added `GameState.nc_best_times_ms: [f64; 11]` (mirroring `ic_best_times_ms`) with
+decode (`dto.rs`) and encode (`encode.rs`), and the `updateChallengeTime` step in
+`big_crunch_reset`'s `at_goal` branch next to the existing IC one.
+
+### Verification
+- Fidelity grid: 93 → **95** cells (+2) — the fixtures where NC best-times were
+  the *sole* remaining divergence; the rest also carry the numerical drift above.
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

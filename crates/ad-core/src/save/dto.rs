@@ -863,8 +863,7 @@ pub struct InfinityChallengeDTO {
     pub best_times: Vec<f64>,
 }
 
-/// `player.challenge.normal` (modelled subset). `bestTimes` is ignored until a
-/// records consumer exists.
+/// `player.challenge.normal` (modelled subset).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalChallengeDTO {
@@ -872,6 +871,9 @@ pub struct NormalChallengeDTO {
     pub current: u8,
     /// Completed-challenge bitmask (bit `1 << id`).
     pub completed_bits: u16,
+    /// Fastest completion times (ms) for NC2–12, indexed `id - 2`;
+    /// `Number.MAX_VALUE` = never.
+    pub best_times: Vec<f64>,
 }
 
 /// `player.dimensions` — the `antimatter`, `infinity`, and `time` arrays.
@@ -2135,6 +2137,14 @@ impl GameState {
                 let mut times = [f64::MAX; 8];
                 for (i, t) in
                     dto.challenge.infinity.best_times.iter().take(8).enumerate()
+                {
+                    times[i] = *t;
+                }
+                times
+            },
+            nc_best_times_ms: {
+                let mut times = [f64::MAX; 11];
+                for (i, t) in dto.challenge.normal.best_times.iter().take(11).enumerate()
                 {
                     times[i] = *t;
                 }

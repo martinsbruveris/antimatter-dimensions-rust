@@ -24,6 +24,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (batch 1) | Wired normal achievements 31–54 (conditions + effects): sacrifice exponent (32), starting antimatter (37/54), tickspeed base (36/45), AD multipliers (31/34/43/48) | 34 (+2) |
 | 2026-07-09 | (pending) | Froze AD production once the Big Crunch goal is reached (pre-break / antimatter challenge) and recorded `maxAM` from the pre-cap overshoot, mirroring `AntimatterDimensions.tick`'s early return. (Also fixed achievement 28 firing on the bulk "buy max" AD1 path — count-neutral.) | 36 (+2) |
 | 2026-07-09 | (pending) | Modelled the best-rate records `thisEternity.bestInfinitiesPerMs` and `bestInfinity.bestIPminEternity` (decode/encode + the `bigCrunchUpdateStatistics` update + Eternity/Reality/EC resets); previously dropped on decode | 93 (+57) |
+| 2026-07-09 | (pending) | Modelled Normal Challenge best times (`challenge.normal.bestTimes`, 11 entries): decode/encode + the crunch `updateChallengeTime` step; previously dropped to the `f64::MAX` sentinel | 95 (+2) |
 
 ## Method
 

@@ -61,6 +61,13 @@ fn default_ic_best_times() -> [f64; 8] {
     [f64::MAX; 8]
 }
 
+/// serde default for `nc_best_times_ms` (`Number.MAX_VALUE` = never completed).
+/// One entry per Normal Challenge 2–12 (`player.challenge.normal.bestTimes`).
+#[cfg(feature = "serde")]
+fn default_nc_best_times() -> [f64; 11] {
+    [f64::MAX; 11]
+}
+
 /// serde defaults for EC8's per-run purchase budgets.
 #[cfg(feature = "serde")]
 fn default_eterc8_ids() -> i32 {
@@ -297,6 +304,11 @@ pub struct GameState {
     /// Eternity Upgrade 3.
     #[cfg_attr(feature = "serde", serde(default = "default_ic_best_times"))]
     pub ic_best_times_ms: [f64; 8],
+    /// Fastest completion of each Normal Challenge 2–12 in game ms
+    /// (`player.challenge.normal.bestTimes`, indexed `id - 2`; `f64::MAX` =
+    /// never). Persisted for fidelity; feeds achievements 65/74 (unmodelled).
+    #[cfg_attr(feature = "serde", serde(default = "default_nc_best_times"))]
+    pub nc_best_times_ms: [f64; 11],
     /// Time Dilation (`player.dilation`): studies, the active-run flag,
     /// Tachyon Particles / Dilated Time / Tachyon Galaxies, and the Dilation
     /// Upgrades. Persists across Eternities. See `dilation.rs`.
@@ -510,6 +522,7 @@ impl GameState {
             eternity_upgrades: 0,
             epmult_upgrades: 0,
             ic_best_times_ms: [f64::MAX; 8],
+            nc_best_times_ms: [f64::MAX; 11],
             dilation: DilationState::new(),
             reality: RealityState::new(),
             requirement_checks: RequirementChecks::new(),

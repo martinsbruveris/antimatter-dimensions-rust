@@ -87,7 +87,7 @@ pub fn allowlist() -> Vec<FieldRule> {
         // Best challenge *game*-times (written from `thisInfinity.time`, not the
         // clock): gate the Break-Infinity `worstChallenge` and Eternity-Upgrade-4
         // `infinityChallengeSum` reward multipliers. MAX_VALUE = never completed.
-        R("challenge.normal.bestTimes[]", Number), // (gap) NC best-times not modelled
+        R("challenge.normal.bestTimes[]", Number), // modelled (nc_best_times_ms)
         R("challenge.infinity.bestTimes[]", Number), // modelled (ic_best_times_ms)
     ]);
 

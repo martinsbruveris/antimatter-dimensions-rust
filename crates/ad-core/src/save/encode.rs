@@ -221,6 +221,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     player["epmultUpgrades"] = json!(state.epmult_upgrades);
     // Infinity Challenge record times.
     player["challenge"]["infinity"]["bestTimes"] = json!(state.ic_best_times_ms);
+    player["challenge"]["normal"]["bestTimes"] = json!(state.nc_best_times_ms);
     let mut ec_map = serde_json::Map::new();
     for (i, &count) in state.eternity_challenges.iter().enumerate() {
         if count > 0 {

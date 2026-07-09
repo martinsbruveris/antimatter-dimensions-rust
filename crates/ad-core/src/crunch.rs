@@ -328,6 +328,13 @@ impl GameState {
                 let slot = &mut self.ic_best_times_ms[(ic - 1) as usize];
                 *slot = slot.min(self.records.this_infinity.time_ms);
             }
+            // `updateChallengeTime` for a running Normal Challenge (NC2–12,
+            // indexed `id - 2`): keep the fastest completion this infinity.
+            let nc = self.challenge.current;
+            if nc >= 2 {
+                let slot = &mut self.nc_best_times_ms[(nc - 2) as usize];
+                *slot = slot.min(self.records.this_infinity.time_ms);
+            }
             self.handle_challenge_completion();
 
             // `bigCrunchUpdateStatistics`: fold this infinity's peak IP/min into the
