@@ -183,6 +183,39 @@ fn default_recent_eternities() -> Vec<RecentEternity> {
     vec![RecentEternity::placeholder(); 10]
 }
 
+/// One entry of the last-10-infinities ring (`player.records.recentInfinities`
+/// tuples `[time, realTime, IP, infinities, challenge]`; the challenge-name slot
+/// is not modelled). The `f64::MAX` sentinel means "no run yet".
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RecentInfinity {
+    /// Game time of the run (ms). Divides `ip` to give the run's IP/min.
+    pub time_ms: f64,
+    /// Real time of the run (ms).
+    pub real_time_ms: f64,
+    /// IP gained by the run.
+    pub ip: Decimal,
+    /// Infinities gained by the run.
+    pub infinities: Decimal,
+}
+
+impl RecentInfinity {
+    pub fn placeholder() -> Self {
+        Self {
+            time_ms: f64::MAX,
+            real_time_ms: f64::MAX,
+            ip: Decimal::ONE,
+            infinities: Decimal::ONE,
+        }
+    }
+}
+
+/// serde default for the recent-infinities ring (10 placeholders).
+#[cfg(feature = "serde")]
+fn default_recent_infinities() -> Vec<RecentInfinity> {
+    vec![RecentInfinity::placeholder(); 10]
+}
+
 /// Records for the current (in-progress) reality. Reset by a Reality; the
 /// modelled slice of `player.records.thisReality`.
 #[derive(Debug, Clone, PartialEq)]
@@ -368,6 +401,10 @@ pub struct Records {
     pub this_infinity: ThisInfinity,
     /// The fastest infinity's records (kept on crunch).
     pub best_infinity: BestInfinity,
+    /// The last 10 infinities, newest first (`records.recentInfinities`). Feeds
+    /// `bestRunIPPM` (the `ipGen` Break Infinity Upgrade's passive IP rate).
+    #[cfg_attr(feature = "serde", serde(default = "default_recent_infinities"))]
+    pub recent_infinities: Vec<RecentInfinity>,
     /// The current eternity's records (reset on Eternity). The peak-antimatter
     /// component persists across a Big Crunch and gates Infinity-Challenge /
     /// Infinity-Dimension unlocks.
@@ -398,6 +435,7 @@ impl Records {
             time_played_at_bh_unlock_ms: f64::MAX,
             this_infinity: ThisInfinity::new(),
             best_infinity: BestInfinity::new(),
+            recent_infinities: vec![RecentInfinity::placeholder(); 10],
             this_eternity: ThisEternity::new(),
             best_eternity: BestEternity::new(),
             recent_eternities: vec![RecentEternity::placeholder(); 10],

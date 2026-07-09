@@ -451,22 +451,30 @@ impl GameState {
     /// Disabled while the best infinity is slower than the too-slow cutoff or has
     /// never happened. Mirrors `preProductionGenerateIP`.
     pub(crate) fn generate_passive_ip(&mut self, dt_ms: f64) {
-        if !self.infinity_upgrade_bought(InfinityUpgrade::IpGen) {
-            return;
+        // Source 1: the `ipGen` *Infinity* Upgrade — generate `totalIPMult` IP
+        // every `bestInfinity.time × 10` ms, banking fractional progress in
+        // `part_infinity_point`. Disabled once the best infinity is too slow.
+        if self.infinity_upgrade_bought(InfinityUpgrade::IpGen) {
+            let best = self.records.best_infinity.time_ms;
+            let gen_period = best * 10.0;
+            if best < IP_GEN_TOO_SLOW_MS && gen_period > 0.0 {
+                self.part_infinity_point += dt_ms / gen_period;
+                let whole = self.part_infinity_point.floor();
+                if whole >= 1.0 {
+                    self.part_infinity_point -= whole;
+                    self.infinity_points +=
+                        Decimal::from_float(whole) * self.total_ip_mult();
+                }
+            }
         }
-        let best = self.records.best_infinity.time_ms;
-        if best >= IP_GEN_TOO_SLOW_MS {
-            return;
-        }
-        let gen_period = best * 10.0;
-        if gen_period <= 0.0 {
-            return;
-        }
-        self.part_infinity_point += dt_ms / gen_period;
-        let whole = self.part_infinity_point.floor();
-        if whole >= 1.0 {
-            self.part_infinity_point -= whole;
-            self.infinity_points += Decimal::from_float(whole) * self.total_ip_mult();
+        // Source 2: the `ipGen` *Break Infinity* Upgrade (rebuyable
+        // `infinityRebuyables[2]`) — passively add `bestRunIPPM · upgrades/20` IP
+        // per minute. This is `preProductionGenerateIP`'s trailing add, applied
+        // independently of source 1.
+        let ip_gen = self.infinity_rebuyables[2];
+        if ip_gen > 0 {
+            let rate = self.best_run_ippm() * Decimal::from_float(ip_gen as f64 / 20.0);
+            self.infinity_points += rate * Decimal::from_float(dt_ms / 60_000.0);
         }
     }
 
@@ -700,5 +708,32 @@ mod tests {
         let before = game.infinity_points;
         game.generate_passive_ip(30_000.0);
         assert_eq!(game.infinity_points, before + Decimal::from_float(3.0));
+    }
+
+    #[test]
+    fn best_run_ippm_drives_the_break_infinity_ipgen_passive() {
+        let mut game = GameState::new();
+        // One recent infinity: 1e12 IP over 120_000 ms (2 min) → 5e11 IP/min.
+        game.records.recent_infinities[0] = crate::records::RecentInfinity {
+            time_ms: 120_000.0,
+            real_time_ms: 120_000.0,
+            ip: Decimal::new(1.0, 12),
+            infinities: Decimal::ONE,
+        };
+        assert_eq!(game.best_run_ippm(), Decimal::new(5.0, 11));
+
+        // 4 ipGen upgrades → effect = bestRunIPPM · 4/20 = 1e11 IP/min. Over one
+        // minute the passive add is exactly that. (The `ipGen` Infinity Upgrade is
+        // not owned, so source 1 stays inert.)
+        game.infinity_rebuyables[2] = 4;
+        let before = game.infinity_points;
+        game.generate_passive_ip(60_000.0);
+        assert_eq!(game.infinity_points, before + Decimal::new(1.0, 11));
+
+        // With no upgrades the passive term is inert.
+        game.infinity_rebuyables[2] = 0;
+        let before = game.infinity_points;
+        game.generate_passive_ip(60_000.0);
+        assert_eq!(game.infinity_points, before);
     }
 }

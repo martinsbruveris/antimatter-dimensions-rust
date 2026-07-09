@@ -301,6 +301,10 @@ impl GameState {
         // full `bestInfinity` struct otherwise persists across a crunch).
         self.records.best_infinity.best_ip_min_eternity = Decimal::ZERO;
         self.records.this_infinity = ThisInfinity::new();
+        // `resetInfinityRuns`: clear the last-10-infinities ring (so `bestRunIPPM`
+        // starts fresh next eternity).
+        self.records.recent_infinities =
+            vec![crate::records::RecentInfinity::placeholder(); 10];
         let keep_infinity_upgrades = self.eternity_milestone_reached(4);
         self.dim_boosts = if keep_infinity_upgrades { 4 } else { 0 };
         self.galaxies = if keep_infinity_upgrades { 1 } else { 0 };

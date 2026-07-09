@@ -140,6 +140,20 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         json!(state.records.best_infinity.real_time_ms);
     records["bestInfinity"]["bestIPminEternity"] =
         decimal(&state.records.best_infinity.best_ip_min_eternity);
+    // The recent-infinities ring, as the original's 5-tuples (the challenge-name
+    // slot is unmodelled → "").
+    records["recentInfinities"] = json!(state
+        .records
+        .recent_infinities
+        .iter()
+        .map(|r| json!([
+            r.time_ms,
+            r.real_time_ms,
+            r.ip.to_string(),
+            r.infinities.to_string(),
+            ""
+        ]))
+        .collect::<Vec<_>>());
     records["thisEternity"]["time"] = json!(state.records.this_eternity.time_ms);
     records["thisEternity"]["realTime"] =
         json!(state.records.this_eternity.real_time_ms);

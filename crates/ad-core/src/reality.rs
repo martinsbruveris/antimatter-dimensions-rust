@@ -672,6 +672,8 @@ impl GameState {
         self.infinity_rebuyables = [0, 0, 0];
 
         // `resetInfinityRuns` / `resetEternityRuns`.
+        self.records.recent_infinities =
+            vec![crate::records::RecentInfinity::placeholder(); 10];
         self.records.recent_eternities =
             vec![crate::records::RecentEternity::placeholder(); 10];
 

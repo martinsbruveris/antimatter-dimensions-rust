@@ -56,6 +56,19 @@ impl GameState {
     /// 41/51/141/142/143, the ×4 achievements 85/93, achievements 116/125, and
     /// the ×2-per-purchase `ipMult` Infinity Upgrade (`ip_mult_purchases`). Read
     /// by [`GameState::generate_passive_ip`] too.
+    /// `Player.bestRunIPPM`: the best IP-per-minute over the last 10 infinities
+    /// (`recentInfinities.map(run => ratePerMinute(run.ip, run.gameTime)).max`).
+    /// `ratePerMinute(amount, time) = amount / (time / 60000)`. Feeds the `ipGen`
+    /// Break Infinity Upgrade's passive IP rate. Placeholder runs (`time = MAX`)
+    /// contribute ≈0.
+    pub(crate) fn best_run_ippm(&self) -> Decimal {
+        self.records
+            .recent_infinities
+            .iter()
+            .map(|r| r.ip / Decimal::from_float(r.time_ms / 60000.0))
+            .fold(Decimal::ZERO, |a, b| a.max(&b))
+    }
+
     pub(crate) fn total_ip_mult(&self) -> Decimal {
         // Effarig's Infinity stage nullifies every IP multiplier (`totalIPMult`
         // returns 1).
@@ -330,6 +343,19 @@ impl GameState {
             let gained_ip = self.gained_infinity_points();
             self.infinity_points += gained_ip;
             self.infinities += self.gained_infinities();
+            // `addInfinityTime`: push this run onto the last-10-infinities ring
+            // (newest first), keeping 10, using the pre-reset `thisInfinity`
+            // timing. Feeds `bestRunIPPM` for the next infinity's passive `ipGen`.
+            self.records.recent_infinities.pop();
+            self.records.recent_infinities.insert(
+                0,
+                crate::records::RecentInfinity {
+                    time_ms: self.records.this_infinity.time_ms,
+                    real_time_ms: self.records.this_infinity.real_time_ms,
+                    ip: gained_ip,
+                    infinities: self.gained_infinities().round(),
+                },
+            );
             // The Automator's BIG_CRUNCH_AFTER notification (`prestigeNotify`)
             // plus the gain for its event-log text.
             self.automator_notify_prestige(

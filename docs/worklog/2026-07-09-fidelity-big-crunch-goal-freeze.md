@@ -978,3 +978,38 @@ Moved the IC3 neutralisation from `tickspeed_effect` (which zeroed everything) t
 - `cargo test -p ad-core --features serde`: 582 pass (strengthened the IC3 unit
   test to assert `tickspeed_effect == 1.02` with Achievement 36 owned); fmt +
   clippy clean; round-trip clean.
+
+## Bug 31 — missing passive IP generation from the `ipGen` Break Infinity Upgrade
+
+### Symptom
+`infinityPoints` (and the `thisEternity.maxIP` / `thisReality.maxIP` records that
+track it) was the single most common diverged field across the suite — ~245
+`infinityPoints` divergences. The isolated case `00267` @1 grew its IP by ×1.00265
+per tick in JS while Rust's stayed flat, with *no crunch* and every other field
+matching.
+
+### Diagnosis
+`preProductionGenerateIP(diff)` has a second passive-IP term that Rust never
+modelled: `Currency.infinityPoints.add(BreakInfinityUpgrade.ipGen.effect ×
+diff/60000)`, where the `ipGen` rebuyable's effect is `Player.bestRunIPPM ×
+(infinityRebuyables[2] / 20)` — "generate 5 %·n of your best IP/min over the last
+10 infinities per minute". `bestRunIPPM = max over recentInfinities of
+ratePerMinute(run.ip, run.gameTime)`. Rust modelled neither `recentInfinities` nor
+`bestRunIPPM` (the ring was an unmodelled allowlist gap), so the term was 0. For
+`00267` (`infinityRebuyables[2] = 10`, `bestRunIPPM = 9.90e72`) the missing add is
+`9.90e72 · 0.5 · 50/60000 = 4.12e69` IP/tick — exactly the observed gap.
+
+### Fix
+- Modelled the `recentInfinities` ring (`records::RecentInfinity`, decode/encode).
+- Added `best_run_ippm()` (`recentInfinities.map(ratePerMinute).max`).
+- Added the second passive-IP term to `generate_passive_ip` (independent of the
+  `ipGen` *Infinity* Upgrade's source-1 term).
+- Push each crunch onto the ring (`addInfinityTime`) and clear it on
+  Eternity / EC-start / Reality (`resetInfinityRuns`).
+
+### Verification
+- Fidelity grid: 844 → **1090** cells (+246). `00267` passes at every horizon.
+- Round-trip: 1131 → 1377 / 1435 (the ring now re-encodes to match the oracle
+  instead of the template default).
+- `cargo test -p ad-core --features serde`: 583 pass (added a `bestRunIPPM`
+  passive-generation test); fmt + clippy clean.

@@ -41,7 +41,8 @@ use crate::options::{
     MIN_NOTATION_DIGITS, MIN_UPDATE_RATE_MS, TAB_COUNT,
 };
 use crate::records::{
-    BestEternity, BestInfinity, RecentEternity, Records, ThisEternity, ThisInfinity,
+    BestEternity, BestInfinity, RecentEternity, RecentInfinity, Records, ThisEternity,
+    ThisInfinity,
 };
 use crate::replicanti::ReplicantiState;
 use crate::state::{DimensionTier, GameState, TickspeedState};
@@ -950,6 +951,11 @@ pub struct RecordsDTO {
     pub time_played_at_bh_unlock: f64,
     pub this_infinity: ThisInfinityDTO,
     pub best_infinity: BestInfinityDTO,
+    /// `records.recentInfinities` — 10 mixed-type tuples
+    /// `[time, realTime, IP, infinities, challenge]`; parsed leniently (like the
+    /// eternity ring). Feeds `bestRunIPPM`.
+    #[serde(default)]
+    pub recent_infinities: Vec<serde_json::Value>,
     pub this_eternity: ThisEternityDTO,
     pub best_eternity: BestEternityDTO,
     /// `records.recentEternities` — 10 mixed-type tuples
@@ -1569,6 +1575,22 @@ impl GameState {
             recent_eternities.push(RecentEternity::placeholder());
         }
 
+        let mut recent_infinities = Vec::with_capacity(10);
+        for entry in dto.records.recent_infinities.iter().take(10) {
+            let parsed = entry.as_array().and_then(|t| {
+                Some(RecentInfinity {
+                    time_ms: t.first()?.as_f64()?,
+                    real_time_ms: t.get(1)?.as_f64()?,
+                    ip: parse_decimal(t.get(2)?)?,
+                    infinities: parse_decimal(t.get(3)?)?,
+                })
+            });
+            recent_infinities.push(parsed.unwrap_or_else(RecentInfinity::placeholder));
+        }
+        while recent_infinities.len() < 10 {
+            recent_infinities.push(RecentInfinity::placeholder());
+        }
+
         // Per-EC completion counts from the `eternityChalls` map.
         let mut eternity_challenges = [0u8; 12];
         for (key, count) in &dto.eternity_challs {
@@ -1621,6 +1643,7 @@ impl GameState {
                 real_time_ms: dto.records.best_infinity.real_time,
                 best_ip_min_eternity: dto.records.best_infinity.best_ip_min_eternity,
             },
+            recent_infinities,
             this_eternity: ThisEternity {
                 time_ms: dto.records.this_eternity.time,
                 real_time_ms: dto.records.this_eternity.real_time,
