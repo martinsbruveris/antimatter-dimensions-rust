@@ -129,6 +129,35 @@ struct InfinityUpgradeView {
     effect: Num,
 }
 
+/// Serializable view of the Infinity Upgrades bottom row — the `ipMult`
+/// rebuyable and the one-time `ipOffline`, both unlocked by Achievement 41.
+#[derive(Serialize)]
+struct InfinityUpgradesBottomRowView {
+    /// Whether the row is shown at all (Achievement 41 unlocked).
+    unlocked: bool,
+    /// `ipMult` purchases so far.
+    ip_mult_purchases: u32,
+    /// Next `ipMult` cost.
+    ip_mult_cost: Num,
+    /// Current `ipMult` effect (`2^purchases`).
+    ip_mult_effect: Num,
+    /// Whether `ipMult` hit its 1e6M cost cap (displays as bought).
+    ip_mult_capped: bool,
+    /// Whether the next `ipMult` purchase can happen now.
+    ip_mult_can_be_bought: bool,
+    /// Whether `ipOffline` is owned.
+    ip_offline_bought: bool,
+    /// Whether `ipOffline` can be bought now.
+    ip_offline_can_be_bought: bool,
+    /// `ipOffline`'s 1000-IP cost.
+    ip_offline_cost: Num,
+    /// `ipOffline`'s displayed effect (IP per offline minute).
+    ip_offline_effect_per_min: Num,
+    /// The IP-mult autobuyer (1-Eternity milestone): unlocked + active flags.
+    autobuyer_unlocked: bool,
+    autobuyer_active: bool,
+}
+
 /// Serializable view of a single Normal Challenge tile.
 #[derive(Serialize)]
 struct ChallengeView {
@@ -367,6 +396,8 @@ struct GameView {
     eternity_challenges_unlocked: bool,
     /// The 16 Infinity Upgrades (grid order), for the Infinity Upgrades tab.
     infinity_upgrades: Vec<InfinityUpgradeView>,
+    /// The Achievement-41 bottom row (`ipMult` rebuyable + `ipOffline`).
+    infinity_upgrades_bottom_row: InfinityUpgradesBottomRowView,
     /// Whether the Challenges tab is available (post first Infinity).
     challenges_unlocked: bool,
     /// The 12 Normal Challenges, for the Challenges tab.
@@ -1786,6 +1817,27 @@ fn build_infinity_upgrades_view(game: &GameState) -> Vec<InfinityUpgradeView> {
         .collect()
 }
 
+/// Build the Infinity Upgrades bottom-row view (`ipMult` + `ipOffline`,
+/// Achievement 41).
+fn build_infinity_upgrades_bottom_row_view(
+    game: &GameState,
+) -> InfinityUpgradesBottomRowView {
+    InfinityUpgradesBottomRowView {
+        unlocked: game.achievement_unlocked(41),
+        ip_mult_purchases: game.ip_mult_purchases,
+        ip_mult_cost: num(&game.ip_mult_cost()),
+        ip_mult_effect: num(&game.ip_mult_effect()),
+        ip_mult_capped: game.ip_mult_capped(),
+        ip_mult_can_be_bought: game.can_buy_ip_mult(),
+        ip_offline_bought: game.ip_offline_bought,
+        ip_offline_can_be_bought: game.can_buy_ip_offline(),
+        ip_offline_cost: num(&game.ip_offline_cost()),
+        ip_offline_effect_per_min: num(&game.ip_offline_effect_per_min()),
+        autobuyer_unlocked: game.eternity_milestone_reached(1) && !game.is_doomed(),
+        autobuyer_active: game.autobuyers.ip_mult_buyer_active,
+    }
+}
+
 /// Build the Normal Challenges view (all 12, in id order). Static per-challenge
 /// display data (name, reward, description, unlock threshold) lives frontend-side.
 fn build_challenges_view(game: &GameState) -> Vec<ChallengeView> {
@@ -2382,6 +2434,7 @@ fn build_game_view(game: &GameState) -> GameView {
             })
             .collect(),
         infinity_upgrades: build_infinity_upgrades_view(game),
+        infinity_upgrades_bottom_row: build_infinity_upgrades_bottom_row_view(game),
         challenges_unlocked: game.challenges_unlocked(),
         challenges: build_challenges_view(game),
         infinity_challenges_unlocked: game.infinity_challenges_unlocked(),
@@ -3213,6 +3266,38 @@ fn buy_infinity_upgrade(id: String, state: State<'_, Mutex<GameState>>) {
     if let Some(upgrade) = InfinityUpgrade::from_save_id(&id) {
         game.buy_infinity_upgrade(upgrade);
     }
+}
+
+/// Buy a single ×2 IP-multiplier (`ipMult`) purchase.
+#[tauri::command]
+fn buy_ip_mult(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_ip_mult();
+}
+
+/// Buy as many `ipMult` purchases as affordable (`buyMax`).
+#[tauri::command]
+fn buy_max_ip_mult(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_max_ip_mult();
+}
+
+/// Buy the one-time `ipOffline` Infinity Upgrade.
+#[tauri::command]
+fn buy_ip_offline(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_ip_offline();
+}
+
+/// Toggle the IP-multiplier autobuyer (`Autobuyer.ipMult.isActive`).
+#[tauri::command]
+fn set_ip_mult_autobuyer(active: bool, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().autobuyers.ip_mult_buyer_active = active;
+}
+
+/// The lump-sum offline currency award (`ipOffline`), fired once by the
+/// frontend's chunked offline replay before its first chunk. The all-at-once
+/// `simulate_offline` path applies it engine-side instead.
+#[tauri::command]
+fn offline_currency_gain(away_ms: f64, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().offline_currency_gain(away_ms);
 }
 
 /// Start Normal Challenge `id` (2..=12); a no-op if it can't be started.
@@ -4522,6 +4607,11 @@ pub fn run() {
             buy_replicanti_galaxy_cap,
             buy_replicanti_galaxy,
             buy_infinity_upgrade,
+            buy_ip_mult,
+            buy_max_ip_mult,
+            buy_ip_offline,
+            set_ip_mult_autobuyer,
+            offline_currency_gain,
             start_challenge,
             exit_challenge,
             start_infinity_challenge,

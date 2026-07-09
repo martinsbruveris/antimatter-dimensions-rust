@@ -352,7 +352,7 @@ impl GameState {
         self.records.this_eternity.max_ip = self.infinity_points;
 
         // `playerInfinityUpgradesOnReset` (milestone-aware).
-        self.reset_infinity_upgrades_on_eternity();
+        self.player_infinity_upgrades_on_reset();
 
         // `Player.resetRequirements("eternity")`.
         self.requirement_checks.eternity_no_rg = true;
@@ -360,29 +360,35 @@ impl GameState {
         self.antimatter = self.starting_antimatter();
     }
 
-    /// `playerInfinityUpgradesOnReset`: with the keepBreakUpgrades milestone
-    /// (8 eternities) you start with *all* Infinity + Break Infinity Upgrades
-    /// and maxed rebuyables; with keepInfinityUpgrades (4) all 16 Infinity
-    /// Upgrades only; below that everything is cleared.
-    fn reset_infinity_upgrades_on_eternity(&mut self) {
+    /// `playerInfinityUpgradesOnReset` (shared by the Eternity, EC-start, and
+    /// Reality resets): with Reality Upgrade 10 or the keepBreakUpgrades
+    /// milestone (8 eternities) you start with *all* Infinity + Break Infinity
+    /// Upgrades (including `ipOffline`) and maxed rebuyables; with
+    /// keepInfinityUpgrades (4) all 16 Infinity Upgrades + `ipOffline` only;
+    /// below that everything is cleared. Both keep branches *grant* the full
+    /// sets, as in the original (they assign the whole set, not a filter).
+    pub(crate) fn player_infinity_upgrades_on_reset(&mut self) {
         let all_infinity: u32 = crate::ALL_INFINITY_UPGRADES
             .iter()
             .fold(0, |bits, u| bits | u.bit());
         let all_break: u32 = crate::ALL_BREAK_INFINITY_UPGRADES
             .iter()
             .fold(0, |bits, u| bits | u.bit());
-        if self.eternity_milestone_reached(8) {
+        if self.reality_upgrade_bought(10) || self.eternity_milestone_reached(8) {
             self.infinity_upgrades = all_infinity;
             self.break_infinity_upgrades = all_break;
             self.infinity_rebuyables = [8, 7, 10];
+            self.ip_offline_bought = true;
         } else if self.eternity_milestone_reached(4) {
             self.infinity_upgrades = all_infinity;
             self.break_infinity_upgrades = 0;
             self.infinity_rebuyables = [0, 0, 0];
+            self.ip_offline_bought = true;
         } else {
             self.infinity_upgrades = 0;
             self.break_infinity_upgrades = 0;
             self.infinity_rebuyables = [0, 0, 0];
+            self.ip_offline_bought = false;
         }
     }
 

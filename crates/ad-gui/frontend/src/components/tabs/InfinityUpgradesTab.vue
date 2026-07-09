@@ -70,6 +70,25 @@ function effectLine(cell) {
 function buy(cell) {
   if (cell.view?.can_be_bought) game.buyInfinityUpgrade(cell.meta.id);
 }
+
+// The Achievement-41 bottom row (ipMult rebuyable + ipOffline).
+const bottom = computed(() => s.value?.infinity_upgrades_bottom_row);
+
+const ipMultClass = computed(() => ({
+  "o-infinity-upgrade-btn--bought": bottom.value?.ip_mult_capped,
+  "o-infinity-upgrade-btn--available":
+    !bottom.value?.ip_mult_capped && bottom.value?.ip_mult_can_be_bought,
+  "o-infinity-upgrade-btn--unavailable":
+    !bottom.value?.ip_mult_capped && !bottom.value?.ip_mult_can_be_bought,
+}));
+
+const ipOfflineClass = computed(() => ({
+  "o-infinity-upgrade-btn--bought": bottom.value?.ip_offline_bought,
+  "o-infinity-upgrade-btn--available":
+    !bottom.value?.ip_offline_bought && bottom.value?.ip_offline_can_be_bought,
+  "o-infinity-upgrade-btn--unavailable":
+    !bottom.value?.ip_offline_bought && !bottom.value?.ip_offline_can_be_bought,
+}));
 </script>
 
 <template>
@@ -110,6 +129,69 @@ function buy(cell) {
         />
       </div>
     </div>
+
+    <div
+      v-if="bottom && bottom.unlocked"
+      class="l-infinity-upgrades-bottom-row"
+    >
+      <div class="l-spoon-btn-group l-infinity-upgrades-tab__mult-btn">
+        <button
+          class="o-infinity-upgrade-btn o-infinity-upgrade-btn--multiplier"
+          :class="ipMultClass"
+          @click="game.buyIpMult()"
+        >
+          <span>Multiply Infinity Points from all sources by ×2</span>
+          <br>
+          ×{{ formatDecimal(bottom.ip_mult_effect, 2, 2) }}
+          <template v-if="bottom.ip_mult_capped">
+            <br>
+            <span>(Capped at
+              {{ formatDecimal({ m: 1, e: 6000000 }) }} Infinity Points)</span>
+          </template>
+          <template v-else>
+            <br>
+            Cost: {{ formatDecimal(bottom.ip_mult_cost, 2) }} IP
+          </template>
+        </button>
+        <button
+          class="o-primary-btn l--spoon-btn-group__little-spoon
+            o-primary-btn--small-spoon"
+          @click="game.buyMaxIpMult()"
+        >
+          Max Infinity Point mult
+        </button>
+        <button
+          v-if="bottom.autobuyer_unlocked"
+          class="o-primary-btn l--spoon-btn-group__little-spoon
+            o-primary-btn--small-spoon"
+          @click="game.setIpMultAutobuyer(!bottom.autobuyer_active)"
+        >
+          Autobuy IP mult {{ bottom.autobuyer_active ? "ON" : "OFF" }}
+        </button>
+      </div>
+      <button
+        class="o-infinity-upgrade-btn l-infinity-upgrade-grid__cell
+          o-infinity-upgrade-btn--color-2"
+        :class="ipOfflineClass"
+        @click="game.buyIpOffline()"
+      >
+        <span>Only while offline, gain 50% of your best IP/min
+          without using Max All</span>
+        <br>
+        {{ formatDecimal(bottom.ip_offline_effect_per_min, 2, 2) }} IP/min
+        <template v-if="!bottom.ip_offline_bought">
+          <br>
+          Cost: {{ formatDecimal(bottom.ip_offline_cost, 2) }} IP
+        </template>
+      </button>
+    </div>
+    <div v-if="s.eternity_unlocked && bottom && bottom.unlocked">
+      The Infinity Point multiplier becomes more expensive
+      <br>
+      above {{ formatDecimal({ m: 1, e: 3000000 }) }} Infinity Points,
+      and cannot be purchased past
+      {{ formatDecimal({ m: 1, e: 6000000 }) }} Infinity Points.
+    </div>
   </div>
 </template>
 
@@ -138,5 +220,10 @@ function buy(cell) {
 
 .s-base--dark .c-infinity-upgrade-grid__column--background {
   opacity: 0.5;
+}
+
+.l-infinity-upgrades-bottom-row .l-infinity-upgrade-grid__cell,
+.l-infinity-upgrades-bottom-row .l-infinity-upgrades-tab__mult-btn {
+  margin: 0.5rem 1.1rem;
 }
 </style>

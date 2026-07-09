@@ -36,3 +36,34 @@ each buy applies the equal-cost bump and stops at the Big Crunch goal.
 exact counts; the super-exponential branch); the two integration tests that
 bought tickspeed from a fresh state now unlock it first (AD2 purchase), since
 `buy_tickspeed` carries the original's unlock guard.
+
+## 2.2 — Infinity Upgrades bottom row (`ipMult` + `ipOffline`)
+
+**What shipped:** the Achievement-41 bottom row is now fully modelled. Engine:
+the `ipMult` rebuyable's two-regime cost curve (×10 steps to 1e3M, ×1e10 steps
+to the 1e6M cap), single purchase + the original's two-phase geometric-series
+`buyMax` (via new `Decimal::afford/sum_geometric_series` helpers ported into
+`break_infinity`), the Big-Crunch-autobuyer dynamic-amount ×2 bump per purchase
+(TS181 suppresses it), the `ipOffline` one-time purchase, and the offline
+catch-up award (`offline_currency_gain`, called engine-side by
+`simulate_offline` and once by the GUI's chunked replay). The IP-mult autobuyer
+(1-Eternity milestone) ticks `buy_max_ip_mult` every update. GUI: the bottom
+row on the Infinity Upgrades tab (multiplier tile + spoon buttons + ipOffline
+tile, vendored classes), new Tauri commands, and the cost-cap footer.
+
+**Fidelity fixes found along the way:**
+- `playerInfinityUpgradesOnReset` is now a shared faithful port: it honours
+  Reality Upgrade 10 (previously the Reality reset always cleared the upgrade
+  bitmasks and `apply_rupg10` never restored them) and grants/clears
+  `ipOffline` with the milestone keeps (the original's keep *sets* include it).
+- The `ipMult` effect in `total_ip_mult` now carries Effarig's Eternity-stage
+  cap (the E1E6 default cap is above the natural e993k max, so only Effarig's
+  can bind).
+
+**Deviations:** the original gates the `ipOffline` award on
+`player.options.offlineProgress`; that toggle is an 8.8 gap and offline
+progress is always on here, so the award is ungated (noted in the code).
+
+**Tests:** eight new unit tests (gating, cost curve, geometric-series buyMax,
+threshold crossing, cap, autobuyer bump, ipOffline award, milestone keeps).
+Fidelity grid unchanged (1118/1148).

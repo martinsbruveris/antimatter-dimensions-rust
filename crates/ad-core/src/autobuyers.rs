@@ -403,7 +403,7 @@ pub struct AutobuyerState {
     #[cfg_attr(feature = "serde", serde(default))]
     pub reality: RealityAutobuyer,
     /// `player.auto.ipMultBuyer.isActive` — the ×2-IP-upgrade autobuyer's active
-    /// flag. Behaviour unmodelled; preserved for round-trip fidelity.
+    /// flag. Unlocked by the 1-Eternity milestone; buys max `ipMult` every tick.
     #[cfg_attr(feature = "serde", serde(default))]
     pub ip_mult_buyer_active: bool,
     /// The Dimensional Sacrifice autobuyer's active flag
@@ -864,6 +864,16 @@ impl GameState {
             self.reset_autobuyer_ticks(PRESTIGE_INFINITY, dt_ms);
         }
 
+        // The Infinity Point Multiplier autobuyer (`IPMultAutobuyerState`): no
+        // interval — buys max `ipMult` every tick once the 1-Eternity milestone
+        // is reached (and not while Doomed).
+        if self.autobuyers.ip_mult_buyer_active
+            && self.eternity_milestone_reached(1)
+            && !self.is_doomed()
+        {
+            self.buy_max_ip_mult();
+        }
+
         // Eternity and Reality autobuyers: no interval — their conditions are
         // checked every tick (plain `AutobuyerState`s in the original). The
         // prestige calls gate themselves on availability.
@@ -1140,9 +1150,8 @@ impl GameState {
 
     /// "Dynamic amount" (`bumpAmount`): prestige-currency multiplier purchases
     /// scale the fixed-amount goal along. The Big Crunch bump fires from
-    /// Achievements 85/93 (×4 IP) — the `ipMult` rebuyable is a deferred
-    /// Break-Infinity feature; the Eternity bump fires from the `epMult`
-    /// Eternity Upgrade (×5 each).
+    /// Achievements 85/93 (×4 IP) and each `ipMult` purchase (×2, unless TS181);
+    /// the Eternity bump fires from the `epMult` Eternity Upgrade (×5 each).
     pub(crate) fn bump_big_crunch_amount(&mut self, mult: Decimal) {
         if self.autobuyer_is_unlocked(AutobuyerTarget::BigCrunch)
             && self.autobuyers.big_crunch_settings.increase_with_mult

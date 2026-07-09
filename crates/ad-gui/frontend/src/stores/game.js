@@ -450,6 +450,25 @@ export const useGameStore = defineStore("game", {
     buyInfinityUpgrade(id) {
       return invoke("buy_infinity_upgrade", { id });
     },
+    // The Achievement-41 bottom row: the ×2 IP-multiplier rebuyable (single /
+    // max), the one-time ipOffline upgrade, and the IP-mult autobuyer toggle.
+    buyIpMult() {
+      return invoke("buy_ip_mult");
+    },
+    buyMaxIpMult() {
+      return invoke("buy_max_ip_mult");
+    },
+    buyIpOffline() {
+      return invoke("buy_ip_offline");
+    },
+    setIpMultAutobuyer(active) {
+      return invoke("set_ip_mult_autobuyer", { active });
+    },
+    // The lump-sum offline award (ipOffline): fired once by the chunked offline
+    // replay before its first chunk (the all-at-once path applies it engine-side).
+    offlineCurrencyGain(awayMs) {
+      return invoke("offline_currency_gain", { awayMs });
+    },
     // Start Normal Challenge `id` (a forced Big Crunch, then enter). Navigates to
     // the Antimatter Dimensions tab like the original's `start()`.
     startChallenge(id) {

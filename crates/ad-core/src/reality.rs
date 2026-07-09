@@ -665,11 +665,9 @@ impl GameState {
 
         self.antimatter = self.starting_antimatter();
 
-        // `playerInfinityUpgradesOnReset` — eternities are 0, so everything
-        // clears.
-        self.infinity_upgrades = 0;
-        self.break_infinity_upgrades = 0;
-        self.infinity_rebuyables = [0, 0, 0];
+        // `playerInfinityUpgradesOnReset` — eternities are 0, so the milestone
+        // keeps fail; Reality Upgrade 10 (which persists) keeps everything.
+        self.player_infinity_upgrades_on_reset();
 
         // `resetInfinityRuns` / `resetEternityRuns`.
         self.records.recent_infinities =

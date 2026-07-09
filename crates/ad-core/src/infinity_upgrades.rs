@@ -15,8 +15,13 @@
 //! tickspeed, dim-boost/galaxy requirements — see
 //! `docs/design/2026-07-03-infinity-upgrades.md`.
 //!
-//! The bottom row (`ipMult` rebuyable + `ipOffline`, gated by Achievement 41) is a
-//! scoped follow-up and is not modelled here.
+//! The bottom row — the `ipMult` rebuyable and the one-time `ipOffline`, both
+//! gated by Achievement 41 — is also modelled here: `ip_mult_purchases` /
+//! `ip_offline_bought` on [`GameState`], the two-regime cost curve
+//! (`InfinityIPMultUpgrade`: ×10 steps to 1e3M, ×1e10 steps to the 1e6M cap),
+//! and `buy_max_ip_mult`'s two-phase geometric-series bulk buy. The `ipMult`
+//! effect (`2^purchases`) applies in `total_ip_mult` (crunch.rs); `ipOffline`'s
+//! IP award applies in the offline catch-up (tick.rs).
 
 use break_infinity::Decimal;
 
@@ -123,6 +128,20 @@ const INFINITY_UPGRADE_SAVE_IDS: [&str; INFINITY_UPGRADE_COUNT] = [
 /// `player.records.bestInfinity.time >= 999999999999` cutoff.
 const IP_GEN_TOO_SLOW_MS: f64 = 999_999_999_999.0;
 
+/// The `ipMult` rebuyable's `costIncreaseThreshold` (`DC.E3E6`): past it the
+/// per-purchase cost ratio steepens from ×10 to ×1e10.
+const IP_MULT_COST_INCREASE_THRESHOLD: Decimal = Decimal::new_unchecked(1.0, 3_000_000);
+
+/// The `ipMult` rebuyable's `costCap` (`DC.E6E6`): once the next cost reaches
+/// it the upgrade is capped.
+const IP_MULT_COST_CAP: Decimal = Decimal::new_unchecked(1.0, 6_000_000);
+
+/// `purchasesAtIncrease = costIncreaseThreshold.log10() - 1`.
+const IP_MULT_PURCHASES_AT_INCREASE: u32 = 2_999_999;
+
+/// IP cost of the one-time `ipOffline` upgrade.
+const IP_OFFLINE_COST: Decimal = Decimal::new_unchecked(1.0, 3);
+
 impl InfinityUpgrade {
     /// Bitmask bit for this upgrade (its slot in `GameState::infinity_upgrades`).
     pub fn bit(self) -> u32 {
@@ -192,8 +211,8 @@ impl GameState {
         // Achievement 41: buy 16 Infinity Upgrades. The original counts
         // `player.infinityUpgrades.size`, which holds both the grid upgrades and
         // the Break Infinity upgrades (a single string set); here they are two
-        // bitmasks, so sum their popcounts. Its reward (two extra upgrades) is
-        // unmodelled, so the unlock has no numeric effect.
+        // bitmasks, so sum their popcounts. Its reward unlocks the bottom row
+        // (`ipMult` + `ipOffline`).
         if self.infinity_upgrades.count_ones()
             + self.break_infinity_upgrades.count_ones()
             >= 16
@@ -209,6 +228,160 @@ impl GameState {
         ) {
             self.skip_resets_if_possible();
         }
+        true
+    }
+
+    // --- The bottom row: the `ipMult` rebuyable + `ipOffline` ---------------
+
+    /// Whether the `ipMult` cost has passed `costIncreaseThreshold` (1e3M) into
+    /// the steep ×1e10 regime (`hasIncreasedCost`).
+    fn ip_mult_has_increased_cost(&self) -> bool {
+        self.ip_mult_purchases >= IP_MULT_PURCHASES_AT_INCREASE
+    }
+
+    /// The current per-purchase cost ratio (`costIncrease`): ×10, steepening to
+    /// ×1e10 past the threshold.
+    fn ip_mult_cost_increase(&self) -> f64 {
+        if self.ip_mult_has_increased_cost() {
+            1e10
+        } else {
+            10.0
+        }
+    }
+
+    /// The next `ipMult` purchase's IP cost (`InfinityIPMultUpgrade.cost`).
+    pub fn ip_mult_cost(&self) -> Decimal {
+        if self.ip_mult_has_increased_cost() {
+            let excess = (self.ip_mult_purchases - IP_MULT_PURCHASES_AT_INCREASE) as f64;
+            IP_MULT_COST_INCREASE_THRESHOLD
+                * Decimal::from_float(1e10).pow(&Decimal::from_float(excess))
+        } else {
+            Decimal::pow10((self.ip_mult_purchases + 1) as f64)
+        }
+    }
+
+    /// Whether `ipMult` has hit its cost cap of 1e6M (`isCapped`); a capped
+    /// upgrade displays as bought.
+    pub fn ip_mult_capped(&self) -> bool {
+        self.ip_mult_cost() >= IP_MULT_COST_CAP
+    }
+
+    /// `InfinityIPMultUpgrade.canBeBought`: not Doomed, not capped, Achievement
+    /// 41 unlocked, and the next purchase affordable.
+    pub fn can_buy_ip_mult(&self) -> bool {
+        !self.is_doomed()
+            && !self.ip_mult_capped()
+            && self.infinity_points >= self.ip_mult_cost()
+            && self.achievement_unlocked(41)
+    }
+
+    /// Buy `amount` `ipMult` purchases at the current scaling
+    /// (`InfinityIPMultUpgrade.purchase`). Only ever called with `amount = 1` or
+    /// from `buy_max_ip_mult` under conditions that keep the scaling constant
+    /// across the whole batch. Without TS181 each purchase also doubles the Big
+    /// Crunch autobuyer's dynamic amount.
+    fn purchase_ip_mult(&mut self, amount: f64) {
+        if !self.can_buy_ip_mult() {
+            return;
+        }
+        if !self.time_study_bought(181) {
+            let bump = Decimal::from_float(2.0).pow(&Decimal::from_float(amount));
+            self.bump_big_crunch_amount(bump);
+        }
+        let cost = Decimal::sum_geometric_series(
+            amount,
+            &self.ip_mult_cost(),
+            &Decimal::from_float(self.ip_mult_cost_increase()),
+            0.0,
+        );
+        self.infinity_points -= cost;
+        self.ip_mult_purchases += amount as u32;
+    }
+
+    /// Buy a single `ipMult` purchase. Returns whether one was bought.
+    pub fn buy_ip_mult(&mut self) -> bool {
+        if !self.can_buy_ip_mult() {
+            return false;
+        }
+        self.purchase_ip_mult(1.0);
+        true
+    }
+
+    /// `InfinityIPMultUpgrade.buyMax`: bulk-buy in two phases — up to the
+    /// `costIncreaseThreshold` at ×10 scaling, then (deliberately *not* an
+    /// `else`) up to the cap at ×1e10 — so a balance spanning the threshold is
+    /// processed on both sides in one call.
+    pub fn buy_max_ip_mult(&mut self) {
+        if !self.can_buy_ip_mult() {
+            return;
+        }
+        if !self.ip_mult_has_increased_cost() {
+            // Only IP below the threshold participates in this phase.
+            let available = self.infinity_points.min(&IP_MULT_COST_INCREASE_THRESHOLD);
+            let purchases = Decimal::afford_geometric_series(
+                &available,
+                &self.ip_mult_cost(),
+                &Decimal::from_float(10.0),
+                0.0,
+            );
+            if purchases <= 0.0 {
+                return;
+            }
+            self.purchase_ip_mult(purchases);
+        }
+        if self.ip_mult_has_increased_cost() {
+            let available = self.infinity_points.min(&IP_MULT_COST_CAP);
+            let purchases = Decimal::afford_geometric_series(
+                &available,
+                &self.ip_mult_cost(),
+                &Decimal::from_float(1e10),
+                0.0,
+            );
+            if purchases <= 0.0 {
+                return;
+            }
+            self.purchase_ip_mult(purchases);
+        }
+    }
+
+    /// The `ipMult` effect for display: `2^purchases`, or the flat `1e1000000`
+    /// once cost-capped purchases pass 3.3M (see `total_ip_mult` for the applied
+    /// form, which also carries Effarig's cap).
+    pub fn ip_mult_effect(&self) -> Decimal {
+        if self.ip_mult_purchases >= 3_300_000 {
+            Decimal::new_unchecked(1.0, 1_000_000)
+        } else {
+            Decimal::from_float(2.0).pow(&Decimal::from(self.ip_mult_purchases as u64))
+        }
+    }
+
+    /// IP cost of the one-time `ipOffline` upgrade.
+    pub fn ip_offline_cost(&self) -> Decimal {
+        IP_OFFLINE_COST
+    }
+
+    /// `ipOffline`'s displayed effect: IP gained per minute while away
+    /// (`bestIPMsWithoutMaxAll × 60000 / 2`).
+    pub fn ip_offline_effect_per_min(&self) -> Decimal {
+        self.records.this_eternity.best_ip_ms_without_max_all
+            * Decimal::from_float(30_000.0)
+    }
+
+    /// Whether the one-time `ipOffline` upgrade can be bought: Achievement 41
+    /// unlocked (`checkRequirement`), not already owned, and affordable.
+    pub fn can_buy_ip_offline(&self) -> bool {
+        !self.ip_offline_bought
+            && self.achievement_unlocked(41)
+            && self.infinity_points >= IP_OFFLINE_COST
+    }
+
+    /// Buy the `ipOffline` upgrade. Returns whether the purchase happened.
+    pub fn buy_ip_offline(&mut self) -> bool {
+        if !self.can_buy_ip_offline() {
+            return false;
+        }
+        self.infinity_points -= IP_OFFLINE_COST;
+        self.ip_offline_bought = true;
         true
     }
 
@@ -708,6 +881,133 @@ mod tests {
         let before = game.infinity_points;
         game.generate_passive_ip(30_000.0);
         assert_eq!(game.infinity_points, before + Decimal::from_float(3.0));
+    }
+
+    /// Unlock Achievement 41 (the bottom-row gate) directly.
+    fn with_ach41(game: &mut GameState) {
+        game.unlock_achievement(41);
+    }
+
+    #[test]
+    fn ip_mult_gated_on_achievement_41() {
+        let mut game = GameState::new();
+        game.infinity_points = Decimal::new(1.0, 10);
+        assert!(!game.can_buy_ip_mult());
+        with_ach41(&mut game);
+        assert!(game.can_buy_ip_mult());
+    }
+
+    #[test]
+    fn ip_mult_cost_curve_and_single_purchase() {
+        let mut game = GameState::new();
+        with_ach41(&mut game);
+        // Cost starts at 10 and ×10 per purchase.
+        assert_eq!(game.ip_mult_cost(), Decimal::from_float(10.0));
+        game.infinity_points = Decimal::from_float(10.0);
+        assert!(game.buy_ip_mult());
+        assert_eq!(game.ip_mult_purchases, 1);
+        assert_eq!(game.infinity_points, Decimal::ZERO);
+        assert_eq!(game.ip_mult_cost(), Decimal::from_float(100.0));
+        assert_eq!(game.ip_mult_effect(), Decimal::from_float(2.0));
+    }
+
+    #[test]
+    fn ip_mult_buy_max_spends_the_geometric_series() {
+        let mut game = GameState::new();
+        with_ach41(&mut game);
+        // 10 + 100 + 1000 = 1110 buys exactly 3 with 1500 IP.
+        game.infinity_points = Decimal::from_float(1500.0);
+        game.buy_max_ip_mult();
+        assert_eq!(game.ip_mult_purchases, 3);
+        let left = game.infinity_points.to_f64();
+        assert!((left - 390.0).abs() < 1e-6, "left={left}");
+    }
+
+    #[test]
+    fn ip_mult_steepens_past_the_threshold_and_caps() {
+        let mut game = GameState::new();
+        with_ach41(&mut game);
+        // Just below the threshold the ratio is still ×10.
+        game.ip_mult_purchases = 2_999_998;
+        assert_eq!(game.ip_mult_cost(), Decimal::new_unchecked(1.0, 2_999_999));
+        // At `purchasesAtIncrease` the cost jumps to the 1e3M threshold and the
+        // ratio steepens to ×1e10.
+        game.ip_mult_purchases = 2_999_999;
+        assert_eq!(game.ip_mult_cost(), Decimal::new_unchecked(1.0, 3_000_000));
+        game.ip_mult_purchases = 3_000_000;
+        assert_eq!(game.ip_mult_cost(), Decimal::new_unchecked(1.0, 3_000_010));
+        // The cap: cost ≥ 1e6M ⇒ no further purchases even with infinite IP.
+        game.ip_mult_purchases = 3_299_999;
+        assert!(game.ip_mult_capped());
+        game.infinity_points = Decimal::MAX_VALUE;
+        assert!(!game.can_buy_ip_mult());
+    }
+
+    #[test]
+    fn ip_mult_buy_max_crosses_the_threshold_in_one_call() {
+        let mut game = GameState::new();
+        with_ach41(&mut game);
+        // Enough IP to clear the whole ×10 regime and buy into the ×1e10 one.
+        game.infinity_points = Decimal::new_unchecked(1.0, 3_000_025);
+        game.buy_max_ip_mult();
+        assert!(
+            game.ip_mult_purchases > 2_999_999,
+            "purchases={}",
+            game.ip_mult_purchases
+        );
+        assert!(game.ip_mult_purchases < 3_300_000);
+    }
+
+    #[test]
+    fn ip_mult_purchase_bumps_crunch_autobuyer_amount() {
+        let mut game = GameState::new();
+        with_ach41(&mut game);
+        // Unlock the Big Crunch autobuyer + dynamic amount.
+        for id in 1..=12 {
+            game.complete_challenge(id);
+        }
+        game.autobuyers.big_crunch_settings.increase_with_mult = true;
+        game.autobuyers.big_crunch_settings.amount = Decimal::from_float(3.0);
+        game.infinity_points = Decimal::from_float(10.0);
+        assert!(game.buy_ip_mult());
+        // ×2 per purchase (TS181 not owned).
+        assert_eq!(
+            game.autobuyers.big_crunch_settings.amount,
+            Decimal::from_float(6.0)
+        );
+    }
+
+    #[test]
+    fn ip_offline_purchase_and_offline_award() {
+        let mut game = GameState::new();
+        game.infinity_points = Decimal::from_float(2000.0);
+        assert!(!game.buy_ip_offline()); // needs Achievement 41
+        with_ach41(&mut game);
+        assert!(game.buy_ip_offline());
+        assert!(game.ip_offline_bought);
+        assert_eq!(game.infinity_points, Decimal::from_float(1000.0));
+        assert!(!game.buy_ip_offline()); // one-time
+
+        // The offline award: bestIPMsWithoutMaxAll × ms / 2.
+        game.records.this_eternity.best_ip_ms_without_max_all = Decimal::from_float(4.0);
+        let before = game.infinity_points;
+        game.offline_currency_gain(1000.0);
+        assert_eq!(game.infinity_points, before + Decimal::from_float(2000.0));
+    }
+
+    #[test]
+    fn keep_infinity_upgrades_milestone_grants_ip_offline() {
+        let mut game = GameState::new();
+        game.eternities = Decimal::from_float(4.0);
+        game.player_infinity_upgrades_on_reset();
+        assert!(game.ip_offline_bought);
+        assert_eq!(game.infinity_upgrades.count_ones(), 16);
+
+        // Below the milestone everything (including ipOffline) clears.
+        game.eternities = Decimal::ZERO;
+        game.player_infinity_upgrades_on_reset();
+        assert!(!game.ip_offline_bought);
+        assert_eq!(game.infinity_upgrades, 0);
     }
 
     #[test]

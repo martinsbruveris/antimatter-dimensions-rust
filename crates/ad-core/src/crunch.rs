@@ -160,11 +160,20 @@ impl GameState {
         }
         // The `ipMult` repeatable Infinity Upgrade: ×2 IP per purchase (past 3.3M
         // purchases the capped cost gives a flat `1e1000000`). `IPMultPurchases`.
-        if self.ip_mult_purchases >= 3_300_000 {
-            mult *= Decimal::new_unchecked(1.0, 1_000_000);
-        } else if self.ip_mult_purchases > 0 {
-            mult *= Decimal::from_float(2.0)
-                .pow(&Decimal::from(self.ip_mult_purchases as u64));
+        // Its effect is capped by Effarig's Eternity stage (`cap: () =>
+        // Effarig.eternityCap ?? DC.E1E6`; the E1E6 default is above the natural
+        // e993k maximum, so only the Effarig cap can bind).
+        if self.ip_mult_purchases > 0 {
+            let mut value = if self.ip_mult_purchases >= 3_300_000 {
+                Decimal::new_unchecked(1.0, 1_000_000)
+            } else {
+                Decimal::from_float(2.0)
+                    .pow(&Decimal::from(self.ip_mult_purchases as u64))
+            };
+            if let Some(cap) = self.effarig_eternity_cap() {
+                value = value.min(&cap);
+            }
+            mult *= value;
         }
         // The `infinityIP` glyph effect (`GlyphEffect.ipMult`).
         mult *= Decimal::from_float(self.glyph_effect_infinity_ip());

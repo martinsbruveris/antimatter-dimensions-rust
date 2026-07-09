@@ -55,7 +55,12 @@ not the current state).
   `galaxy_strength_effect`, `reset_boost_reduction`, the AD-multiplier
   contributions, `skip_resets_if_possible`, passive `generate_passive_ip`). Effects
   are *applied* at the original's sites (dimension multiplier, tickspeed, boost/
-  galaxy requirement, reset paths). See
+  galaxy requirement, reset paths). Also the Achievement-41 **bottom row**: the
+  `ipMult` rebuyable (`InfinityIPMultUpgrade`'s two-regime cost curve — ×10 steps
+  to 1e3M then ×1e10 to the 1e6M cap — with the two-phase geometric-series
+  `buy_max_ip_mult` and the Big-Crunch-autobuyer amount bump) and the one-time
+  `ipOffline` (its award fires in `offline_currency_gain`, tick.rs; the IP-mult
+  autobuyer ticks in autobuyers.rs, gated on the 1-Eternity milestone). See
   `../../docs/design/2026-07-03-infinity-upgrades.md`.
 - `src/break_infinity_upgrades.rs` — Break Infinity + its 12 upgrades (Feature 2.3).
   `GameState::broke_infinity` (↔ `player.break`) lifts the `1e308` cap and switches

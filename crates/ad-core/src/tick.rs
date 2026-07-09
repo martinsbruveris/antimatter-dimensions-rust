@@ -361,7 +361,26 @@ impl GameState {
         if ticks == 0 {
             return;
         }
+        self.offline_currency_gain(game_ms);
         self.ticks(tick_size, ticks);
+    }
+
+    /// The lump-sum currency award of the original's `simulateTime` (fired once
+    /// per offline catch-up, before the tick replay): the `ipOffline` Infinity
+    /// Upgrade grants 50% of the best IP/min without Max All over the whole away
+    /// interval (`bestIPMsWithoutMaxAll × ms / 2`). The GUI's chunked replay
+    /// calls this once before its first chunk;
+    /// [`simulate_offline`](Self::simulate_offline) calls it itself.
+    ///
+    /// The original gates this on `player.options.offlineProgress`; that toggle
+    /// is not modelled (offline progress is always on here — the 8.8 gap in the
+    /// port audit).
+    pub fn offline_currency_gain(&mut self, away_ms: f64) {
+        if self.ip_offline_bought && away_ms > 0.0 {
+            self.infinity_points +=
+                self.records.this_eternity.best_ip_ms_without_max_all
+                    * Decimal::from_float(away_ms / 2.0);
+        }
     }
 }
 

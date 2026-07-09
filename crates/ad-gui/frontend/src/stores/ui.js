@@ -268,6 +268,11 @@ export const useUiStore = defineStore("ui", {
       const total = plan.ticks;
       if (total <= 0) return;
 
+      // The lump-sum currency award (the ipOffline Infinity Upgrade) fires once
+      // for the whole away interval, before the tick replay — mirroring the
+      // original simulateTime's OFFLINE_CURRENCY_GAINED block.
+      await game.offlineCurrencyGain(gameMs);
+
       this.offlineReplayActive = true;
       this.offlineProgress = { current: 0, max: total, startTime: Date.now() };
       this.openModal = "offlineProgress";

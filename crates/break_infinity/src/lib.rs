@@ -825,6 +825,38 @@ impl Decimal {
         LN_10 * self.log10()
     }
 
+    /// `Decimal.affordGeometricSeries`: how many sequential purchases are
+    /// affordable with `resources`, where the first costs
+    /// `price_start × price_ratio^current_owned` and each subsequent purchase
+    /// costs `price_ratio` times the previous.
+    pub fn afford_geometric_series(
+        resources: &Decimal,
+        price_start: &Decimal,
+        price_ratio: &Decimal,
+        current_owned: f64,
+    ) -> f64 {
+        let first_cost =
+            *price_start * price_ratio.pow(&Decimal::from_float(current_owned));
+        let value =
+            *resources / first_cost * (*price_ratio - Decimal::ONE) + Decimal::ONE;
+        (value.log10() / price_ratio.log10()).floor()
+    }
+
+    /// `Decimal.sumGeometricSeries`: the total cost of `num_items` sequential
+    /// purchases under the same cost curve as
+    /// [`afford_geometric_series`](Self::afford_geometric_series).
+    pub fn sum_geometric_series(
+        num_items: f64,
+        price_start: &Decimal,
+        price_ratio: &Decimal,
+        current_owned: f64,
+    ) -> Decimal {
+        *price_start
+            * price_ratio.pow(&Decimal::from_float(current_owned))
+            * (Decimal::ONE - price_ratio.pow(&Decimal::from_float(num_items)))
+            / (Decimal::ONE - *price_ratio)
+    }
+
     /// Raises the Decimal to the power of the given Decimal.
     pub fn pow(&self, power: &Decimal) -> Decimal {
         if self.m == 0.0 {
