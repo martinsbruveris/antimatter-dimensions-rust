@@ -466,6 +466,29 @@ mod tests {
     use super::*;
     use crate::data::constants::BIG_CRUNCH_THRESHOLD;
 
+    #[test]
+    fn replicanti_timer_carries_sub_interval_phase_across_a_load() {
+        let mut base = GameState::new();
+        base.replicanti.unlocked = true;
+        base.replicanti.amount = Decimal::from_float(1e50);
+        base.replicanti.chance = 0.5;
+        base.replicanti.interval_ms = 100.0;
+        assert_eq!(base.replicanti_effective_interval(false), 100.0);
+
+        // A fresh (zero) timer: (50 + 0) / 100 = 0.5 of an interval — no growth.
+        let mut g0 = base.clone();
+        g0.tick_replicanti(50.0);
+        assert_eq!(g0.replicanti.amount, Decimal::from_float(1e50));
+
+        // A near-full timer completes an interval this tick: (50 + 60) / 100 = 1.1,
+        // so Replicanti grow by ×(1 + chance).
+        let mut g1 = base.clone();
+        g1.replicanti.timer_ms = 60.0;
+        g1.tick_replicanti(50.0);
+        let ratio = g1.replicanti.amount.to_f64() / 1.5e50;
+        assert!((ratio - 1.0).abs() < 1e-9, "{}", g1.replicanti.amount);
+    }
+
     fn unlocked_game() -> GameState {
         let mut game = GameState::new();
         game.infinity_points = Decimal::new(1.0, 141);

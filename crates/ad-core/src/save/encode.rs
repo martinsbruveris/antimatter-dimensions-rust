@@ -617,6 +617,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     rep["boughtGalaxyCap"] = json!(state.replicanti.galaxy_cap);
     rep["galaxies"] = json!(state.replicanti.galaxies);
     rep["galCost"] = decimal(&gal_cost);
+    rep["timer"] = json!(state.replicanti.timer_ms);
 
     // Options.
     let options = &mut player["options"];

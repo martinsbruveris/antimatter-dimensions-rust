@@ -766,10 +766,9 @@ pub struct RealityChecksDTO {
     pub max_id1: Decimal,
 }
 
-/// `player.replicanti` (modelled subset). The sub-interval `timer` is transient and
-/// absent from real saves, so it is not read (defaults to 0). `galCost` is present
-/// in the save but derived on our side (`replicanti_galaxy_cost`), so it is omitted
-/// here and ignored on load.
+/// `player.replicanti` (modelled subset). `galCost` is present in the save but
+/// derived on our side (`replicanti_galaxy_cost`), so it is omitted here and
+/// ignored on load.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplicantiDTO {
@@ -789,6 +788,10 @@ pub struct ReplicantiDTO {
     pub bought_galaxy_cap: u32,
     /// Replicanti Galaxies made.
     pub galaxies: u32,
+    /// Sub-interval time accumulator (`timer`, ms): carried across a load so a
+    /// mid-interval save resumes with the right phase. Older saves omit it.
+    #[serde(default)]
+    pub timer: f64,
 }
 
 /// `player.dilation` (modelled subset). `rebuyables` is an id-keyed object map
@@ -1490,7 +1493,7 @@ impl GameState {
         let replicanti = ReplicantiState {
             unlocked: dto.replicanti.unl,
             amount: dto.replicanti.amount,
-            timer_ms: 0.0,
+            timer_ms: dto.replicanti.timer,
             chance: dto.replicanti.chance,
             chance_cost: dto.replicanti.chance_cost,
             interval_ms: dto.replicanti.interval,

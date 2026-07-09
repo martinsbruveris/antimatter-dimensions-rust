@@ -795,3 +795,28 @@ Infinity Power now matches JS to ~15 significant figures.
   correctness fix that matters wherever Infinity Dimensions change fast within a tick.
 - `cargo test -p ad-core --features serde`: 575 pass; fmt + clippy clean; round-trip
   clean.
+
+## Bug 25 — the Replicanti sub-interval `timer` was dropped on load
+
+### Symptom
+`00232`, `00233`, `00241` diverged on `replicanti.amount` at horizon 1 (~8–12%).
+For `00241`, Rust's post-tick Replicanti equalled JS's *pre*-tick value — Rust grew
+nothing where JS completed one interval.
+
+### Diagnosis
+Replicanti replicate in discrete intervals; the leftover sub-interval time is stored
+in `player.replicanti.timer` and carried across ticks (and saves). Rust decoded this
+as 0 (deliberately, on the assumption it was transient). For `00241`
+`getReplicantiInterval = 166.77 ms` and the saved `timer = 140.94 ms`, so JS's
+`tickCount = (50 + 140.94) / 166.77 = 1` (one interval, ×1.12), while Rust's
+`(50 + 0) / 166.77 = 0` — no growth.
+
+### Fix
+Decode and encode `player.replicanti.timer` into `ReplicantiState.timer_ms` (with a
+serde default of 0 for older saves).
+
+### Verification
+- The Replicanti divergence is gone for all three fixtures (they now fail only on the
+  general ~2e-4/tier AD-chain floating-point drift). Grid holds at 607/1148;
+  round-trip clean (the new `timer` field round-trips).
+- `cargo test -p ad-core --features serde`: 576 pass; fmt + clippy clean.
