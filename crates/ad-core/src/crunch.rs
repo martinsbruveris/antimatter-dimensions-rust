@@ -354,6 +354,16 @@ impl GameState {
                 .this_eternity
                 .best_infinities_per_ms
                 .max(&infinities_per_ms);
+            // Best IP/ms this eternity, but only over crunches that did not use
+            // "Max All" this infinity (`bigCrunchUpdateStatistics`).
+            if !self.requirement_checks.infinity_max_all {
+                let ip_per_ms = gained_ip / Decimal::from_float(divisor);
+                self.records.this_eternity.best_ip_ms_without_max_all = self
+                    .records
+                    .this_eternity
+                    .best_ip_ms_without_max_all
+                    .max(&ip_per_ms);
+            }
 
             // Lower the fastest-infinity record to this run before resetting it
             // (mirrors `bigCrunchUpdateStatistics` + `secondSoftReset`).

@@ -1015,6 +1015,12 @@ pub struct ThisEternityDTO {
     /// Best infinities/ms this eternity (`bestInfinitiesPerMs`).
     #[serde(rename = "bestInfinitiesPerMs", with = "break_infinity::serde_string")]
     pub best_infinities_per_ms: Decimal,
+    /// Best IP/ms this eternity without "Max All" (`bestIPMsWithoutMaxAll`).
+    #[serde(
+        rename = "bestIPMsWithoutMaxAll",
+        with = "break_infinity::serde_string"
+    )]
+    pub best_ip_ms_without_max_all: Decimal,
 }
 
 /// `player.records.bestEternity` (modelled subset). Times are
@@ -1506,6 +1512,10 @@ impl GameState {
                 best_ep_min: dto.records.this_eternity.best_ep_min,
                 best_ep_min_val: dto.records.this_eternity.best_ep_min_val,
                 best_infinities_per_ms: dto.records.this_eternity.best_infinities_per_ms,
+                best_ip_ms_without_max_all: dto
+                    .records
+                    .this_eternity
+                    .best_ip_ms_without_max_all,
             },
             best_eternity: BestEternity {
                 time_ms: dto.records.best_eternity.time,

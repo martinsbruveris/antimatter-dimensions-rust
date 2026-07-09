@@ -181,3 +181,30 @@ decode (`dto.rs`) and encode (`encode.rs`), and the `updateChallengeTime` step i
 - Fidelity grid: 93 → **95** cells (+2) — the fixtures where NC best-times were
   the *sole* remaining divergence; the rest also carry the numerical drift above.
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 5 — `thisEternity.bestIPMsWithoutMaxAll` unmodelled
+
+### Symptom
+After the NC best-times fix, the next remaining discrete divergence (e.g.
+`00030 @ 1`) was `records.thisEternity.bestIPMsWithoutMaxAll`: JS held a real
+rate, Rust `0`.
+
+### The bug
+The last field of `bigCrunchUpdateStatistics` was unmodelled. The original keeps
+it only over crunches that did *not* use "Max All" this infinity:
+`if (!requirementChecks.infinity.maxAll) bestIPMsWithoutMaxAll =
+max(bestIPMsWithoutMaxAll, gainedIP / max(33, thisInfinity.realTime))`. It resets
+to 0 on Eternity and Reality.
+
+### The fix
+Added `ThisEternity.best_ip_ms_without_max_all` with decode/encode and the guarded
+update in the crunch `at_goal` branch (Rust already models the
+`requirement_checks.infinity_max_all` latch). The Eternity/Reality resets come
+for free via the `ThisEternity::new()` those paths assign.
+
+### Verification
+- Fixture 30 @ 1: now passes (remaining higher-horizon fails are the numerical
+  drift only).
+- Fidelity grid: 95 → **130** cells (+35) — this field gated a large swath of
+  mid/late-game fixtures. No regressions.
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

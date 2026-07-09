@@ -146,6 +146,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         decimal(&state.records.this_eternity.best_ep_min_val);
     records["thisEternity"]["bestInfinitiesPerMs"] =
         decimal(&state.records.this_eternity.best_infinities_per_ms);
+    records["thisEternity"]["bestIPMsWithoutMaxAll"] =
+        decimal(&state.records.this_eternity.best_ip_ms_without_max_all);
     records["bestEternity"]["time"] = json!(state.records.best_eternity.time_ms);
     records["bestEternity"]["realTime"] =
         json!(state.records.best_eternity.real_time_ms);

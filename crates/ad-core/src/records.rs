@@ -93,6 +93,10 @@ pub struct ThisEternity {
     /// (`thisEternity.bestInfinitiesPerMs`), updated at each Big Crunch.
     #[cfg_attr(feature = "serde", serde(default))]
     pub best_infinities_per_ms: Decimal,
+    /// Best IP-per-ms this eternity over crunches that did *not* use "Max All"
+    /// (`thisEternity.bestIPMsWithoutMaxAll`), updated at each Big Crunch.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_ip_ms_without_max_all: Decimal,
 }
 
 impl ThisEternity {
@@ -105,6 +109,7 @@ impl ThisEternity {
             best_ep_min: Decimal::ZERO,
             best_ep_min_val: Decimal::ZERO,
             best_infinities_per_ms: Decimal::ZERO,
+            best_ip_ms_without_max_all: Decimal::ZERO,
         }
     }
 }
