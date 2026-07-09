@@ -217,6 +217,63 @@ pub struct Autobuyer {
     pub timer_ms: f64,
 }
 
+/// Dim Boost autobuyer limit config (`player.auto.dimBoost`): mirrors the
+/// original's `limitDimBoosts` / `maxDimBoosts` / `limitUntilGalaxies` /
+/// `galaxies` / `buyMaxInterval`. Gates the autobuyer and round-trips through the
+/// save.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DimBoostAutobuyerConfig {
+    /// Stop boosting once `dim_boosts >= max_dim_boosts` (`limitDimBoosts`).
+    pub limit_dim_boosts: bool,
+    /// The boost cap (`maxDimBoosts`); a plain number in the save.
+    pub max_dim_boosts: f64,
+    /// Only boost once `galaxies >= until_galaxies` (`limitUntilGalaxies`).
+    pub limit_until_galaxies: bool,
+    /// The galaxy threshold (`galaxies`).
+    pub until_galaxies: f64,
+    /// "Buys max" interval-suspension setting (`buyMaxInterval`), preserved.
+    pub buy_max_interval: f64,
+}
+
+impl Default for DimBoostAutobuyerConfig {
+    fn default() -> Self {
+        Self {
+            limit_dim_boosts: false,
+            max_dim_boosts: 1.0,
+            limit_until_galaxies: false,
+            until_galaxies: 10.0,
+            buy_max_interval: 0.0,
+        }
+    }
+}
+
+/// Antimatter Galaxy autobuyer limit config (`player.auto.galaxy`): mirrors
+/// `limitGalaxies` / `maxGalaxies` / `buyMax` / `buyMaxInterval`.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GalaxyAutobuyerConfig {
+    /// Stop buying once `galaxies >= max_galaxies` (`limitGalaxies`).
+    pub limit_galaxies: bool,
+    /// The galaxy cap (`maxGalaxies`).
+    pub max_galaxies: f64,
+    /// "Buys max" toggle (`buyMax`); preserved (inert pre-Reality).
+    pub buy_max: bool,
+    /// "Buys max" interval-suspension setting (`buyMaxInterval`), preserved.
+    pub buy_max_interval: f64,
+}
+
+impl Default for GalaxyAutobuyerConfig {
+    fn default() -> Self {
+        Self {
+            limit_galaxies: false,
+            max_galaxies: 1.0,
+            buy_max: false,
+            buy_max_interval: 0.0,
+        }
+    }
+}
+
 /// serde default for [`Autobuyer::cost`] (1 IP), since `f64`'s `Default` is 0.
 #[cfg(feature = "serde")]
 fn default_autobuyer_cost() -> f64 {
@@ -306,9 +363,15 @@ pub struct AutobuyerState {
     /// path — `is_bought` stays false; runs off `can_be_upgraded`.
     #[cfg_attr(feature = "serde", serde(default = "default_dim_boost_autobuyer"))]
     pub dim_boost: Autobuyer,
+    /// Dim Boost autobuyer limit config (`limitDimBoosts` etc.).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub dim_boost_config: DimBoostAutobuyerConfig,
     /// Antimatter Galaxy autobuyer (unlocked by completing NC11).
     #[cfg_attr(feature = "serde", serde(default = "default_galaxy_autobuyer"))]
     pub galaxy: Autobuyer,
+    /// Galaxy autobuyer limit config (`limitGalaxies` etc.).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub galaxy_config: GalaxyAutobuyerConfig,
     /// Big Crunch autobuyer (unlocked by completing NC12). Its maxed interval
     /// gates Break Infinity.
     #[cfg_attr(feature = "serde", serde(default = "default_big_crunch_autobuyer"))]
@@ -358,10 +421,12 @@ impl AutobuyerState {
                 DIM_BOOST_AUTOBUYER_INTERVAL_MS,
                 AutobuyerMode::BuySingle,
             ),
+            dim_boost_config: DimBoostAutobuyerConfig::default(),
             galaxy: Autobuyer::new(
                 GALAXY_AUTOBUYER_INTERVAL_MS,
                 AutobuyerMode::BuySingle,
             ),
+            galaxy_config: GalaxyAutobuyerConfig::default(),
             big_crunch: Autobuyer::new(
                 BIG_CRUNCH_AUTOBUYER_INTERVAL_MS,
                 AutobuyerMode::BuySingle,
@@ -651,17 +716,32 @@ impl GameState {
         // Prestige autobuyers (unlocked by completing NC10/11/12). Their readiness
         // is exactly the buy/reset condition, so the phase resets only when the
         // action can actually happen (matching the original's `canTick`).
+        // Dim Boost limit gate (`DimBoostAutobuyerState.tick`, non-buyMax path):
+        // boost only when under the boost cap, or once the wait-for-galaxies
+        // threshold is met. `isBuyMaxUnlocked` is a post-Reality perk we don't
+        // model, so only this branch applies.
+        let db_cfg = self.autobuyers.dim_boost_config.clone();
+        let limit_condition =
+            !db_cfg.limit_dim_boosts || (self.dim_boosts as f64) < db_cfg.max_dim_boosts;
+        let galaxy_condition = db_cfg.limit_until_galaxies
+            && (self.galaxies as f64) >= db_cfg.until_galaxies;
         let ready = self.autobuyers.dim_boost.is_active
             && self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost)
-            && self.can_dim_boost();
+            && self.can_dim_boost()
+            && (limit_condition || galaxy_condition);
         let eff = self.autobuyers.dim_boost.interval_ms * speedup;
         if self.autobuyers.dim_boost.advance(dt_ms, eff, ready) {
             self.buy_dim_boost();
         }
 
+        // Galaxy limit gate (`GalaxyAutobuyerState.tick`: the cap passed to
+        // `requestGalaxyReset` stops it at `maxGalaxies`).
+        let galaxy_limit_ok = !self.autobuyers.galaxy_config.limit_galaxies
+            || (self.galaxies as f64) < self.autobuyers.galaxy_config.max_galaxies;
         let ready = self.autobuyers.galaxy.is_active
             && self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy)
-            && self.can_buy_galaxy();
+            && self.can_buy_galaxy()
+            && galaxy_limit_ok;
         let eff = self.autobuyers.galaxy.interval_ms * speedup;
         if self.autobuyers.galaxy.advance(dt_ms, eff, ready) {
             self.buy_galaxy();

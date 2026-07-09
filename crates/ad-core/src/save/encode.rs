@@ -692,6 +692,20 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         entry["cost"] = json!(ab.cost);
         entry["lastTick"] = last_tick(ab.timer_ms);
     }
+    // Dim Boost / Galaxy limit config.
+    let dbc = &state.autobuyers.dim_boost_config;
+    let db = &mut player["auto"]["dimBoost"];
+    db["limitDimBoosts"] = json!(dbc.limit_dim_boosts);
+    db["maxDimBoosts"] = json!(dbc.max_dim_boosts);
+    db["limitUntilGalaxies"] = json!(dbc.limit_until_galaxies);
+    db["galaxies"] = json!(dbc.until_galaxies);
+    db["buyMaxInterval"] = json!(dbc.buy_max_interval);
+    let gc = &state.autobuyers.galaxy_config;
+    let g = &mut player["auto"]["galaxy"];
+    g["limitGalaxies"] = json!(gc.limit_galaxies);
+    g["maxGalaxies"] = json!(gc.max_galaxies);
+    g["buyMax"] = json!(gc.buy_max);
+    g["buyMaxInterval"] = json!(gc.buy_max_interval);
     // Big Crunch goal settings (post-break modes).
     let s = &state.autobuyers.big_crunch_settings;
     let entry = &mut player["auto"]["bigCrunch"];

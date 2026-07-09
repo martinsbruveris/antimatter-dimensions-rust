@@ -27,6 +27,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Modelled Normal Challenge best times (`challenge.normal.bestTimes`, 11 entries): decode/encode + the crunch `updateChallengeTime` step; previously dropped to the `f64::MAX` sentinel | 95 (+2) |
 | 2026-07-09 | (pending) | Modelled `thisEternity.bestIPMsWithoutMaxAll` (decode/encode + the guarded `bigCrunchUpdateStatistics` update); previously dropped on decode | 130 (+35) |
 | 2026-07-09 | (pending) | Accrued autobuyer timers while globally disabled so the derived `lastTick` stays fixed (was drifting +1 tick/frame), mirroring the original's `timeSinceLastTick = realTimePlayed - lastTick` | 160 (+30) |
+| 2026-07-09 | (pending) | Modelled the Dim Boost / Galaxy autobuyer limit config (`limitDimBoosts`/`maxDimBoosts`/`limitUntilGalaxies`/`galaxies`, `limitGalaxies`/`maxGalaxies`/`buyMax`): decode/encode + readiness gating (stops the over-boost in `00061`) | 187 (+27) |
 
 ## Method
 

@@ -236,3 +236,29 @@ constant.
   carry the numerical drift or a crunch-timing difference).
 - Fidelity grid: 130 → **160** cells (+30). No regressions.
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 7 — Dim Boost / Galaxy autobuyer limit config unmodelled
+
+### Symptom
+Fixtures `00058`–`00068`+ diverged on `auto.dimBoost.{limitDimBoosts,maxDimBoosts,
+limitUntilGalaxies,galaxies,buyMaxInterval}` and `auto.galaxy.{limitGalaxies,
+maxGalaxies,buyMax,buyMaxInterval}` (e.g. JS `maxDimBoosts=6`, Rust `1`). Worse,
+`00061` also showed `dimensionBoosts` JS=6 / Rust=7 — Rust ignored the cap and
+over-boosted.
+
+### The bug
+The prestige-autobuyer limit config was neither decoded, encoded, nor applied.
+The original gates the Dim Boost autobuyer on `!limitDimBoosts || purchasedBoosts
+< maxDimBoosts` (or the `limitUntilGalaxies` wait), and caps the Galaxy autobuyer
+at `maxGalaxies`.
+
+### The fix
+Added `DimBoostAutobuyerConfig` and `GalaxyAutobuyerConfig` to `AutobuyerState`
+with decode/encode, and gated the two autobuyers' readiness on the caps in
+`tick_autobuyers` (the pre-Reality, non-`isBuyMaxUnlocked` path).
+
+### Verification
+- `00061` no longer over-boosts; `00059/60/62/63/66/67/68` pass horizon 1 (the
+  rest carry only the numerical drift).
+- Fidelity grid: 160 → **187** cells (+27). No regressions.
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

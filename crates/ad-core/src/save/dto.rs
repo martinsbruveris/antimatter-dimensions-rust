@@ -1145,9 +1145,9 @@ pub struct RealityAutobuyerDTO {
 }
 
 /// A Dim Boost / Galaxy / Big Crunch autobuyer entry. These have no antimatter
-/// "slow version" (`isBought`) or single/max `mode`, so we read only the
-/// active flag and interval-upgrade state; the rest of each object (limit config,
-/// crunch mode) is ignored.
+/// "slow version" (`isBought`) or single/max `mode`, so we read the active flag,
+/// interval-upgrade state, and the Dim Boost / Galaxy limit config (each ignores
+/// the other's fields via serde defaults; Big Crunch has neither).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrestigeAutobuyerDTO {
@@ -1158,6 +1158,38 @@ pub struct PrestigeAutobuyerDTO {
     /// elapsed-time `timer_ms` on load (see [`AutobuyerDTO::last_tick`]).
     #[serde(default)]
     pub last_tick: f64,
+    /// Dim Boost autobuyer: cap the boost count at `max_dim_boosts`.
+    #[serde(default)]
+    pub limit_dim_boosts: bool,
+    #[serde(default = "one_f64")]
+    pub max_dim_boosts: f64,
+    /// Dim Boost autobuyer: only boost once `player.galaxies >= galaxies`.
+    #[serde(default)]
+    pub limit_until_galaxies: bool,
+    #[serde(default = "ten_f64")]
+    pub galaxies: f64,
+    /// Galaxy autobuyer: cap the galaxy count at `max_galaxies`.
+    #[serde(default)]
+    pub limit_galaxies: bool,
+    #[serde(default = "one_f64")]
+    pub max_galaxies: f64,
+    /// Galaxy autobuyer: "Buys max" toggle (`buyMax`).
+    #[serde(default)]
+    pub buy_max: bool,
+    /// The "Buys max" interval-suspension setting (`buyMaxInterval`), preserved
+    /// verbatim.
+    #[serde(default)]
+    pub buy_max_interval: f64,
+}
+
+/// serde default `1.0` for the Dim Boost / Galaxy limit caps.
+fn one_f64() -> f64 {
+    1.0
+}
+
+/// serde default `10.0` for the Dim Boost `limitUntilGalaxies` galaxy count.
+fn ten_f64() -> f64 {
+    10.0
 }
 
 /// `player.auto.antimatterDims` — the `all` array holds the 8 tier autobuyers.
@@ -1910,6 +1942,20 @@ impl GameState {
             ab.cost = cost;
             ab.timer_ms = timer_from(last_tick);
         }
+        // Dim Boost / Galaxy limit config (gates the autobuyer and round-trips).
+        autobuyers.dim_boost_config = crate::autobuyers::DimBoostAutobuyerConfig {
+            limit_dim_boosts: dto.auto.dim_boost.limit_dim_boosts,
+            max_dim_boosts: dto.auto.dim_boost.max_dim_boosts,
+            limit_until_galaxies: dto.auto.dim_boost.limit_until_galaxies,
+            until_galaxies: dto.auto.dim_boost.galaxies,
+            buy_max_interval: dto.auto.dim_boost.buy_max_interval,
+        };
+        autobuyers.galaxy_config = crate::autobuyers::GalaxyAutobuyerConfig {
+            limit_galaxies: dto.auto.galaxy.limit_galaxies,
+            max_galaxies: dto.auto.galaxy.max_galaxies,
+            buy_max: dto.auto.galaxy.buy_max,
+            buy_max_interval: dto.auto.galaxy.buy_max_interval,
+        };
         // Big Crunch goal settings + the Eternity / Reality autobuyers.
         autobuyers.big_crunch_settings = PrestigeGoalSettings {
             mode: prestige_goal_mode_from_raw(dto.auto.big_crunch.mode)?,
