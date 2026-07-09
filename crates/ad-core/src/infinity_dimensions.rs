@@ -354,19 +354,22 @@ impl GameState {
     /// `InfinityDimensions.tick`.
     pub fn tick_infinity_dimensions(&mut self, dt_ms: f64) {
         let dt_s = dt_ms / 1000.0;
-        let prod: [Decimal; 8] =
-            std::array::from_fn(|t| self.id_production_per_second(t));
-
         let dt10 = Decimal::from_float(dt_s / 10.0);
+        // The original produces sequentially top-down, so each tier's production
+        // reads the amount the tier above *just* added — the chain compounds within
+        // the tick. Recompute the per-second rate inside the loop (as the AD loop
+        // does) rather than snapshotting every tier's rate up front.
         for tier in (1..INFINITY_DIMENSION_COUNT).rev() {
-            self.infinity_dimensions[tier - 1].amount += prod[tier] * dt10;
+            let produced = self.id_production_per_second(tier) * dt10;
+            self.infinity_dimensions[tier - 1].amount += produced;
         }
-        // EC7: the 1st Infinity Dimension produces 7th Antimatter Dimensions
-        // instead of Infinity Power.
+        // The 1st Infinity Dimension then produces Infinity Power (`diff`) from its
+        // just-updated amount — or, under EC7, 7th Antimatter Dimensions.
+        let id1_prod = self.id_production_per_second(0);
         if self.ec_running(7) {
-            self.dimensions[6].amount += prod[0] * Decimal::from_float(dt_s);
+            self.dimensions[6].amount += id1_prod * Decimal::from_float(dt_s);
         } else {
-            self.infinity_power += prod[0] * Decimal::from_float(dt_s);
+            self.infinity_power += id1_prod * Decimal::from_float(dt_s);
         }
         // Track the peak 1st Infinity Dimension amount this Reality
         // (`reality.maxID1 = maxID1.clampMin(ID1.amount)`; gates Imaginary Up. 15).
@@ -391,6 +394,36 @@ impl GameState {
 mod tests {
     use super::*;
     use crate::data::constants::BIG_CRUNCH_THRESHOLD;
+
+    #[test]
+    fn infinity_dimension_production_compounds_within_a_tick() {
+        let mut game = GameState::new();
+        game.infinity_dimensions[0].is_unlocked = true;
+        game.infinity_dimensions[1].is_unlocked = true;
+        game.infinity_dimensions[0].base_amount = 100;
+        game.infinity_dimensions[1].base_amount = 100;
+        game.infinity_dimensions[0].amount = Decimal::from_float(1e10);
+        game.infinity_dimensions[1].amount = Decimal::from_float(1e10);
+
+        let dt_ms = 50.0;
+        let dt10 = Decimal::from_float(dt_ms / 1000.0 / 10.0);
+        let dt_s = Decimal::from_float(dt_ms / 1000.0);
+
+        // Replicate the sequential (compounding) chain by hand: ID2 feeds ID1, then
+        // the *updated* ID1 feeds Infinity Power.
+        let mut reference = game.clone();
+        let id2_prod = reference.id_production_per_second(1) * dt10;
+        reference.infinity_dimensions[0].amount += id2_prod;
+        let expected_power =
+            reference.infinity_power + reference.id_production_per_second(0) * dt_s;
+
+        game.tick_infinity_dimensions(dt_ms);
+
+        let ratio = game.infinity_power.to_f64() / expected_power.to_f64();
+        assert!((ratio - 1.0).abs() < 1e-12, "ratio={ratio}");
+        // The 1st Infinity Dimension grew this tick (the compounding source).
+        assert!(game.infinity_dimensions[0].amount > Decimal::from_float(1e10));
+    }
 
     fn game_with_id1_unlockable() -> GameState {
         let mut game = GameState::new();

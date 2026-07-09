@@ -765,3 +765,33 @@ recursion). All eight per-tier multipliers now match JS to ~15 significant figur
   a separate, much smaller issue). Grid holds at 606/1148 (no regressions;
   round-trip clean; the structural @1 count/flag list stays empty).
 - `cargo test -p ad-core --features serde`: 574 pass; fmt + clippy clean.
+
+## Bug 24 — Infinity Dimension production must compound within a tick
+
+### Symptom
+After the IC8 fix, `00241`'s AD chain still drifted ~0.04 orders/tier, tracking a
+`infinityPower` divergence (Δ≈5.6e-3) that fed the `IP^7` AD multiplier.
+
+### Diagnosis
+On JS's exact pre-Infinity-Dimension state, Rust's per-tier ID multipliers and
+Infinity Power all matched — yet running Rust's `tick_infinity_dimensions` on that
+state produced `1.4051e364` vs JS's `1.4233e364`. `tick_infinity_dimensions`
+snapshotted *every* tier's production-per-second up front (`std::array::from_fn`)
+and then applied them, so the chain did **not** compound within the tick. The
+original produces sequentially top-down (`ID(tier).produceDimensions(ID(tier-1),
+diff/10)`), so each tier reads the amount the tier above just added, and the final
+Infinity Power uses the *compounded* 1st Infinity Dimension — exactly like the AD
+production loop, which already recomputed its rate inside the loop.
+
+### Fix
+Recompute `id_production_per_second` inside the chain loop (top-down), and produce
+Infinity Power from the just-updated 1st Infinity Dimension. Rust's post-ID
+Infinity Power now matches JS to ~15 significant figures.
+
+### Verification
+- Fidelity grid: 606 → **607** cells (+1). `00241`'s AD chain drift drops from
+  ~0.04/tier to ~1e-4/tier (a `replicanti` divergence, Δ≈4.9e-2, is the next
+  prominent issue). The single-tick effect is small for steady-state saves but is a
+  correctness fix that matters wherever Infinity Dimensions change fast within a tick.
+- `cargo test -p ad-core --features serde`: 575 pass; fmt + clippy clean; round-trip
+  clean.
