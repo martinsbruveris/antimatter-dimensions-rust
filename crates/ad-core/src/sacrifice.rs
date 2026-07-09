@@ -154,6 +154,13 @@ impl GameState {
         self.total_boost(&new_sacrificed)
     }
 
+    /// Whether the Dimensional Sacrifice autobuyer runs
+    /// (`SacrificeAutobuyerState.isUnlocked`): the `autoIC` Eternity milestone (7
+    /// eternities) or a completed Infinity Challenge 2.
+    pub fn sacrifice_autobuyer_unlocked(&self) -> bool {
+        self.eternity_milestone_reached(7) || self.infinity_challenge_completed(2)
+    }
+
     /// Perform a dimensional sacrifice.
     ///
     /// Standard: adds AD1 amount to the sacrifice total and resets dimensions
@@ -171,49 +178,59 @@ impl GameState {
         if !self.can_sacrifice() {
             return false;
         }
+        // Below the Break, or in a Normal (not Infinity) Challenge, refuse once
+        // antimatter passes the Infinity cap — you should crunch, not sacrifice
+        // (`sacrificeReset`'s antimatter guard).
+        let nc_not_ic =
+            self.challenge.current != 0 && self.infinity_challenge.current == 0;
+        if (!self.broke_infinity || nc_not_ic)
+            && self.antimatter > Decimal::NUMBER_MAX_VALUE
+        {
+            return false;
+        }
+        // Under NC8 the running product doubles as the sacrifice multiplier and
+        // is capped at `Number.MAX_VALUE`.
+        if self.challenge_running(8)
+            && self.chall8_total_sacrifice >= BIG_CRUNCH_THRESHOLD
+        {
+            return false;
+        }
 
         // SACRIFICE_RESET_BEFORE achievements (88), read from the pre-sacrifice
         // `nextBoost`.
         self.check_sacrifice_before_achievements();
 
-        // A Sacrifice breaks the "no Sacrifice since last Galaxy" flag
-        // (`sacrifice.js`).
-        self.requirement_checks.infinity_no_sacrifice = false;
+        // `chall8TotalSacrifice *= nextBoost` and `sacrificed += AD1` run for every
+        // sacrifice, even outside NC8 (`sacrificeReset`); NC8 merely also *uses* the
+        // product as its multiplier.
+        let next_boost = self.next_sacrifice_boost();
+        self.chall8_total_sacrifice *= next_boost;
+        self.sacrificed += self.dimensions[0].amount;
 
         // Achievement 118 stops a Sacrifice from resetting the Antimatter
         // Dimensions (`isAch118Unlocked`).
         let keep_dimensions = self.achievement_unlocked(118);
-
         if self.challenge_running(8) {
-            if self.chall8_total_sacrifice >= BIG_CRUNCH_THRESHOLD {
-                return false;
-            }
-            let next_boost = self.next_sacrifice_boost();
-            self.chall8_total_sacrifice *= next_boost;
-            self.sacrificed += self.dimensions[0].amount;
+            // NC8 fully resets every dimension (and antimatter) for a much
+            // stronger boost.
             if !keep_dimensions {
                 for i in 0..8 {
                     self.dimensions[i] = DimensionTier::new();
                 }
             }
             self.antimatter = self.starting_antimatter();
-            self.check_sacrifice_after_achievements();
-            return true;
-        }
-
-        // Update total sacrificed
-        self.sacrificed += self.dimensions[0].amount;
-
-        // Reset amounts for the lower dimensions (`resetAmountUpToTier`): up to
-        // tier 7 (indices 0–6) normally, or tier 6 (indices 0–5, keeping AD7)
-        // under Normal Challenge 12. Achievement 118 skips this reset entirely.
-        if !keep_dimensions {
+        } else if !keep_dimensions {
+            // `resetAmountUpToTier`: reset amounts up to tier 7 (indices 0–6), or
+            // tier 6 (keeping AD7) under Normal Challenge 12.
             let max_tier = if self.challenge_running(12) { 6 } else { 7 };
             for i in 0..max_tier {
                 self.dimensions[i].amount = Decimal::ZERO;
             }
         }
 
+        // A Sacrifice breaks the "no Sacrifice since last Galaxy" flag
+        // (`sacrifice.js`).
+        self.requirement_checks.infinity_no_sacrifice = false;
         // SACRIFICE_RESET_AFTER achievements (32, 118, …).
         self.check_sacrifice_after_achievements();
         true

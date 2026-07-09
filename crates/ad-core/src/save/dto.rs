@@ -1122,6 +1122,38 @@ pub struct AutoDTO {
     /// unmodelled; only the active flag is preserved for round-trip fidelity.
     #[serde(rename = "ipMultBuyer", default)]
     pub ip_mult_buyer: IsActiveDTO,
+    /// `player.auto.sacrifice` (Dimensional Sacrifice autobuyer).
+    #[serde(default)]
+    pub sacrifice: SacrificeAutobuyerDTO,
+}
+
+/// `player.auto.sacrifice` — the Dimensional Sacrifice autobuyer: an `isActive`
+/// flag and the boost-ratio `multiplier` threshold (a Decimal). It has no interval
+/// (ticks every game tick).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SacrificeAutobuyerDTO {
+    #[serde(default = "default_true_bool")]
+    pub is_active: bool,
+    #[serde(
+        with = "break_infinity::serde_string",
+        default = "default_sacrifice_multiplier"
+    )]
+    pub multiplier: Decimal,
+}
+
+impl Default for SacrificeAutobuyerDTO {
+    fn default() -> Self {
+        Self {
+            is_active: true,
+            multiplier: default_sacrifice_multiplier(),
+        }
+    }
+}
+
+/// serde default for [`SacrificeAutobuyerDTO::multiplier`] (`DC.D2`).
+fn default_sacrifice_multiplier() -> Decimal {
+    Decimal::from_float(2.0)
 }
 
 /// A minimal `{ isActive }` autobuyer object, preserved verbatim.
@@ -1940,6 +1972,8 @@ impl GameState {
         let mut autobuyers = AutobuyerState::new();
         autobuyers.enabled = dto.auto.autobuyers_on;
         autobuyers.ad_group_active = dto.auto.antimatter_dims.is_active;
+        autobuyers.sacrifice_active = dto.auto.sacrifice.is_active;
+        autobuyers.sacrifice_multiplier = dto.auto.sacrifice.multiplier;
         // The JS interval autobuyers store `lastTick` as an absolute
         // `realTimePlayed` timestamp; we model the timer as elapsed time, so
         // convert `timer_ms = realTimePlayed - lastTick` (clamped ≥ 0) to

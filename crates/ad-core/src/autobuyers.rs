@@ -406,6 +406,15 @@ pub struct AutobuyerState {
     /// flag. Behaviour unmodelled; preserved for round-trip fidelity.
     #[cfg_attr(feature = "serde", serde(default))]
     pub ip_mult_buyer_active: bool,
+    /// The Dimensional Sacrifice autobuyer's active flag
+    /// (`player.auto.sacrifice.isActive`).
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub sacrifice_active: bool,
+    /// The Sacrifice autobuyer's boost-ratio threshold
+    /// (`player.auto.sacrifice.multiplier`): it sacrifices once the next boost
+    /// reaches `max(this, 1.01)` (or unconditionally under Achievement 118).
+    #[cfg_attr(feature = "serde", serde(default = "default_sacrifice_threshold"))]
+    pub sacrifice_multiplier: Decimal,
 }
 
 /// serde defaults for the three challenge-only autobuyers (so an older serialized
@@ -425,6 +434,10 @@ fn default_big_crunch_autobuyer() -> Autobuyer {
 #[cfg(feature = "serde")]
 fn default_true() -> bool {
     true
+}
+#[cfg(feature = "serde")]
+fn default_sacrifice_threshold() -> Decimal {
+    Decimal::from_float(2.0)
 }
 
 impl AutobuyerState {
@@ -459,6 +472,8 @@ impl AutobuyerState {
             eternity: EternityAutobuyer::new(),
             reality: RealityAutobuyer::new(),
             ip_mult_buyer_active: false,
+            sacrifice_active: true,
+            sacrifice_multiplier: Decimal::from_float(2.0),
         }
     }
 }
@@ -853,6 +868,22 @@ impl GameState {
         {
             self.reset_autobuyer_ticks(PRESTIGE_REALITY, dt_ms);
         }
+
+        // Dimensional Sacrifice autobuyer (`SacrificeAutobuyerState`): no interval,
+        // so it sacrifices every tick once the next boost reaches the configured
+        // threshold — or unconditionally under Achievement 118, which makes a
+        // Sacrifice free. Runs after the prestige autobuyers, matching the
+        // original's tick order (`sacrifice` sits in the post-prestige group).
+        if self.sacrifice_autobuyer_unlocked() && self.autobuyers.sacrifice_active {
+            let threshold = self
+                .autobuyers
+                .sacrifice_multiplier
+                .max(&Decimal::from_float(1.01));
+            if self.achievement_unlocked(118) || self.next_sacrifice_boost() >= threshold
+            {
+                self.sacrifice();
+            }
+        }
     }
 
     /// `Autobuyers.resetTick(prestigeEvent)`: on a prestige reset the original sets
@@ -1198,6 +1229,36 @@ mod tests {
         game.autobuyers.dimensions[0].timer_ms = 100.0;
         game.tick_autobuyers(150.0);
         assert_eq!(game.dimensions[0].bought, 2);
+    }
+
+    #[test]
+    fn sacrifice_autobuyer_fires_when_active_and_the_boost_clears_the_threshold() {
+        let mut game = GameState::new();
+        game.complete_infinity_challenge(2); // unlocks the sacrifice autobuyer
+        assert!(game.sacrifice_autobuyer_unlocked());
+
+        // A sacrificeable state: >= 5 boosts, an 8th dimension, and a large 1st
+        // dimension so the next boost easily clears the x2 threshold. Keep the AD
+        // autobuyers out of the way so only the sacrifice fires.
+        game.dim_boosts = 5;
+        game.dimensions[7].amount = Decimal::from_float(1e3);
+        game.dimensions[0].amount = Decimal::new(1.0, 200);
+        for ab in game.autobuyers.dimensions.iter_mut() {
+            ab.is_active = false;
+        }
+        game.autobuyers.sacrifice_active = true;
+        game.autobuyers.sacrifice_multiplier = Decimal::from_float(2.0);
+
+        assert_eq!(game.sacrificed, Decimal::ZERO);
+        game.tick_autobuyers(50.0);
+        assert!(game.sacrificed > Decimal::ZERO);
+
+        // With the autobuyer toggled off, nothing is sacrificed.
+        game.sacrificed = Decimal::ZERO;
+        game.dimensions[0].amount = Decimal::new(1.0, 200);
+        game.autobuyers.sacrifice_active = false;
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.sacrificed, Decimal::ZERO);
     }
 
     #[test]

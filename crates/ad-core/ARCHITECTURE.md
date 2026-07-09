@@ -20,7 +20,9 @@ not the current state).
 - `src/galaxy.rs` — Antimatter galaxy purchases; Dimension Boosts
   (`can_dim_boost`, `buy_dim_boost`, and the `autobuyMaxDimboosts` buy-max path
   `max_buy_dim_boosts`)
-- `src/sacrifice.rs` — Dimension sacrifice
+- `src/sacrifice.rs` — Dimension sacrifice (`sacrifice` mirrors `sacrificeReset`:
+  the `chall8TotalSacrifice *= nextBoost` product runs for every sacrifice, not
+  only NC8) + the Sacrifice autobuyer gate (`sacrifice_autobuyer_unlocked`)
 - `src/crunch.rs` — Big Crunch (Infinity): `can_big_crunch`, `big_crunch`, and the
   shared `big_crunch_reset(forced, entering_challenge)` that both the manual crunch
   and the challenge enter/exit route through. Awards Infinity Points

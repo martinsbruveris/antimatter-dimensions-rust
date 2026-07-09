@@ -622,3 +622,36 @@ autobuyers on `individual && (collapseDisplay ? group : true)`.
 - Fidelity grid: 580 → **584** cells (+4); `00184`/`00185` now pass @1 and @10.
 - Round-trip identity holds for all fixtures (the new group flag encodes cleanly).
 - `cargo test -p ad-core --features serde`: 569 pass; fmt + clippy clean.
+
+## Bug 19 — the Dimensional Sacrifice autobuyer (+ the `chall8TotalSacrifice` product)
+
+### Symptom
+`00145` (438 min, post-break, not in a challenge) diverged from horizon 1 with
+every Antimatter Dimension a flat Δlog10 ≈ 17.80 low, plus `sacrificed JS=3.9e1779
+Rust=0` and `chall8TotalSacrifice JS=6.25e17 Rust=1`.
+
+### Diagnosis
+Driving the game showed an active, unlocked **Sacrifice autobuyer**
+(`multiplier`/threshold 2) that Rust didn't model — JS auto-sacrificed on tick 1,
+Rust didn't. With Achievement 118 the sacrifice keeps the dimensions (no reset),
+so the sacrifice's 8th-dimension boost (`nextBoost` = 6.25e17) propagates down the
+production chain and lifts every dimension by log10(6.25e17) ≈ 17.80. The
+`chall8TotalSacrifice` gap was a second bug: `sacrificeReset` multiplies the
+running product by `nextBoost` for **every** sacrifice, but Rust only did so
+inside the NC8 branch.
+
+### Fix
+Rewrote `sacrifice()` to mirror `sacrificeReset()` (the always-on
+`chall8TotalSacrifice *= nextBoost` and `sacrificed += AD1`, the pre-crunch
+antimatter guard, the NC8 cap, and the Achievement-118-gated resets), then modelled
+the Sacrifice autobuyer: `AutobuyerState.sacrifice_active`/`sacrifice_multiplier`
+(↔ `player.auto.sacrifice`, decode/encode), `sacrifice_autobuyer_unlocked` (the
+`autoIC` milestone or a completed IC2), and the trigger in `tick_autobuyers`
+(sacrifice when `Achievement(118)` applies or `nextBoost >= max(threshold, 1.01)`),
+placed after the prestige autobuyers to match the original's order.
+
+### Verification
+- `00145`'s structural divergence is gone (17.80 orders → ~1.5e-4 FP noise); it now
+  fails only on floating-point drift, like the rest of the deep cohort. Grid holds
+  at 584/1148 (no fixture flips, none regress; round-trip clean).
+- `cargo test -p ad-core --features serde`: 570 pass; fmt + clippy clean.

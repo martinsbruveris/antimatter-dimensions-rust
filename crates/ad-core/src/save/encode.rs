@@ -760,6 +760,9 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     entry["time"] = json!(ab.time);
     player["auto"]["ipMultBuyer"]["isActive"] =
         json!(state.autobuyers.ip_mult_buyer_active);
+    player["auto"]["sacrifice"]["isActive"] = json!(state.autobuyers.sacrifice_active);
+    player["auto"]["sacrifice"]["multiplier"] =
+        decimal(&state.autobuyers.sacrifice_multiplier);
 }
 
 /// A `Decimal` as the JSON string the original stores (`Decimal::toJSON =
