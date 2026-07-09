@@ -283,9 +283,14 @@ not the current state).
   restarting each interval. The AD autobuyers also carry a group toggle
   (`ad_group_active` ↔ `auto.antimatterDims.isActive`): once every tier is
   maxed/unlocked with unlimited bulk the UI collapses them into one control
-  (`ad_autobuyer_collapse_display`) and that group flag gates all tiers. The save codec converts `lastTick ↔ timer_ms` on
-  load/store (see `save/dto.rs` / `save/encode.rs`); discarding it desynchronises
-  every autobuyer's firing phase on replay. See
+  (`ad_autobuyer_collapse_display`) and that group flag gates all tiers. Order
+  matters where autobuyers share state: the Galaxy autobuyer runs **before** the
+  Dim Boost one (the original's `singleComplex` order), so after the AD autobuyers
+  grow the 8th dimension a galaxy pre-empts a boost at the same threshold; the
+  buy-max Dim Boost autobuyer's `resetTickOn` is `INFINITY` (not `ANTIMATTER_GALAXY`),
+  so a galaxy doesn't reset its phase (`reset_autobuyer_ticks`). The save codec
+  converts `lastTick ↔ timer_ms` on load/store (see `save/dto.rs` / `save/encode.rs`);
+  discarding it desynchronises every autobuyer's firing phase on replay. See
   `../../docs/design/2026-07-03-autobuyers.md`.
 - `src/options.rs` — `Options` struct: player UI/UX preferences (mirrors JS
   `player.options`), held in `GameState`, preserved across a Big Crunch.

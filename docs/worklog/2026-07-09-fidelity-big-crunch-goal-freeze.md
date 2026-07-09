@@ -655,3 +655,32 @@ placed after the prestige autobuyers to match the original's order.
   fails only on floating-point drift, like the rest of the deep cohort. Grid holds
   at 584/1148 (no fixture flips, none regress; round-trip clean).
 - `cargo test -p ad-core --features serde`: 570 pass; fmt + clippy clean.
+
+## Bug 20 — Galaxy/Dim-Boost autobuyer order (and the buy-max `resetTickOn`)
+
+### Symptom
+`00129`, `00154` (post-break, buy-max Dim Boost active) diverged at horizon 1 with
+`dimensionBoosts JS=4 Rust=30` and `galaxies JS=6 Rust=5` — JS bought an Antimatter
+Galaxy (which resets boosts to the starting 4) while Rust bought 18 Dimension
+Boosts instead.
+
+### Diagnosis
+On the input both `DimBoost.requirement` (131) and `Galaxy.requirement` (371)
+exceed the 8th dimension (120), so nothing can fire yet. But the AD autobuyers run
+first and grow the 8th dimension past both thresholds, and then **whichever of the
+Galaxy / Dim Boost autobuyers runs next consumes it via its reset**. The original
+ticks them in `singleComplex` order — Galaxy *before* Dim Boost — so a galaxy
+pre-empts the boost; Rust ran Dim Boost first. A follow-on mismatch: the buy-max
+Dim Boost autobuyer's `resetTickOn` is `INFINITY`, not `ANTIMATTER_GALAXY`, so a
+galaxy must not reset its timer — Rust's `reset_autobuyer_ticks` reset it
+unconditionally, leaving `auto.dimBoost.lastTick` wrong.
+
+### Fix
+Reordered `tick_autobuyers` to run the Galaxy autobuyer before the Dim Boost one,
+and made `reset_autobuyer_ticks` use the buy-max-aware Dim Boost `resetTickOn`
+(`INFINITY` when `autobuyMaxDimboosts` is bought, else `ANTIMATTER_GALAXY`).
+
+### Verification
+- Fidelity grid: 584 → **602** cells (+18). `00129` @1 passes; `00154`'s structural
+  divergence is gone (now FP-only). No regressions; round-trip clean.
+- `cargo test -p ad-core --features serde`: 571 pass; fmt + clippy clean.

@@ -775,6 +775,25 @@ impl GameState {
         // Prestige autobuyers (unlocked by completing NC10/11/12). Their readiness
         // is exactly the buy/reset condition, so the phase resets only when the
         // action can actually happen (matching the original's `canTick`).
+        // The original ticks the Antimatter Galaxy autobuyer *before* the Dimension
+        // Boost one (both sit in its `singleComplex` group, galaxy first). The order
+        // matters: after the AD autobuyers grow the 8th dimension, whichever of the
+        // two fires first consumes it via its reset, so galaxy-before-boost is what
+        // lets a galaxy pre-empt a boost at the same threshold.
+
+        // Galaxy limit gate (`GalaxyAutobuyerState.tick`: the cap passed to
+        // `requestGalaxyReset` stops it at `maxGalaxies`).
+        let galaxy_limit_ok = !self.autobuyers.galaxy_config.limit_galaxies
+            || (self.galaxies as f64) < self.autobuyers.galaxy_config.max_galaxies;
+        let ready = self.autobuyers.galaxy.is_active
+            && self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy)
+            && self.can_buy_galaxy()
+            && galaxy_limit_ok;
+        let eff = self.autobuyers.galaxy.interval_ms * speedup;
+        if self.autobuyers.galaxy.advance(dt_ms, eff, ready) && self.buy_galaxy() {
+            self.reset_autobuyer_ticks(PRESTIGE_ANTIMATTER_GALAXY, dt_ms);
+        }
+
         // Dim Boost gate (`DimBoostAutobuyerState.tick`). The `autobuyMaxDimboosts`
         // Break Infinity Upgrade switches it to a "buy max" path: it only fires
         // when a boost would unlock a new dimension, or the wait-for-galaxies
@@ -821,19 +840,6 @@ impl GameState {
             if bought {
                 self.reset_autobuyer_ticks(reset_event, dt_ms);
             }
-        }
-
-        // Galaxy limit gate (`GalaxyAutobuyerState.tick`: the cap passed to
-        // `requestGalaxyReset` stops it at `maxGalaxies`).
-        let galaxy_limit_ok = !self.autobuyers.galaxy_config.limit_galaxies
-            || (self.galaxies as f64) < self.autobuyers.galaxy_config.max_galaxies;
-        let ready = self.autobuyers.galaxy.is_active
-            && self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy)
-            && self.can_buy_galaxy()
-            && galaxy_limit_ok;
-        let eff = self.autobuyers.galaxy.interval_ms * speedup;
-        if self.autobuyers.galaxy.advance(dt_ms, eff, ready) && self.buy_galaxy() {
-            self.reset_autobuyer_ticks(PRESTIGE_ANTIMATTER_GALAXY, dt_ms);
         }
 
         // Big Crunch: `canTick` is `Player.canCrunch` (at the goal), so the phase
@@ -893,14 +899,22 @@ impl GameState {
     /// incremented *after* the autobuyer pass this tick, so target the post-tick
     /// value (`+ dt_ms`) to keep the derived `lastTick` exactly 0. Pre-Reality
     /// `resetTickOn`: AD / Tickspeed = `DIMENSION_BOOST` (0), Dim Boost =
-    /// `ANTIMATTER_GALAXY` (1), Galaxy = `INFINITY` (2), Big Crunch = `ETERNITY` (3).
+    /// `ANTIMATTER_GALAXY` (1) — but `INFINITY` (2) once the `autobuyMaxDimboosts`
+    /// buy-max mode is unlocked — Galaxy = `INFINITY` (2), Big Crunch = `ETERNITY` (3).
     fn reset_autobuyer_ticks(&mut self, event: u8, dt_ms: f64) {
         let rt = self.records.real_time_played_ms + dt_ms;
+        // The buy-max Dim Boost autobuyer resets its phase only on an Infinity (not
+        // a Galaxy), matching `DimBoostAutobuyerState.resetTickOn`.
+        let dim_boost_reset_on = if self.is_buy_max_dimboosts_unlocked() {
+            PRESTIGE_INFINITY
+        } else {
+            PRESTIGE_ANTIMATTER_GALAXY
+        };
         for ab in &mut self.autobuyers.dimensions {
             ab.timer_ms = rt;
         }
         self.autobuyers.tickspeed.timer_ms = rt;
-        if event >= PRESTIGE_ANTIMATTER_GALAXY {
+        if event >= dim_boost_reset_on {
             self.autobuyers.dim_boost.timer_ms = rt;
         }
         if event >= PRESTIGE_INFINITY {
@@ -1229,6 +1243,37 @@ mod tests {
         game.autobuyers.dimensions[0].timer_ms = 100.0;
         game.tick_autobuyers(150.0);
         assert_eq!(game.dimensions[0].bought, 2);
+    }
+
+    #[test]
+    fn galaxy_autobuyer_pre_empts_the_dim_boost_at_a_shared_threshold() {
+        let mut game = GameState::new();
+        game.broke_infinity = true;
+        // Unlock both prestige autobuyers (mark bought), arm their timers, and keep
+        // the AD / Tickspeed autobuyers out of the way.
+        for ab in game.autobuyers.dimensions.iter_mut() {
+            ab.is_active = false;
+        }
+        game.autobuyers.tickspeed.is_active = false;
+        for ab in [&mut game.autobuyers.galaxy, &mut game.autobuyers.dim_boost] {
+            ab.is_bought = true;
+            ab.is_active = true;
+            ab.interval_ms = 100.0;
+            ab.timer_ms = 100.0;
+        }
+        // 5 boosts (a galaxy is possible) and an 8th dimension large enough for
+        // both the galaxy and the (bulk-1) dim-boost requirement.
+        game.dim_boosts = 5;
+        game.galaxies = 0;
+        game.dimensions[7].amount = Decimal::from_float(1e6);
+        assert!(game.can_buy_galaxy());
+        assert!(game.can_dim_boost());
+
+        game.tick_autobuyers(150.0);
+        // The galaxy runs first and its reset consumes the 8th dimension, so the
+        // boost can't fire: one galaxy, boosts reset to the starting count (0).
+        assert_eq!(game.galaxies, 1);
+        assert_eq!(game.dim_boosts, 0);
     }
 
     #[test]
