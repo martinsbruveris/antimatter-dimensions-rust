@@ -487,3 +487,26 @@ After the cost-scaling fix, the widest remaining structural divergences on the n
 ### Verification
 - Fidelity grid: 362 → **420** cells. No early-game regression (284/312).
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 15 (partial) — dimension production order; fixture 119 deep-dive
+
+Investigating the deep post-break fixtures (e.g. `00119`, 261 min), whose AD/ID
+amounts diverge by growing factors down the tier chain (~25×/tier, dim6 1.4
+orders → dim0 9.7 orders), all with clean round-trips and no structural
+count/flag divergence.
+
+**Fixed:** the original produces `TimeDimensions → InfinityDimensions →
+AntimatterDimensions` each tick (game.js), so AD production reads *this* tick's
+Infinity Power. We produced ADs first, then TD/ID, so the AD multiplier's
+`infinityPower^7` term was stale. Reordered TD/ID ahead of AD production
+(inert pre-break, where `infinityPower = 0`).
+
+**Still open:** that reorder only recovered ~0.2 of the ~11 orders on `00119`.
+Tracing showed `tickspeed` (both 8 bought), the `infinityPower^7` multiplier,
+`Sacrifice` (both 1), `achievement_power`, the dim-boost/buy-10 factors, and every
+`bought` count all match JS; `infinityPower` itself matches at horizon 1. Yet AD
+production stays 25×/tier low. The save's AD5–AD8 are empty at load and the
+autobuyer buys them (same counts as JS) within the tick, so the divergence is in
+the buy+chain-production interaction of freshly-bought top dimensions — it needs
+per-tick *intermediate* state (post-autobuyer / pre-production) that the oracle's
+persisted-player snapshots don't expose. Left as the next target.
