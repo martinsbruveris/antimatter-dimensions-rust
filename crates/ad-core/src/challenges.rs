@@ -86,6 +86,8 @@ impl GameState {
         self.chall3_pow = Decimal::from_float(0.01);
         self.matter = Decimal::ZERO;
         self.chall8_total_sacrifice = Decimal::ONE;
+        // `resetChallengeStuff` also resets the IC4 last-bought tracker to 1.
+        self.post_c4_tier = 1;
     }
 
     /// NC9 `multiplySameCosts`, triggered by completing a group of 10 of dimension

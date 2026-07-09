@@ -30,6 +30,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Modelled the Dim Boost / Galaxy autobuyer limit config (`limitDimBoosts`/`maxDimBoosts`/`limitUntilGalaxies`/`galaxies`, `limitGalaxies`/`maxGalaxies`/`buyMax`): decode/encode + readiness gating (stops the over-boost in `00061`) | 187 (+27) |
 | 2026-07-09 | (pending) | Decoded/encoded the Tickspeed autobuyer's `BUY_MAX` mode (100, distinct from AD `BUY_10`=10); was never decoded and mis-encoded | 193 (+6) |
 | 2026-07-09 | (pending) | Modelled the `ipMult` ×2 Infinity Upgrade (`IPMultPurchases`): decode/encode, `2^purchases` in `total_ip_mult`, and the Eternity/Reality resets | 195 (+2) |
+| 2026-07-09 | (pending) | Applied the autobuyer `resetTick` (`lastTick`→0) on each prestige event and reset `postC4Tier` in `reset_challenge_stuff` — the missing prestige-reset behaviour (found via a dense `00059` trace) | 203 (+8) |
 
 ## Method
 

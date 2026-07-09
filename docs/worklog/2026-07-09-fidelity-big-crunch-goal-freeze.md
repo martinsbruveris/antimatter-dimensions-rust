@@ -320,3 +320,34 @@ Added `GameState.ip_mult_purchases` (decode/encode), applied `2^purchases` (flat
 - `00076`/`00077` pass horizon 1.
 - Fidelity grid: 193 → **195** cells (+2). No regressions.
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 10 — autobuyer `resetTick` and `postC4Tier` not reset on prestige
+
+### Symptom
+A dense oracle trace of `00059` (using the now-available game server) put the
+first divergence at **tick 110**, a Big Crunch: JS zeroed every autobuyer
+`lastTick` and set `postC4Tier` to 1, while Rust left the timers firing normally
+(`lastTick` ≈ realTimePlayed) and `postC4Tier` at 6.
+
+### The bug
+Two prestige-reset behaviours were missing:
+1. The original's `Autobuyers.resetTick(prestigeEvent)` sets `lastTick = 0` for
+   every autobuyer whose `resetTickOn <= event` (AD/Tickspeed on any prestige,
+   Dim Boost from a Galaxy, Galaxy from a Crunch, Big Crunch from an Eternity).
+   We modelled none of it.
+2. `resetChallengeStuff()` sets `postC4Tier = 1`; our `reset_challenge_stuff`
+   reset the challenge powers/matter but not `post_c4_tier`.
+
+### The fix
+- Added `reset_autobuyer_ticks(event, dt)` and called it after each successful
+  prestige action (dim boost / galaxy / crunch / eternity / reality) in
+  `tick_autobuyers`. Because `lastTick = 0` means `timer_ms == realTimePlayed` at
+  save and the original bumps `realTimePlayed` *after* the autobuyer pass, the
+  reset targets the post-tick value (`realTimePlayed + dt`) so the derived
+  `lastTick` lands exactly on 0.
+- Added `self.post_c4_tier = 1` to `reset_challenge_stuff`.
+
+### Verification
+- `00059` dense trace: first divergence tick 110 → **none over 1000 ticks**.
+- Fidelity grid: 195 → **203** cells (+8). No regressions.
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

@@ -174,6 +174,14 @@ pub enum AutobuyerTarget {
     BigCrunch,
 }
 
+/// The original's `PRESTIGE_EVENT` ordinals, used by `resetTick` to decide which
+/// autobuyer timers a reset clears (`prestigeEvent >= resetTickOn`).
+const PRESTIGE_DIMENSION_BOOST: u8 = 0;
+const PRESTIGE_ANTIMATTER_GALAXY: u8 = 1;
+const PRESTIGE_INFINITY: u8 = 2;
+const PRESTIGE_ETERNITY: u8 = 3;
+const PRESTIGE_REALITY: u8 = 4;
+
 /// The 100 ms floor an autobuyer's interval can be reduced to. Reaching it is
 /// `hasMaxedInterval`; the Big Crunch autobuyer hitting it is what unlocks Break
 /// Infinity (Feature 2.3).
@@ -730,8 +738,8 @@ impl GameState {
             && self.can_dim_boost()
             && (limit_condition || galaxy_condition);
         let eff = self.autobuyers.dim_boost.interval_ms * speedup;
-        if self.autobuyers.dim_boost.advance(dt_ms, eff, ready) {
-            self.buy_dim_boost();
+        if self.autobuyers.dim_boost.advance(dt_ms, eff, ready) && self.buy_dim_boost() {
+            self.reset_autobuyer_ticks(PRESTIGE_DIMENSION_BOOST, dt_ms);
         }
 
         // Galaxy limit gate (`GalaxyAutobuyerState.tick`: the cap passed to
@@ -743,8 +751,8 @@ impl GameState {
             && self.can_buy_galaxy()
             && galaxy_limit_ok;
         let eff = self.autobuyers.galaxy.interval_ms * speedup;
-        if self.autobuyers.galaxy.advance(dt_ms, eff, ready) {
-            self.buy_galaxy();
+        if self.autobuyers.galaxy.advance(dt_ms, eff, ready) && self.buy_galaxy() {
+            self.reset_autobuyer_ticks(PRESTIGE_ANTIMATTER_GALAXY, dt_ms);
         }
 
         // Big Crunch: `canTick` is `Player.canCrunch` (at the goal), so the phase
@@ -756,8 +764,9 @@ impl GameState {
         let eff = self.autobuyers.big_crunch.interval_ms * speedup;
         if self.autobuyers.big_crunch.advance(dt_ms, eff, ready)
             && self.will_auto_crunch()
+            && self.big_crunch()
         {
-            self.big_crunch();
+            self.reset_autobuyer_ticks(PRESTIGE_INFINITY, dt_ms);
         }
 
         // Eternity and Reality autobuyers: no interval — their conditions are
@@ -766,15 +775,42 @@ impl GameState {
         if self.eternity_autobuyer_unlocked()
             && self.autobuyers.eternity.is_active
             && self.will_auto_eternity()
+            && self.eternity()
         {
-            self.eternity();
+            self.reset_autobuyer_ticks(PRESTIGE_ETERNITY, dt_ms);
         }
 
         if self.reality_autobuyer_unlocked()
             && self.autobuyers.reality.is_active
             && self.will_auto_reality()
+            && self.auto_reality()
         {
-            self.auto_reality();
+            self.reset_autobuyer_ticks(PRESTIGE_REALITY, dt_ms);
+        }
+    }
+
+    /// `Autobuyers.resetTick(prestigeEvent)`: on a prestige reset the original sets
+    /// each qualifying autobuyer's `lastTick` to 0 (so its whole run counts as
+    /// elapsed and it can fire immediately). We store the timer as elapsed time and
+    /// re-derive `lastTick = realTimePlayed - timer_ms` on save; `realTimePlayed` is
+    /// incremented *after* the autobuyer pass this tick, so target the post-tick
+    /// value (`+ dt_ms`) to keep the derived `lastTick` exactly 0. Pre-Reality
+    /// `resetTickOn`: AD / Tickspeed = `DIMENSION_BOOST` (0), Dim Boost =
+    /// `ANTIMATTER_GALAXY` (1), Galaxy = `INFINITY` (2), Big Crunch = `ETERNITY` (3).
+    fn reset_autobuyer_ticks(&mut self, event: u8, dt_ms: f64) {
+        let rt = self.records.real_time_played_ms + dt_ms;
+        for ab in &mut self.autobuyers.dimensions {
+            ab.timer_ms = rt;
+        }
+        self.autobuyers.tickspeed.timer_ms = rt;
+        if event >= PRESTIGE_ANTIMATTER_GALAXY {
+            self.autobuyers.dim_boost.timer_ms = rt;
+        }
+        if event >= PRESTIGE_INFINITY {
+            self.autobuyers.galaxy.timer_ms = rt;
+        }
+        if event >= PRESTIGE_ETERNITY {
+            self.autobuyers.big_crunch.timer_ms = rt;
         }
     }
 
