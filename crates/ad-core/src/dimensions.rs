@@ -47,6 +47,24 @@ impl GameState {
     /// (0-indexed). Returns true if the purchase was
     /// successful.
     pub fn buy_dimension(&mut self, tier: usize) -> bool {
+        if !self.buy_one_dimension(tier) {
+            return false;
+        }
+        // 28: buy a *single* 1st dimension while holding over 1e150 of them. The
+        // original checks this only in `buyOneDimension`, never on the bulk
+        // "buy max"/until-ten paths — which reuse `buy_one_dimension` directly.
+        if tier == 0 && self.dimensions[0].amount.exponent() >= 150 {
+            self.unlock_achievement(28);
+        }
+        true
+    }
+
+    /// The core single-dimension purchase, shared by the genuine "buy one"
+    /// entry point ([`buy_dimension`](Self::buy_dimension)) and the group
+    /// completion loop ([`buy_until_10_dimension`](Self::buy_until_10_dimension)).
+    /// Mirrors the body of the original's `buyOneDimension` *minus* its
+    /// `Achievement(28)` unlock, which fires only on the genuine single buy.
+    fn buy_one_dimension(&mut self, tier: usize) -> bool {
         if !self.dim_available_for_purchase(tier) {
             return false;
         }
@@ -119,10 +137,6 @@ impl GameState {
         if tier == 7 && self.dimensions[7].amount == Decimal::from_float(99.0) {
             self.unlock_achievement(23);
         }
-        // 28: buy a 1st dimension while holding over 1e150 of them.
-        if tier == 0 && self.dimensions[0].amount.exponent() >= 150 {
-            self.unlock_achievement(28);
-        }
     }
 
     /// Buy the maximum number of the specified dimension tier that can be
@@ -141,7 +155,7 @@ impl GameState {
         let remaining = 10 - (self.dimensions[tier].bought % 10);
         let mut count = 0u64;
         for _ in 0..remaining {
-            if !self.buy_dimension(tier) {
+            if !self.buy_one_dimension(tier) {
                 break;
             }
             count += 1;
