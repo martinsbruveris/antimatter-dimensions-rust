@@ -351,3 +351,40 @@ Two prestige-reset behaviours were missing:
 - `00059` dense trace: first divergence tick 110 → **none over 1000 ticks**.
 - Fidelity grid: 195 → **203** cells (+8). No regressions.
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Session summary
+
+Ten discrete fidelity bugs fixed this session, taking the grid from **34 → 203
+cells** at the 1e-6 tolerance (and **284/312** at 1e-4):
+
+1. Achievement 28 on bulk buys (count-neutral correctness).
+2. AD production freeze at the Big Crunch goal + `maxAM` overshoot (+2).
+3. `bestInfinitiesPerMs` / `bestIPminEternity` records (+57).
+4. Normal Challenge best times (+2).
+5. `thisEternity.bestIPMsWithoutMaxAll` (+35).
+6. Autobuyer `lastTick` drift while globally disabled (+30).
+7. Dim Boost / Galaxy autobuyer limit config (+27).
+8. Tickspeed autobuyer `BUY_MAX` mode (+6).
+9. `ipMult` ×2 Infinity Upgrade / `IPMultPurchases` (+2).
+10. Autobuyer `resetTick` + `postC4Tier` on prestige (+8).
+
+### The remaining ~109 failures (at 1e-6) split cleanly
+
+- **~76 are the floating-point drift / catastrophic-cancellation class**: they
+  pass at 1e-4 (263 → 284 after this session's fixes). A dense oracle trace of
+  `00023` confirmed the divergence is present at tick 1 with every multiplier
+  component matching JS to ~1e-15 — the residue is `f64::powf`-vs-V8-`Math.pow`
+  and Decimal add/normalize rounding, amplified by `multiplier^upgrades` and by a
+  large purchase's subtraction from a near-equal antimatter total. This is what
+  the log-space tolerance exists to absorb; closing these would need a bit-exact
+  `break_infinity`/pow alignment pass against V8.
+- **~28 still fail at 1e-4** and are mostly *timing snowballs* downstream of that
+  drift: a purchase/boost/tickspeed buy lands one tick early or late because the
+  ~1e-6 production drift tips an affordability check, then cascades into
+  `lastBuyTime`, `chall2Pow`, `dimensionBoosts`, `totalTickBought`, `postC4Tier`.
+  A handful of records fields (`bestIPminVal`) remain to audit.
+
+### Tooling note
+The dense oracle trace (`npm run generate -- --save <n> --trace <f>.json` against
+the game served on `:8080`, then `ad-fidelity trace <f>.json`) was decisive for
+bug 10 — it pinned the first divergence to the exact tick and field.
