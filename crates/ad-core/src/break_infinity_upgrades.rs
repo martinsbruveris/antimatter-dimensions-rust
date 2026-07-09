@@ -9,10 +9,10 @@
 //!
 //! This module owns the upgrade vocabulary + data, the purchase logic, and the
 //! effect readers the rest of the engine calls (`break_infinity_upgrade_common_mult`,
-//! `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`). Several
-//! effects depend on inputs we don't model yet (challenge best-times, IP/min, the
-//! cost-scaling knobs); those upgrades are purchasable/persisted but their effect is
-//! neutral until their inputs exist. See `docs/design/2026-07-03-break-infinity.md`.
+//! `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`). A few effects
+//! still depend on inputs we don't model yet (IP/min, the cost-scaling knobs); those
+//! upgrades are purchasable/persisted but their effect is neutral until their inputs
+//! exist. See `docs/design/2026-07-03-break-infinity.md`.
 
 use break_infinity::Decimal;
 
@@ -33,7 +33,7 @@ pub enum BreakInfinityUpgrade {
     InfinitiedMult,
     /// AD ×`max((achievements − 30)^3 / 40, 1)`.
     AchievementMult,
-    /// AD × based on the slowest challenge time (deferred — no challenge best-times).
+    /// AD ×`clampMin(50 / worstChallengeMinutes, 1)` (capped at 3e4).
     SlowestChallengeMult,
     /// Passively generate Infinities (deferred — generation loop).
     InfinitiedGen,
@@ -262,7 +262,29 @@ impl GameState {
             let value = ((count - 30.0).powi(3) / 40.0).max(1.0);
             mult *= Decimal::from_float(value);
         }
+        mult *= self.slowest_challenge_mult();
         mult
+    }
+
+    /// The `slowestChallengeMult` Break Infinity Upgrade effect: an all-tier AD
+    /// multiplier `clampMin(50 / worstChallengeMinutes, 1)`, capped at 3e4, where
+    /// the worst challenge time is the slowest (max) of the Normal Challenge best
+    /// times. Any uncompleted challenge (`f64::MAX`) leaves the worst time huge, so
+    /// the effect stays at ×1 until every Normal Challenge is completed.
+    fn slowest_challenge_mult(&self) -> Decimal {
+        if !self
+            .break_infinity_upgrade_bought(BreakInfinityUpgrade::SlowestChallengeMult)
+        {
+            return Decimal::ONE;
+        }
+        let worst_ms = self
+            .nc_best_times_ms
+            .iter()
+            .copied()
+            .fold(f64::MIN, f64::max);
+        let worst_minutes = worst_ms / 60_000.0;
+        let raw = (50.0 / worst_minutes).max(1.0);
+        Decimal::from_float(raw).min(&Decimal::new_unchecked(3.0, 4))
     }
 
     /// Extra galaxy-strength factor from the `postGalaxy` Break Infinity Upgrade
@@ -353,6 +375,25 @@ mod tests {
         game.break_infinity_upgrades |= BreakInfinityUpgrade::AutobuyerSpeed.bit();
         assert_eq!(game.break_infinity_galaxy_boost(), 1.5);
         assert_eq!(game.break_infinity_autobuyer_speedup(), 0.5);
+    }
+
+    #[test]
+    fn slowest_challenge_mult_needs_all_challenges_and_the_upgrade() {
+        let mut game = broken_game();
+        // Every Normal Challenge completed, slowest at 2.05 min (123_000 ms).
+        game.nc_best_times_ms = [10_000.0; 11];
+        game.nc_best_times_ms[3] = 123_000.0; // the slowest run
+                                              // Without the upgrade the effect is inert (×1).
+        assert_eq!(game.break_infinity_upgrade_common_mult(), Decimal::ONE);
+
+        game.break_infinity_upgrades |= BreakInfinityUpgrade::SlowestChallengeMult.bit();
+        // effect = clampMin(50 / (123_000 / 60_000), 1) = 50 / 2.05 ≈ 24.390.
+        let mult = game.break_infinity_upgrade_common_mult().to_f64();
+        assert!((mult / (50.0 / 2.05) - 1.0).abs() < 1e-9, "{mult}");
+
+        // An uncompleted challenge (f64::MAX) drops the effect back to ×1.
+        game.nc_best_times_ms[7] = f64::MAX;
+        assert_eq!(game.break_infinity_upgrade_common_mult(), Decimal::ONE);
     }
 
     #[test]

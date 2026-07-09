@@ -38,6 +38,8 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Added a second fixture batch (Infinity→early-Eternity), raised default tolerance to 1e-4, and modelled the super-exponential `ExponentialCostScaling` for AD/Tickspeed costs past `Number.MAX_VALUE` (`00086`: 28 diverged fields → 1) | 303/1148 |
 | 2026-07-09 | (pending) | Preserved `ipOffline`; aligned num-field epsilon to 1e-4; modelled the early-Eternity per-tick accumulators `partInfinitied` (passive `infinitiedGen`), `reality.maxID1` (bool→Decimal peak), and the `ic2Count` if/else timer | 350/1148 |
 | 2026-07-09 | (pending) | Preserved `player.ic2Count`; modelled the Eternity best-rate records `thisReality.bestEternitiesPerMs` and `bestEternity.bestEPminReality` (decode/encode + the Eternity update + Reality reset) | 420/1148 |
+| 2026-07-09 | (pending) | Produced Time → Infinity → Antimatter Dimensions each tick (game.js order) so AD production reads *this* tick's Infinity Power (was stale) | 424/1148 |
+| 2026-07-09 | (pending) | Implemented the `slowestChallengeMult` Break Infinity Upgrade (`clampMin(50 / worstChallengeMinutes, 1)`, cap 3e4) from the decoded Normal Challenge best times; was stubbed as deferred, missing a ~24× AD multiplier on post-break saves (`00119`) | 574/1148 |
 
 ## Method
 

@@ -510,3 +510,44 @@ autobuyer buys them (same counts as JS) within the tick, so the divergence is in
 the buy+chain-production interaction of freshly-bought top dimensions — it needs
 per-tick *intermediate* state (post-autobuyer / pre-production) that the oracle's
 persisted-player snapshots don't expose. Left as the next target.
+
+## Bug 16 — the `slowestChallengeMult` Break Infinity Upgrade (resolves Bug 15)
+
+The Bug-15 "25×/tier" divergence on the deep post-break fixtures turned out to be
+a single missing multiplier, not a production-chain subtlety.
+
+### Diagnosis
+Added a temporary within-tick dump to the oracle (monkey-patching
+`AntimatterDimensions.tick` to snapshot the post-autobuyer / post-TD-ID /
+pre-AD-production state, plus `AD8.multiplier`, `AD8.productionPerSecond`, and the
+game-speed diff) and a matching Rust snapshot hook. This confirmed the pre-AD
+state is bit-identical (antimatter, infinityPower, every AD amount/bought), the
+game-speed diff matches (50 ms, 1×), yet JS's `AD8.multiplier = 3.082e46` vs
+Rust's `dimension_multiplier(7) = 1.264e45` — a clean **24.39×**.
+
+Breaking the multiplier into components isolated the gap to the Break Infinity
+common multiplier. JS's `antimatterDimensionCommonMultiplier` applies
+`BreakInfinityUpgrade.slowestChallengeMult`
+(`clampMin(50 / Time.worstChallenge.totalMinutes, 1)`, capped at 3e4), which Rust
+had stubbed as "deferred — no challenge best-times". For `00119` the slowest
+Normal Challenge best time is 122 999 ms → `50 / (122999/60000) = 24.390` —
+exactly the missing factor.
+
+### Fix
+Implemented `slowest_challenge_mult()` from the already-decoded `nc_best_times_ms`
+(worst = max over the 11 Normal Challenge best times; any uncompleted challenge is
+`f64::MAX`, so the effect stays ×1 until every challenge is complete) and folded
+it into `break_infinity_upgrade_common_mult`. Rust's `dimension_multiplier(7)` now
+matches JS to ~15 significant figures.
+
+### Verification
+- Fidelity grid: 424 → **574** cells (+150). No early-game regression.
+- `cargo test -p ad-core --features serde`: 566 pass; fmt + clippy clean.
+- All temporary diagnostics removed (oracle dump, `tick.rs` stop-flag, the
+  breakdown tests, the `/tmp` scratch saves).
+
+`00119` itself still fails: at horizons 1/10 a small residual (~2.7e-4/tier,
+compounding linearly down the chain — i.e. the shared per-tier `tickspeed`
+factor) sits just over the 1e-4 epsilon, and at 100/1000 JS performs a Big Crunch
+that Rust does not. Both are separate follow-ups; the dominant structural gap on
+this whole cohort of post-break fixtures is closed.

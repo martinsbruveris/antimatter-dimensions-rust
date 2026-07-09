@@ -60,7 +60,7 @@ not the current state).
   maxed). This module owns the `BreakInfinityUpgrade` (9 one-time, sharing the save's
   `infinityUpgrades`) + `BreakInfinityRebuyable` (3, in `infinityRebuyables`) types,
   purchase logic, and the effect readers (`break_infinity_upgrade_common_mult`,
-  `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`); six effects are
+  `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`); five effects are
   deferred (neutral). See `../../docs/design/2026-07-03-break-infinity.md`.
 - `src/replicanti.rs` — Replicanti (Feature 3.2): `ReplicantiState` on `GameState`,
   unlocked with IP (`unlock_replicanti`), grown each tick (`tick_replicanti`, the
