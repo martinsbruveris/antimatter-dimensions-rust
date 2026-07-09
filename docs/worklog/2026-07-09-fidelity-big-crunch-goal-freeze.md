@@ -208,3 +208,31 @@ for free via the `ThisEternity::new()` those paths assign.
 - Fidelity grid: 95 → **130** cells (+35) — this field gated a large swath of
   mid/late-game fixtures. No regressions.
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 6 — autobuyer `lastTick` drifts while autobuyers are globally off
+
+### Symptom
+Fixtures with autobuyers toggled off (e.g. `00046`–`00055`) diverged at horizon 1
+on *every* autobuyer's `lastTick` (all 12: the 8 AD tiers, tickspeed, dimBoost,
+galaxy, bigCrunch): JS held the loaded `0`, Rust `50` — and it grew by one tick
+(50 ms) per frame. Those `lastTick` fields were the sole divergence.
+
+### The bug
+We model the autobuyer timer as elapsed time (`timer_ms = realTimePlayed -
+lastTick`) and re-derive `lastTick = realTimePlayed - timer_ms` on encode. The
+original's `timeSinceLastTick` is *derived* from `realTimePlayed`, so it keeps
+growing with real time even while autobuyers are globally off — leaving the stored
+`lastTick` fixed. But `tick_autobuyers` returned early when
+`!autobuyers.enabled`, so `timer_ms` froze while `realTimePlayed` kept advancing;
+the re-derived `lastTick` then crept up one tick per frame.
+
+### The fix
+In the globally-disabled branch, accrue `timer_ms += dt` for all 12 timer-bearing
+autobuyers (no firing) before returning, keeping `realTimePlayed - timer_ms`
+constant.
+
+### Verification
+- Fixtures `00046`–`00055`: horizon 1 now green (later horizons that still fail
+  carry the numerical drift or a crunch-timing difference).
+- Fidelity grid: 130 → **160** cells (+30). No regressions.
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

@@ -580,6 +580,19 @@ impl GameState {
     /// Does nothing if autobuyers are globally disabled.
     pub fn tick_autobuyers(&mut self, dt_ms: f64) {
         if !self.autobuyers.enabled {
+            // Globally-off autobuyers never fire, but the original's
+            // `timeSinceLastTick = realTimePlayed - lastTick` keeps growing with
+            // real time regardless (it is derived, not stored). Our timers are the
+            // elapsed-time form, so accrue every one to keep the stored `lastTick`
+            // (`realTimePlayed - timer_ms`) fixed — otherwise it drifts one tick per
+            // frame while disabled.
+            for ab in &mut self.autobuyers.dimensions {
+                ab.timer_ms += dt_ms;
+            }
+            self.autobuyers.tickspeed.timer_ms += dt_ms;
+            self.autobuyers.dim_boost.timer_ms += dt_ms;
+            self.autobuyers.galaxy.timer_ms += dt_ms;
+            self.autobuyers.big_crunch.timer_ms += dt_ms;
             return;
         }
 

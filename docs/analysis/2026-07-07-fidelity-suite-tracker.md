@@ -26,6 +26,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Modelled the best-rate records `thisEternity.bestInfinitiesPerMs` and `bestInfinity.bestIPminEternity` (decode/encode + the `bigCrunchUpdateStatistics` update + Eternity/Reality/EC resets); previously dropped on decode | 93 (+57) |
 | 2026-07-09 | (pending) | Modelled Normal Challenge best times (`challenge.normal.bestTimes`, 11 entries): decode/encode + the crunch `updateChallengeTime` step; previously dropped to the `f64::MAX` sentinel | 95 (+2) |
 | 2026-07-09 | (pending) | Modelled `thisEternity.bestIPMsWithoutMaxAll` (decode/encode + the guarded `bigCrunchUpdateStatistics` update); previously dropped on decode | 130 (+35) |
+| 2026-07-09 | (pending) | Accrued autobuyer timers while globally disabled so the derived `lastTick` stays fixed (was drifting +1 tick/frame), mirroring the original's `timeSinceLastTick = realTimePlayed - lastTick` | 160 (+30) |
 
 ## Method
 
