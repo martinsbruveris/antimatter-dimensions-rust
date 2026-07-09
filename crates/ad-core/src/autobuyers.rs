@@ -395,6 +395,10 @@ pub struct AutobuyerState {
     /// The Reality autobuyer (Reality Upgrade 25).
     #[cfg_attr(feature = "serde", serde(default))]
     pub reality: RealityAutobuyer,
+    /// `player.auto.ipMultBuyer.isActive` — the ×2-IP-upgrade autobuyer's active
+    /// flag. Behaviour unmodelled; preserved for round-trip fidelity.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub ip_mult_buyer_active: bool,
 }
 
 /// serde defaults for the three challenge-only autobuyers (so an older serialized
@@ -442,6 +446,7 @@ impl AutobuyerState {
             big_crunch_settings: PrestigeGoalSettings::new(),
             eternity: EternityAutobuyer::new(),
             reality: RealityAutobuyer::new(),
+            ip_mult_buyer_active: false,
         }
     }
 }

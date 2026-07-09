@@ -1118,6 +1118,18 @@ pub struct AutoDTO {
     /// `player.auto.reality` (Reality Upgrade 25 autobuyer). The Effarig
     /// `shard` target is out of frontier and ignored.
     pub reality: RealityAutobuyerDTO,
+    /// `player.auto.ipMultBuyer` (the ×2-IP-upgrade autobuyer). Its behaviour is
+    /// unmodelled; only the active flag is preserved for round-trip fidelity.
+    #[serde(rename = "ipMultBuyer", default)]
+    pub ip_mult_buyer: IsActiveDTO,
+}
+
+/// A minimal `{ isActive }` autobuyer object, preserved verbatim.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IsActiveDTO {
+    #[serde(default)]
+    pub is_active: bool,
 }
 
 /// `player.auto.bigCrunch`.
@@ -2027,6 +2039,7 @@ impl GameState {
             glyph: dto.auto.reality.glyph.max(0.0) as u32,
             time: dto.auto.reality.time,
         };
+        autobuyers.ip_mult_buyer_active = dto.auto.ip_mult_buyer.is_active;
 
         // Options: numeric values must be in range — we reject rather than clamp.
         // Notation is the one intentional exception: a name we don't model (the
