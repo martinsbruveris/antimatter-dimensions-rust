@@ -96,9 +96,10 @@ pub struct Tolerance {
 
 impl Default for Tolerance {
     fn default() -> Self {
-        // A single log-space epsilon to start (design §10 "start simple").
+        // Default log-space epsilon: 1e-4, which absorbs the accumulated-rounding /
+        // cancellation drift between Rust f64 and V8 (see the 2026-07-09 worklog).
         Self {
-            log_base: 1e-6,
+            log_base: 1e-4,
             log_per_tick: 0.0,
             num_base: 1e-9,
             num_per_tick: 0.0,

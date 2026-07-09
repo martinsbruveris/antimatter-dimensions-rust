@@ -13,7 +13,7 @@ use break_infinity::Decimal;
 pub const EPSILON_EXACT: f64 = 1e-10;
 
 /// Epsilon for multi-step simulations (accumulated error).
-pub const EPSILON_SIMULATION: f64 = 1e-6;
+pub const EPSILON_SIMULATION: f64 = 1e-4;
 
 /// Compare two Decimal values using log-space relative tolerance.
 ///

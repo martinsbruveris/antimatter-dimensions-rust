@@ -7,7 +7,11 @@ measured as the number of passing **grid cells** across the commit history.
 A *cell* is one (fixture × horizon) comparison. The current suite uses 4 horizons 
 (1, 10, 100, 1000 ticks) and the number of fixtures will grow over time. A cell
 passes when every allowlisted `player` field matches the JS oracle within the
-log-space tolerance (`1e-6`).
+log-space tolerance. As of 2026-07-09 the default is **`1e-4`**: raised from
+`1e-6` to absorb the accumulated-rounding / catastrophic-cancellation drift
+between Rust `f64` and V8 (a `libm`/fdlibm `pow` swap flips zero cells, so the
+residue is `Decimal` add/normalize + multiplication-order noise, not `pow`), so
+the suite tracks *structural* divergences rather than floating-point noise.
 
 ## Progress
 

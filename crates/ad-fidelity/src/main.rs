@@ -3,8 +3,8 @@
 //!
 //! ```text
 //! ad-fidelity [DIR] [--tests 1,3,12] [--ticks 1,10] [--tick-ms 50]
-//!             [--epsilon 1e-6] [--roundtrip] [--verbose]
-//! ad-fidelity trace <ID> [--tick X] [--epsilon 1e-6] [--tick-ms 50]
+//!             [--epsilon 1e-4] [--roundtrip] [--verbose]
+//! ad-fidelity trace <ID> [--tick X] [--epsilon 1e-4] [--tick-ms 50]
 //! ```
 //!
 //! Default (no subcommand): compare every fixture in `DIR` at every horizon it
@@ -76,7 +76,7 @@ struct Cli {
     tick_ms: Option<f64>,
 
     /// Log-space (and relative) comparison epsilon.
-    #[arg(long, default_value_t = 1e-6)]
+    #[arg(long, default_value_t = 1e-4)]
     epsilon: f64,
 
     /// Also run the round-trip identity check (a `rt` column: Rust
@@ -107,7 +107,7 @@ struct TraceArgs {
     tick: Option<u32>,
 
     /// Log-space (and relative) comparison epsilon.
-    #[arg(long, default_value_t = 1e-6)]
+    #[arg(long, default_value_t = 1e-4)]
     epsilon: f64,
 
     /// Override the fixture's `meta.tickMs`. Must match the oracle.
