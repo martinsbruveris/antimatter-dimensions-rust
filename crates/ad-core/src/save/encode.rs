@@ -133,6 +133,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     records["bestInfinity"]["time"] = json!(state.records.best_infinity.time_ms);
     records["bestInfinity"]["realTime"] =
         json!(state.records.best_infinity.real_time_ms);
+    records["bestInfinity"]["bestIPminEternity"] =
+        decimal(&state.records.best_infinity.best_ip_min_eternity);
     records["thisEternity"]["time"] = json!(state.records.this_eternity.time_ms);
     records["thisEternity"]["realTime"] =
         json!(state.records.this_eternity.real_time_ms);
@@ -142,6 +144,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         decimal(&state.records.this_eternity.best_ep_min);
     records["thisEternity"]["bestEPminVal"] =
         decimal(&state.records.this_eternity.best_ep_min_val);
+    records["thisEternity"]["bestInfinitiesPerMs"] =
+        decimal(&state.records.this_eternity.best_infinities_per_ms);
     records["bestEternity"]["time"] = json!(state.records.best_eternity.time_ms);
     records["bestEternity"]["realTime"] =
         json!(state.records.best_eternity.real_time_ms);

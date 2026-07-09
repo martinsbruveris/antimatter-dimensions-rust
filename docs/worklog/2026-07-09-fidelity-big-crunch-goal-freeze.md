@@ -85,3 +85,41 @@ so `maxAM` doesn't move.
 - Fixture 8 (`00008-…-manual`): was 2/4, now **4/4**.
 - Fidelity grid: 34 → **36** cells, no regressions.
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 3 — best-rate records `bestInfinitiesPerMs` / `bestIPminEternity` unmodelled
+
+### Symptom
+The next failing cell, `00009-…-timed @ 1`, diverged on
+`records.thisEternity.bestInfinitiesPerMs` (JS 1.66e-8, Rust 0) and
+`records.bestInfinity.bestIPminEternity` (JS 9.97e-4, Rust 0). `--roundtrip`
+diverged identically, so the values were already present in the input save and
+we simply dropped them on decode.
+
+### The bug
+Neither field was modelled: not decoded, not encoded (so the encode template's 0
+won), and never updated. Both are maintained by `bigCrunchUpdateStatistics()` at
+each Big Crunch:
+- `bestInfinity.bestIPminEternity = clampMin(thisInfinity.bestIPmin)` (then
+  `thisInfinity.bestIPmin` is reset), and
+- `thisEternity.bestInfinitiesPerMs = clampMin(gainedInfinities().round() /
+  max(33, thisInfinity.realTime))`.
+
+They reset to 0 on Eternity, Reality, and at the start of an Eternity Challenge.
+(`bestInfinity.bestIPminReality` is never written by the core game — always 0 —
+so it needs no modelling.)
+
+### The fix
+- Added `ThisEternity.best_infinities_per_ms` and
+  `BestInfinity.best_ip_min_eternity` to the records structs, with decode
+  (`dto.rs`) and encode (`encode.rs`) so real-save values round-trip.
+- Applied the `bigCrunchUpdateStatistics` update in the `at_goal` branch of
+  `big_crunch_reset`, before `this_infinity` is reset.
+- Reset `best_ip_min_eternity` in `eternity_reset_core` (shared by Eternity and
+  EC-start) and `reality_reset_internal`; `best_infinities_per_ms` already zeroes
+  via the `ThisEternity::new()` those paths assign.
+
+### Verification
+- Fixture 9: was 0/4 (+rt), now **5/5**.
+- Fidelity grid: 36 → **93** cells (+57) — these fields gated the record diff on
+  many fixtures. No regressions.
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

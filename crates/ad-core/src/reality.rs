@@ -602,6 +602,7 @@ impl GameState {
         self.infinities_banked = Decimal::ZERO;
         self.records.best_infinity.time_ms = BEST_INFINITY_RESET_MS;
         self.records.best_infinity.real_time_ms = BEST_INFINITY_RESET_MS;
+        self.records.best_infinity.best_ip_min_eternity = Decimal::ZERO;
         self.records.this_infinity = ThisInfinity::new();
         self.dim_boosts = 0;
         self.galaxies = 0;

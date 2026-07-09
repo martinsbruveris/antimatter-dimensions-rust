@@ -89,6 +89,10 @@ pub struct ThisEternity {
     /// (`thisEternity.bestEPminVal`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub best_ep_min_val: Decimal,
+    /// Best infinities-per-millisecond rate this eternity
+    /// (`thisEternity.bestInfinitiesPerMs`), updated at each Big Crunch.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_infinities_per_ms: Decimal,
 }
 
 impl ThisEternity {
@@ -100,6 +104,7 @@ impl ThisEternity {
             max_ip: Decimal::ZERO,
             best_ep_min: Decimal::ZERO,
             best_ep_min_val: Decimal::ZERO,
+            best_infinities_per_ms: Decimal::ZERO,
         }
     }
 }
@@ -307,6 +312,10 @@ pub struct BestInfinity {
     pub time_ms: f64,
     /// Fastest infinity by real time (ms). Same `f64::MAX` sentinel.
     pub real_time_ms: f64,
+    /// Best IP-per-minute rate over this eternity (`bestInfinity.bestIPminEternity`);
+    /// updated at each Big Crunch from `thisInfinity.bestIPmin`, reset on Eternity.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_ip_min_eternity: Decimal,
 }
 
 impl BestInfinity {
@@ -314,6 +323,7 @@ impl BestInfinity {
         Self {
             time_ms: f64::MAX,
             real_time_ms: f64::MAX,
+            best_ip_min_eternity: Decimal::ZERO,
         }
     }
 }

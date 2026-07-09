@@ -1010,6 +1010,9 @@ pub struct ThisEternityDTO {
     /// The Eternity EP gain when the peak rate was set (`bestEPminVal`).
     #[serde(rename = "bestEPminVal", with = "break_infinity::serde_string")]
     pub best_ep_min_val: Decimal,
+    /// Best infinities/ms this eternity (`bestInfinitiesPerMs`).
+    #[serde(rename = "bestInfinitiesPerMs", with = "break_infinity::serde_string")]
+    pub best_infinities_per_ms: Decimal,
 }
 
 /// `player.records.bestEternity` (modelled subset). Times are
@@ -1056,6 +1059,9 @@ pub struct BestInfinityDTO {
     pub time: f64,
     /// Fastest infinity by real time (ms).
     pub real_time: f64,
+    /// Best IP/min this eternity (`bestIPminEternity`).
+    #[serde(rename = "bestIPminEternity", with = "break_infinity::serde_string")]
+    pub best_ip_min_eternity: Decimal,
 }
 
 /// `player.auto` — autobuyer state (modelled subset).
@@ -1488,6 +1494,7 @@ impl GameState {
             best_infinity: BestInfinity {
                 time_ms: dto.records.best_infinity.time,
                 real_time_ms: dto.records.best_infinity.real_time,
+                best_ip_min_eternity: dto.records.best_infinity.best_ip_min_eternity,
             },
             this_eternity: ThisEternity {
                 time_ms: dto.records.this_eternity.time,
@@ -1496,6 +1503,7 @@ impl GameState {
                 max_ip: dto.records.this_eternity.max_ip,
                 best_ep_min: dto.records.this_eternity.best_ep_min,
                 best_ep_min_val: dto.records.this_eternity.best_ep_min_val,
+                best_infinities_per_ms: dto.records.this_eternity.best_infinities_per_ms,
             },
             best_eternity: BestEternity {
                 time_ms: dto.records.best_eternity.time,

@@ -23,6 +23,7 @@ Commits that don't change the count are omitted.
 | 2026-07-07 | `1bff354` | Widening coverage, verifying ~60 more fields per cell. Fixed some small issues involving non-modelled fields. Obtaining new baseline. | 32 (−8) |
 | 2026-07-09 | (batch 1) | Wired normal achievements 31–54 (conditions + effects): sacrifice exponent (32), starting antimatter (37/54), tickspeed base (36/45), AD multipliers (31/34/43/48) | 34 (+2) |
 | 2026-07-09 | (pending) | Froze AD production once the Big Crunch goal is reached (pre-break / antimatter challenge) and recorded `maxAM` from the pre-cap overshoot, mirroring `AntimatterDimensions.tick`'s early return. (Also fixed achievement 28 firing on the bulk "buy max" AD1 path — count-neutral.) | 36 (+2) |
+| 2026-07-09 | (pending) | Modelled the best-rate records `thisEternity.bestInfinitiesPerMs` and `bestInfinity.bestIPminEternity` (decode/encode + the `bigCrunchUpdateStatistics` update + Eternity/Reality/EC resets); previously dropped on decode | 93 (+57) |
 
 ## Method
 

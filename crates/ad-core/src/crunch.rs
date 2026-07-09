@@ -330,6 +330,24 @@ impl GameState {
             }
             self.handle_challenge_completion();
 
+            // `bigCrunchUpdateStatistics`: fold this infinity's peak IP/min into the
+            // per-eternity best (before `this_infinity` is reset below), and record
+            // the best infinities/ms this eternity from the pending gain over the
+            // run's real time (`gainedInfinities().round() / max(33, realTime)`).
+            self.records.best_infinity.best_ip_min_eternity = self
+                .records
+                .best_infinity
+                .best_ip_min_eternity
+                .max(&self.records.this_infinity.best_ip_min);
+            let divisor = self.records.this_infinity.real_time_ms.max(33.0);
+            let infinities_per_ms =
+                self.gained_infinities().round() / Decimal::from_float(divisor);
+            self.records.this_eternity.best_infinities_per_ms = self
+                .records
+                .this_eternity
+                .best_infinities_per_ms
+                .max(&infinities_per_ms);
+
             // Lower the fastest-infinity record to this run before resetting it
             // (mirrors `bigCrunchUpdateStatistics` + `secondSoftReset`).
             self.records.best_infinity.time_ms = self

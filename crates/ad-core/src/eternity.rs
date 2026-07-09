@@ -279,6 +279,9 @@ impl GameState {
         self.infinities = Decimal::ZERO;
         self.records.best_infinity.time_ms = BEST_INFINITY_RESET_MS;
         self.records.best_infinity.real_time_ms = BEST_INFINITY_RESET_MS;
+        // `bestInfinity.bestIPminEternity` is per-eternity, so it resets here (the
+        // full `bestInfinity` struct otherwise persists across a crunch).
+        self.records.best_infinity.best_ip_min_eternity = Decimal::ZERO;
         self.records.this_infinity = ThisInfinity::new();
         let keep_infinity_upgrades = self.eternity_milestone_reached(4);
         self.dim_boosts = if keep_infinity_upgrades { 4 } else { 0 };
