@@ -2,7 +2,7 @@
 //! the JS oracle fixtures.
 //!
 //! ```text
-//! ad-fidelity [DIR] [--tests 1,3,12] [--ticks 1,10] [--tick-ms 50]
+//! ad-fidelity [DIR] [--tests 1-10,12,14-18] [--ticks 1,10] [--tick-ms 50]
 //!             [--epsilon 1e-4] [--roundtrip] [--verbose]
 //! ad-fidelity trace <ID> [--tick X] [--epsilon 1e-4] [--tick-ms 50]
 //! ```
@@ -23,6 +23,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::str::FromStr;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -60,10 +61,11 @@ struct Cli {
     #[arg(default_value = DEFAULT_FIXTURES_DIR)]
     dir: PathBuf,
 
-    /// Only these fixtures, by 0-based row index (as shown in the table),
-    /// comma-separated: --tests 1,3,12
-    #[arg(long, value_delimiter = ',')]
-    tests: Option<Vec<usize>>,
+    /// Only these fixtures, by 0-based row index (as shown in the table).
+    /// Accepts individual indices and inclusive ranges, comma-separated:
+    /// --tests 1-10,12,14-18
+    #[arg(long)]
+    tests: Option<TestSelection>,
 
     /// Only these horizons (tick counts), comma-separated: --ticks 1,10.
     /// Defaults to every horizon present across the selected fixtures.
@@ -137,7 +139,8 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
-    let fixtures = match select_fixtures(all, cli.tests.as_deref()) {
+    let tests = cli.tests.as_ref().map(|s| s.indices());
+    let fixtures = match select_fixtures(all, tests) {
         Ok(f) => f,
         Err(msg) => {
             eprintln!("{msg}");
@@ -234,6 +237,58 @@ fn run_trace(args: &TraceArgs) -> ExitCode {
     }
 }
 
+/// A `--tests` selection: 0-based fixture indices, expanded from a
+/// comma-separated list of individual indices and inclusive ranges
+/// (e.g. `1-10,12,14-18`).
+#[derive(Debug, Clone)]
+struct TestSelection(Vec<usize>);
+
+impl TestSelection {
+    fn indices(&self) -> &[usize] {
+        &self.0
+    }
+}
+
+impl FromStr for TestSelection {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut indices = Vec::new();
+        for part in s.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            match part.split_once('-') {
+                Some((lo, hi)) => {
+                    let lo: usize = lo.trim().parse().map_err(|_| {
+                        format!("invalid range start in `{part}`")
+                    })?;
+                    let hi: usize = hi.trim().parse().map_err(|_| {
+                        format!("invalid range end in `{part}`")
+                    })?;
+                    if lo > hi {
+                        return Err(format!(
+                            "range `{part}` is descending (start {lo} > end {hi})"
+                        ));
+                    }
+                    indices.extend(lo..=hi);
+                }
+                None => {
+                    let i: usize = part
+                        .parse()
+                        .map_err(|_| format!("invalid index `{part}`"))?;
+                    indices.push(i);
+                }
+            }
+        }
+        if indices.is_empty() {
+            return Err("no test indices given".to_string());
+        }
+        Ok(TestSelection(indices))
+    }
+}
+
 /// Keep only the fixtures at the given 0-based indices (or all, if `None`).
 fn select_fixtures(
     all: Vec<Fixture>,
@@ -281,4 +336,60 @@ fn select_horizons(
         horizons.insert(0, 0);
     }
     horizons
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(s: &str) -> Vec<usize> {
+        s.parse::<TestSelection>().unwrap().0
+    }
+
+    #[test]
+    fn single_indices() {
+        assert_eq!(parse("1,3,12"), vec![1, 3, 12]);
+    }
+
+    #[test]
+    fn inclusive_ranges() {
+        assert_eq!(parse("1-4"), vec![1, 2, 3, 4]);
+        assert_eq!(parse("0-0"), vec![0]);
+    }
+
+    #[test]
+    fn mixed_ranges_and_indices() {
+        assert_eq!(
+            parse("1-10,12,14-18"),
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 15, 16, 17, 18]
+        );
+    }
+
+    #[test]
+    fn whitespace_and_trailing_commas_tolerated() {
+        assert_eq!(parse(" 1 , 3 - 5 ,"), vec![1, 3, 4, 5]);
+    }
+
+    #[test]
+    fn duplicates_preserved() {
+        // select_fixtures deliberately allows repeats; the parser keeps them.
+        assert_eq!(parse("2,2,1-2"), vec![2, 2, 1, 2]);
+    }
+
+    #[test]
+    fn descending_range_rejected() {
+        assert!("5-1".parse::<TestSelection>().is_err());
+    }
+
+    #[test]
+    fn empty_selection_rejected() {
+        assert!("".parse::<TestSelection>().is_err());
+        assert!(" , ".parse::<TestSelection>().is_err());
+    }
+
+    #[test]
+    fn non_numeric_rejected() {
+        assert!("1,x".parse::<TestSelection>().is_err());
+        assert!("1-b".parse::<TestSelection>().is_err());
+    }
 }

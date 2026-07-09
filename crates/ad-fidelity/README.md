@@ -117,7 +117,7 @@ Options:
 | Flag | Meaning |
 |------|---------|
 | `[DIR]` | Fixtures directory (default `saves/fixtures`). |
-| `--tests 1,3,12` | Only these fixtures, by 0-based row index. |
+| `--tests 1-6,8,12` | Only these fixtures, range inclusive, by 0-based row index. |
 | `--ticks 1,10` | Only these horizons (columns). |
 | `--tick-ms 50` | Override the fixture's `meta.tickMs` (must match the oracle). |
 | `--epsilon 1e-6` | Log-space / relative comparison epsilon. |
