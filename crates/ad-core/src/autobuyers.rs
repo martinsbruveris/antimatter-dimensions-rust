@@ -364,6 +364,13 @@ pub struct AutobuyerState {
     pub enabled: bool,
     /// Autobuyers for each of the 8 antimatter dimension tiers.
     pub dimensions: [Autobuyer; 8],
+    /// The Antimatter Dimension autobuyer *group* toggle
+    /// (`player.auto.antimatterDims.isActive`). Once every tier autobuyer is
+    /// maxed/unlocked/unlimited-bulk (the UI collapses them into one control —
+    /// [`ad_autobuyer_collapse_display`](GameState::ad_autobuyer_collapse_display)),
+    /// this group flag gates all of them; before then only the per-tier flags apply.
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub ad_group_active: bool,
     /// Autobuyer for tickspeed upgrades. Pre-Infinity its mode is locked to
     /// `BuySingle` (the "Buys max" toggle requires completing a challenge).
     pub tickspeed: Autobuyer,
@@ -415,6 +422,10 @@ fn default_galaxy_autobuyer() -> Autobuyer {
 fn default_big_crunch_autobuyer() -> Autobuyer {
     Autobuyer::new(BIG_CRUNCH_AUTOBUYER_INTERVAL_MS, AutobuyerMode::BuySingle)
 }
+#[cfg(feature = "serde")]
+fn default_true() -> bool {
+    true
+}
 
 impl AutobuyerState {
     pub fn new() -> Self {
@@ -424,6 +435,7 @@ impl AutobuyerState {
             dimensions: std::array::from_fn(|tier| {
                 Autobuyer::new(AD_AUTOBUYER_INTERVALS_MS[tier], AutobuyerMode::BuyMax)
             }),
+            ad_group_active: true,
             tickspeed: Autobuyer::new(
                 TICKSPEED_AUTOBUYER_INTERVAL_MS,
                 AutobuyerMode::BuySingle,
@@ -618,6 +630,19 @@ impl GameState {
         self.autobuyer(target).is_bought || self.autobuyer_can_be_upgraded(target)
     }
 
+    /// Whether the Antimatter Dimension autobuyers' UI collapses into a single
+    /// group control (`Autobuyer.antimatterDimension.collapseDisplay`): every tier
+    /// autobuyer has a maxed interval and is unlocked, and the shared "unlimited
+    /// bulk" (Achievement 61) is earned. Only while collapsed does the group toggle
+    /// [`ad_group_active`](AutobuyerState::ad_group_active) gate the tier autobuyers.
+    pub fn ad_autobuyer_collapse_display(&self) -> bool {
+        let all_maxed_interval =
+            (0..8).all(|t| self.autobuyers.dimensions[t].has_maxed_interval());
+        let all_unlocked =
+            (0..8).all(|t| self.autobuyer_is_unlocked(AutobuyerTarget::AdTier(t)));
+        all_maxed_interval && all_unlocked && self.achievement_unlocked(61)
+    }
+
     /// Whether `target`'s interval is already at the 100 ms floor.
     pub fn autobuyer_has_maxed_interval(&self, target: AutobuyerTarget) -> bool {
         self.autobuyer(target).has_maxed_interval()
@@ -685,8 +710,14 @@ impl GameState {
 
         // Antimatter dimension autobuyers: `isAvailableForPurchase &&
         // isAffordable` (the single-cost affordability, even in "Buys max").
+        // The per-tier flag is only sufficient while the UI is expanded; once the
+        // tier autobuyers collapse into one control the group toggle applies too
+        // (`thisSetting = individual && (collapseDisplay ? group : true)`).
+        let ad_group_ok =
+            !self.ad_autobuyer_collapse_display() || self.autobuyers.ad_group_active;
         for tier in 0..8 {
             let ready = self.autobuyers.dimensions[tier].is_active
+                && ad_group_ok
                 && self.autobuyer_is_unlocked(AutobuyerTarget::AdTier(tier))
                 && self.dim_available_for_purchase(tier)
                 && self.dim_single_affordable(tier);
@@ -1130,6 +1161,43 @@ mod tests {
         game.tick_autobuyers(150.0);
         // Three groups of ten in one fire.
         assert_eq!(game.dimensions[0].bought, 30);
+    }
+
+    #[test]
+    fn ad_group_toggle_gates_tier_autobuyers_only_once_collapsed() {
+        let mut game = GameState::new();
+        game.antimatter = Decimal::from_float(1e12);
+        game.autobuyers.dimensions[0].is_bought = true;
+        game.autobuyers.dimensions[0].is_active = true;
+        game.autobuyers.dimensions[0].mode = AutobuyerMode::BuySingle;
+        game.autobuyers.dimensions[0].interval_ms = 100.0;
+        game.autobuyers.dimensions[0].timer_ms = 100.0;
+        // The group toggle is off, but the display hasn't collapsed (other tiers
+        // are neither maxed nor unlocked), so the tier autobuyer still fires.
+        game.autobuyers.ad_group_active = false;
+        assert!(!game.ad_autobuyer_collapse_display());
+        game.tick_autobuyers(150.0);
+        assert_eq!(game.dimensions[0].bought, 1);
+
+        // Force the display to collapse: every tier maxed + unlocked, and the
+        // unlimited-bulk achievement (61) earned. Now the off group toggle blocks
+        // the tier autobuyer entirely.
+        for ab in game.autobuyers.dimensions.iter_mut() {
+            ab.is_bought = true;
+            ab.interval_ms = 100.0;
+        }
+        game.unlock_achievement(61);
+        assert!(game.ad_autobuyer_collapse_display());
+        game.antimatter = Decimal::from_float(1e12);
+        game.autobuyers.dimensions[0].timer_ms = 100.0;
+        game.tick_autobuyers(150.0);
+        assert_eq!(game.dimensions[0].bought, 1); // unchanged — group gate closed
+
+        // Re-enable the group toggle and it fires again.
+        game.autobuyers.ad_group_active = true;
+        game.autobuyers.dimensions[0].timer_ms = 100.0;
+        game.tick_autobuyers(150.0);
+        assert_eq!(game.dimensions[0].bought, 2);
     }
 
     #[test]

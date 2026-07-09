@@ -278,7 +278,10 @@ not the current state).
   condition: AD/Tickspeed `isAvailableForPurchase && isAffordable`, Dim Boost /
   Galaxy `canBeBought && requirement`, Big Crunch `Player.canCrunch`) — so the
   phase keeps accruing while an autobuyer waits to afford its purchase instead of
-  restarting each interval. The save codec converts `lastTick ↔ timer_ms` on
+  restarting each interval. The AD autobuyers also carry a group toggle
+  (`ad_group_active` ↔ `auto.antimatterDims.isActive`): once every tier is
+  maxed/unlocked with unlimited bulk the UI collapses them into one control
+  (`ad_autobuyer_collapse_display`) and that group flag gates all tiers. The save codec converts `lastTick ↔ timer_ms` on
   load/store (see `save/dto.rs` / `save/encode.rs`); discarding it desynchronises
   every autobuyer's firing phase on replay. See
   `../../docs/design/2026-07-03-autobuyers.md`.

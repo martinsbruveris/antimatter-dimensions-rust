@@ -1230,10 +1230,14 @@ fn ten_f64() -> f64 {
     10.0
 }
 
-/// `player.auto.antimatterDims` — the `all` array holds the 8 tier autobuyers.
+/// `player.auto.antimatterDims` — the `all` array holds the 8 tier autobuyers,
+/// plus the group-level `isActive` toggle that gates them once the UI collapses.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AntimatterDimsDTO {
     pub all: Vec<AutobuyerDTO>,
+    #[serde(default = "default_true_bool")]
+    pub is_active: bool,
 }
 
 /// A single autobuyer entry (`auto.antimatterDims.all[t]` or `auto.tickspeed`).
@@ -1270,6 +1274,11 @@ pub struct AutobuyerDTO {
 /// serde default for [`AutobuyerDTO::bulk`] — the tickspeed autobuyer save omits it.
 fn default_dto_bulk() -> u32 {
     1
+}
+
+/// serde default for [`AntimatterDimsDTO::is_active`] — absent in the oldest saves.
+fn default_true_bool() -> bool {
+    true
 }
 
 /// `player.options` — UI/UX preferences (modelled subset).
@@ -1930,6 +1939,7 @@ impl GameState {
         // overlay only the saved active/bought/mode flags (§4.4).
         let mut autobuyers = AutobuyerState::new();
         autobuyers.enabled = dto.auto.autobuyers_on;
+        autobuyers.ad_group_active = dto.auto.antimatter_dims.is_active;
         // The JS interval autobuyers store `lastTick` as an absolute
         // `realTimePlayed` timestamp; we model the timer as elapsed time, so
         // convert `timer_ms = realTimePlayed - lastTick` (clamped ≥ 0) to

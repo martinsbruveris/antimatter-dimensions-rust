@@ -675,6 +675,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     let real_time = state.records.real_time_played_ms;
     let last_tick = |timer_ms: f64| json!(real_time - timer_ms);
     player["auto"]["autobuyersOn"] = json!(state.autobuyers.enabled);
+    player["auto"]["antimatterDims"]["isActive"] =
+        json!(state.autobuyers.ad_group_active);
     for (tier, ab) in state.autobuyers.dimensions.iter().enumerate() {
         let entry = &mut player["auto"]["antimatterDims"]["all"][tier];
         entry["isActive"] = json!(ab.is_active);

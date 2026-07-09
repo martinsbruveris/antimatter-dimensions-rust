@@ -592,3 +592,33 @@ distinct from `infinity_goal`'s `1e308`, so post-break boosting is unaffected).
 ### Verification
 - Fidelity grid: 574 → **580** cells (+6); `00204`/`00206` @1 now pass.
 - `cargo test -p ad-core --features serde`: 568 pass; fmt + clippy clean.
+
+## Bug 18 — the Antimatter Dimension autobuyer group toggle
+
+### Symptom
+Deep fixtures with the AD autobuyers turned off at the *group* level (e.g. `00184`,
+`00185`, in Infinity Challenge 5) diverged from horizon 1: JS bought nothing
+(`dim0.bought` stayed 10, dimensions barely grew from production alone), while Rust
+ran the tier autobuyers and bought aggressively (`dim0.bought` → 2500, antimatter
+1e6053 → 1e7120). The tell was `auto.antimatterDims.isActive JS=false Rust=true`
+plus the tier autobuyers' `lastTick` reset to 0 in JS.
+
+### Diagnosis
+The AD autobuyer's `canTick` uses `thisSetting = individualSetting &&
+(collapseDisplay ? groupSetting : true)`, where `collapseDisplay =
+allMaxedInterval && allUnlocked && allUnlimitedBulk` (the UI collapses the eight
+tier controls into one once they're all maxed, unlocked, and have unlimited bulk —
+Achievement 61). On these fully-upgraded saves the display is collapsed, so the
+group toggle `auto.antimatterDims.isActive` (false) gates every tier autobuyer.
+Rust modelled only the per-tier `is_active` flags and never read the group flag.
+
+### Fix
+Modelled the group toggle (`AutobuyerState.ad_group_active` ↔
+`auto.antimatterDims.isActive`, decode/encode) and `ad_autobuyer_collapse_display`
+(all tiers maxed-interval + unlocked, and Achievement 61), then gated the tier
+autobuyers on `individual && (collapseDisplay ? group : true)`.
+
+### Verification
+- Fidelity grid: 580 → **584** cells (+4); `00184`/`00185` now pass @1 and @10.
+- Round-trip identity holds for all fixtures (the new group flag encodes cleanly).
+- `cargo test -p ad-core --features serde`: 569 pass; fmt + clippy clean.

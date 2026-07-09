@@ -41,6 +41,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Produced Time → Infinity → Antimatter Dimensions each tick (game.js order) so AD production reads *this* tick's Infinity Power (was stale) | 424/1148 |
 | 2026-07-09 | (pending) | Implemented the `slowestChallengeMult` Break Infinity Upgrade (`clampMin(50 / worstChallengeMinutes, 1)`, cap 3e4) from the decoded Normal Challenge best times; was stubbed as deferred, missing a ~24× AD multiplier on post-break saves (`00119`) | 574/1148 |
 | 2026-07-09 | (pending) | Implemented the Dimension Boost autobuyer's `autobuyMaxDimboosts` buy-max branch (gate `canUnlockNewDimension \|\| galaxyCondition`, `maxBuyDimBoosts`, `softReset(bulk)`) + the `infinityLimit`/`infinityGoal` boost guards; Rust was boosting (and collapsing antimatter) when JS's buy-max branch would not (`00204`/`00206`) | 580/1148 |
+| 2026-07-09 | (pending) | Modelled the AD autobuyer group toggle (`auto.antimatterDims.isActive`) + `collapseDisplay` (all tiers maxed/unlocked + Achievement 61); Rust ran the tier autobuyers when JS's collapsed group toggle disabled them (`00184`/`00185`) | 584/1148 |
 
 ## Method
 
