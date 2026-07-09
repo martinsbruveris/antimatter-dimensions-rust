@@ -120,6 +120,9 @@ pub struct PlayerDTO {
     /// `player.partInfinitied` — fractional carry of passive Infinity generation.
     #[serde(default)]
     pub part_infinitied: f64,
+    /// `player.ic2Count` — the IC2 auto-sacrifice timer (ms).
+    #[serde(rename = "ic2Count", default)]
+    pub ic2_count: f64,
     /// `player.infinityPower` — produced by the Infinity Dimensions.
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_power: Decimal,
@@ -2241,7 +2244,7 @@ impl GameState {
             post_c4_tier: dto.post_c4_tier,
             // Transient per-run challenge counter; defaulted rather than
             // round-tripped.
-            ic2_count: 0.0,
+            ic2_count: dto.ic2_count,
             chall8_total_sacrifice: dto.chall8_total_sacrifice,
             chall2_pow: dto.chall2_pow,
             chall3_pow: dto.chall3_pow,
