@@ -42,3 +42,46 @@ paths no longer touch achievement 28 — matching the original's split exactly.
 `achievementBits` no longer diverges. On its own this fix leaves the grid at 34
 cells (the fixture still fails on the production divergence below), but it is a
 genuine correctness fix. `cargo test -p ad-core --features serde` stays green.
+
+## Bug 2 — production must freeze once the Big Crunch goal is reached
+
+### Symptom
+Every `dimensions.antimatter[*].amount` diverged, and the gap *grew* with the
+horizon (Δlog10 ≈ 0.4 at 100 ticks, ≈ 3.0 at 1000). Tell-tale: the JS amounts
+were **identical at horizons 100 and 1000** — JS had frozen — while Rust kept
+producing. Separately, `records.{thisInfinity,thisEternity,thisReality}.maxAM`
+diverged by a hair: JS ≈ 1.805e308, Rust exactly `NUMBER_MAX_VALUE`
+(1.7977e308).
+
+### The bug
+The original's `AntimatterDimensions.tick(diff)` opens with
+
+```js
+const hasBigCrunchGoal = !player.break || Player.isInAntimatterChallenge;
+if (hasBigCrunchGoal && Currency.antimatter.gte(Player.infinityGoal)) return;
+```
+
+Pre-break (or in an antimatter challenge), once antimatter reaches the goal the
+whole AD tick is skipped — the dimensions are hidden behind the Big Crunch
+button, so **all** production and antimatter gain freeze until the player
+crunches. Our tick always ran the production chain and only capped antimatter at
+the end, so the dimension amounts kept climbing past the wall.
+
+The `maxAM` discrepancy is the same mechanic seen from the antimatter setter:
+`Currency.antimatter`'s setter records `maxAM = maxAM.max(value)` on *every*
+assignment, so the overshoot on the reaching tick (produced value, e.g.
+1.805e308) is captured *before* `dropTo(infinityGoal)` caps it. We recorded
+`maxAM` from the already-capped value, so it stuck at the goal.
+
+### The fix
+In `tick.rs`, compute `has_big_crunch_goal` and the `goal`, then wrap the
+dimension chain + antimatter gain in `if !(has_big_crunch_goal && antimatter >=
+goal)`. Inside, capture `peak_am` (the post-gain, pre-cap antimatter) and use it
+for the three `maxAM` record updates, then apply the `dropTo` cap. When
+production is frozen, `peak_am` is just the current (already ≥ goal) antimatter,
+so `maxAM` doesn't move.
+
+### Verification
+- Fixture 8 (`00008-…-manual`): was 2/4, now **4/4**.
+- Fidelity grid: 34 → **36** cells, no regressions.
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

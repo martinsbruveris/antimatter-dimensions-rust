@@ -78,46 +78,61 @@ impl GameState {
         // dimensions make antimatter, and higher dimensions feed 2 tiers below
         // (AD3→AD1, AD4→AD2, …). Locked dimensions and EC3-silenced tiers produce
         // 0 via `dimension_production_per_second`, so the loop needs no extra guard.
-        let offset = if self.challenge_running(12) { 2 } else { 1 };
-        for producer in (offset..8).rev() {
-            let produced = self.dimension_production_per_second(producer) * dt_dim;
-            self.dimensions[producer - offset].amount += produced;
-        }
-
-        // Any 1st Antimatter Dimension stock breaks the "no AD1" run flag
-        // (`antimatter-dimension.js` checks this after dimension production).
-        if self.dimensions[0].amount > Decimal::ZERO {
-            self.requirement_checks.eternity_no_ad1 = false;
-        }
-
-        // The 1st dimension (and the 2nd under NC12) makes antimatter at the full
-        // interval, reading its amount after the chain above has fed into it.
-        // `total_antimatter` (monotonic, survives crunches) counts all antimatter
-        // produced, before the Big Crunch cap.
-        let mut am_gain = self.dimension_production_per_second(0) * dt;
-        if self.challenge_running(12) {
-            am_gain += self.dimension_production_per_second(1) * dt;
-        }
-        self.antimatter += am_gain;
-        self.total_antimatter += am_gain;
-        // Any antimatter gain breaks the "no antimatter this reality" flag
-        // (`Currency.antimatter.add`, currency.js).
-        if am_gain > Decimal::ZERO {
-            self.requirement_checks.reality_no_am = false;
-        }
-
-        // Cap antimatter at the current goal while a crunch goal is in force:
-        // pre-break the player must Crunch to progress, and even post-break any
-        // antimatter challenge still targets its goal (`1e308` for Normal
-        // Challenges, the IC's own goal for Infinity Challenges). Mirrors
-        // `hasBigCrunchGoal = !player.break || isInAntimatterChallenge` capping at
-        // `Player.infinityGoal`. Post-break and outside a challenge, antimatter
-        // grows without bound.
+        // `AntimatterDimensions.tick`'s `hasBigCrunchGoal`: pre-break, or inside any
+        // antimatter challenge, the run targets a Big Crunch goal (`1e308` for
+        // Normal Challenges, the IC's own goal for Infinity Challenges). Post-break
+        // and outside a challenge, antimatter grows without bound.
         let goal = self.infinity_goal();
-        if (!self.broke_infinity || self.in_any_antimatter_challenge())
-            && self.antimatter > goal
-        {
-            self.antimatter = goal;
+        let has_big_crunch_goal =
+            !self.broke_infinity || self.in_any_antimatter_challenge();
+
+        // The original's `AntimatterDimensions.tick` returns early once the goal is
+        // met (`hasBigCrunchGoal && antimatter.gte(infinityGoal)`): pre-break the
+        // dimensions are hidden behind the Big Crunch button, so production — and
+        // thus every dimension amount and antimatter itself — freezes until the
+        // player crunches. `peak_am` tracks the post-production, pre-cap antimatter
+        // for the `maxAM` records below (mirroring the antimatter setter, which
+        // records `maxAM` before the goal cap).
+        let mut peak_am = self.antimatter;
+        if !(has_big_crunch_goal && self.antimatter >= goal) {
+            let offset = if self.challenge_running(12) { 2 } else { 1 };
+            for producer in (offset..8).rev() {
+                let produced = self.dimension_production_per_second(producer) * dt_dim;
+                self.dimensions[producer - offset].amount += produced;
+            }
+
+            // Any 1st Antimatter Dimension stock breaks the "no AD1" run flag
+            // (`antimatter-dimension.js` checks this after dimension production).
+            if self.dimensions[0].amount > Decimal::ZERO {
+                self.requirement_checks.eternity_no_ad1 = false;
+            }
+
+            // The 1st dimension (and the 2nd under NC12) makes antimatter at the
+            // full interval, reading its amount after the chain above has fed into
+            // it. `total_antimatter` (monotonic, survives crunches) counts all
+            // antimatter produced, before the Big Crunch cap.
+            let mut am_gain = self.dimension_production_per_second(0) * dt;
+            if self.challenge_running(12) {
+                am_gain += self.dimension_production_per_second(1) * dt;
+            }
+            self.antimatter += am_gain;
+            self.total_antimatter += am_gain;
+            // Any antimatter gain breaks the "no antimatter this reality" flag
+            // (`Currency.antimatter.add`, currency.js).
+            if am_gain > Decimal::ZERO {
+                self.requirement_checks.reality_no_am = false;
+            }
+
+            // The antimatter setter records `maxAM` from this post-gain value —
+            // before the cap below — so an overshoot on the reaching tick counts
+            // (maxAM ends slightly above the goal pre-break).
+            peak_am = self.antimatter;
+
+            // `Currency.antimatter.dropTo(Player.infinityGoal)`: production may
+            // overshoot the goal on the final tick before a crunch; cap it back.
+            if has_big_crunch_goal && self.antimatter > goal {
+                self.antimatter = goal;
+            }
         }
 
         // Time Dimensions produce Time Shards → free Tickspeed upgrades.
@@ -166,18 +181,19 @@ impl GameState {
             self.records.this_eternity.max_ip.max(&self.infinity_points);
         self.records.this_reality.max_ip =
             self.records.this_reality.max_ip.max(&self.infinity_points);
-        // Track the peak antimatter this infinity (capped value), mirroring the
-        // antimatter setter's `thisInfinity.maxAM = maxAM.max(value)`. The same
-        // setter also updates the this-reality peak.
+        // Track the peak antimatter this infinity, mirroring the antimatter
+        // setter's `thisInfinity.maxAM = maxAM.max(value)`. `peak_am` is the
+        // post-production value *before* the goal cap, so a pre-crunch overshoot is
+        // counted. The same setter also updates the this-reality peak.
         self.records.this_infinity.max_am =
-            self.records.this_infinity.max_am.max(&self.antimatter);
+            self.records.this_infinity.max_am.max(&peak_am);
         self.records.this_reality.max_am =
-            self.records.this_reality.max_am.max(&self.antimatter);
+            self.records.this_reality.max_am.max(&peak_am);
         // Peak antimatter this eternity (persists across crunches; gates Infinity
         // Challenge unlocks).
         let prev_peak = self.records.this_eternity.max_am;
         self.records.this_eternity.max_am =
-            self.records.this_eternity.max_am.max(&self.antimatter);
+            self.records.this_eternity.max_am.max(&peak_am);
 
         // Reality-record peaks (the original tracks these in the EP / DT /
         // replicanti currency setters): peak EP, replicanti, and DT this
