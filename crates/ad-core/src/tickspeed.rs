@@ -139,6 +139,14 @@ impl GameState {
     /// 3+ galaxies (exponential):
     ///   0.8 * 0.965^(galaxies - 4)
     pub fn tickspeed_purchase_multiplier(&self) -> f64 {
+        // IC3 neutralises the *per-purchase* multiplier (`getTickSpeedMultiplier`
+        // returns `DC.D1`), so each Tickspeed upgrade contributes ×1. The base
+        // tickspeed and its Achievement effects (36/45/66/83) still apply via
+        // `starting_tickspeed_mult`, so the overall tickspeed production factor is
+        // *not* 1 — only the growth from upgrades is removed.
+        if self.ic3_neutralizes_tickspeed() {
+            return 1.0;
+        }
         // `effectiveBaseGalaxies`: antimatter galaxies plus Replicanti Galaxies feed
         // the tickspeed formula (the branch cutoff, per-galaxy reduction, and the
         // exponent). The base-multiplier lookup, however, keys off the *antimatter*
@@ -218,11 +226,11 @@ impl GameState {
     /// tickspeed interval:
     ///   effect = INITIAL_TICKSPEED_MS / current_tickspeed_ms
     pub fn tickspeed_effect(&self) -> Decimal {
-        // Infinity Challenge 3 neutralises Tickspeed (its production effect → ×1);
-        // in exchange it grants a static Antimatter Dimension multiplier.
-        if self.ic3_neutralizes_tickspeed() {
-            return Decimal::ONE;
-        }
+        // IC3 does *not* zero this: it only forces the per-purchase multiplier to
+        // ×1 (handled in `tickspeed_purchase_multiplier`), so `current` is still
+        // `1000 · starting_tickspeed_mult · 1^upgrades` and the production factor
+        // is `1000 / current = 1 / starting_tickspeed_mult` (≠ 1 whenever a
+        // starting-tickspeed Achievement is owned).
         let current = self.current_tickspeed_ms();
         if current <= Decimal::ZERO {
             return Decimal::from_float(1.0);

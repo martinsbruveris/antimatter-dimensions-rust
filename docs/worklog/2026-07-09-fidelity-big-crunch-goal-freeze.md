@@ -946,3 +946,35 @@ Six of the nine remaining horizon-1 failures diverged *only* on
   `dimBoost`/`galaxy` `lastTick` to the digit.
 - `cargo test -p ad-core --features serde`: 582 pass (two new regression tests);
   fmt + clippy clean; round-trip unchanged.
+
+## Bug 30 — IC3 zeroed the whole Tickspeed factor, not just the per-purchase growth
+
+### Symptom
+The three remaining horizon-1 failures included `00146`/`00147`, both mid-IC3
+runs, with a per-tier AD-chain drift (~1.8e-4/tier compounding to ~1.3e-3 at AD1
+— the classic 7:1 bottom-of-chain ratio).
+
+### Diagnosis
+Probing the live oracle for `00146` showed every per-tier `AntimatterDimension.
+multiplier` matched Rust to the digit, so the drift was in the *tickspeed*
+production factor. In the original, IC3 makes `getTickSpeedMultiplier()` return
+`DC.D1` — the per-purchase multiplier only. `Tickspeed.baseValue` is still
+`1000 · Achievement(36/45/66/83) · getTickSpeedMultiplier()^totalUpgrades`, so
+with the multiplier pinned to 1 the base and its Achievement effects survive:
+`Tickspeed.perSecond = 1000 / current = 1 / startingTickspeedMult`. For `00146`
+that is `1.062` (Achievements 36/45/66 owned), not 1. Rust's `tickspeed_effect`
+short-circuited to `Decimal::ONE` under IC3, dropping that ×1.062 — a ~5 %
+production increment diluted by the large standing AD stock into the observed
+~1.3e-3 drift.
+
+### Fix
+Moved the IC3 neutralisation from `tickspeed_effect` (which zeroed everything) to
+`tickspeed_purchase_multiplier` (returns `1.0` under IC3, mirroring
+`getTickSpeedMultiplier`). `tickspeed_effect` now always computes
+`1000 / current`, so the starting-tickspeed Achievement effects are retained.
+
+### Verification
+- Fidelity grid: 839 → **844** cells (+5). `00146`/`00147` pass @1.
+- `cargo test -p ad-core --features serde`: 582 pass (strengthened the IC3 unit
+  test to assert `tickspeed_effect == 1.02` with Achievement 36 owned); fmt +
+  clippy clean; round-trip clean.

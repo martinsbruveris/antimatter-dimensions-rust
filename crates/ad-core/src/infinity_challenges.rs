@@ -143,8 +143,11 @@ impl GameState {
 
     // --- Effect readers (per the original's `InfinityChallenge(N)` sites) ------
 
-    /// Whether Tickspeed is neutralised (its production effect → 1): IC3 while
-    /// running (`getTickSpeedMultiplier` returns 1). Read in `tickspeed_effect`.
+    /// Whether IC3 forces the Tickspeed *per-purchase* multiplier to ×1
+    /// (`getTickSpeedMultiplier` returns `DC.D1` while IC3 runs). The base
+    /// tickspeed and its starting-tickspeed Achievement effects still apply, so
+    /// this does *not* make the overall production factor 1. Read in
+    /// `tickspeed_purchase_multiplier`.
     pub(crate) fn ic3_neutralizes_tickspeed(&self) -> bool {
         self.infinity_challenge_running(3)
     }
@@ -317,8 +320,19 @@ mod tests {
         game.start_infinity_challenge(3);
         game.tickspeed.bought = 10;
         game.galaxies = 2;
-        // Tickspeed's production effect is neutralised to ×1.
+        // IC3 zeroes only the per-purchase growth: with no starting-tickspeed
+        // Achievement, `current = 1000·1·1^10`, so the production factor is ×1
+        // regardless of how many upgrades are bought.
         assert_eq!(game.tickspeed_effect(), Decimal::ONE);
+        // But the base tickspeed and its Achievement effects still apply: owning
+        // Achievement 36 (starting tickspeed ÷1.02) leaves the production factor
+        // at 1/(1/1.02) = 1.02, *not* 1 (regression: IC3 forced it to 1).
+        game.unlock_achievement(36);
+        assert!(
+            (game.tickspeed_effect().to_f64() - 1.02).abs() < 1e-9,
+            "{}",
+            game.tickspeed_effect()
+        );
         // The static AD multiplier is (1.05 + 2×0.005)^10 = 1.06^10.
         let expected = 1.06_f64.powi(10);
         let mult = game.infinity_challenge_common_mult().to_f64();
