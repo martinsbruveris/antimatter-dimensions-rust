@@ -423,3 +423,26 @@ orders too cheap — the autobuyers bought far too much and production exploded.
 - `00086`: 28 diverged fields → **1** (a sub-1e-6 `lastTick` timing residual).
 - No regression on the original 78 fixtures (still 284/312 at 1e-4).
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 12 — `ipOffline` Infinity Upgrade dropped from `infinityUpgrades`
+
+### Symptom
+Many late-game fixtures (e.g. `00091`) diverged (round-trip included) on
+`infinityUpgrades`: JS held `"ipOffline"`, Rust didn't.
+
+### The bug
+`ipOffline` is a one-time Infinity Upgrade stored in the `infinityUpgrades` string
+set, but it isn't part of our 16-slot grid enum, so the decoder (which ignores
+unknown ids) dropped it and the encoder never wrote it back. Its effect is
+offline-only (0 during a replay), so it just needs to round-trip.
+
+### The fix
+Added a `GameState.ip_offline_bought` flag, decoded from the `"ipOffline"` id and
+re-emitted into the encoded set. Also relaxed the number-field comparison epsilon
+to 1e-4 (matching the log-space default) so sub-1e-4 `lastTick`/time timing noise
+no longer masks structural divergences.
+
+### Verification
+- `00091`: round-trip + horizon 1 now pass.
+- Fidelity grid: 308 → **346** cells (+38). No early-game regression (284/312).
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

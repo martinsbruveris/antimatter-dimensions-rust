@@ -213,6 +213,11 @@ pub struct GameState {
     /// (`player.IPMultPurchases`). Feeds `total_ip_mult`; reset on Eternity.
     #[cfg_attr(feature = "serde", serde(default))]
     pub ip_mult_purchases: u32,
+    /// The one-time `ipOffline` Infinity Upgrade (in `player.infinityUpgrades`).
+    /// Its effect is offline-only (0 during a replay), so it is preserved for
+    /// round-trip fidelity but has no in-tick effect.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub ip_offline_bought: bool,
     /// Current Eternity Points (`Currency.eternityPoints`): gained on an
     /// Eternity, cumulative, spent on Time Dimensions / Eternity Upgrades /
     /// Time Theorems. Reset only on Reality (out of frontier). See `eternity.rs`.
@@ -526,6 +531,7 @@ impl GameState {
             eternity_upgrades: 0,
             epmult_upgrades: 0,
             ip_mult_purchases: 0,
+            ip_offline_bought: false,
             ic_best_times_ms: [f64::MAX; 8],
             nc_best_times_ms: [f64::MAX; 11],
             dilation: DilationState::new(),

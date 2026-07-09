@@ -99,6 +99,10 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
             .filter(|u| state.break_infinity_upgrade_bought(**u))
             .map(|u| u.save_id()),
     );
+    // The one-time `ipOffline` upgrade (offline-only effect) shares the set.
+    if state.ip_offline_bought {
+        owned_upgrades.push("ipOffline");
+    }
     player["infinityUpgrades"] = json!(owned_upgrades);
     player["infinityRebuyables"] = json!(state.infinity_rebuyables);
     player["partInfinityPoint"] = json!(state.part_infinity_point);

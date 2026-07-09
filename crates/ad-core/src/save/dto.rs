@@ -1442,11 +1442,14 @@ impl GameState {
         // ids are ignored so a later-game save still loads.
         let mut infinity_upgrades = 0u32;
         let mut break_infinity_upgrades = 0u32;
+        let mut ip_offline_bought = false;
         for id in &dto.infinity_upgrades {
             if let Some(upgrade) = InfinityUpgrade::from_save_id(id) {
                 infinity_upgrades |= upgrade.bit();
             } else if let Some(upgrade) = BreakInfinityUpgrade::from_save_id(id) {
                 break_infinity_upgrades |= upgrade.bit();
+            } else if id == "ipOffline" {
+                ip_offline_bought = true;
             }
         }
 
@@ -2198,6 +2201,7 @@ impl GameState {
             },
             epmult_upgrades: dto.epmult_upgrades,
             ip_mult_purchases: dto.ip_mult_purchases,
+            ip_offline_bought,
             ic_best_times_ms: {
                 let mut times = [f64::MAX; 8];
                 for (i, t) in
