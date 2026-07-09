@@ -65,8 +65,9 @@ Wire the kinds together so any one of them leads to the others:
 This index is maintained by hand. When you add a doc, re-categorize one, or change
 a `status`, update the matching table row in the same change. (The codebase is
 small enough that hand-maintenance is fine; revisit if it starts to drift.) The
-[port audit](design/2026-07-05-port-audit.md) is the authoritative snapshot of
-what is actually implemented vs. remaining.
+[port audit](design/2026-07-09-port-audit.md) is the authoritative snapshot of
+what is actually implemented vs. remaining (numbered per feature for progress
+tracking); it supersedes the [2026-07-05 snapshot](design/2026-07-05-port-audit.md).
 
 ## Design docs (RFCs)
 
@@ -107,10 +108,11 @@ decisions.
 | Partial | [`2026-07-04-eternity.md`](design/2026-07-04-eternity.md) | Phase 4 (4.1–4.6): Eternity, Milestones, Time Dimensions, Time Studies, Eternity Challenges, Eternity Upgrades |
 | Implemented | [`2026-07-04-tab-notifications.md`](design/2026-07-04-tab-notifications.md) | Tab notification badges (the yellow `!` on tabs) |
 | Implemented | [`2026-07-05-automator.md`](design/2026-07-05-automator.md) | Feature 6.6: the Automator (all five stages) |
-| Reference | [`2026-07-05-port-audit.md`](design/2026-07-05-port-audit.md) | Code-level audit of what is ported vs remaining (2026-07-05) — the current status snapshot |
+| Reference | [`2026-07-05-port-audit.md`](design/2026-07-05-port-audit.md) | Code-level audit of what is ported vs remaining (2026-07-05) — prior snapshot, superseded by 2026-07-09 |
 | Partial | [`2026-07-05-reality.md`](design/2026-07-05-reality.md) | Phase 6 (6.1–6.5): Reality, Glyphs, Perks, Reality Upgrades, Black Holes |
 | Accepted | [`2026-07-06-fidelity-testing.md`](design/2026-07-06-fidelity-testing.md) | Save-replay differential fidelity harness (design agreed; not yet built) |
 | Partial | [`2026-07-06-celestials.md`](design/2026-07-06-celestials.md) | Phase 7 celestials 1–4 (Teresa, Effarig, Enslaved, V): mechanics, frontier cuts, Rust design, save/load, UI |
+| Reference | [`2026-07-09-port-audit.md`](design/2026-07-09-port-audit.md) | Numbered code-level audit of what is ported vs remaining (2026-07-09) — the authoritative status snapshot |
 
 ## Analysis (study of the original JS game)
 
