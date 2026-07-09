@@ -230,8 +230,19 @@ not the current state).
   `../../docs/design/2026-07-07-pelle.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
-  multiplier, and `starting_antimatter`. Unlocks fire inline from the relevant
-  action methods; see `../../docs/design/2026-06-30-achievements.md`.
+  multiplier, `starting_antimatter`, and the `achievement_ad_common_mult` term.
+  Rows 1–17 are wired: unlock conditions live in per-event `check_*_achievements`
+  dispatchers (`check_tick_achievements`, `check_crunch_before/after`,
+  `check_galaxy_before/after`, `check_sacrifice_before/after`,
+  `check_eternity_before/after`, `check_reality_before/after`,
+  `check_infinity_challenge_completed`, `check_perk_bought`,
+  `check_reality_upgrade_bought`, `check_black_hole_unlocked/upgrade`,
+  `check_singularity_before/after`, `check_annihilation`,
+  `check_challenge_failed`) called at the matching action seam; effects live at
+  their consumption sites across the engine. `IMPLEMENTED_ACHIEVEMENTS` lists the
+  naturally-awardable ids (its doc comment enumerates the deferred ones). Row 18
+  (Pelle) is never awarded. See `../../docs/design/2026-06-30-achievements.md` and
+  the `2026-07-09-normal-achievements-wiring` worklog.
 - `src/tab_notifications.rs` — Tab notification badges: the pulsing yellow `!`
   on tab/subtab buttons pointing at newly relevant content. `tab_notifications`
   (the badged `tabKey + subtabKey` strings, ↔ `player.tabNotifications`) +

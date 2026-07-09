@@ -106,14 +106,24 @@ impl GameState {
 
     /// A hole's game-speed power while active (`180/2^id × 1.35^upgrades`).
     pub fn black_hole_power(&self, index: usize) -> f64 {
-        (180.0 / 2f64.powi(index as i32))
-            * 1.35f64.powi(self.black_holes.holes[index].power_upgrades as i32)
+        let mut power = (180.0 / 2f64.powi(index as i32))
+            * 1.35f64.powi(self.black_holes.holes[index].power_upgrades as i32);
+        // Achievement 158 (both holes permanent): Black Hole power +10%.
+        if self.achievement_unlocked(158) {
+            power *= 1.1;
+        }
+        power
     }
 
     /// A hole's active duration in seconds (`(10 − 3·id) × 1.3^upgrades`).
     pub fn black_hole_duration(&self, index: usize) -> f64 {
-        (10.0 - index as f64 * 3.0)
-            * 1.3f64.powi(self.black_holes.holes[index].duration_upgrades as i32)
+        let mut duration = (10.0 - index as f64 * 3.0)
+            * 1.3f64.powi(self.black_holes.holes[index].duration_upgrades as i32);
+        // Achievement 155 (13.7 billion years played): durations +10%.
+        if self.achievement_unlocked(155) {
+            duration *= 1.1;
+        }
+        duration
     }
 
     /// `isPermanent`: duty cycle ≥ 0.9999.

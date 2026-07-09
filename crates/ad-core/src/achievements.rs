@@ -44,9 +44,12 @@ pub const ACHIEVEMENTS_PER_ROW: u16 = 8;
 /// set via Reality auto-achievement or the ACHNR reality upgrade: 22 (News),
 /// 35 (6-hour offline), 61 (autobuyer bulk has no in-engine upgrade), 62/111
 /// (`bestRunIPPM` / the recent-infinities ring is unmodelled), 65/74 (the
-/// Normal-Challenge best-times sum is unmodelled), and 117 (no ≥750 bulk
-/// Dimension-Boost purchase path). Their *effects* are still wired where they
-/// have a consumption site, so an auto-achieved unlock behaves correctly.
+/// Normal-Challenge best-times sum is unmodelled), 117 (no ≥750 bulk
+/// Dimension-Boost purchase path), 156 (`noPurchasedTT` unmodelled), 165 (the
+/// per-factor glyph-level weights are unmodelled), and 172 (`noTriads`
+/// unmodelled). Their *effects* are still wired where they have a consumption
+/// site, so an auto-achieved unlock behaves correctly. Row 18 (Pelle) is never
+/// awarded by design.
 pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] = &[
     11, 12, 13, 14, 15, 16, 17, 18, // row 1
     21, 23, 24, 25, 26, 27, 28, // row 2 (22 = News, deferred)
@@ -62,7 +65,9 @@ pub const IMPLEMENTED_ACHIEVEMENTS: &[u16] = &[
     121, 122, 123, 124, 125, 126, 127, 128, // row 12
     131, 132, 133, 134, 135, 136, 137, 138, // row 13
     141, 142, 143, 144, 145, 146, 147, 148, // row 14
-    151, 152, 153, 154, // row 15 (155–158 pending)
+    151, 152, 153, 154, 155, 157, 158, // row 15 (156 deferred)
+    161, 162, 163, 164, 166, 167, 168, // row 16 (165 deferred)
+    171, 173, 174, 175, 176, 177, 178, // row 17 (172 deferred)
 ];
 
 impl GameState {
@@ -468,6 +473,64 @@ impl GameState {
         if self.reality.glyphs.inventory.len() >= 100 {
             self.unlock_achievement(152);
         }
+        // 155: play for 13.7 billion years (game time).
+        if self.records.total_time_played_ms > 13.7e9 * 365.25 * 86_400_000.0 {
+            self.unlock_achievement(155);
+        }
+        // 157: have a Glyph with 4 effects (a GLYPHS_CHANGED achievement).
+        if !self.achievement_unlocked(157)
+            && self
+                .reality
+                .glyphs
+                .active
+                .iter()
+                .chain(self.reality.glyphs.inventory.iter())
+                .any(|g| g.effects.count_ones() >= 4)
+        {
+            self.unlock_achievement(157);
+        }
+        // 161: 1e100000000 antimatter while Dilated.
+        if self.dilation.active && self.antimatter.exponent() >= 100_000_000 {
+            self.unlock_achievement(161);
+        }
+        // 162: have every Time Study at once (58 of them).
+        if self.studies.len() >= 58 {
+            self.unlock_achievement(162);
+        }
+        // 163: all Eternity Challenges completed 5× within 1 second this Reality.
+        if self.records.this_reality.time_ms <= 1000.0
+            && (1..=crate::eternity_challenges::ETERNITY_CHALLENGE_COUNT as u8)
+                .map(|id| self.eternity_challenge_completions(id))
+                .min()
+                .unwrap_or(0)
+                >= 5
+        {
+            self.unlock_achievement(163);
+        }
+        // 164: reach Number.MAX_VALUE total Infinities.
+        if self.infinities_total() >= Decimal::NUMBER_MAX_VALUE {
+            self.unlock_achievement(164);
+        }
+        // 167: reach Number.MAX_VALUE Reality Machines.
+        if self.reality.machines >= Decimal::NUMBER_MAX_VALUE {
+            self.unlock_achievement(167);
+        }
+        // 168: 50 total Ra Celestial Memory levels.
+        if (0..crate::celestials::ra::PET_COUNT)
+            .map(|p| self.ra_pet_level(p))
+            .sum::<u32>()
+            >= 50
+        {
+            self.unlock_achievement(168);
+        }
+        // 171: sacrifice every (basic) Glyph type at least once.
+        if self.reality.glyphs.sac.iter().all(|&s| s > 0.0) {
+            self.unlock_achievement(171);
+        }
+        // 173: reach 9.99999e999 Reality Machines.
+        if self.reality.machines >= Decimal::new(9.99999, 999) {
+            self.unlock_achievement(173);
+        }
         // 52: max the interval for the AD and Tickspeed autobuyers. The original
         // fires this on REALITY_RESET_AFTER / REALITY_UPGRADE_TEN_BOUGHT, but a
         // Reality clears autobuyer intervals, so it is only truly reachable while
@@ -694,6 +757,64 @@ impl GameState {
         if self.records.this_reality.time_ms <= 5_000.0 {
             self.unlock_achievement(154);
         }
+        // 166: a Glyph with level exactly 6969.
+        if self.gained_glyph_level().actual_level == 6969 {
+            self.unlock_achievement(166);
+        }
+        // 165 (level-5000 Glyph with equal Effarig weights) is deferred: the
+        // per-factor glyph-level weights are not modelled.
+    }
+
+    /// REALITY_RESET_AFTER conditions.
+    pub(crate) fn check_reality_after_achievements(&mut self) {
+        // 175: all Alchemy Resources at the flat cap (25000).
+        let cap = crate::celestials::alchemy::ALCHEMY_RESOURCE_CAP;
+        if (0..crate::celestials::alchemy::ALCHEMY_COUNT)
+            .all(|id| self.alchemy_amount(id) >= cap)
+        {
+            self.unlock_achievement(175);
+        }
+    }
+
+    /// SINGULARITY_RESET_BEFORE conditions.
+    pub(crate) fn check_singularity_before_achievements(&mut self) {
+        // 174: get a Singularity.
+        self.unlock_achievement(174);
+    }
+
+    /// SINGULARITY_RESET_AFTER conditions.
+    pub(crate) fn check_singularity_after_achievements(&mut self) {
+        // 177: complete every Singularity Milestone at least once.
+        if (0..crate::celestials::singularity::MILESTONE_COUNT)
+            .all(|id| self.singularity_milestone_completions(id) > 0)
+        {
+            self.unlock_achievement(177);
+        }
+    }
+
+    /// The Dark-Matter-Dimension annihilation achievement (176), unlocked the
+    /// first time an annihilation happens.
+    pub(crate) fn check_annihilation_achievements(&mut self) {
+        // 176: annihilate your Dark Matter Dimensions.
+        self.unlock_achievement(176);
+    }
+
+    /// The static glyph-level adder from achievements 148 (number of distinct
+    /// equipped basic Glyph types) and 166 (+69) — the original's
+    /// `Effects.sum(Achievement(148), Achievement(166))` in `getGlyphLevelInputs`.
+    pub(crate) fn achievement_glyph_level_bonus(&self) -> u32 {
+        let mut bonus = 0u32;
+        if self.achievement_unlocked(148) {
+            let active = self.active_glyphs_without_companion();
+            bonus += crate::glyphs::BASIC_GLYPH_TYPES
+                .iter()
+                .filter(|&&t| active.iter().any(|g| g.kind == t))
+                .count() as u32;
+        }
+        if self.achievement_unlocked(166) {
+            bonus += 69;
+        }
+        bonus
     }
 
     /// PERK_BOUGHT conditions.
@@ -723,6 +844,10 @@ impl GameState {
         // 145: either Black Hole interval smaller than its duration.
         if (0..2).any(|i| self.black_hole_interval(i) < self.black_hole_duration(i)) {
             self.unlock_achievement(145);
+        }
+        // 158: make both Black Holes permanent.
+        if (0..2).all(|i| self.black_hole_is_permanent(i)) {
+            self.unlock_achievement(158);
         }
     }
 
@@ -761,6 +886,10 @@ impl GameState {
         // 151: 800 Antimatter Galaxies without buying an 8th AD this Infinity.
         if self.galaxies >= 800 && self.requirement_checks.infinity_no_ad8 {
             self.unlock_achievement(151);
+        }
+        // 178: 100000 Antimatter Galaxies.
+        if self.galaxies >= 100_000 {
+            self.unlock_achievement(178);
         }
     }
 
@@ -1507,5 +1636,79 @@ mod tests {
         }
         game.check_reality_upgrade_bought_achievements();
         assert!(game.achievement_unlocked(147));
+    }
+
+    // ---- Batch 6 (ids 155–178) ----
+
+    #[test]
+    fn achievement_164_multiplies_infinities() {
+        let mut game = GameState::new();
+        let before = game.gained_infinities();
+        game.unlock_achievement(164);
+        assert_eq!(
+            game.gained_infinities(),
+            before * Decimal::from_float(1024.0)
+        );
+    }
+
+    #[test]
+    fn achievement_178_strengthens_galaxies() {
+        let mut game = GameState::new();
+        let before = game.galaxy_strength_effect();
+        game.unlock_achievement(178);
+        assert!((game.galaxy_strength_effect() - before * 1.01).abs() < 1e-12);
+    }
+
+    #[test]
+    fn achievements_155_158_boost_black_holes() {
+        let mut game = GameState::new();
+        let dur_before = game.black_hole_duration(0);
+        let pow_before = game.black_hole_power(0);
+        game.unlock_achievement(155);
+        game.unlock_achievement(158);
+        assert!((game.black_hole_duration(0) - dur_before * 1.1).abs() < 1e-9);
+        assert!((game.black_hole_power(0) - pow_before * 1.1).abs() < 1e-9);
+    }
+
+    #[test]
+    fn achievement_166_adds_69_glyph_levels() {
+        let mut game = GameState::new();
+        assert_eq!(game.achievement_glyph_level_bonus(), 0);
+        game.unlock_achievement(166);
+        assert_eq!(game.achievement_glyph_level_bonus(), 69);
+    }
+
+    #[test]
+    fn achievement_162_needs_all_time_studies() {
+        let mut game = GameState::new();
+        game.studies = (1..=58).collect();
+        game.check_tick_achievements(50.0);
+        assert!(game.achievement_unlocked(162));
+    }
+
+    #[test]
+    fn achievement_171_needs_every_glyph_type_sacrificed() {
+        let mut game = GameState::new();
+        game.reality.glyphs.sac = [1.0; 5];
+        game.check_tick_achievements(50.0);
+        assert!(game.achievement_unlocked(171));
+    }
+
+    #[test]
+    fn achievement_176_on_annihilation() {
+        let mut game = GameState::new();
+        game.check_annihilation_achievements();
+        assert!(game.achievement_unlocked(176));
+    }
+
+    #[test]
+    fn singularity_achievements_174_177() {
+        let mut game = GameState::new();
+        game.check_singularity_before_achievements();
+        assert!(game.achievement_unlocked(174));
+        // Enough Singularities that every milestone has ≥ 1 completion.
+        game.celestials.laitela.singularities = 1e300;
+        game.check_singularity_after_achievements();
+        assert!(game.achievement_unlocked(177));
     }
 }

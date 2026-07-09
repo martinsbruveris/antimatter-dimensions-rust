@@ -312,3 +312,56 @@ Effects wired:
 
 - 10 new unit tests (131, 141, 142, 143, 145, 132, 137, reality-before, 144, 147).
 - Full suite green. Fidelity unchanged at 34.
+
+---
+
+## Batch 6 — ids 155–178 (final; row 18 Pelle never awarded)
+
+### What shipped
+
+Conditions for the deep row-15–17 achievements, plus tractable effects.
+
+New seams:
+- **Reality-after** (`finish_process_reality`): 175.
+- **Singularity before/after** (`condense_singularity`): 174, 177.
+- **Annihilation** (`Laitela.annihilate`): 176.
+- **Black-hole-upgrade** additions: 158. **Galaxy-after**: 178.
+- **Reality-before** additions: 166. **Tick** additions: 155, 157, 161, 162,
+  163, 164, 167, 168, 171, 173.
+
+Effects wired:
+- 155 / 158: Black Hole duration / power +10%.
+- 164: ×1024 Infinities. 167: RM gain ×`max(1, log2(RM))`.
+- 178: all Galaxies +1% (alongside 86). 148 / 166: static glyph-level adders
+  (`Effects.sum` — distinct equipped types, +69).
+
+### Deferred (conditions or effects) — the unmodelled tail
+
+- **Conditions deferred** (unmodelled dependency, excluded from
+  `IMPLEMENTED_ACHIEVEMENTS`): 156 (`noPurchasedTT`), 165 (per-factor glyph-level
+  weights), 172 (`noTriads`).
+- **Effects deferred** (condition wired, reward a follow-up): 168 (×1.1
+  memories), 171 (×2 Glyph sacrifice), 175 (Synergism/Momentum).
+- **Row 18 (181–188, Pelle)** is never awarded by design.
+
+### Tests
+
+- 8 new unit tests (164, 178, 155/158, 166, 162, 171, 176, 174/177).
+- Full suite green (514 `ad-core` unit tests). Fidelity unchanged at 34.
+
+---
+
+## Wrap-up
+
+Rows 1–17 of the normal achievements are now wired end-to-end: every unlock
+condition the engine's modelled state can express fires at its action seam, and
+every effect with a modelled consumption site is applied. The `check_*`
+dispatchers in `achievements.rs` are the single home for the conditions; effects
+live at their original sites (AD/ID/TD multipliers, tickspeed, IP/infinity/EP
+gain, sacrifice, dim-boost, galaxy strength, black holes, dilation, replicanti,
+glyph level). Deferred items (all noted above) are the handful that depend on
+state the engine doesn't model yet (News, offline wall-clock, recent-infinities
+ring, Normal-Challenge best times, `noPurchasedTT`/`noTriads`, per-factor glyph
+weights, autobuyer-bulk upgrades) or on deeper behavioural rewards (133/138 run
+starts, 126 RG-divide, 171/168/175 celestial internals); their bits still set
+correctly via Reality auto-achievement.

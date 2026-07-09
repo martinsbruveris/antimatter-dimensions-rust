@@ -218,6 +218,10 @@ impl GameState {
         if self.achievement_unlocked(131) {
             gain *= Decimal::from_float(2.0);
         }
+        // Achievement 164: ×1024 Infinities.
+        if self.achievement_unlocked(164) {
+            gain *= Decimal::from_float(1024.0);
+        }
         gain
     }
 

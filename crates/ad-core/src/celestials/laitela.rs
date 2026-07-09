@@ -469,6 +469,8 @@ impl GameState {
         }
         self.celestials.laitela.dark_matter_mult += self.dark_matter_mult_gain();
         self.dmd_reset();
+        // Achievement 176: annihilate your Dark Matter Dimensions.
+        self.check_annihilation_achievements();
         true
     }
 

@@ -131,9 +131,13 @@ impl GameState {
         if !self.singularity_cap_reached() {
             return false;
         }
+        // SINGULARITY_RESET_BEFORE achievements (174).
+        self.check_singularity_before_achievements();
         let gained = self.singularities_gained();
         self.celestials.laitela.dark_energy = 0.0;
         self.celestials.laitela.singularities += gained;
+        // SINGULARITY_RESET_AFTER achievements (177).
+        self.check_singularity_after_achievements();
         true
     }
 

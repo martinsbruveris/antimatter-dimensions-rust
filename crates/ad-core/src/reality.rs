@@ -316,7 +316,14 @@ impl GameState {
 
     /// `MachineHandler.gainedRealityMachines`: hardcapped at `1e1000`.
     pub fn gained_reality_machines(&self) -> Decimal {
-        self.uncapped_rm().min(&RM_HARDCAP)
+        let mut rm = self.uncapped_rm();
+        // Achievement 167: more RM based on current RM (`max(1, log2(RM))`).
+        if self.achievement_unlocked(167) {
+            let factor =
+                (self.reality.machines.pos_log10() / std::f64::consts::LOG10_2).max(1.0);
+            rm *= Decimal::from_float(factor);
+        }
+        rm.min(&RM_HARDCAP)
     }
 
     // --- Glyph level (getGlyphLevelInputs) ---------------------------------------
@@ -410,10 +417,11 @@ impl GameState {
         scaled = instability_softcap(scaled, 4000.0, 400.0);
 
         // Static post-instability adders: +1 per fully-bought Reality Upgrade
-        // row, plus Ra's `relicShardGlyphLevelBoost` (the achievement adders
-        // 148/166 are out of frontier).
-        let inc =
-            self.reality_upgrade_row_factor() as f64 + self.ra_relic_shard_glyph_level();
+        // row, Ra's `relicShardGlyphLevelBoost`, and the achievement adders
+        // `Effects.sum(Achievement(148), Achievement(166))`.
+        let inc = self.reality_upgrade_row_factor() as f64
+            + self.ra_relic_shard_glyph_level()
+            + self.achievement_glyph_level_bonus() as f64;
         (base_level + inc, (scaled + inc).max(1.0))
     }
 
@@ -538,6 +546,9 @@ impl GameState {
         self.apply_alchemy_reactions();
 
         self.reality_reset_internal();
+
+        // REALITY_RESET_AFTER achievements (175).
+        self.check_reality_after_achievements();
 
         // The Automator's REALITY_RESET_AFTER handling: the prestige
         // notification, the optional event-log clear, and the force-restart
