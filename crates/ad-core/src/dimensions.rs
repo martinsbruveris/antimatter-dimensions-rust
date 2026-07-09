@@ -167,18 +167,31 @@ impl GameState {
     /// Buy dimensions until the next group of 10 is complete.
     /// Returns the number bought.
     pub fn buy_until_10_dimension(&mut self, tier: usize) -> u64 {
-        if !self.dim_available_for_purchase(tier) {
+        if !self.dim_available_for_purchase(tier) || !self.dim_affordable_until_10(tier)
+        {
             return 0;
         }
         let remaining = 10 - (self.dimensions[tier].bought % 10);
-        let mut count = 0u64;
-        for _ in 0..remaining {
-            if !self.buy_one_dimension(tier) {
-                break;
-            }
-            count += 1;
+        // Mirror the original's `buyManyDimension` / `buyUntilTen`: pay the whole
+        // group's `costUntil10` up front, apply the NC9/IC5 group cost bump, add
+        // the remaining count, and fire `on_buy_dimension` *once* — rather than
+        // looping single buys. The distinction matters under NC4 + NC6, where a
+        // per-buy erase of the lower dimensions (NC4) would wipe the very lower
+        // dimension being spent as currency (NC6): paying for the whole group
+        // before the single erase lets all ten purchases land, as in the original.
+        let cost_until_10 = self.dimension_cost_until_10(tier);
+        self.spend_dim_currency(tier, cost_until_10);
+        // `challengeCostBump` fires once as the group completes (before the bought
+        // increment); IC5 (per-tier) takes precedence over NC9 (equal-cost).
+        if self.infinity_challenge_running(5) {
+            self.ic5_bump_costs_from_dimension(tier);
+        } else if self.challenge_running(9) {
+            self.nc9_bump_same_cost_from_dimension(tier);
         }
-        count
+        self.dimensions[tier].amount += Decimal::from_float(remaining as f64);
+        self.dimensions[tier].bought += remaining;
+        self.on_buy_dimension(tier);
+        remaining
     }
 
     /// Compute the cost to buy until the next group of 10
@@ -659,6 +672,34 @@ mod tests {
         game.antimatter = cost * Decimal::from_float(10.0);
         assert_eq!(game.buy_max_dimension_bulk(0, 1.0), 10);
         assert_eq!(game.dimensions[0].bought, 20);
+    }
+
+    /// Under NC4 (a purchase erases lower dimensions) + NC6 (a dimension is bought
+    /// with the dimension two tiers below), completing a group must be atomic: the
+    /// whole group is paid *before* the single NC4 erase, so it can't wipe the very
+    /// lower dimension used as currency mid-group. Both challenges are active under
+    /// IC1. Regression: the old per-buy loop erased the currency after the first
+    /// buy and stalled at one.
+    #[test]
+    fn buy_until_ten_is_atomic_under_nc4_plus_nc6() {
+        let mut game = GameState::new();
+        game.infinity_challenge.current = 1; // IC1 runs every NC except 9/12
+        assert!(game.challenge_running(4) && game.challenge_running(6));
+
+        game.dimensions[3].bought = 10; // AD4 on a group boundary
+        game.dimensions[3].amount = Decimal::from_float(1e3);
+        // AD2 (tier 1) is AD4's currency under NC6: enough for the whole group.
+        let cost_until_10 = game.dimension_cost_until_10(3);
+        game.dimensions[1].amount = cost_until_10 * Decimal::from_float(1.5);
+        game.dimensions[0].amount = Decimal::from_float(1e5);
+        game.dimensions[2].amount = Decimal::from_float(1e5);
+
+        assert_eq!(game.buy_until_10_dimension(3), 10);
+        assert_eq!(game.dimensions[3].bought, 20);
+        // NC4 erased the lower tiers once, after the group was paid for.
+        assert_eq!(game.dimensions[0].amount, Decimal::ZERO);
+        assert_eq!(game.dimensions[1].amount, Decimal::ZERO);
+        assert_eq!(game.dimensions[2].amount, Decimal::ZERO);
     }
 
     /// Bulk caps the number of groups: with ample antimatter, `bulk = 2` completes

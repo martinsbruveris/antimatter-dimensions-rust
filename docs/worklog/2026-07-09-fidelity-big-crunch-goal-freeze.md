@@ -1042,3 +1042,33 @@ keeping the annihilation guarded on NC11.
   bought-count drift under IC1 remains).
 - `cargo test -p ad-core --features serde`: 533 pass (added an IC6 matter-growth
   test); fmt + clippy clean; round-trip 1381/1435.
+
+## Bug 33 — `buyUntilTen` looped single buys, breaking NC4 + NC6 group buys
+
+### Symptom
+IC1 fixture `00133` diverged at tick 10: the AD4 autobuyer bought only 1
+(671) where JS bought a full group of 10 (680), cascading a ~0.146-order drift
+into AD1–3.
+
+### Diagnosis
+Under IC1 both **NC4** (buying a dimension erases all lower-tier amounts) and
+**NC6** (a dimension is bought with the dimension *two tiers below* instead of
+antimatter) are active. Rust's `buy_until_10_dimension` completed a group by
+looping `buy_one_dimension`, which fires `on_buy_dimension` — and thus the NC4
+erase — after *each* single purchase. Buying the first AD4 zeroed AD2, which is
+AD4's own NC6 currency, so the second `buy_one_dimension` found 0 currency and
+stopped. The original's `buyManyDimension` / `buyUntilTen` instead pay the whole
+group's `costUntil10` up front and call `onBuyDimension` **once**, so the group
+completes before the single erase.
+
+### Fix
+Rewrote `buy_until_10_dimension` as an atomic group buy: check
+`isAffordableUntil10`, spend `costUntil10`, apply the NC9/IC5 group cost bump,
+add the remaining count, and fire `on_buy_dimension` once. (The analytic
+`getMaxBought` bulk path and JS both skip `onBuyDimension`, so it then finds the
+erased currency and stops — landing on exactly one group, as JS does.)
+
+### Verification
+- Fidelity grid: 1094 → **1099** cells (+5). `00133` passes at every horizon.
+- `cargo test -p ad-core --features serde`: 584 pass (added an NC4+NC6
+  atomic-group-buy test); fmt + clippy clean; round-trip 1386/1435.
