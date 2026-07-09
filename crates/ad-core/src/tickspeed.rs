@@ -33,45 +33,75 @@ impl GameState {
             .calculate_cost((self.tickspeed.bought + self.tickspeed.cost_bumps) as f64)
     }
 
-    /// Buy one tickspeed upgrade. Returns true if successful.
+    /// Buy one tickspeed upgrade (`buyTickSpeed`). Returns true if successful.
     pub fn buy_tickspeed(&mut self) -> bool {
-        // EC9: Tickspeed upgrades cannot be purchased.
-        if self.ec_running(9) {
+        if !self.tickspeed_available() || !self.tickspeed_affordable() {
             return false;
         }
-        let cost = self.tickspeed_purchase_cost();
-        if self.antimatter >= cost {
-            // Clear the TICKSPEED tutorial highlight on the purchase, like the
-            // original's buyTickSpeed (no-op once past that step).
-            self.tutorial_turn_off(crate::tutorial::state::TICKSPEED);
-            // NC9: buying a Tickspeed upgrade bumps every equal-cost dimension to
-            // its next cost step (before the purchase, using the current cost).
-            if self.challenge_running(9) {
+        // NC9: buying a Tickspeed upgrade bumps every equal-cost dimension to
+        // its next cost step (before the purchase, using the current cost).
+        if self.challenge_running(9) {
+            self.nc9_bump_same_cost_from_tickspeed();
+        }
+        // Clear the TICKSPEED tutorial highlight on the purchase, like the
+        // original's buyTickSpeed (no-op once past that step).
+        self.tutorial_turn_off(crate::tutorial::state::TICKSPEED);
+        self.antimatter -= self.tickspeed_purchase_cost();
+        self.tickspeed.bought += 1;
+        // IC8: buying a Tickspeed upgrade resets the production-decay timer.
+        self.records.this_infinity.last_buy_time_ms = self.records.this_infinity.time_ms;
+        // Normal Challenge 2: buying a Tickspeed upgrade also halts production.
+        if self.challenge_running(2) {
+            self.chall2_pow = 0.0;
+        }
+        true
+    }
+
+    /// Faithful port of `buyMaxTickSpeed`: under NC9 it loops purchase-by-purchase
+    /// (each buy bumps every equal-cost dimension, so costs are abnormal and the
+    /// buy stops at the Big Crunch goal); otherwise it uses the analytic
+    /// `getMaxBought`, charging only for the most expensive purchase — O(1) even
+    /// for enormous balances. Returns the number bought.
+    pub fn buy_max_tickspeed(&mut self) -> u64 {
+        if !self.tickspeed_available() || !self.tickspeed_affordable() {
+            return 0;
+        }
+        let mut bought = 0u64;
+        self.tutorial_turn_off(crate::tutorial::state::TICKSPEED);
+        if self.challenge_running(9) {
+            let goal = self.infinity_goal();
+            let mut cost = self.tickspeed_purchase_cost();
+            // The original's loop condition is strict (`antimatter.gt(cost)`).
+            while self.antimatter > cost && cost < goal {
                 self.nc9_bump_same_cost_from_tickspeed();
+                self.antimatter -= cost;
+                self.tickspeed.bought += 1;
+                bought += 1;
+                cost = self.tickspeed_purchase_cost();
             }
-            self.antimatter -= cost;
-            self.tickspeed.bought += 1;
-            // Normal Challenge 2: buying a Tickspeed upgrade also halts production.
+        } else {
+            // Like the original, this passes `totalTickBought` alone — the NC9
+            // cost bumps are not folded in (they are zero outside NC9).
+            let purchases = self.tickspeed_cost_scale().get_max_bought(
+                self.tickspeed.bought as f64,
+                self.antimatter,
+                1.0,
+            );
+            let Some((quantity, log_price)) = purchases else {
+                return 0;
+            };
+            self.antimatter -= Decimal::pow10(log_price);
+            self.tickspeed.bought += quantity as u64;
+            bought = quantity as u64;
+        }
+        if bought > 0 {
+            self.records.this_infinity.last_buy_time_ms =
+                self.records.this_infinity.time_ms;
             if self.challenge_running(2) {
                 self.chall2_pow = 0.0;
             }
-            // IC8: buying a Tickspeed upgrade resets the production-decay timer.
-            self.records.this_infinity.last_buy_time_ms =
-                self.records.this_infinity.time_ms;
-            true
-        } else {
-            false
         }
-    }
-
-    /// Buy the maximum number of tickspeed upgrades affordable.
-    /// Returns the number bought.
-    pub fn buy_max_tickspeed(&mut self) -> u64 {
-        let mut count = 0u64;
-        while self.buy_tickspeed() {
-            count += 1;
-        }
-        count
+        bought
     }
 
     /// Total Tickspeed upgrades: bought plus the free upgrades from Time
@@ -242,6 +272,35 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The analytic `buy_max_tickspeed` mirrors `getMaxBought`: it buys every
+    /// upgrade whose *individual* cost fits the balance and charges only for the
+    /// most expensive one (the original's deliberate bulk simplification). With
+    /// 1e40 antimatter (base 1000, ×10 per buy) that is 38 upgrades — one more
+    /// than a cumulative-cost loop affords — for exactly 1e40.
+    #[test]
+    fn buy_max_tickspeed_charges_only_top_purchase() {
+        let mut game = GameState::new();
+        game.dimensions[1].bought = 1; // unlock tickspeed
+        game.antimatter = Decimal::from_float(1e40);
+        assert_eq!(game.buy_max_tickspeed(), 38);
+        assert_eq!(game.tickspeed.bought, 38);
+        assert_eq!(game.antimatter, Decimal::ZERO);
+    }
+
+    /// The bulk buy handles the super-exponential regime past `Number.MAX_VALUE`
+    /// in O(1): the quadratic branch of `getMaxBought` puts 1e5000 antimatter at
+    /// 402 total upgrades (306 geometric + the scaling tail).
+    #[test]
+    fn buy_max_tickspeed_handles_super_exponential_regime() {
+        let mut game = GameState::new();
+        game.dimensions[1].bought = 1;
+        game.broke_infinity = true;
+        game.antimatter = Decimal::new(1.0, 5000);
+        let bought = game.buy_max_tickspeed();
+        assert_eq!(bought, 402);
+        assert!(game.antimatter >= Decimal::ZERO);
+    }
 
     /// Past 2 Antimatter Galaxies the per-purchase Tickspeed multiplier
     /// (`0.8·0.965^…`) is *not* clamped to the 0.01 floor (that floor only applies

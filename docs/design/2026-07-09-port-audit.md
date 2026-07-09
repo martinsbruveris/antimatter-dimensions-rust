@@ -57,7 +57,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 |---|---|---|---|
 | 1.1 | Antimatter Dimensions (8 tiers) | ✅ | |
 | 1.2 | Tickspeed | ✅ | distant + remote scaling |
-| 1.3 | Buy-10 / bulk buy | 🟡 | buy-max is **repeated single buys**, not the closed-form `ExponentialCostScaling`; correct results, perf divergence at extreme counts |
+| 1.3 | Buy-10 / bulk buy | ✅ | AD + Tickspeed buy-max both use the closed-form `ExponentialCostScaling` (`getMaxBought`), with the NC9/IC5 loop branches |
 | 1.4 | Dimension Boosts | ✅ | |
 | 1.5 | Antimatter Galaxies | ✅ | distant + remote scaling |
 | 1.6 | Dimensional Sacrifice | ✅ | pre- and post-IC2 formulas |

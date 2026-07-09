@@ -143,6 +143,10 @@ fn test_initial_tickspeed() {
 fn test_buy_tickspeed() {
     let mut game = GameState::new();
     game.antimatter = Decimal::from_float(1e6);
+    // Tickspeed unlocks once a 2nd Antimatter Dimension has been bought
+    // (which itself requires owning a 1st).
+    game.buy_dimension(0);
+    game.buy_dimension(1);
     assert!(game.buy_tickspeed());
     assert_eq!(game.tickspeed.bought, 1);
     // Tickspeed should be faster (less than 1000ms)
@@ -154,6 +158,8 @@ fn test_tickspeed_increases_production() {
     let mut game = GameState::new();
     game.antimatter = Decimal::from_float(1e6);
     game.buy_dimension(0);
+    // Tickspeed unlocks once a 2nd Antimatter Dimension has been bought.
+    game.buy_dimension(1);
 
     // Measure production rate without tickspeed
     let prod_without = game.dimension_production_per_second(0);

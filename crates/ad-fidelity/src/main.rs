@@ -261,12 +261,14 @@ impl FromStr for TestSelection {
             }
             match part.split_once('-') {
                 Some((lo, hi)) => {
-                    let lo: usize = lo.trim().parse().map_err(|_| {
-                        format!("invalid range start in `{part}`")
-                    })?;
-                    let hi: usize = hi.trim().parse().map_err(|_| {
-                        format!("invalid range end in `{part}`")
-                    })?;
+                    let lo: usize = lo
+                        .trim()
+                        .parse()
+                        .map_err(|_| format!("invalid range start in `{part}`"))?;
+                    let hi: usize = hi
+                        .trim()
+                        .parse()
+                        .map_err(|_| format!("invalid range end in `{part}`"))?;
                     if lo > hi {
                         return Err(format!(
                             "range `{part}` is descending (start {lo} > end {hi})"

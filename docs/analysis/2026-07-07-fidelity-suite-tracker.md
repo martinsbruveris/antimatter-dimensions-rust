@@ -53,6 +53,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Modelled the `recentInfinities` ring + `bestRunIPPM` and added the missing second passive-IP term (`BreakInfinityUpgrade.ipGen`: `bestRunIPPM · infinityRebuyables[2]/20 · diff/60000` per tick); `infinityPoints` was the most common diverged field (~245). Ring updated on crunch, cleared on Eternity/EC/Reality (`00267`) | 1090/1148 |
 | 2026-07-09 | (pending) | Moved `updateNormalAndInfinityChallenges` after the autobuyer pass + records-time increment (was before) so an NC2 purchase zeroes `chall2Pow` *before* its one-tick regrowth (`00133`); and widened the matter-growth gate to `NC11 \|\| IC6` (annihilation stays NC11-only) so IC6 grows matter (`00203`) | 1094/1148 |
 | 2026-07-09 | (pending) | Made `buy_until_10_dimension` an atomic group buy (pay `costUntil10` up front, one `on_buy_dimension`) instead of looping single buys; under NC4+NC6 (both active in IC1) the per-buy NC4 erase was wiping AD4's NC6 currency (AD2) after the first buy, stalling the group at 1 vs the original's 10 (`00133`) | 1099/1148 |
+| 2026-07-09 | (pending) | Ported `buyMaxTickSpeed`'s closed form: the analytic `getMaxBought` (charging only the top purchase) replaces the repeated-single-buy loop, with the original's NC9 purchase-by-purchase branch; `buyTickSpeed` now carries the full `isAvailableForPurchase` guard | 1118/1148 |
 
 ## Method
 
