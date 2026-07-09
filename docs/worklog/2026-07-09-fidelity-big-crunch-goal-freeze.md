@@ -737,3 +737,31 @@ reset into the at-goal `bigCrunchUpdateStatistics` block, and cleared
 - Fidelity grid: 602 → **606** cells (+4); `00124` @1 now passes.
 - `cargo test -p ad-core --features serde`: 573 pass; fmt + clippy clean; round-trip
   clean.
+
+## Bug 23 — the missing Infinity Challenge 8 completion reward (AD 2–7)
+
+### Symptom
+`00241`'s from-zero AD rebuild (after its crunch) diverged ~124 orders/tier down
+the chain — a 743-order gap at the 1st dimension — even though bought counts and the
+top dimensions matched.
+
+### Diagnosis
+Capturing JS's per-tier AD multipliers at production time and recomputing Rust's on
+the identical intermediate state showed AD1 and AD8 matched exactly but **AD2–AD7
+were ~124 orders low**. Those are precisely the tiers (`tier > 1 && tier < 8`) that
+`applyNDMultipliers` gives `InfinityChallenge(8).reward`:
+`(AD1.multiplier × AD8.multiplier)^0.02`. Rust modelled IC8's *production decay*
+(while running) but not its *completion reward*; for `00241`
+`(2.345e3195 × 5.4e2700)^0.02 ≈ e118`, the missing per-tier factor.
+
+### Fix
+Applied the IC8 completion reward to AD 2–7 in `dimension_multiplier` using the 1st
+and 8th dimensions' final multipliers (they never include the reward, so there is no
+recursion). All eight per-tier multipliers now match JS to ~15 significant figures.
+
+### Verification
+- `00241`'s tick-1 divergence collapses from **743 orders to 0.34** (the residual is
+  the infinity-power drift — `infinityPower` Δ≈5.6e-3 → `IP^7` ≈0.04/tier compounding —
+  a separate, much smaller issue). Grid holds at 606/1148 (no regressions;
+  round-trip clean; the structural @1 count/flag list stays empty).
+- `cargo test -p ad-core --features serde`: 574 pass; fmt + clippy clean.

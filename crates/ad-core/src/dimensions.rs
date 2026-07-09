@@ -439,6 +439,14 @@ impl GameState {
         if tier <= 3 && self.achievement_unlocked(64) {
             mult *= Decimal::from_float(1.25);
         }
+        // Infinity Challenge 8's completion reward: Antimatter Dimensions 2–7
+        // (0-indexed 1–6) gain `(AD1.multiplier × AD8.multiplier)^0.02`, using the
+        // 1st and 8th dimensions' *final* multipliers (which never include this
+        // reward themselves, so there is no recursion).
+        if (1..=6).contains(&tier) && self.infinity_challenge_completed(8) {
+            let base = self.dimension_multiplier(0) * self.dimension_multiplier(7);
+            mult *= base.pow(&Decimal::from_float(0.02));
+        }
         // 43: every dimension gains a boost proportional to its (1-indexed) tier.
         if self.achievement_unlocked(43) {
             mult *= Decimal::from_float(1.0 + (tier as f64 + 1.0) / 100.0);
@@ -651,6 +659,44 @@ mod tests {
         // From a clean start, bulk 2 buys exactly two groups of ten.
         assert_eq!(game.buy_max_dimension_bulk(0, 2.0), 20);
         assert_eq!(game.dimensions[0].bought, 20);
+    }
+
+    /// The Infinity Challenge 8 completion reward multiplies only the 2nd–7th
+    /// Antimatter Dimensions by `(AD1.mult × AD8.mult)^0.02`.
+    #[test]
+    fn ic8_reward_multiplies_only_ad2_through_ad7() {
+        let mut game = GameState::new();
+        // Non-trivial 1st/8th multipliers so the reward is meaningfully > 1.
+        game.broke_infinity = true;
+        game.dimensions[0].bought = 100;
+        game.dimensions[7].bought = 100;
+        game.dim_boosts = 5;
+
+        // Toggle only the IC8-completed bit, so no achievement side effects shift
+        // the baseline. With the reward:
+        game.infinity_challenge.completed |= 1u16 << 8;
+        let with: Vec<f64> = (0..8)
+            .map(|t| game.dimension_multiplier(t).to_f64())
+            .collect();
+        let reward = (game.dimension_multiplier(0) * game.dimension_multiplier(7))
+            .pow(&Decimal::from_float(0.02))
+            .to_f64();
+        assert!(reward > 1.0, "reward={reward}");
+
+        // Without it:
+        game.infinity_challenge.completed &= !(1u16 << 8);
+        let without: Vec<f64> = (0..8)
+            .map(|t| game.dimension_multiplier(t).to_f64())
+            .collect();
+
+        // AD1 (tier 0) and AD8 (tier 7) do not receive the reward.
+        assert!((with[0] / without[0] - 1.0).abs() < 1e-9);
+        assert!((with[7] / without[7] - 1.0).abs() < 1e-9);
+        // AD2–AD7 (tiers 1–6) each gain exactly the reward factor.
+        for t in 1..=6 {
+            let ratio = with[t] / (without[t] * reward);
+            assert!((ratio - 1.0).abs() < 1e-9, "tier {t}: ratio={ratio}");
+        }
     }
 
     /// Unbounded bulk buys complete groups only (lands on a multiple of ten) and,
