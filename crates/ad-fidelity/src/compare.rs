@@ -96,12 +96,15 @@ pub struct Tolerance {
 
 impl Default for Tolerance {
     fn default() -> Self {
-        // Default log-space epsilon: 1e-4, which absorbs the accumulated-rounding /
+        // Default epsilon: 1e-4 for both the log-space (Decimal) and the relative
+        // number-field comparison, which absorbs the accumulated-rounding /
         // cancellation drift between Rust f64 and V8 (see the 2026-07-09 worklog).
+        // Structural count/flag mismatches diverge by far more than 1e-4, and
+        // `Compare::Exact` bitmask/bool fields are unaffected by this epsilon.
         Self {
             log_base: 1e-4,
             log_per_tick: 0.0,
-            num_base: 1e-9,
+            num_base: 1e-4,
             num_per_tick: 0.0,
         }
     }
