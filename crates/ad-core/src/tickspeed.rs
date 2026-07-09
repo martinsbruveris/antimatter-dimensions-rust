@@ -175,14 +175,16 @@ impl GameState {
             (base - reduction).max(TICKSPEED_MULTIPLIER_MIN)
         } else {
             // JS: galaxies -= 2; galaxies *= effects; decay^(galaxies - 2) * base.
+            // Unlike the `< 3` branch, the original does *not* clamp this to the
+            // 0.01 floor, so deep galaxy counts drive the per-purchase multiplier
+            // well below 0.01 (a much faster tickspeed).
             let galaxy_base = if in_c5 {
                 TICKSPEED_GALAXY_BASE_C5
             } else {
                 TICKSPEED_GALAXY_BASE
             };
             let adjusted = (galaxies - 2.0) * effects;
-            (galaxy_base * TICKSPEED_GALAXY_DECAY.powf(adjusted - 2.0))
-                .max(TICKSPEED_MULTIPLIER_MIN)
+            galaxy_base * TICKSPEED_GALAXY_DECAY.powf(adjusted - 2.0)
         }
     }
 
@@ -226,5 +228,21 @@ impl GameState {
             return Decimal::from_float(1.0);
         }
         Decimal::from_float(INITIAL_TICKSPEED_MS) / current
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Past 2 Antimatter Galaxies the per-purchase Tickspeed multiplier
+    /// (`0.8·0.965^…`) is *not* clamped to the 0.01 floor (that floor only applies
+    /// below 3 galaxies), so deep galaxy counts drive it well below 0.01.
+    #[test]
+    fn tickspeed_multiplier_unclamped_past_two_galaxies() {
+        let mut game = GameState::new();
+        game.galaxies = 300;
+        let m = game.tickspeed_purchase_multiplier();
+        assert!(m > 0.0 && m < 0.01, "expected 0 < m < 0.01, got {m}");
     }
 }

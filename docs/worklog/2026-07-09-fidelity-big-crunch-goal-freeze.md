@@ -878,3 +878,35 @@ Cap `dimension_production_per_second` at 1e315 unless post-break, mirroring
 - Fidelity grid: 706 → **715** cells (+9). `00081` now passes all four horizons.
 - `cargo test -p ad-core --features serde`: 579 pass; fmt + clippy clean; round-trip
   clean.
+
+## Bug 28 — the Tickspeed multiplier was clamped to 0.01 past 2 galaxies
+
+### Symptom
+Deep steady-state fixtures (e.g. `00232`) diverged from horizon 1 by a small
+per-tier-compounding AD-chain drift (~2e-4/tier). The per-tier multipliers matched
+JS exactly, which pointed away from the multiplier — but the *production* still
+diverged.
+
+### Diagnosis
+Dumping JS's actual `productionPerSecond` alongside the components showed the gap
+was in `Tickspeed.perSecond`: JS = 5.13e3697, Rust = 5.51e1809 — Rust's was ~e1888
+too small. (Earlier I'd only ever compared Rust's `tickspeed_effect` on two decoded
+states, both from Rust's own function, never against JS's live value.) Rust's
+`tickspeed_purchase_multiplier` clamped the ≥3-galaxy branch (`0.8·0.965^(adjusted-2)`)
+to the `TICKSPEED_MULTIPLIER_MIN` (0.01) floor. The original only clamps the *<3*
+galaxy branch (`DC.D0_01.clampMin(...)`); the ≥3 branch has no floor. For `00232`
+the true per-purchase multiplier is ~8.2e-5, so the 0.01 floor left the tickspeed
+(and thus all AD production) e1888 slow — manifesting as ~0.3 %/tick of missing
+growth.
+
+### Fix
+Dropped the `.max(TICKSPEED_MULTIPLIER_MIN)` from the ≥3-galaxy branch of
+`tickspeed_purchase_multiplier`.
+
+### Verification
+- Fidelity grid: 715 → **812** cells (+97). `00232` now passes @1 and @10 (its
+  remaining @100/@1000 failures are longer-horizon crunch timing). This was the
+  dominant source of the "irreducible" per-tier AD drift on deep-galaxy fixtures —
+  it was never floating point.
+- `cargo test -p ad-core --features serde`: 580 pass; fmt + clippy clean; round-trip
+  clean.
