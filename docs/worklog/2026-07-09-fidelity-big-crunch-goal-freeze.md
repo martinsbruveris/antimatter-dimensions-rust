@@ -1013,3 +1013,32 @@ ratePerMinute(run.ip, run.gameTime)`. Rust modelled neither `recentInfinities` n
   instead of the template default).
 - `cargo test -p ad-core --features serde`: 583 pass (added a `bestRunIPPM`
   passive-generation test); fmt + clippy clean.
+
+## Bug 32 — challenge accumulators ran before autobuyers; matter ignored IC6
+
+### Symptom
+IC1 fixture `00133` had `chall2Pow = 0` (JS 0.0002777) and its top AD amounts
+were 0; IC6 fixture `00203` had `matter = 0` (JS grew it).
+
+### Diagnosis
+Two issues in `updateNormalAndInfinityChallenges`:
+1. **Order.** The original runs it (game.js:542) *after* the autobuyers
+   (game.js:409) and the records-time increment (game.js:523). Rust ran
+   `update_challenges` *before* the autobuyers. In NC2 (active under IC1) an
+   autobuyer purchase zeroes `chall2Pow`; running the growth first let the
+   purchase wipe it, leaving 0 instead of one tick's regrowth.
+2. **Matter condition.** Matter rises under `NormalChallenge(11) ||
+   InfinityChallenge(6)`, but Rust checked only NC11 — so IC6 never grew matter.
+   (The annihilation branch is NC11-only and must stay so.)
+
+### Fix
+Moved `update_challenges` to after the autobuyer pass and the records-time
+increment (before production). Widened the matter-growth gate to `NC11 || IC6`,
+keeping the annihilation guarded on NC11.
+
+### Verification
+- Fidelity grid: 1090 → **1094** cells (+4). `00203` passes at every horizon;
+  `00133` no longer diverges on `chall2Pow`/`matter` (a residual autobuyer
+  bought-count drift under IC1 remains).
+- `cargo test -p ad-core --features serde`: 533 pass (added an IC6 matter-growth
+  test); fmt + clippy clean; round-trip 1381/1435.

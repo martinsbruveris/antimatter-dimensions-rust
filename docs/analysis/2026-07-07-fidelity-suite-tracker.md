@@ -51,6 +51,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Fixed the Dim Boost autobuyer `lastTick`: a Galaxy reset (which precedes Dim Boost's own `advance`) now targets the pre-increment realTimePlayed so `lastTick` lands on 0 not −dt (`00118`); and a buy-max Dim Boost emits `DIMENSION_BOOST` not `INFINITY`, so it no longer zeroes the Galaxy autobuyer's phase (`00126`/`00136`) | 839/1148 |
 | 2026-07-09 | (pending) | IC3 now neutralises only the Tickspeed *per-purchase* multiplier (moved into `tickspeed_purchase_multiplier`), not the whole production factor; the base tickspeed's Achievement effects (36/45/66/83) survive, so `tickspeed_effect = 1/startingTickspeedMult` (≈1.062 for `00146`) instead of 1 — fixed the residual ~1.8e-4/tier AD drift on IC3 fixtures (`00146`/`00147`) | 844/1148 |
 | 2026-07-09 | (pending) | Modelled the `recentInfinities` ring + `bestRunIPPM` and added the missing second passive-IP term (`BreakInfinityUpgrade.ipGen`: `bestRunIPPM · infinityRebuyables[2]/20 · diff/60000` per tick); `infinityPoints` was the most common diverged field (~245). Ring updated on crunch, cleared on Eternity/EC/Reality (`00267`) | 1090/1148 |
+| 2026-07-09 | (pending) | Moved `updateNormalAndInfinityChallenges` after the autobuyer pass + records-time increment (was before) so an NC2 purchase zeroes `chall2Pow` *before* its one-tick regrowth (`00133`); and widened the matter-growth gate to `NC11 \|\| IC6` (annihilation stays NC11-only) so IC6 grows matter (`00203`) | 1094/1148 |
 
 ## Method
 

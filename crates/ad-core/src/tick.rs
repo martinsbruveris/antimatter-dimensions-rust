@@ -42,11 +42,6 @@ impl GameState {
         // Generator, and the game-end check.
         self.pelle_tick(real_dt_ms);
 
-        // Advance the per-run challenge accumulators first, matching the original
-        // game loop (`updateNormalAndInfinityChallenges` runs before autobuyers
-        // and production).
-        self.update_challenges(dt_ms);
-
         // Run autobuyers before production (real time — autobuyer intervals are
         // wall-clock in the original).
         self.tick_autobuyers(real_dt_ms);
@@ -74,6 +69,14 @@ impl GameState {
         self.records.this_eternity.real_time_ms += real_dt_ms;
         self.records.this_reality.time_ms += dt_ms;
         self.records.this_reality.real_time_ms += real_dt_ms;
+
+        // Advance the per-run challenge accumulators (`updateNormalAndInfinity
+        // Challenges`), matching the original game loop: it runs *after* the
+        // autobuyers and the records-time increment, but before production. Order
+        // matters for NC2 — a tickspeed/dimension purchase (autobuyer, above)
+        // zeroes `chall2Pow`, and this then regrows it by one tick's worth; running
+        // it before the autobuyers would let the purchase wipe the growth.
+        self.update_challenges(dt_ms);
 
         // The original produces Time → Infinity → Antimatter Dimensions in that
         // order each tick (`game.js`), so Antimatter Dimension production reads the
@@ -265,9 +268,10 @@ impl GameState {
     /// the top of [`tick`](Self::tick), before autobuyers and production. A no-op
     /// unless the corresponding challenge is running.
     fn update_challenges(&mut self, dt_ms: f64) {
-        // NC11: normal matter rises once a 2nd Antimatter Dimension exists; if it
-        // overtakes antimatter (and you cannot yet Crunch) it annihilates.
-        if self.challenge_running(11) {
+        // NC11 (or IC6): normal matter rises once a 2nd Antimatter Dimension
+        // exists; under NC11 only, if it overtakes antimatter (and you cannot yet
+        // Crunch) it annihilates.
+        if self.challenge_running(11) || self.infinity_challenge_running(6) {
             if self.dimensions[1].amount != Decimal::ZERO {
                 // `Currency.matter.bumpTo(1)` — never let it drop below 1 here.
                 self.matter = self.matter.max(&Decimal::ONE);
@@ -280,10 +284,13 @@ impl GameState {
                 // The `Currency.matter` setter clamps to Number.MAX_VALUE.
                 self.matter = (self.matter * growth).min(&BIG_CRUNCH_THRESHOLD);
             }
-            if self.matter > self.antimatter && !self.can_big_crunch() {
-                // Annihilation: a Dimension-Boost-style soft reset that grants no
-                // boost (`softReset(0, true, true)` — forced, so the ANR perk
-                // does not soften it), keeping boosts and galaxies.
+            if self.matter > self.antimatter
+                && self.challenge_running(11)
+                && !self.can_big_crunch()
+            {
+                // Annihilation (NC11 only, not IC6): a Dimension-Boost-style soft
+                // reset that grants no boost (`softReset(0, true, true)` — forced,
+                // so the ANR perk does not soften it), keeping boosts and galaxies.
                 self.dim_boost_reset_forced();
             }
         }
@@ -415,6 +422,29 @@ mod tests {
 
         let ratio = actual_gain.to_f64() / expected_gain.to_f64();
         assert!((ratio - 1.0).abs() < 1e-9, "ratio={ratio}");
+    }
+
+    #[test]
+    fn matter_grows_under_ic6_but_does_not_annihilate() {
+        use break_infinity::Decimal;
+        // `updateNormalAndInfinityChallenges` grows `matter` under NC11 *or* IC6.
+        let mut game = GameState::new();
+        game.infinity_challenge.current = 6;
+        game.dimensions[1].amount = Decimal::from_float(1e3); // a 2nd dimension exists
+        game.antimatter = Decimal::ONE; // tiny → matter will exceed it
+        game.matter = Decimal::ZERO;
+
+        game.update_challenges(50.0);
+
+        // Matter is bumped to 1 then grows (capped_base 1.03 over 50/20 ticks).
+        assert!(
+            game.matter > Decimal::ONE,
+            "matter did not grow: {}",
+            game.matter
+        );
+        // Annihilation is NC11-only, so under IC6 the 2nd dimension survives even
+        // though matter now exceeds antimatter.
+        assert_eq!(game.dimensions[1].amount, Decimal::from_float(1e3));
     }
 
     #[test]
