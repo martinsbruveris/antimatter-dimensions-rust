@@ -262,3 +262,42 @@ with decode/encode, and gated the two autobuyers' readiness on the caps in
   rest carry only the numerical drift).
 - Fidelity grid: 160 → **187** cells (+27). No regressions.
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Interlude — categorising the residue with a raised tolerance + oracle trace
+
+Per a mid-session suggestion, swept the grid at looser tolerances:
+
+| eps | passing |
+| --- | --- |
+| 1e-6 | 187 |
+| 1e-5 | 220 |
+| 1e-4 | 263 |
+| 1e-3 | 270 |
+
+So ~76 cells fail *only* between 1e-6 and 1e-4 — the accumulated-rounding /
+catastrophic-cancellation class (confirmed: a dense oracle trace of `00023` puts
+the first divergence at **tick 1**, antimatter/dim0 ~1e-6, with every multiplier
+component matching JS to ~1e-15 — the residue is `f64::powf`-vs-V8-`Math.pow` and
+Decimal-cancellation noise). Discrete-bug hunting now targets the ~49 cells that
+still fail at 1e-4.
+
+## Bug 8 — Tickspeed autobuyer "Buys max" mode (100) dropped
+
+### Symptom
+Fixtures `00071`–`00077` diverged on `auto.tickspeed.mode`: JS `100`
+(`BUY_MAX`), Rust `1` (single).
+
+### The bug
+Two problems: the tickspeed mode was never decoded (left at the default single),
+and even the encode used the AD `BUY_10` value (10) rather than the tickspeed
+`BUY_MAX` (100). Rust already runs `buy_max_tickspeed()` for that mode, so only
+the codec was wrong.
+
+### The fix
+Decode the tickspeed mode (100 → BuyMax, else single) and encode BuyMax as 100
+for the tickspeed autobuyer specifically.
+
+### Verification
+- `00071/74/75` pass horizon 1 (the rest carry other discrete bugs +/or drift).
+- Fidelity grid: 187 → **193** cells (+6). No regressions.
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

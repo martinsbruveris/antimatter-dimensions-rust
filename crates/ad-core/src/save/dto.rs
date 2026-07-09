@@ -1905,10 +1905,15 @@ impl GameState {
             ab.bulk = src.bulk;
             ab.timer_ms = timer_from(src.last_tick);
         }
-        // The tickspeed autobuyer's mode is locked to single pre-Infinity for us,
-        // so only its active/bought flags (and interval-upgrade state) are taken.
+        // The tickspeed autobuyer's "Buys max" is `AUTOBUYER_MODE.BUY_MAX` (100),
+        // distinct from the AD `BUY_10` (10); anything else is single.
         autobuyers.tickspeed.is_active = dto.auto.tickspeed.is_active;
         autobuyers.tickspeed.is_bought = dto.auto.tickspeed.is_bought;
+        autobuyers.tickspeed.mode = if dto.auto.tickspeed.mode == 100 {
+            AutobuyerMode::BuyMax
+        } else {
+            AutobuyerMode::BuySingle
+        };
         autobuyers.tickspeed.interval_ms = dto.auto.tickspeed.interval;
         autobuyers.tickspeed.cost = dto.auto.tickspeed.cost;
         autobuyers.tickspeed.timer_ms = timer_from(dto.auto.tickspeed.last_tick);

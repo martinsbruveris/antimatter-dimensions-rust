@@ -36,6 +36,7 @@ const DEFAULT_PLAYER_TEMPLATE: &str = include_str!("default_player.json");
 /// The original `AUTOBUYER_MODE` numeric values.
 const AUTOBUYER_MODE_BUY_SINGLE: i64 = 1;
 const AUTOBUYER_MODE_BUY_10: i64 = 10;
+const AUTOBUYER_MODE_BUY_MAX: i64 = 100;
 
 /// Encodes a [`GameState`] into an AD save string the original game can import.
 ///
@@ -674,7 +675,12 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     let tickspeed = &mut player["auto"]["tickspeed"];
     tickspeed["isActive"] = json!(state.autobuyers.tickspeed.is_active);
     tickspeed["isBought"] = json!(state.autobuyers.tickspeed.is_bought);
-    tickspeed["mode"] = json!(mode_to_raw(state.autobuyers.tickspeed.mode));
+    // The Tickspeed autobuyer's "Buys max" is `AUTOBUYER_MODE.BUY_MAX` (100), not
+    // the AD `BUY_10` (10) that `mode_to_raw` emits.
+    tickspeed["mode"] = json!(match state.autobuyers.tickspeed.mode {
+        AutobuyerMode::BuyMax => AUTOBUYER_MODE_BUY_MAX,
+        AutobuyerMode::BuySingle => AUTOBUYER_MODE_BUY_SINGLE,
+    });
     tickspeed["interval"] = json!(state.autobuyers.tickspeed.interval_ms);
     tickspeed["cost"] = json!(state.autobuyers.tickspeed.cost);
     tickspeed["lastTick"] = last_tick(state.autobuyers.tickspeed.timer_ms);
