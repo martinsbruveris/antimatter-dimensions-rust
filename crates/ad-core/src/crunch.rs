@@ -17,6 +17,21 @@ impl GameState {
         }
     }
 
+    /// The antimatter ceiling past which a Dimension Boost / Galaxy is refused
+    /// (`Player.infinityLimit`): the current antimatter challenge's goal, else the
+    /// full `Decimal::MAX_VALUE` (unlike [`infinity_goal`](Self::infinity_goal),
+    /// whose non-challenge value is the `1e308` `NUMBER_MAX_VALUE`). Post-break the
+    /// player boosts well past `1e308`, so this must be the larger cap.
+    pub fn infinity_limit(&self) -> Decimal {
+        if self.infinity_challenge.current != 0 {
+            Self::infinity_challenge_goal(self.infinity_challenge.current)
+        } else if self.challenge.current != 0 {
+            BIG_CRUNCH_THRESHOLD
+        } else {
+            Decimal::MAX_VALUE
+        }
+    }
+
     /// Whether the player can perform a Big Crunch: the peak antimatter this
     /// infinity has reached the goal (`Player.canCrunch`). Peak (not current) so a
     /// mid-run Dimension Boost/Galaxy reset doesn't revoke it.

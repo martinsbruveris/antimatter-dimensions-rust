@@ -729,22 +729,52 @@ impl GameState {
         // Prestige autobuyers (unlocked by completing NC10/11/12). Their readiness
         // is exactly the buy/reset condition, so the phase resets only when the
         // action can actually happen (matching the original's `canTick`).
-        // Dim Boost limit gate (`DimBoostAutobuyerState.tick`, non-buyMax path):
-        // boost only when under the boost cap, or once the wait-for-galaxies
-        // threshold is met. `isBuyMaxUnlocked` is a post-Reality perk we don't
-        // model, so only this branch applies.
+        // Dim Boost gate (`DimBoostAutobuyerState.tick`). The `autobuyMaxDimboosts`
+        // Break Infinity Upgrade switches it to a "buy max" path: it only fires
+        // when a boost would unlock a new dimension, or the wait-for-galaxies
+        // threshold is met, and then buys as many boosts as possible on the
+        // `buyMaxInterval` (seconds) cadence, resetting on the Infinity prestige
+        // event. The default path fires under the boost cap or past the galaxy
+        // threshold, buying one boost on the standard interval.
         let db_cfg = self.autobuyers.dim_boost_config.clone();
-        let limit_condition =
-            !db_cfg.limit_dim_boosts || (self.dim_boosts as f64) < db_cfg.max_dim_boosts;
-        let galaxy_condition = db_cfg.limit_until_galaxies
-            && (self.galaxies as f64) >= db_cfg.until_galaxies;
-        let ready = self.autobuyers.dim_boost.is_active
-            && self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost)
-            && self.can_dim_boost()
-            && (limit_condition || galaxy_condition);
-        let eff = self.autobuyers.dim_boost.interval_ms * speedup;
-        if self.autobuyers.dim_boost.advance(dt_ms, eff, ready) && self.buy_dim_boost() {
-            self.reset_autobuyer_ticks(PRESTIGE_DIMENSION_BOOST, dt_ms);
+        let buy_max = self.is_buy_max_dimboosts_unlocked();
+        let (ready, eff, reset_event) = if buy_max {
+            let galaxy_condition = !db_cfg.limit_until_galaxies
+                || (self.galaxies as f64) >= db_cfg.until_galaxies;
+            let gate = self.can_unlock_new_dimension() || galaxy_condition;
+            let ready = self.autobuyers.dim_boost.is_active
+                && self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost)
+                && self.can_dim_boost()
+                && gate;
+            (
+                ready,
+                db_cfg.buy_max_interval * 1000.0 * speedup,
+                PRESTIGE_INFINITY,
+            )
+        } else {
+            let limit_condition = !db_cfg.limit_dim_boosts
+                || (self.dim_boosts as f64) < db_cfg.max_dim_boosts;
+            let galaxy_condition = db_cfg.limit_until_galaxies
+                && (self.galaxies as f64) >= db_cfg.until_galaxies;
+            let ready = self.autobuyers.dim_boost.is_active
+                && self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost)
+                && self.can_dim_boost()
+                && (limit_condition || galaxy_condition);
+            (
+                ready,
+                self.autobuyers.dim_boost.interval_ms * speedup,
+                PRESTIGE_DIMENSION_BOOST,
+            )
+        };
+        if self.autobuyers.dim_boost.advance(dt_ms, eff, ready) {
+            let bought = if buy_max {
+                self.max_buy_dim_boosts()
+            } else {
+                self.buy_dim_boost()
+            };
+            if bought {
+                self.reset_autobuyer_ticks(reset_event, dt_ms);
+            }
         }
 
         // Galaxy limit gate (`GalaxyAutobuyerState.tick`: the cap passed to

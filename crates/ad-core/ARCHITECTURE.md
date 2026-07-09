@@ -17,7 +17,9 @@ not the current state).
 - `src/tick.rs` — Main game loop (`tick()` and `simulate()`)
 - `src/dimensions.rs` — Dimension purchasing, production, multipliers
 - `src/tickspeed.rs` — Tickspeed upgrades and effects
-- `src/galaxy.rs` — Antimatter galaxy purchases
+- `src/galaxy.rs` — Antimatter galaxy purchases; Dimension Boosts
+  (`can_dim_boost`, `buy_dim_boost`, and the `autobuyMaxDimboosts` buy-max path
+  `max_buy_dim_boosts`)
 - `src/sacrifice.rs` — Dimension sacrifice
 - `src/crunch.rs` — Big Crunch (Infinity): `can_big_crunch`, `big_crunch`, and the
   shared `big_crunch_reset(forced, entering_challenge)` that both the manual crunch
@@ -60,8 +62,9 @@ not the current state).
   maxed). This module owns the `BreakInfinityUpgrade` (9 one-time, sharing the save's
   `infinityUpgrades`) + `BreakInfinityRebuyable` (3, in `infinityRebuyables`) types,
   purchase logic, and the effect readers (`break_infinity_upgrade_common_mult`,
-  `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`); five effects are
-  deferred (neutral). See `../../docs/design/2026-07-03-break-infinity.md`.
+  `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`,
+  `is_buy_max_dimboosts_unlocked`); four effects are deferred (neutral). See
+  `../../docs/design/2026-07-03-break-infinity.md`.
 - `src/replicanti.rs` — Replicanti (Feature 3.2): `ReplicantiState` on `GameState`,
   unlocked with IP (`unlock_replicanti`), grown each tick (`tick_replicanti`, the
   capped continuous approximation), and spent on Replicanti Galaxies

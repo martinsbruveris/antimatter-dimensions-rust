@@ -37,7 +37,8 @@ pub enum BreakInfinityUpgrade {
     SlowestChallengeMult,
     /// Passively generate Infinities (deferred — generation loop).
     InfinitiedGen,
-    /// Unlock the buy-max Dimension Boost autobuyer mode (deferred behaviour).
+    /// Unlock the buy-max Dimension Boost autobuyer mode
+    /// ([`is_buy_max_dimboosts_unlocked`](crate::GameState::is_buy_max_dimboosts_unlocked)).
     AutobuyMaxDimboosts,
     /// Challenge-unlocked autobuyers work twice as fast.
     AutobuyerSpeed,

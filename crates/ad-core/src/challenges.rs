@@ -502,6 +502,36 @@ mod tests {
     }
 
     #[test]
+    fn buy_max_dimboosts_gate_tracks_new_dimension_unlocks() {
+        use crate::break_infinity_upgrades::BreakInfinityUpgrade;
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.broke_infinity = true;
+        game.break_infinity_upgrades |= BreakInfinityUpgrade::AutobuyMaxDimboosts.bit();
+        assert!(game.is_buy_max_dimboosts_unlocked());
+
+        // 3 boosts → a boost still unlocks the 8th dimension.
+        game.dim_boosts = 3;
+        assert!(game.can_unlock_new_dimension());
+        // 4 boosts → all 8 unlocked, so the buy-max autobuyer's gate closes
+        // (unless the galaxy condition opens it).
+        game.dim_boosts = 4;
+        assert!(!game.can_unlock_new_dimension());
+    }
+
+    #[test]
+    fn max_buy_dim_boosts_buys_one_to_unlock_a_new_dimension() {
+        let mut game = GameState::new();
+        game.infinity_unlocked = true;
+        game.broke_infinity = true;
+        game.dim_boosts = 3; // 7th dimension unlocked; the 8th is not yet
+        game.dimensions[6].amount = Decimal::from_float(100.0); // requirement is 20
+        assert!(game.can_unlock_new_dimension());
+        assert!(game.max_buy_dim_boosts());
+        assert_eq!(game.dim_boosts, 4);
+    }
+
+    #[test]
     fn nc10_disables_sacrifice() {
         let mut game = GameState::new();
         game.infinity_unlocked = true;

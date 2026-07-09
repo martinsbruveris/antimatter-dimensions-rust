@@ -551,3 +551,44 @@ compounding linearly down the chain — i.e. the shared per-tier `tickspeed`
 factor) sits just over the 1e-4 epsilon, and at 100/1000 JS performs a Big Crunch
 that Rust does not. Both are separate follow-ups; the dominant structural gap on
 this whole cohort of post-break fixtures is closed.
+
+## Bug 17 — the Dimension Boost autobuyer's "buy max" branch
+
+### Symptom
+Many deep post-break fixtures (e.g. `00204`, `00206`, in Infinity Challenge 7 with
+antimatter ≈ 1e7810) diverged catastrophically at horizon 1: Rust bought a
+Dimension Boost that JS did not, and the boost's soft reset collapsed antimatter
+from ~1e7810 to the ~5e25 starting value (JS kept growing). The shared tell was
+`dimensionBoosts JS=4 Rust=5`.
+
+### Diagnosis
+Every `DimBoost` gate said "yes" (`canBeBought`, `requirement.isSatisfied`, the
+autobuyer active with its interval elapsed), yet JS still didn't boost. Driving
+the real game confirmed `Autobuyer.dimboost.isBuyMaxUnlocked` was **true**: the
+`autobuyMaxDimboosts` Break Infinity Upgrade switches the autobuyer to a distinct
+`tick()` branch that boosts only when a boost would unlock a new dimension **or**
+the wait-for-galaxies condition is met — and returns otherwise. With all 8
+dimensions already unlocked (`canUnlockNewDimension` false) and 0 galaxies (< the
+configured 5), JS's branch returned without boosting. Rust had stubbed this
+upgrade as "deferred behaviour" and always ran the default (boost-under-cap)
+branch, so it boosted.
+
+### Fix
+Implemented the buy-max branch: `is_buy_max_dimboosts_unlocked`,
+`can_unlock_new_dimension`, and `max_buy_dim_boosts` (JS `maxBuyDimBoosts` — buy
+one to unlock a new dimension, else linearly extrapolate the tier-8 requirement
+with an EC5 binary-search fallback), plus `soft_reset_bulk` (JS `softReset(bulk)`
+with the `antimatter > Player.infinityLimit` guard and the boost-cap clamp). The
+autobuyer now branches on the upgrade: the buy-max path gates on
+`canUnlockNewDimension || galaxyCondition`, fires on the `buyMaxInterval` (seconds)
+cadence, and resets on the Infinity prestige event.
+
+Also ported the two Dimension-Boost purchase guards Rust lacked (`can_dim_boost`):
+`requestDimensionBoost`'s `antimatter > Player.infinityLimit` and `canBeBought`'s
+`maxAM > Player.infinityGoal && (!broke || inAntimatterChallenge)`, adding the
+`infinity_limit()` helper (challenge goal, else the full `Decimal::MAX_VALUE` —
+distinct from `infinity_goal`'s `1e308`, so post-break boosting is unaffected).
+
+### Verification
+- Fidelity grid: 574 → **580** cells (+6); `00204`/`00206` @1 now pass.
+- `cargo test -p ad-core --features serde`: 568 pass; fmt + clippy clean.
