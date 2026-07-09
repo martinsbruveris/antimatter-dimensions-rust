@@ -711,3 +711,29 @@ in `tick_autobuyers` (`buy_max_interval * 1000`, not `* speedup`).
   from-zero rebuild with astronomical multipliers still diverges ~124 orders/tier).
   Grid holds at 602/1148 (no regressions; round-trip clean).
 - `cargo test -p ad-core --features serde`: 572 pass; fmt + clippy clean.
+
+## Bug 22 — the Big Crunch over-reset `thisInfinity` and skipped the requirement latches
+
+### Symptom
+`00124` (both engines crunch on tick 1, identical dimension reset so no production
+divergence) diverged on two fields: `requirementChecks.infinity.noAD8 JS=true
+Rust=false` and `records.thisInfinity.bestIPminVal JS=3010765 Rust=0`.
+
+### Diagnosis
+Rust reset the whole `thisInfinity` record with `ThisInfinity::new()`, zeroing
+`bestIPminVal` — but the original's `secondSoftReset` resets only `time` /
+`realTime` / `maxAM` / `lastBuyTime`, and `bigCrunchUpdateStatistics` zeroes
+`bestIPmin` alone; `bestIPminVal` is kept across the crunch. Rust also never ran
+`Player.resetRequirements("infinity")`, so the infinity latches (`maxAll`,
+`noSacrifice`, `noAD8`) weren't cleared for the new infinity.
+
+### Fix
+Replaced the blanket `thisInfinity = ThisInfinity::new()` with the selective
+`secondSoftReset` fields (keeping `best_ip_min_val`), moved the `best_ip_min = 0`
+reset into the at-goal `bigCrunchUpdateStatistics` block, and cleared
+`infinity_max_all` / `infinity_no_sacrifice` / `infinity_no_ad8` on every crunch.
+
+### Verification
+- Fidelity grid: 602 → **606** cells (+4); `00124` @1 now passes.
+- `cargo test -p ad-core --features serde`: 573 pass; fmt + clippy clean; round-trip
+  clean.

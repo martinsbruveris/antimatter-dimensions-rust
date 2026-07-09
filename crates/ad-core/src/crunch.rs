@@ -1,7 +1,6 @@
 use break_infinity::Decimal;
 
 use crate::data::constants::BIG_CRUNCH_THRESHOLD;
-use crate::records::ThisInfinity;
 use crate::state::{DimensionTier, GameState, TickspeedState};
 use crate::tab_notifications::TabNotificationId;
 
@@ -369,6 +368,9 @@ impl GameState {
                 .best_infinity
                 .best_ip_min_eternity
                 .max(&self.records.this_infinity.best_ip_min);
+            // `bigCrunchUpdateStatistics` zeroes `bestIPmin` (only here, at the
+            // goal) — but leaves `bestIPminVal` untouched (kept across the crunch).
+            self.records.this_infinity.best_ip_min = Decimal::ZERO;
             let divisor = self.records.this_infinity.real_time_ms.max(33.0);
             let infinities_per_ms =
                 self.gained_infinities().round() / Decimal::from_float(divisor);
@@ -444,9 +446,19 @@ impl GameState {
         if !entering_challenge {
             self.skip_resets_if_possible();
         }
-        // Reset the current infinity's records (time/maxAM back to 0); the
-        // fastest-infinity record and total time played persist.
-        self.records.this_infinity = ThisInfinity::new();
+        // `secondSoftReset`: reset this infinity's records (time / real time / peak
+        // antimatter / last-buy time) but *keep* `best_ip_min_val` — the original
+        // only zeroes `bestIPmin` (above, at the goal), never `bestIPminVal`. The
+        // fastest-infinity record and total time played persist too.
+        self.records.this_infinity.time_ms = 0.0;
+        self.records.this_infinity.real_time_ms = 0.0;
+        self.records.this_infinity.max_am = Decimal::ZERO;
+        self.records.this_infinity.last_buy_time_ms = 0.0;
+        // `Player.resetRequirements("infinity")`: clear the infinity requirement
+        // latches for the fresh infinity.
+        self.requirement_checks.infinity_max_all = false;
+        self.requirement_checks.infinity_no_sacrifice = true;
+        self.requirement_checks.infinity_no_ad8 = true;
 
         // EC4's Infinity limit is checked on each crunch
         // (`bigCrunchCheckUnlocks` → `EternityChallenge(4).tryFail()`).
@@ -517,6 +529,32 @@ mod tests {
 
         // Infinity stays unlocked after the crunch (persists across resets).
         assert!(game.infinity_unlocked);
+    }
+
+    #[test]
+    fn crunch_keeps_best_ip_min_val_and_resets_the_infinity_latches() {
+        let mut game = GameState::new();
+        game.records.this_infinity.real_time_ms = 3.0 * 3_600_000.0;
+        // Records/latches that a crunch should treat asymmetrically.
+        game.records.this_infinity.best_ip_min = Decimal::from_float(1e7);
+        game.records.this_infinity.best_ip_min_val = Decimal::from_float(3e6);
+        game.requirement_checks.infinity_no_ad8 = false;
+        game.requirement_checks.infinity_no_sacrifice = false;
+        game.requirement_checks.infinity_max_all = true;
+
+        game.antimatter = BIG_CRUNCH_THRESHOLD;
+        assert!(game.big_crunch());
+
+        // `bigCrunchUpdateStatistics` zeroes `bestIPmin` but keeps `bestIPminVal`.
+        assert_eq!(game.records.this_infinity.best_ip_min, Decimal::ZERO);
+        assert_eq!(
+            game.records.this_infinity.best_ip_min_val,
+            Decimal::from_float(3e6)
+        );
+        // `resetRequirements("infinity")` clears the latches for the new infinity.
+        assert!(game.requirement_checks.infinity_no_ad8);
+        assert!(game.requirement_checks.infinity_no_sacrifice);
+        assert!(!game.requirement_checks.infinity_max_all);
     }
 
     #[test]

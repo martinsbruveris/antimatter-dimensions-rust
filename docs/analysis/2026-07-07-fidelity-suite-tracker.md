@@ -43,6 +43,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Implemented the Dimension Boost autobuyer's `autobuyMaxDimboosts` buy-max branch (gate `canUnlockNewDimension \|\| galaxyCondition`, `maxBuyDimBoosts`, `softReset(bulk)`) + the `infinityLimit`/`infinityGoal` boost guards; Rust was boosting (and collapsing antimatter) when JS's buy-max branch would not (`00204`/`00206`) | 580/1148 |
 | 2026-07-09 | (pending) | Modelled the AD autobuyer group toggle (`auto.antimatterDims.isActive`) + `collapseDisplay` (all tiers maxed/unlocked + Achievement 61); Rust ran the tier autobuyers when JS's collapsed group toggle disabled them (`00184`/`00185`) | 584/1148 |
 | 2026-07-09 | (pending) | Ran the Galaxy autobuyer before the Dim Boost one (original `singleComplex` order) so a galaxy pre-empts a boost at a shared threshold, and made `resetTickOn` buy-max-aware (`INFINITY`, not `ANTIMATTER_GALAXY`) — `00129`/`00154` | 602/1148 |
+| 2026-07-09 | (pending) | Big Crunch now resets `thisInfinity` selectively (keeps `bestIPminVal`, zeroes `bestIPmin` only at the goal) and runs `resetRequirements("infinity")` (clears `maxAll`/`noSacrifice`/`noAD8`) — `00124` | 606/1148 |
 
 ## Method
 

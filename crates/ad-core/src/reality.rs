@@ -185,8 +185,8 @@ pub struct RequirementChecks {
     /// antimatter gain.
     #[cfg_attr(feature = "serde", serde(default = "default_true"))]
     pub reality_no_am: bool,
-    /// A "Max All" was used this infinity (`infinity.maxAll`); a latch set only
-    /// by the manual Max All action (never reset), so it round-trips unchanged.
+    /// A "Max All" was used this infinity (`infinity.maxAll`); set by the manual
+    /// Max All action and cleared by a Big Crunch (`resetRequirements("infinity")`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinity_max_all: bool,
     /// No 8th Antimatter Dimension bought this eternity (`infinity.noAD8`);
