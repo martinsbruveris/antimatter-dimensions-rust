@@ -35,6 +35,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Decoded/encoded the Tickspeed autobuyer's `BUY_MAX` mode (100, distinct from AD `BUY_10`=10); was never decoded and mis-encoded | 193 (+6) |
 | 2026-07-09 | (pending) | Modelled the `ipMult` ×2 Infinity Upgrade (`IPMultPurchases`): decode/encode, `2^purchases` in `total_ip_mult`, and the Eternity/Reality resets | 195 (+2) |
 | 2026-07-09 | (pending) | Applied the autobuyer `resetTick` (`lastTick`→0) on each prestige event and reset `postC4Tier` in `reset_challenge_stuff` — the missing prestige-reset behaviour (found via a dense `00059` trace) | 203 (+8) |
+| 2026-07-09 | (pending) | Added a second fixture batch (Infinity→early-Eternity), raised default tolerance to 1e-4, and modelled the super-exponential `ExponentialCostScaling` for AD/Tickspeed costs past `Number.MAX_VALUE` (`00086`: 28 diverged fields → 1) | 303/1148 |
 
 ## Method
 

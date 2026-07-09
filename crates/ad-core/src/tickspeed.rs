@@ -8,13 +8,39 @@ use crate::data::constants::{
 use crate::state::GameState;
 
 impl GameState {
+    /// `Player.tickSpeedMultDecrease`: the Tickspeed cost-scale (`costScale`),
+    /// reduced by the `tickspeedCostMult` Break Infinity Upgrade (−1 per purchase)
+    /// and EC11 completions (−0.07 each).
+    pub fn tickspeed_mult_decrease(&self) -> f64 {
+        10.0 - self.infinity_rebuyables[0] as f64
+            - self.eternity_challenge_completions(11) as f64 * 0.07
+    }
+
+    /// The Tickspeed purchase-cost curve (`Tickspeed.costScale`).
+    fn tickspeed_cost_scale(&self) -> crate::cost_scaling::CostScale {
+        crate::cost_scaling::CostScale::new(
+            1000.0,
+            10.0,
+            self.tickspeed_mult_decrease(),
+            crate::cost_scaling::LOG10_NUMBER_MAX_VALUE,
+        )
+    }
+
+    /// `Tickspeed.cost`: `calculateCost(totalTickBought + chall9TickspeedCostBumps)`.
+    /// Super-exponential past `Number.MAX_VALUE` (see [`crate::cost_scaling`]).
+    pub fn tickspeed_purchase_cost(&self) -> Decimal {
+        self.tickspeed_cost_scale()
+            .calculate_cost((self.tickspeed.bought + self.tickspeed.cost_bumps) as f64)
+    }
+
     /// Buy one tickspeed upgrade. Returns true if successful.
     pub fn buy_tickspeed(&mut self) -> bool {
         // EC9: Tickspeed upgrades cannot be purchased.
         if self.ec_running(9) {
             return false;
         }
-        if self.antimatter >= self.tickspeed.cost {
+        let cost = self.tickspeed_purchase_cost();
+        if self.antimatter >= cost {
             // Clear the TICKSPEED tutorial highlight on the purchase, like the
             // original's buyTickSpeed (no-op once past that step).
             self.tutorial_turn_off(crate::tutorial::state::TICKSPEED);
@@ -23,9 +49,8 @@ impl GameState {
             if self.challenge_running(9) {
                 self.nc9_bump_same_cost_from_tickspeed();
             }
-            self.antimatter -= self.tickspeed.cost;
+            self.antimatter -= cost;
             self.tickspeed.bought += 1;
-            self.tickspeed.cost *= self.tickspeed.cost_multiplier;
             // Normal Challenge 2: buying a Tickspeed upgrade also halts production.
             if self.challenge_running(2) {
                 self.chall2_pow = 0.0;
@@ -62,13 +87,14 @@ impl GameState {
         self.tickspeed_unlocked()
             && !self.ec_running(9)
             && !self.continuum_active()
-            && (self.broke_infinity || self.tickspeed.cost < Decimal::NUMBER_MAX_VALUE)
+            && (self.broke_infinity
+                || self.tickspeed_purchase_cost() < Decimal::NUMBER_MAX_VALUE)
     }
 
     /// Whether antimatter covers the next Tickspeed upgrade
     /// (`Tickspeed.isAffordable`).
     pub fn tickspeed_affordable(&self) -> bool {
-        self.antimatter >= self.tickspeed.cost
+        self.antimatter >= self.tickspeed_purchase_cost()
     }
 
     /// Compute the current tickspeed in milliseconds:

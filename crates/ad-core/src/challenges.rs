@@ -101,16 +101,15 @@ impl GameState {
                 self.dimensions[t].cost_bumps += 1;
             }
         }
-        if self.tickspeed.cost.exponent() == src_e {
+        if self.tickspeed_purchase_cost().exponent() == src_e {
             self.tickspeed.cost_bumps += 1;
-            self.tickspeed.cost *= self.tickspeed.cost_multiplier;
         }
     }
 
     /// NC9 `Tickspeed.multiplySameCosts`: buying a Tickspeed upgrade bumps every
     /// dimension whose current cost shares Tickspeed's order of magnitude.
     pub(crate) fn nc9_bump_same_cost_from_tickspeed(&mut self) {
-        let ts_e = self.tickspeed.cost.exponent();
+        let ts_e = self.tickspeed_purchase_cost().exponent();
         for t in 0..8 {
             if self.dimension_cost(t).exponent() == ts_e {
                 self.dimensions[t].cost_bumps += 1;

@@ -64,7 +64,7 @@ impl ObservedTickspeedState {
     fn from_game_state(game: &GameState) -> Self {
         Self {
             bought: game.tickspeed.bought,
-            cost: game.tickspeed.cost,
+            cost: game.tickspeed_purchase_cost(),
             cost_multiplier: game.tickspeed.cost_multiplier,
             tickspeed_ms: game.current_tickspeed_ms(),
             tickspeed_effect: game.tickspeed_effect(),

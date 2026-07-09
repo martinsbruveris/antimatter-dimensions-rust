@@ -7,6 +7,7 @@ pub mod black_holes;
 pub mod break_infinity_upgrades;
 pub mod celestials;
 pub mod challenges;
+pub mod cost_scaling;
 pub mod crunch;
 pub mod data;
 pub mod dilation;

@@ -16,10 +16,28 @@ impl GameState {
         } else {
             (AD_BASE_COSTS[tier], AD_COST_MULTIPLIERS[tier])
         };
-        let purchase_group =
-            self.dimensions[tier].bought / 10 + self.dimensions[tier].cost_bumps;
-        Decimal::from_float(base)
-            * Decimal::from_float(mult).pow(&Decimal::from_float(purchase_group as f64))
+        let purchase_group = (self.dimensions[tier].bought / 10
+            + self.dimensions[tier].cost_bumps) as f64;
+        self.ad_cost_scale(base, mult)
+            .calculate_cost(purchase_group)
+    }
+
+    /// `Player.dimensionMultDecrease`: the AD cost-scale (`costScale`), reduced by
+    /// the `dimCostMult` Break Infinity Upgrade (−1 per purchase) and EC6
+    /// completions (−0.2 each).
+    pub fn dimension_mult_decrease(&self) -> f64 {
+        10.0 - self.infinity_rebuyables[1] as f64
+            - self.eternity_challenge_completions(6) as f64 * 0.2
+    }
+
+    /// The Antimatter Dimension purchase-cost curve for a tier's `(base, mult)`.
+    fn ad_cost_scale(&self, base: f64, mult: f64) -> crate::cost_scaling::CostScale {
+        crate::cost_scaling::CostScale::new(
+            base,
+            mult,
+            self.dimension_mult_decrease(),
+            crate::cost_scaling::LOG10_NUMBER_MAX_VALUE,
+        )
     }
 
     /// The currency a dimension purchase spends. Normal Challenge 6 pays for the
@@ -248,36 +266,28 @@ impl GameState {
             return count;
         }
 
-        // Normal regime: analytic bulk buy over the geometric cost curve.
+        // Normal regime: analytic bulk buy via `getMaxBought` (10-per-set), which
+        // handles both the geometric branch and the super-exponential scaling past
+        // `Number.MAX_VALUE`.
         let (base, mult) = if self.challenge_running(6) {
             (C6_AD_BASE_COSTS[tier], C6_AD_COST_MULTIPLIERS[tier])
         } else {
             (AD_BASE_COSTS[tier], AD_COST_MULTIPLIERS[tier])
         };
-        let log_base = base.log10();
-        let log_mult = mult.log10();
         let p0 = (self.dimensions[tier].bought / 10 + self.dimensions[tier].cost_bumps)
-            as i64;
-        // `getMaxBought`: divide by the 10-per-set so we don't buy a whole set we
-        // can only partly afford; the `1 +` is because the first purchase carries
-        // no multiplier. Linear (geometric) branch only — Rust models cost below
-        // the e308 super-exponential threshold.
-        let log_money =
-            (self.dim_currency_amount(tier) / Decimal::from_float(10.0)).log10();
-        let new_purchases = (1.0 + (log_money - log_base) / log_mult).floor() as i64;
-        if new_purchases <= p0 {
-            return count;
-        }
-        let quantity = new_purchases - p0;
-        // Clamp to the remaining bulk (the manual path passes ∞, so never clamps).
-        let buying = if (quantity as f64) <= bulk_left {
-            quantity
-        } else {
-            bulk_left as i64
+            as f64;
+        let money = self.dim_currency_amount(tier);
+        let (quantity, log_price) = match self
+            .ad_cost_scale(base, mult)
+            .get_max_bought(p0, money, 10.0)
+        {
+            Some(q) => q,
+            None => return count,
         };
+        // Clamp to the remaining bulk (the manual path passes ∞, so never clamps).
         // The original charges the price of the *unclamped* top group regardless of
-        // clamping (`Decimal.pow10(maxBought.logPrice)`), so mirror that exactly.
-        let log_price = (new_purchases - 1) as f64 * log_mult + log_base + 1.0;
+        // clamping (`Decimal.pow10(maxBought.logPrice)`), so `log_price` is unchanged.
+        let buying = quantity.min(bulk_left) as i64;
         let bought = 10 * buying;
         let amount = self.dimensions[tier].amount + Decimal::from_float(bought as f64);
         self.dimensions[tier].amount = amount.round();

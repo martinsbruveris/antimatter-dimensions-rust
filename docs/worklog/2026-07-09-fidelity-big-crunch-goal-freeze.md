@@ -388,3 +388,38 @@ cells** at the 1e-6 tolerance (and **284/312** at 1e-4):
 The dense oracle trace (`npm run generate -- --save <n> --trace <f>.json` against
 the game served on `:8080`, then `ad-fidelity trace <f>.json`) was decisive for
 bug 10 — it pinned the first divergence to the exact tick and field.
+
+## Bug 11 — super-exponential cost scaling (`ExponentialCostScaling`) unmodelled
+
+### Context
+A second batch of savefiles (Infinity → very-early-Eternity, 112–620 min) was
+added and oracle fixtures generated for them; the default tolerance was raised to
+1e-4 (the FP-drift class). Almost every late-game fixture diverged massively.
+
+### Symptom
+`00086 @ 1` (post-break, 117 min): antimatter JS=1.26e399 vs Rust=3.6e430
+(Δlog10=31), with Rust over-buying tickspeed (`totalTickBought` 396 vs 319) and
+dimensions. Round-trip clean, so it was one tick of runaway production.
+
+### The bug
+Antimatter Dimension and Tickspeed costs use the original's
+`ExponentialCostScaling`: geometric until the cost passes `Number.MAX_VALUE`,
+then the per-purchase ratio itself grows by `costScale` each step
+(super-exponential). We modelled only the geometric branch, so past the
+threshold (tickspeed at ~306 purchases, AD1 at ~103 groups) costs were tens of
+orders too cheap — the autobuyers bought far too much and production exploded.
+
+### The fix
+- New `cost_scaling.rs` porting `ExponentialCostScaling` (`calculate_cost` +
+  `get_max_bought`, both matching the original's precomputed-`log10` formulae).
+- `dimension_mult_decrease` / `tickspeed_mult_decrease` = `10 − dimCostMult|
+  tickspeedCostMult purchases − EC6·0.2 | EC11·0.07` (the `costScale`).
+- `dimension_cost` and a new computed `tickspeed_purchase_cost` (replacing the
+  stored/incremental tickspeed cost) now go through the curve; the AD bulk buy
+  uses `get_max_bought` (its quadratic branch), and tickspeed buy-max already
+  loops the single buy so it needs no separate change.
+
+### Verification
+- `00086`: 28 diverged fields → **1** (a sub-1e-6 `lastTick` timing residual).
+- No regression on the original 78 fixtures (still 284/312 at 1e-4).
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
