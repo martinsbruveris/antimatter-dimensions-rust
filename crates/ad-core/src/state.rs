@@ -209,6 +209,10 @@ pub struct GameState {
     /// Eternity.
     #[cfg_attr(feature = "serde", serde(default))]
     pub infinities: Decimal,
+    /// Purchases of the repeatable ×2-IP `ipMult` Infinity Upgrade
+    /// (`player.IPMultPurchases`). Feeds `total_ip_mult`; reset on Eternity.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub ip_mult_purchases: u32,
     /// Current Eternity Points (`Currency.eternityPoints`): gained on an
     /// Eternity, cumulative, spent on Time Dimensions / Eternity Upgrades /
     /// Time Theorems. Reset only on Reality (out of frontier). See `eternity.rs`.
@@ -521,6 +525,7 @@ impl GameState {
             eterc8_repl: 40,
             eternity_upgrades: 0,
             epmult_upgrades: 0,
+            ip_mult_purchases: 0,
             ic_best_times_ms: [f64::MAX; 8],
             nc_best_times_ms: [f64::MAX; 11],
             dilation: DilationState::new(),

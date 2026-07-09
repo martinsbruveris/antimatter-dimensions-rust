@@ -621,6 +621,7 @@ impl GameState {
         self.records.this_reality.max_ep = self.eternity_points;
 
         self.epmult_upgrades = 0;
+        self.ip_mult_purchases = 0;
         self.eternities = Decimal::ZERO;
         self.records.this_eternity = ThisEternity::new();
         self.records.best_eternity = crate::records::BestEternity {

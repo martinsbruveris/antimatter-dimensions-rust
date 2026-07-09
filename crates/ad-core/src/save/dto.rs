@@ -114,6 +114,9 @@ pub struct PlayerDTO {
     pub eternity_upgrades: Vec<u8>,
     /// `player.epmultUpgrades` — rebuyable ×5 EP-multiplier purchases.
     pub epmult_upgrades: u32,
+    /// `player.IPMultPurchases` — rebuyable ×2 IP-multiplier purchases.
+    #[serde(rename = "IPMultPurchases", default)]
+    pub ip_mult_purchases: u32,
     /// `player.infinityPower` — produced by the Infinity Dimensions.
     #[serde(with = "break_infinity::serde_string")]
     pub infinity_power: Decimal,
@@ -2194,6 +2197,7 @@ impl GameState {
                 bits
             },
             epmult_upgrades: dto.epmult_upgrades,
+            ip_mult_purchases: dto.ip_mult_purchases,
             ic_best_times_ms: {
                 let mut times = [f64::MAX; 8];
                 for (i, t) in

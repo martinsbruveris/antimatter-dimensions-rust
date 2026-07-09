@@ -301,3 +301,22 @@ for the tickspeed autobuyer specifically.
 - `00071/74/75` pass horizon 1 (the rest carry other discrete bugs +/or drift).
 - Fidelity grid: 187 → **193** cells (+6). No regressions.
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 9 — `ipMult` ×2 Infinity Upgrade (`IPMultPurchases`) unmodelled
+
+### Symptom
+`00076`/`00077` diverged on `IPMultPurchases` (JS 1, Rust 0).
+
+### The bug
+The repeatable ×2-IP `ipMult` Infinity Upgrade was not modelled: its purchase
+count `player.IPMultPurchases` was dropped, and `total_ip_mult` omitted the
+`2^IPMultPurchases` factor.
+
+### The fix
+Added `GameState.ip_mult_purchases` (decode/encode), applied `2^purchases` (flat
+`1e1000000` past 3.3M) in `total_ip_mult`, and reset it on Eternity and Reality.
+
+### Verification
+- `00076`/`00077` pass horizon 1.
+- Fidelity grid: 193 → **195** cells (+2). No regressions.
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

@@ -222,6 +222,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         .map(|u| u.id())
         .collect::<Vec<_>>());
     player["epmultUpgrades"] = json!(state.epmult_upgrades);
+    player["IPMultPurchases"] = json!(state.ip_mult_purchases);
     // Infinity Challenge record times.
     player["challenge"]["infinity"]["bestTimes"] = json!(state.ic_best_times_ms);
     player["challenge"]["normal"]["bestTimes"] = json!(state.nc_best_times_ms);

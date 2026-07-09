@@ -277,6 +277,8 @@ impl GameState {
         // `initializeResourcesAfterEternity`.
         self.sacrificed = Decimal::ZERO;
         self.infinities = Decimal::ZERO;
+        // `player.IPMultPurchases = 0` (the ×2 IP upgrade resets each Eternity).
+        self.ip_mult_purchases = 0;
         self.records.best_infinity.time_ms = BEST_INFINITY_RESET_MS;
         self.records.best_infinity.real_time_ms = BEST_INFINITY_RESET_MS;
         // `bestInfinity.bestIPminEternity` is per-eternity, so it resets here (the

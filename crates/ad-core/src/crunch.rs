@@ -39,9 +39,9 @@ impl GameState {
     }
 
     /// The global Infinity-Point multiplier (`totalIPMult`): Time Studies
-    /// 41/51/141/142/143 and the ×4 achievements 85/93 (116/125 are later
-    /// features). The IP-mult Infinity Upgrade is not modelled. Read by
-    /// [`GameState::generate_passive_ip`] too.
+    /// 41/51/141/142/143, the ×4 achievements 85/93, achievements 116/125, and
+    /// the ×2-per-purchase `ipMult` Infinity Upgrade (`ip_mult_purchases`). Read
+    /// by [`GameState::generate_passive_ip`] too.
     pub(crate) fn total_ip_mult(&self) -> Decimal {
         // Effarig's Infinity stage nullifies every IP multiplier (`totalIPMult`
         // returns 1).
@@ -130,6 +130,14 @@ impl GameState {
                 .dilated_time
                 .pow(&Decimal::from_float(1000.0))
                 .max(&Decimal::ONE);
+        }
+        // The `ipMult` repeatable Infinity Upgrade: ×2 IP per purchase (past 3.3M
+        // purchases the capped cost gives a flat `1e1000000`). `IPMultPurchases`.
+        if self.ip_mult_purchases >= 3_300_000 {
+            mult *= Decimal::new_unchecked(1.0, 1_000_000);
+        } else if self.ip_mult_purchases > 0 {
+            mult *= Decimal::from_float(2.0)
+                .pow(&Decimal::from(self.ip_mult_purchases as u64));
         }
         // The `infinityIP` glyph effect (`GlyphEffect.ipMult`).
         mult *= Decimal::from_float(self.glyph_effect_infinity_ip());
