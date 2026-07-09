@@ -472,3 +472,18 @@ After the cost-scaling fix, the widest remaining structural divergences on the n
 - Fidelity grid: 298 → **350** cells across this batch (new-fixture set), no
   early-game regression (284/312).
 - `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.
+
+## Bug 14 — Eternity best-rate records + `ic2Count` preservation
+
+- `player.ic2Count` (IC2 sacrifice timer) was hard-coded to 0 on decode and never
+  encoded, dropping any in-progress timer. Now decoded/encoded (+12 cells).
+- `records.thisReality.bestEternitiesPerMs` and
+  `records.bestEternity.bestEPminReality` — the Eternity analogues of the Infinity
+  best-rate records — were unmodelled. Added the fields with decode/encode, the
+  Eternity-time update (`bestEternitiesPerMs = clampMin(gainedEternities /
+  max(33, thisEternity.realTime))`, `bestEPminReality = max(thisEternity.bestEPmin)`),
+  and the Reality resets. This gated a large swath of the new fixtures (+58 cells).
+
+### Verification
+- Fidelity grid: 362 → **420** cells. No early-game regression (284/312).
+- `cargo test -p ad-core --features serde`: 565 pass; fmt + clippy clean.

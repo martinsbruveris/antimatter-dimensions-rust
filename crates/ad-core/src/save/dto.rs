@@ -985,6 +985,13 @@ pub struct ThisRealityDTO {
     pub max_replicanti: Decimal,
     #[serde(rename = "maxDT", with = "break_infinity::serde_string")]
     pub max_dt: Decimal,
+    /// Best eternities/ms this reality (`bestEternitiesPerMs`).
+    #[serde(
+        rename = "bestEternitiesPerMs",
+        default,
+        with = "break_infinity::serde_string"
+    )]
+    pub best_eternities_per_ms: Decimal,
 }
 
 /// `player.records.bestReality` (modelled subset; the glyph-loadout snapshot
@@ -1044,6 +1051,13 @@ pub struct BestEternityDTO {
     pub time: f64,
     /// Fastest eternity by real time (ms).
     pub real_time: f64,
+    /// Best EP/min this reality (`bestEPminReality`).
+    #[serde(
+        rename = "bestEPminReality",
+        default,
+        with = "break_infinity::serde_string"
+    )]
+    pub best_ep_min_reality: Decimal,
 }
 
 /// `player.records.thisInfinity` (modelled subset).
@@ -1567,6 +1581,7 @@ impl GameState {
             best_eternity: BestEternity {
                 time_ms: dto.records.best_eternity.time,
                 real_time_ms: dto.records.best_eternity.real_time,
+                best_ep_min_reality: dto.records.best_eternity.best_ep_min_reality,
             },
             recent_eternities,
             this_reality: crate::records::ThisReality {
@@ -1577,6 +1592,7 @@ impl GameState {
                 max_ep: dto.records.this_reality.max_ep,
                 max_replicanti: dto.records.this_reality.max_replicanti,
                 max_dt: dto.records.this_reality.max_dt,
+                best_eternities_per_ms: dto.records.this_reality.best_eternities_per_ms,
             },
             best_reality: crate::records::BestReality {
                 time_ms: dto.records.best_reality.time,

@@ -157,6 +157,20 @@ impl GameState {
         self.records.best_reality.best_ep =
             self.records.best_reality.best_ep.max(&self.eternity_points);
         self.eternities += gained_eternities;
+        // `thisReality.bestEternitiesPerMs` / `bestEternity.bestEPminReality`, the
+        // Eternity analogues of `bigCrunchUpdateStatistics` (before the reset).
+        let divisor = self.records.this_eternity.real_time_ms.max(33.0);
+        let eternities_per_ms = gained_eternities / Decimal::from_float(divisor);
+        self.records.this_reality.best_eternities_per_ms = self
+            .records
+            .this_reality
+            .best_eternities_per_ms
+            .max(&eternities_per_ms);
+        self.records.best_eternity.best_ep_min_reality = self
+            .records
+            .best_eternity
+            .best_ep_min_reality
+            .max(&self.records.this_eternity.best_ep_min);
         self.eternity_unlocked = true;
         // `player.requirementChecks.reality.noEternities = false` (any
         // rewarded Eternity spoils Reality Upgrade 6/10's requirement).

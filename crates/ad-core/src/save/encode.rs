@@ -156,6 +156,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     records["bestEternity"]["time"] = json!(state.records.best_eternity.time_ms);
     records["bestEternity"]["realTime"] =
         json!(state.records.best_eternity.real_time_ms);
+    records["bestEternity"]["bestEPminReality"] =
+        decimal(&state.records.best_eternity.best_ep_min_reality);
     // Achievement bitmask, written back verbatim (one int per row).
     player["achievementBits"] = json!(state.achievement_bits);
     // Tab notification badges: the badged keys (a Set serialized as an array,
@@ -317,6 +319,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     records["thisReality"]["maxReplicanti"] =
         decimal(&state.records.this_reality.max_replicanti);
     records["thisReality"]["maxDT"] = decimal(&state.records.this_reality.max_dt);
+    records["thisReality"]["bestEternitiesPerMs"] =
+        decimal(&state.records.this_reality.best_eternities_per_ms);
     records["bestReality"]["time"] = json!(state.records.best_reality.time_ms);
     records["bestReality"]["realTime"] = json!(state.records.best_reality.real_time_ms);
     records["bestReality"]["RMmin"] = decimal(&state.records.best_reality.rm_min);

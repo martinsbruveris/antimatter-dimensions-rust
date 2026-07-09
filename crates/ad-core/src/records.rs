@@ -128,6 +128,10 @@ pub struct BestEternity {
     pub time_ms: f64,
     /// Fastest eternity by real time (ms). Same sentinel.
     pub real_time_ms: f64,
+    /// Best EP-per-minute rate over this Reality (`bestEternity.bestEPminReality`);
+    /// updated at each Eternity from `thisEternity.bestEPmin`, reset on Reality.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_ep_min_reality: Decimal,
 }
 
 impl BestEternity {
@@ -135,6 +139,7 @@ impl BestEternity {
         Self {
             time_ms: f64::MAX,
             real_time_ms: f64::MAX,
+            best_ep_min_reality: Decimal::ZERO,
         }
     }
 }
@@ -206,6 +211,10 @@ pub struct ThisReality {
     /// Peak Dilated Time this reality (`thisReality.maxDT`); feeds glyph
     /// level.
     pub max_dt: Decimal,
+    /// Best eternities-per-millisecond rate this reality
+    /// (`thisReality.bestEternitiesPerMs`), updated at each Eternity.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub best_eternities_per_ms: Decimal,
 }
 
 impl ThisReality {
@@ -218,6 +227,7 @@ impl ThisReality {
             max_ep: Decimal::ZERO,
             max_replicanti: Decimal::ZERO,
             max_dt: Decimal::ZERO,
+            best_eternities_per_ms: Decimal::ZERO,
         }
     }
 }

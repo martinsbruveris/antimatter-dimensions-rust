@@ -628,6 +628,7 @@ impl GameState {
         self.records.best_eternity = crate::records::BestEternity {
             time_ms: BEST_INFINITY_RESET_MS,
             real_time_ms: BEST_INFINITY_RESET_MS,
+            best_ep_min_reality: Decimal::ZERO,
         };
         self.eternity_upgrades = 0;
         self.total_tick_gained = 0;
