@@ -811,11 +811,11 @@ impl GameState {
                 && self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost)
                 && self.can_dim_boost()
                 && gate;
-            (
-                ready,
-                db_cfg.buy_max_interval * 1000.0 * speedup,
-                PRESTIGE_INFINITY,
-            )
+            // The buy-max interval (`buyMaxInterval` seconds) overrides
+            // `UpgradeableAutobuyerState.interval`, so the `autobuyerSpeed` Break
+            // Infinity Upgrade's halving does *not* apply here (unlike every other
+            // autobuyer interval).
+            (ready, db_cfg.buy_max_interval * 1000.0, PRESTIGE_INFINITY)
         } else {
             let limit_condition = !db_cfg.limit_dim_boosts
                 || (self.dim_boosts as f64) < db_cfg.max_dim_boosts;
@@ -1243,6 +1243,34 @@ mod tests {
         game.autobuyers.dimensions[0].timer_ms = 100.0;
         game.tick_autobuyers(150.0);
         assert_eq!(game.dimensions[0].bought, 2);
+    }
+
+    #[test]
+    fn buy_max_dimboost_interval_ignores_the_autobuyer_speed_upgrade() {
+        use crate::break_infinity_upgrades::BreakInfinityUpgrade;
+        let mut game = GameState::new();
+        game.broke_infinity = true;
+        game.break_infinity_upgrades |= BreakInfinityUpgrade::AutobuyMaxDimboosts.bit();
+        game.break_infinity_upgrades |= BreakInfinityUpgrade::AutobuyerSpeed.bit();
+        assert_eq!(game.break_infinity_autobuyer_speedup(), 0.5);
+
+        // A boostable state so only the interval gates the fire.
+        game.dim_boosts = 3; // a boost would unlock a new dimension → gate open
+        game.dimensions[6].amount = Decimal::from_float(100.0); // requirement met
+        game.autobuyers.dim_boost.is_bought = true;
+        game.autobuyers.dim_boost.is_active = true;
+        game.autobuyers.dim_boost_config.buy_max_interval = 1.0; // 1000 ms
+        game.autobuyers.dim_boost.timer_ms = 600.0; // past 500 (halved) but not 1000
+        for ab in game.autobuyers.dimensions.iter_mut() {
+            ab.is_active = false;
+        }
+        game.autobuyers.tickspeed.is_active = false;
+        game.autobuyers.galaxy.is_active = false;
+
+        game.tick_autobuyers(50.0);
+        // The buy-max interval stays 1000 ms (the `autobuyerSpeed` halving does not
+        // apply), so 600 ms hasn't elapsed and no boost fires.
+        assert_eq!(game.dim_boosts, 3);
     }
 
     #[test]

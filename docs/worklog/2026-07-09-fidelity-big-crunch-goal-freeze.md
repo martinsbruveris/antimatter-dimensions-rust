@@ -684,3 +684,30 @@ and made `reset_autobuyer_ticks` use the buy-max-aware Dim Boost `resetTickOn`
 - Fidelity grid: 584 → **602** cells (+18). `00129` @1 passes; `00154`'s structural
   divergence is gone (now FP-only). No regressions; round-trip clean.
 - `cargo test -p ad-core --features serde`: 571 pass; fmt + clippy clean.
+
+## Bug 21 — the buy-max Dim Boost interval must ignore `autobuyerSpeed`
+
+### Symptom
+`00241` (post-break, buy-max Dim Boost, `autobuyerSpeed` bought) boosted on tick 1
+where JS did not (`dimensionBoosts JS=4 Rust=5`), collapsing a mid-rebuild state
+(all dimensions 0, antimatter 5e25) back to zero instead of letting production
+rebuild it.
+
+### Diagnosis
+The buy-max interval was 1000 ms and the autobuyer's phase was 545 ms, so JS didn't
+fire. Rust applied the `autobuyerSpeed` Break Infinity Upgrade's ×0.5 to the
+interval (→ 500 ms), so 545 ms cleared it and Rust boosted. In the original the
+buy-max `interval` getter *overrides* `UpgradeableAutobuyerState.interval` and
+returns `buyMaxInterval` seconds directly — the `autobuyerSpeed` halving lives only
+in the overridden `super.interval`, so it does not apply in buy-max mode.
+
+### Fix
+Dropped the `speedup` factor from the buy-max Dim Boost branch's effective interval
+in `tick_autobuyers` (`buy_max_interval * 1000`, not `* speedup`).
+
+### Verification
+- `00241`'s spurious boost is gone: its tick-1 divergence drops from 43 fields to a
+  743-order production drift down the rebuilt AD chain (a separate issue — the
+  from-zero rebuild with astronomical multipliers still diverges ~124 orders/tier).
+  Grid holds at 602/1148 (no regressions; round-trip clean).
+- `cargo test -p ad-core --features serde`: 572 pass; fmt + clippy clean.
