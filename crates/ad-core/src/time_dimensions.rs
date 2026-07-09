@@ -334,20 +334,24 @@ impl GameState {
     /// Afterwards the shards are converted into free Tickspeed upgrades.
     pub(crate) fn tick_time_dimensions(&mut self, dt_ms: f64) {
         let dt_s = dt_ms / 1000.0;
-        let prod: [Decimal; TIME_DIMENSION_COUNT] =
-            std::array::from_fn(|t| self.td_production_per_second(t));
-
         let dt10 = Decimal::from_float(dt_s / 10.0);
+        // The original produces sequentially top-down, so each tier reads the
+        // amount the tier above just added — the chain compounds within the tick.
+        // Recompute the per-second rate inside the loop (like the AD/ID loops)
+        // rather than snapshotting every tier's rate up front.
         for tier in (1..TIME_DIMENSION_COUNT).rev() {
-            self.time_dimensions[tier - 1].amount += prod[tier] * dt10;
+            let produced = self.td_production_per_second(tier) * dt10;
+            self.time_dimensions[tier - 1].amount += produced;
         }
-        // EC7 (running): TD1 produces 8th Infinity Dimensions instead of
-        // Time Shards. EC7's reward does the same passively once completed.
+        // EC7 (running): the 1st Time Dimension produces 8th Infinity Dimensions
+        // instead of Time Shards, from its just-updated amount.
+        let td1_prod = self.td_production_per_second(0);
         if self.ec_running(7) {
-            self.infinity_dimensions[7].amount += prod[0] * Decimal::from_float(dt_s);
+            self.infinity_dimensions[7].amount += td1_prod * Decimal::from_float(dt_s);
         } else {
-            self.time_shards += prod[0] * Decimal::from_float(dt_s);
+            self.time_shards += td1_prod * Decimal::from_float(dt_s);
         }
+        // EC7's reward does the same passively once completed.
         if self.ec_completed(7) {
             self.infinity_dimensions[7].amount +=
                 self.ec7_reward_id8_per_second() * Decimal::from_float(dt_s);
@@ -478,6 +482,33 @@ fn free_tickspeed_from_shards(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn time_dimension_production_compounds_within_a_tick() {
+        let mut game = GameState::new();
+        game.time_dimensions[0].bought = 10;
+        game.time_dimensions[1].bought = 10;
+        game.time_dimensions[0].amount = Decimal::from_float(1e20);
+        game.time_dimensions[1].amount = Decimal::from_float(1e20);
+
+        let dt_ms = 50.0;
+        let dt10 = Decimal::from_float(dt_ms / 1000.0 / 10.0);
+        let dt_s = Decimal::from_float(dt_ms / 1000.0);
+
+        // Replicate the sequential (compounding) chain by hand: TD2 feeds TD1, then
+        // the *updated* TD1 feeds Time Shards.
+        let mut reference = game.clone();
+        let td2 = reference.td_production_per_second(1) * dt10;
+        reference.time_dimensions[0].amount += td2;
+        let expected_shards =
+            reference.time_shards + reference.td_production_per_second(0) * dt_s;
+
+        game.tick_time_dimensions(dt_ms);
+
+        let ratio = game.time_shards.to_f64() / expected_shards.to_f64();
+        assert!((ratio - 1.0).abs() < 1e-12, "ratio={ratio}");
+        assert!(game.time_dimensions[0].amount > Decimal::from_float(1e20));
+    }
 
     #[test]
     fn td_costs_follow_the_original_curve() {
