@@ -53,7 +53,13 @@ impl GameState {
     /// scaling (past `galaxy_cost_scaling_start`) adds a quadratic term and
     /// Remote scaling (past 800) an exponential one (`Galaxy.requirementAt`).
     pub fn galaxy_requirement(&self) -> u64 {
-        let galaxies = self.galaxies as u64;
+        self.galaxy_requirement_at(self.galaxies as u64)
+    }
+
+    /// `Galaxy.requirementAt(galaxies)`: the required-tier dimension amount for
+    /// the next galaxy when owning `galaxies` of them (used by the buy-max
+    /// bulk search as well as the current-count requirement above).
+    fn galaxy_requirement_at(&self, galaxies: u64) -> u64 {
         let base_cost = if self.challenge_running(10) {
             NC10_FIRST_GALAXY_REQUIREMENT
         } else {
@@ -128,6 +134,54 @@ impl GameState {
         self.galaxies += 1;
         self.galaxy_reset();
         // GALAXY_RESET_AFTER achievements (27, …), after the galaxy increment.
+        self.check_galaxy_after_achievements();
+        true
+    }
+
+    /// `maxBuyGalaxies(limit)` (the `autobuyMaxGalaxies` milestone path): buy as
+    /// many galaxies as the required-tier dimension amount affords in one reset,
+    /// capped at `limit`. The requirement is non-cumulative — each galaxy only
+    /// needs the *standing* amount — so this searches for the highest count
+    /// whose last purchase is still covered (`Galaxy.buyableGalaxies`). Returns
+    /// whether any were bought.
+    pub fn max_buy_galaxies(&mut self, limit: u64) -> bool {
+        if self.galaxies as u64 >= limit || !self.can_buy_galaxy() {
+            return false;
+        }
+        let tier = self.galaxy_required_tier();
+        // The original rounds the dimension amount (`Math.round`).
+        let currency = self.dimensions[tier].amount.to_f64().round() as u64;
+        // Affordability of *reaching* `n` total galaxies: the last one costs
+        // `requirementAt(n - 1)`. `can_buy_galaxy` guarantees `owned + 1`.
+        let affordable =
+            |n: u64| -> bool { self.galaxy_requirement_at(n - 1) <= currency };
+        let owned = self.galaxies as u64;
+        let mut lo = owned + 1;
+        let mut hi = lo;
+        // Exponential growth then binary search (requirements grow at least
+        // linearly, so this stays logarithmic).
+        while hi < limit && affordable(hi) {
+            lo = hi;
+            hi = (hi.saturating_mul(2)).min(limit);
+        }
+        while lo + 1 < hi {
+            let mid = lo + (hi - lo) / 2;
+            if affordable(mid) {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        let new_galaxies = if affordable(hi) { hi } else { lo }.min(limit);
+        // Mirror `maxBuyGalaxies`: jump the count and run one reset with the
+        // single-purchase hooks (tutorial, achievements, the Pelle strike)
+        // firing exactly once. No affordability re-check — the search already
+        // established it, like the original's direct `galaxyReset()` call.
+        self.tutorial_turn_off(crate::tutorial::state::GALAXY);
+        self.check_galaxy_before_achievements();
+        self.pelle_trigger_strike(2);
+        self.galaxies = new_galaxies as u32;
+        self.galaxy_reset();
         self.check_galaxy_after_achievements();
         true
     }

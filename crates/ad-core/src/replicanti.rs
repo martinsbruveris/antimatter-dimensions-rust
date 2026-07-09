@@ -320,12 +320,36 @@ impl GameState {
             && self.replicanti.galaxies < self.replicanti_galaxy_max()
     }
 
-    /// Buy one Replicanti Galaxy (`replicantiGalaxy`): reset replicanti to 1, add an
-    /// RG, and perform an antimatter-galaxy-like soft reset with Dimension Boosts
-    /// cleared (`addReplicantiGalaxies`: `dimensionBoosts = 0` then
+    /// `Replicanti.galaxies.gain`: how many RGs one request buys — 1 normally;
+    /// with Achievement 126 (unlimited bulk) one per 1.8e308 of Replicanti in
+    /// log-space, capped by the remaining galaxy allowance.
+    fn replicanti_galaxy_gain(&self) -> u32 {
+        if !self.can_buy_replicanti_galaxy() {
+            return 0;
+        }
+        if self.achievement_unlocked(126) {
+            let max_gain = self.replicanti_galaxy_max() - self.replicanti.galaxies;
+            let by_amount = (self.replicanti.amount.log10()
+                / crate::cost_scaling::LOG10_NUMBER_MAX_VALUE)
+                .floor() as u32;
+            max_gain.min(by_amount)
+        } else {
+            1
+        }
+    }
+
+    /// Buy Replicanti Galaxies (`replicantiGalaxy`): reset replicanti to 1 (or,
+    /// with Achievement 126, divide by 1.8e308 per galaxy gained), add
+    /// [`replicanti_galaxy_gain`](Self::replicanti_galaxy_gain) RGs, and perform
+    /// an antimatter-galaxy-like soft reset with Dimension Boosts cleared
+    /// (`addReplicantiGalaxies`: `dimensionBoosts = 0` then
     /// `softReset(0, true, true)`). Returns whether it happened.
     pub fn buy_replicanti_galaxy(&mut self) -> bool {
         if !self.can_buy_replicanti_galaxy() {
+            return false;
+        }
+        let gain = self.replicanti_galaxy_gain();
+        if gain < 1 {
             return false;
         }
         self.replicanti.timer_ms = 0.0;
@@ -333,12 +357,13 @@ impl GameState {
         // instead of resetting them to 1 (not while Doomed).
         self.replicanti.amount = if self.achievement_unlocked(126) && !self.is_doomed() {
             Decimal::pow10(
-                self.replicanti.amount.log10() - Decimal::NUMBER_MAX_VALUE.log10(),
+                self.replicanti.amount.log10()
+                    - crate::cost_scaling::LOG10_NUMBER_MAX_VALUE * gain as f64,
             )
         } else {
             Decimal::ONE
         };
-        self.replicanti.galaxies += 1;
+        self.replicanti.galaxies += gain;
         // `player.requirementChecks.eternity.noRG = false` (spoils Reality
         // Upgrade 6's requirement for this eternity).
         self.requirement_checks.eternity_no_rg = false;

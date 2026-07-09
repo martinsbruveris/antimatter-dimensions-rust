@@ -782,6 +782,24 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     player["auto"]["sacrifice"]["isActive"] = json!(state.autobuyers.sacrifice_active);
     player["auto"]["sacrifice"]["multiplier"] =
         decimal(&state.autobuyers.sacrifice_multiplier);
+    // The milestone autobuyers: Infinity Dimensions (11–18 Eternities),
+    // Replicanti upgrades (50/60/80), and the Replicanti Galaxy toggle (3).
+    player["auto"]["infinityDims"]["isActive"] =
+        json!(state.autobuyers.infinity_dims_group_active);
+    for (i, ab) in state.autobuyers.infinity_dims.iter().enumerate() {
+        let entry = &mut player["auto"]["infinityDims"]["all"][i];
+        entry["isActive"] = json!(ab.is_active);
+        entry["lastTick"] = last_tick(ab.timer_ms);
+    }
+    player["auto"]["replicantiUpgrades"]["isActive"] =
+        json!(state.autobuyers.replicanti_upgrades_group_active);
+    for (i, ab) in state.autobuyers.replicanti_upgrades.iter().enumerate() {
+        let entry = &mut player["auto"]["replicantiUpgrades"]["all"][i];
+        entry["isActive"] = json!(ab.is_active);
+        entry["lastTick"] = last_tick(ab.timer_ms);
+    }
+    player["auto"]["replicantiGalaxies"]["isActive"] =
+        json!(state.autobuyers.replicanti_galaxies_active);
 }
 
 /// A `Decimal` as the JSON string the original stores (`Decimal::toJSON =

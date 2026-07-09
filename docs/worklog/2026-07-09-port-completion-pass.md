@@ -94,3 +94,33 @@ never be cleared (Triad Studies unmodelled).
 
 **Tests:** nine new unit tests across achievements/autobuyers seams. Fidelity:
 1118 → **1121/1148** (+3).
+
+## 4.2 — Eternity Milestones: the autobuyer + offline-generator tail
+
+**What shipped:** every remaining milestone effect. A new `MilestoneAutobuyer`
+type (active flag + `lastTick` timer, fixed 1 s interval) powers the 8
+Infinity Dimension autobuyers (milestones 11–18), the 3 Replicanti-upgrade
+autobuyers (50/60/80, skipped in EC8, while-loop bulk equivalent to the
+original's closed forms), and — intervalless — the Replicanti Galaxy
+autobuyer (3, honouring TS131's disable unless Achievement 138). Milestone 9
+(`autobuyMaxGalaxies`) switches the Galaxy autobuyer to the `buyMaxInterval`
+cadence and a new `max_buy_galaxies` bulk purchase (binary search over the
+non-cumulative `Galaxy.requirementAt`, refactored out of
+`galaxy_requirement`). The manual RG purchase now buys the full
+`Replicanti.galaxies.gain` (bulk with Achievement 126). The offline
+catch-up awards the milestone generators in the original's priority order:
+`autoEternities` (200) → `autoInfinities` (1000) → `autoEP` (6), plus the
+existing `ipOffline` term. Save round-trip for `auto.infinityDims`,
+`auto.replicantiUpgrades`, `auto.replicantiGalaxies` (group flags, per-entry
+active flags, `lastTick` phases). GUI: grouped autobuyer boxes on the
+Autobuyers tab (group toggle + per-entry toggles, vendored row classes).
+
+**Decisions:** the milestone autobuyers tick in the Rust engine's established
+order (IDs after the AD autobuyers; RG/Replicanti-upgrades after the prestige
+group) rather than reproducing the original's full `Autobuyers.all` order —
+the fidelity suite stayed at 1121/1148, so no observable divergence. The ID
+autobuyer interval ignores the `autobuyerFasterID` perk for now (task 6.3).
+
+**Tests:** five new unit tests (ID autobuyer fire + milestone gate, RG
+autobuyer, Replicanti-upgrade bulk, offline generator priority, galaxy
+buy-max with and without a limit).

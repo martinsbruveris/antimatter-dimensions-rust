@@ -87,7 +87,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | ID | Feature | Status | Notes |
 |---|---|---|---|
 | 4.1 | Eternity prestige | ✅ | EP formula, records, header/hotkey |
-| 4.2 | Eternity Milestones (27) | 🟡 | derived state + grid; effects for now-built systems land at their sites |
+| 4.2 | Eternity Milestones (27) | ✅ | all 27 wired: keeps, autoIC/autoUnlockID, the milestone autobuyers (IP-mult, RG, buy-max Galaxies, ID 1–8, Replicanti upgrades), and the offline generators (autoEP/autoEternities/autoInfinities) |
 | 4.3 | Time Dimensions (8) | ✅ | TD5–8 via dilation studies; free-tickspeed curve + softcap |
 | 4.4 | Time Studies (tree) | 🟡 | 58-study pre-dilation catalogue + tree UI; **some effects await Break-Infinity cost knobs** |
 | 4.5 | Eternity Challenges (12) | 🟡 | all 12 restrictions, 10/12 rewards. Deferred: **EC6/EC11 cost-growth rewards**, **EC8 budget**, EC1 Enslaved goal-1000 (needs `u16` widening) |

@@ -91,7 +91,13 @@ not the current state).
 - `src/eternity_milestones.rs` — Eternity Milestones (Feature 4.2): the
   27-milestone catalogue (pure derived state, `eternities >= threshold`);
   per-tick autoIC/autoUnlockID hooks; unlockAllND/replicantiNoReset are read at
-  their sites (state.rs / replicanti.rs), the reset keeps in eternity.rs.
+  their sites (state.rs / replicanti.rs), the reset keeps in eternity.rs. The
+  milestone autobuyers live in autobuyers.rs (`MilestoneAutobuyer`: ID 1–8 at
+  11–18 Eternities, Replicanti upgrades at 50/60/80, the RG toggle at 3, the
+  IP-mult buyer at 1, buy-max Galaxies at 9 via `max_buy_galaxies`); the
+  offline generators (`autoEP`/`autoEternities`/`autoInfinities`, via
+  `auto_eternities_available`/`auto_infinities_available`) fire from
+  `offline_currency_gain` (tick.rs).
 - `src/time_dimensions.rs` — Time Dimensions (Feature 4.3): 8 EP-bought tiers
   (TD5–8 await Dilation), the threshold/e6000 cost curve, production chain →
   Time Shards → free Tickspeed upgrades (`FreeTickspeed.fromShards` port with

@@ -156,6 +156,40 @@ impl GameState {
         }
     }
 
+    /// `Autobuyer.eternity.autoEternitiesAvailable` (the `autoEternities`
+    /// milestone, 200 Eternities): passive offline Eternity generation is on
+    /// when the Eternity autobuyer idles at an Amount goal of 0, outside any
+    /// challenge and not Dilated.
+    pub(crate) fn auto_eternities_available(&self) -> bool {
+        use crate::autobuyers::PrestigeAutobuyerMode;
+        self.eternity_milestone_reached(200)
+            && !self.in_any_antimatter_challenge()
+            && !self.any_ec_running()
+            && !self.dilation.active
+            && self.autobuyers.enabled
+            && self.autobuyers.eternity.is_active
+            && self.autobuyers.eternity.settings.mode == PrestigeAutobuyerMode::Amount
+            && self.autobuyers.eternity.settings.amount == break_infinity::Decimal::ZERO
+    }
+
+    /// `Autobuyer.bigCrunch.autoInfinitiesAvailable` (the `autoInfinities`
+    /// milestone, 1000 Eternities): passive offline Infinity generation is on
+    /// when the Big Crunch autobuyer runs a ≤5 s Time goal, the Eternity
+    /// autobuyer is off, and no challenge blocks it.
+    pub(crate) fn auto_infinities_available(&self) -> bool {
+        use crate::autobuyers::PrestigeAutobuyerMode;
+        self.eternity_milestone_reached(1000)
+            && !self.ec_running(4)
+            && !self.ec_running(12)
+            && !self.in_any_antimatter_challenge()
+            && self.autobuyers.enabled
+            && self.autobuyers.big_crunch.is_active
+            && !self.autobuyers.eternity.is_active
+            && self.autobuyers.big_crunch_settings.mode == PrestigeAutobuyerMode::Time
+            && self.autobuyers.big_crunch_settings.time <= 5.0
+            && !self.auto_eternities_available()
+    }
+
     /// `InfinityDimensions.tryAutoUnlock` (autoUnlockID milestone, 25
     /// eternities): unlock Infinity Dimensions as soon as they are reachable.
     pub(crate) fn try_auto_unlock_infinity_dimensions(&mut self) {
@@ -230,6 +264,98 @@ mod tests {
         assert!(game.dim_available_for_purchase(7));
         // Tickspeed no longer needs an AD2 purchase.
         assert!(game.tickspeed_unlocked());
+    }
+
+    #[test]
+    fn id_autobuyer_buys_max_on_its_interval() {
+        let mut game = GameState::new();
+        game.eternities = Decimal::from_float(11.0); // autobuyerID1
+        game.infinity_points = Decimal::new(1.0, 10);
+        game.infinity_dimensions[0].is_unlocked = true;
+        game.autobuyers.infinity_dims[0].is_active = true;
+        // Carry a full interval so the first tick fires.
+        game.autobuyers.infinity_dims[0].timer_ms = 1_000.0;
+        game.tick(50.0);
+        assert!(game.infinity_dimensions[0].base_amount > 0);
+
+        // Below the milestone nothing fires.
+        let mut locked = GameState::new();
+        locked.eternities = Decimal::from_float(10.0);
+        locked.infinity_points = Decimal::new(1.0, 10);
+        locked.infinity_dimensions[0].is_unlocked = true;
+        locked.autobuyers.infinity_dims[0].is_active = true;
+        locked.autobuyers.infinity_dims[0].timer_ms = 1_000.0;
+        locked.tick(50.0);
+        assert_eq!(locked.infinity_dimensions[0].base_amount, 0);
+    }
+
+    #[test]
+    fn replicanti_galaxy_autobuyer_fires_each_tick() {
+        let mut game = GameState::new();
+        game.eternities = Decimal::from_float(3.0); // autobuyerReplicantiGalaxy
+        game.replicanti.unlocked = true;
+        game.replicanti.amount = crate::REPLICANTI_CAP;
+        game.replicanti.galaxy_cap = 1;
+        game.autobuyers.replicanti_galaxies_active = true;
+        game.tick(50.0);
+        assert_eq!(game.replicanti.galaxies, 1);
+    }
+
+    #[test]
+    fn replicanti_upgrade_autobuyer_buys_to_the_max() {
+        let mut game = GameState::new();
+        game.eternities = Decimal::from_float(50.0); // chance autobuyer
+        game.replicanti.unlocked = true;
+        // Enough for exactly two chance upgrades (1e150 then 1e165).
+        game.infinity_points = Decimal::new(2.0, 165);
+        game.autobuyers.replicanti_upgrades[0].is_active = true;
+        game.autobuyers.replicanti_upgrades[0].timer_ms = 1_000.0;
+        game.tick(50.0);
+        let chance = (game.replicanti.chance * 100.0).round();
+        assert_eq!(chance, 3.0, "chance={}", game.replicanti.chance);
+    }
+
+    #[test]
+    fn offline_generators_follow_the_milestone_priority() {
+        // autoEternities (200): banks eternities at half the best rate.
+        let mut game = GameState::new();
+        game.eternities = Decimal::from_float(200.0);
+        game.autobuyers.eternity.is_active = true;
+        // Amount mode with goal 0 (the availability condition).
+        game.autobuyers.eternity.settings.amount = Decimal::ZERO;
+        game.records.this_reality.best_eternities_per_ms = Decimal::from_float(0.01);
+        game.offline_currency_gain(10_000.0);
+        // 0.01/ms × 10000 ms / 2 = 50.
+        assert_eq!(game.eternities, Decimal::from_float(250.0));
+
+        // autoEP (6): with no generator available, EP accrues at 25% of the
+        // best rate.
+        let mut ep_game = GameState::new();
+        ep_game.eternities = Decimal::from_float(6.0);
+        ep_game.records.best_eternity.best_ep_min_reality = Decimal::from_float(8.0);
+        ep_game.offline_currency_gain(120_000.0); // 2 minutes
+        assert_eq!(ep_game.eternity_points, Decimal::from_float(4.0));
+    }
+
+    #[test]
+    fn galaxy_autobuyer_buys_max_with_the_milestone() {
+        let mut game = GameState::new();
+        game.eternities = Decimal::from_float(9.0); // autobuyMaxGalaxies
+        game.dim_boosts = 4;
+        game.dimensions[7].bought = 1;
+        // Enough 8th dimensions for several galaxies (req 80, 140, 200 …).
+        game.dimensions[7].amount = Decimal::from_float(220.0);
+        assert!(game.max_buy_galaxies(u64::MAX));
+        assert_eq!(game.galaxies, 3);
+
+        // The limit clamps the bulk.
+        let mut capped = GameState::new();
+        capped.eternities = Decimal::from_float(9.0);
+        capped.dim_boosts = 4;
+        capped.dimensions[7].bought = 1;
+        capped.dimensions[7].amount = Decimal::from_float(220.0);
+        assert!(capped.max_buy_galaxies(2));
+        assert_eq!(capped.galaxies, 2);
     }
 
     #[test]

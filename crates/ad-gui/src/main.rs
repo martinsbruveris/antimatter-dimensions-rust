@@ -310,6 +310,32 @@ struct AutobuyersView {
     eternity: EternityAutobuyerView,
     /// The Reality autobuyer (Reality Upgrade 25).
     reality: RealityAutobuyerView,
+    /// The 8 Infinity Dimension autobuyers (milestones 11–18 Eternities).
+    infinity_dims: MilestoneAutobuyerGroupView,
+    /// The 3 Replicanti-upgrade autobuyers (milestones 50/60/80).
+    replicanti_upgrades: MilestoneAutobuyerGroupView,
+    /// The Replicanti Galaxy autobuyer (milestone 3): unlocked + active.
+    replicanti_galaxy_unlocked: bool,
+    replicanti_galaxy_active: bool,
+}
+
+/// A milestone-autobuyer group (ID / Replicanti-upgrade): the group toggle plus
+/// each entry's name, unlock state, and active flag.
+#[derive(Serialize)]
+struct MilestoneAutobuyerGroupView {
+    /// Whether any entry is unlocked (the box renders at all).
+    any_unlocked: bool,
+    /// The group `isActive` toggle.
+    group_active: bool,
+    entries: Vec<MilestoneAutobuyerEntryView>,
+}
+
+#[derive(Serialize)]
+struct MilestoneAutobuyerEntryView {
+    /// Short display name (e.g. "1st" or "Chance").
+    name: String,
+    is_unlocked: bool,
+    is_active: bool,
 }
 
 /// The goal settings of the Big Crunch / Eternity autobuyers (mode dropdown +
@@ -1805,6 +1831,33 @@ fn build_autobuyers_view(game: &GameState) -> AutobuyersView {
             glyph: game.autobuyers.reality.glyph,
             time: game.autobuyers.reality.time,
         },
+        infinity_dims: MilestoneAutobuyerGroupView {
+            any_unlocked: game.eternity_milestone_reached(11),
+            group_active: game.autobuyers.infinity_dims_group_active,
+            entries: (0..8)
+                .map(|tier| MilestoneAutobuyerEntryView {
+                    name: DIMENSION_ORDINALS[tier].to_string(),
+                    is_unlocked: game.eternity_milestone_reached(11 + tier as u64),
+                    is_active: game.autobuyers.infinity_dims[tier].is_active,
+                })
+                .collect(),
+        },
+        replicanti_upgrades: MilestoneAutobuyerGroupView {
+            any_unlocked: game.eternity_milestone_reached(50),
+            group_active: game.autobuyers.replicanti_upgrades_group_active,
+            entries: ["Chance", "Interval", "Max Galaxies"]
+                .iter()
+                .zip([50u64, 60, 80])
+                .enumerate()
+                .map(|(id, (&name, milestone))| MilestoneAutobuyerEntryView {
+                    name: name.to_string(),
+                    is_unlocked: game.eternity_milestone_reached(milestone),
+                    is_active: game.autobuyers.replicanti_upgrades[id].is_active,
+                })
+                .collect(),
+        },
+        replicanti_galaxy_unlocked: game.eternity_milestone_reached(3),
+        replicanti_galaxy_active: game.autobuyers.replicanti_galaxies_active,
     }
 }
 
@@ -3435,6 +3488,37 @@ fn upgrade_ad_autobuyer_bulk(tier: usize, state: State<'_, Mutex<GameState>>) {
     }
 }
 
+/// Toggle one of the milestone autobuyers (or its group flag). `kind` is
+/// "infinityDims" / "replicantiUpgrades" / "replicantiGalaxy"; `index` selects
+/// the entry, or `None` toggles the group flag.
+#[tauri::command]
+fn toggle_milestone_autobuyer(
+    kind: String,
+    index: Option<usize>,
+    state: State<'_, Mutex<GameState>>,
+) {
+    let mut game = state.lock().unwrap();
+    let a = &mut game.autobuyers;
+    match (kind.as_str(), index) {
+        ("infinityDims", Some(i)) if i < 8 => {
+            a.infinity_dims[i].is_active = !a.infinity_dims[i].is_active;
+        }
+        ("infinityDims", None) => {
+            a.infinity_dims_group_active = !a.infinity_dims_group_active;
+        }
+        ("replicantiUpgrades", Some(i)) if i < 3 => {
+            a.replicanti_upgrades[i].is_active = !a.replicanti_upgrades[i].is_active;
+        }
+        ("replicantiUpgrades", None) => {
+            a.replicanti_upgrades_group_active = !a.replicanti_upgrades_group_active;
+        }
+        ("replicantiGalaxy", _) => {
+            a.replicanti_galaxies_active = !a.replicanti_galaxies_active;
+        }
+        _ => {}
+    }
+}
+
 #[tauri::command]
 fn toggle_autobuyer(target: String, state: State<'_, Mutex<GameState>>) {
     // The Eternity / Reality autobuyers have no `AutobuyerTarget` (no
@@ -4660,6 +4744,7 @@ pub fn run() {
             set_all_autobuyers_active,
             upgrade_autobuyer_interval,
             upgrade_ad_autobuyer_bulk,
+            toggle_milestone_autobuyer,
             toggle_autobuyer,
             set_hotkeys,
             set_update_rate,

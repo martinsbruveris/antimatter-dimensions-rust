@@ -4,9 +4,11 @@ import { computed } from "vue";
 import { useGameStore } from "../../stores/game";
 import OpenHotkeysButton from "../options/OpenHotkeysButton.vue";
 import AutobuyerToggles from "./autobuyers/AutobuyerToggles.vue";
+import AutobuyerToggleFooter from "./autobuyers/AutobuyerToggleFooter.vue";
 import BigCrunchAutobuyerBox from "./autobuyers/BigCrunchAutobuyerBox.vue";
 import DimensionAutobuyerBox from "./autobuyers/DimensionAutobuyerBox.vue";
 import EternityAutobuyerBox from "./autobuyers/EternityAutobuyerBox.vue";
+import MilestoneAutobuyerGroupBox from "./autobuyers/MilestoneAutobuyerGroupBox.vue";
 import PrestigeAutobuyerBox from "./autobuyers/PrestigeAutobuyerBox.vue";
 import RealityAutobuyerBox from "./autobuyers/RealityAutobuyerBox.vue";
 import TickspeedAutobuyerBox from "./autobuyers/TickspeedAutobuyerBox.vue";
@@ -47,5 +49,27 @@ const auto = computed(() => game.snapshot.autobuyers);
     <BigCrunchAutobuyerBox />
     <EternityAutobuyerBox />
     <RealityAutobuyerBox />
+    <MilestoneAutobuyerGroupBox
+      :group="auto.infinity_dims"
+      kind="infinityDims"
+      name="Infinity Dimension"
+    />
+    <MilestoneAutobuyerGroupBox
+      :group="auto.replicanti_upgrades"
+      kind="replicantiUpgrades"
+      name="Replicanti Upgrade"
+    />
+    <span
+      v-if="auto.replicanti_galaxy_unlocked"
+      class="c-autobuyer-box-row"
+    >
+      <AutobuyerToggleFooter
+        :is-active="auto.replicanti_galaxy_active"
+        @toggle="game.toggleMilestoneAutobuyer('replicantiGalaxy')"
+      />
+      <div class="l-autobuyer-box__title">
+        Replicanti Galaxy<br>Autobuyer
+      </div>
+    </span>
   </div>
 </template>

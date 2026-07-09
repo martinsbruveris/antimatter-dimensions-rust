@@ -355,6 +355,60 @@ impl Autobuyer {
     }
 }
 
+/// Base interval of the milestone-unlocked interval autobuyers (Infinity
+/// Dimension / Replicanti-upgrade / Time Dimension): 1000 ms, before the
+/// perk/perk-shop speedups.
+pub const MILESTONE_AUTOBUYER_INTERVAL_MS: f64 = 1000.0;
+
+/// A milestone/upgrade-unlocked interval autobuyer (the original's
+/// `IntervaledAutobuyerState` without the interval-upgrade machinery): the
+/// Infinity Dimension (11–18 Eternities), Replicanti-upgrade (50/60/80), and
+/// Time Dimension (Reality Upgrade 13) autobuyers. Stores only the active flag
+/// and the elapsed-time timer phase (↔ the save's `lastTick`); the effective
+/// interval is derived at tick time.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct MilestoneAutobuyer {
+    /// Whether this autobuyer is toggled on (`isActive`).
+    pub is_active: bool,
+    /// Elapsed time since the last fire (the `timeSinceLastTick` form of the
+    /// save's `lastTick`; see [`Autobuyer::advance`]).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub timer_ms: f64,
+}
+
+impl MilestoneAutobuyer {
+    pub fn new() -> Self {
+        Self {
+            is_active: false,
+            timer_ms: 0.0,
+        }
+    }
+
+    /// Same semantics as [`Autobuyer::advance`]: test the carried phase before
+    /// adding this tick's `dt`, reset to 0 only on a fire.
+    fn advance(&mut self, dt_ms: f64, interval_ms: f64, ready: bool) -> bool {
+        let fired = ready && self.timer_ms >= interval_ms;
+        if fired {
+            self.timer_ms = 0.0;
+        }
+        self.timer_ms += dt_ms;
+        fired
+    }
+}
+
+impl Default for MilestoneAutobuyer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// serde default for the milestone-autobuyer arrays (all inactive).
+#[cfg(feature = "serde")]
+fn default_milestone_autobuyers<const N: usize>() -> [MilestoneAutobuyer; N] {
+    std::array::from_fn(|_| MilestoneAutobuyer::new())
+}
+
 /// Collection of all autobuyer state.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -406,6 +460,23 @@ pub struct AutobuyerState {
     /// flag. Unlocked by the 1-Eternity milestone; buys max `ipMult` every tick.
     #[cfg_attr(feature = "serde", serde(default))]
     pub ip_mult_buyer_active: bool,
+    /// The 8 Infinity Dimension autobuyers (`player.auto.infinityDims.all`,
+    /// milestones 11–18 Eternities) and their group flag (`.isActive`).
+    #[cfg_attr(feature = "serde", serde(default = "default_milestone_autobuyers"))]
+    pub infinity_dims: [MilestoneAutobuyer; 8],
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub infinity_dims_group_active: bool,
+    /// The 3 Replicanti-upgrade autobuyers (`player.auto.replicantiUpgrades.all`:
+    /// chance / interval / max galaxies, milestones 50/60/80) + group flag.
+    #[cfg_attr(feature = "serde", serde(default = "default_milestone_autobuyers"))]
+    pub replicanti_upgrades: [MilestoneAutobuyer; 3],
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub replicanti_upgrades_group_active: bool,
+    /// The Replicanti Galaxy autobuyer's active flag
+    /// (`player.auto.replicantiGalaxies.isActive`, milestone 3 Eternities). No
+    /// interval — it fires every tick.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub replicanti_galaxies_active: bool,
     /// The Dimensional Sacrifice autobuyer's active flag
     /// (`player.auto.sacrifice.isActive`).
     #[cfg_attr(feature = "serde", serde(default = "default_true"))]
@@ -472,6 +543,11 @@ impl AutobuyerState {
             eternity: EternityAutobuyer::new(),
             reality: RealityAutobuyer::new(),
             ip_mult_buyer_active: false,
+            infinity_dims: std::array::from_fn(|_| MilestoneAutobuyer::new()),
+            infinity_dims_group_active: true,
+            replicanti_upgrades: std::array::from_fn(|_| MilestoneAutobuyer::new()),
+            replicanti_upgrades_group_active: true,
+            replicanti_galaxies_active: false,
             sacrifice_active: true,
             sacrifice_multiplier: Decimal::from_float(2.0),
         }
@@ -742,6 +818,12 @@ impl GameState {
             self.autobuyers.dim_boost.timer_ms += dt_ms;
             self.autobuyers.galaxy.timer_ms += dt_ms;
             self.autobuyers.big_crunch.timer_ms += dt_ms;
+            for ab in &mut self.autobuyers.infinity_dims {
+                ab.timer_ms += dt_ms;
+            }
+            for ab in &mut self.autobuyers.replicanti_upgrades {
+                ab.timer_ms += dt_ms;
+            }
             return;
         }
 
@@ -785,6 +867,27 @@ impl GameState {
             }
         }
 
+        // Infinity Dimension autobuyers (`InfinityDimensionAutobuyerState`,
+        // milestones 11–18 Eternities): 1000 ms interval, buy max on fire. The
+        // readiness is `InfinityDimensions.canAutobuy()` (no EC2/EC10/EC8) plus
+        // the tier's `isAvailableForPurchase`.
+        let id_can_autobuy =
+            !self.ec_running(2) && !self.ec_running(10) && !self.ec_running(8);
+        for tier in 0..8 {
+            let ready = self.autobuyers.infinity_dims_group_active
+                && self.autobuyers.infinity_dims[tier].is_active
+                && self.eternity_milestone_reached(11 + tier as u64)
+                && id_can_autobuy
+                && self.id_available_for_purchase(tier);
+            if self.autobuyers.infinity_dims[tier].advance(
+                dt_ms,
+                MILESTONE_AUTOBUYER_INTERVAL_MS,
+                ready,
+            ) {
+                self.buy_max_infinity_dimension(tier);
+            }
+        }
+
         // Tickspeed autobuyer: `isAvailableForPurchase && isAffordable`.
         let ready = self.autobuyers.tickspeed.is_active
             && self.autobuyer_is_unlocked(AutobuyerTarget::Tickspeed)
@@ -820,9 +923,30 @@ impl GameState {
             && self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy)
             && self.can_buy_galaxy()
             && galaxy_limit_ok;
-        let eff = self.autobuyers.galaxy.interval_ms * speedup;
-        if self.autobuyers.galaxy.advance(dt_ms, eff, ready) && self.buy_galaxy() {
-            self.reset_autobuyer_ticks(PRESTIGE_ANTIMATTER_GALAXY, dt_ms);
+        // The `autobuyMaxGalaxies` milestone (9 Eternities) switches the
+        // interval to the player's `buyMaxInterval` (seconds; no
+        // `autobuyerSpeed` halving, like the Dim Boost buy-max branch) and the
+        // purchase to `maxBuyGalaxies`.
+        let galaxy_buy_max = self.eternity_milestone_reached(9);
+        let eff = if galaxy_buy_max {
+            self.autobuyers.galaxy_config.buy_max_interval * 1000.0
+        } else {
+            self.autobuyers.galaxy.interval_ms * speedup
+        };
+        if self.autobuyers.galaxy.advance(dt_ms, eff, ready) {
+            let limit = if self.autobuyers.galaxy_config.limit_galaxies {
+                self.autobuyers.galaxy_config.max_galaxies as u64
+            } else {
+                u64::MAX
+            };
+            let bought = if galaxy_buy_max {
+                self.max_buy_galaxies(limit)
+            } else {
+                self.buy_galaxy()
+            };
+            if bought {
+                self.reset_autobuyer_ticks(PRESTIGE_ANTIMATTER_GALAXY, dt_ms);
+            }
         }
 
         // Dim Boost gate (`DimBoostAutobuyerState.tick`). The `autobuyMaxDimboosts`
@@ -905,6 +1029,49 @@ impl GameState {
             self.buy_max_ip_mult();
         }
 
+        // The Replicanti Galaxy autobuyer (`ReplicantiGalaxyAutobuyerState`,
+        // milestone 3 Eternities): no interval; disabled under TS131 unless
+        // Achievement 138 removes that downside.
+        if self.autobuyers.replicanti_galaxies_active
+            && self.eternity_milestone_reached(3)
+            && (self.achievement_unlocked(138) || !self.time_study_bought(131))
+        {
+            self.buy_replicanti_galaxy();
+        }
+
+        // The Replicanti-upgrade autobuyers (`ReplicantiUpgradeAutobuyerState`,
+        // milestones 50/60/80): 1000 ms interval, skipped inside EC8; each fire
+        // buys its upgrade to the affordable maximum.
+        if !self.ec_running(8) {
+            for (id, milestone) in [50u64, 60, 80].into_iter().enumerate() {
+                let ready = self.autobuyers.replicanti_upgrades_group_active
+                    && self.autobuyers.replicanti_upgrades[id].is_active
+                    && self.eternity_milestone_reached(milestone);
+                if self.autobuyers.replicanti_upgrades[id].advance(
+                    dt_ms,
+                    MILESTONE_AUTOBUYER_INTERVAL_MS,
+                    ready,
+                ) {
+                    // `autobuyerTick`: repeated singles are cost-equivalent to
+                    // the original's closed-form bulk (cumulative charging).
+                    match id {
+                        0 => while self.buy_replicanti_chance() {},
+                        1 => while self.buy_replicanti_interval() {},
+                        _ => {
+                            while self.can_buy_replicanti_galaxy_cap()
+                                && self.buy_replicanti_galaxy_cap()
+                            {
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            for ab in &mut self.autobuyers.replicanti_upgrades {
+                ab.timer_ms += dt_ms;
+            }
+        }
+
         // Eternity and Reality autobuyers: no interval — their conditions are
         // checked every tick (plain `AutobuyerState`s in the original). The
         // prestige calls gate themselves on availability.
@@ -981,6 +1148,14 @@ impl GameState {
         }
         if event >= PRESTIGE_ETERNITY {
             self.autobuyers.big_crunch.timer_ms = rt;
+            // The ID and Replicanti-upgrade autobuyers reset on an Eternity
+            // (`resetTickOn = PRESTIGE_EVENT.ETERNITY`).
+            for ab in &mut self.autobuyers.infinity_dims {
+                ab.timer_ms = rt;
+            }
+            for ab in &mut self.autobuyers.replicanti_upgrades {
+                ab.timer_ms = rt;
+            }
         }
     }
 

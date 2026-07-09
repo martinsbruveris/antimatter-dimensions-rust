@@ -586,6 +586,11 @@ export const useGameStore = defineStore("game", {
     upgradeAdAutobuyerBulk(tier) {
       return invoke("upgrade_ad_autobuyer_bulk", { tier });
     },
+    // Toggle a milestone autobuyer ("infinityDims" / "replicantiUpgrades" /
+    // "replicantiGalaxy"); omit `index` to toggle the group flag.
+    toggleMilestoneAutobuyer(kind, index = null) {
+      return invoke("toggle_milestone_autobuyer", { kind, index });
+    },
     // Toggle a prestige autobuyer (Dim Boost / Galaxy / Big Crunch / Eternity /
     // Reality) on/off.
     toggleAutobuyer(target) {

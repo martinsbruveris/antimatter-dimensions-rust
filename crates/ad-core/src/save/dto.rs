@@ -1133,13 +1133,52 @@ pub struct AutoDTO {
     /// `player.auto.reality` (Reality Upgrade 25 autobuyer). The Effarig
     /// `shard` target is out of frontier and ignored.
     pub reality: RealityAutobuyerDTO,
-    /// `player.auto.ipMultBuyer` (the ×2-IP-upgrade autobuyer). Its behaviour is
-    /// unmodelled; only the active flag is preserved for round-trip fidelity.
+    /// `player.auto.ipMultBuyer` (the ×2-IP-upgrade autobuyer, 1-Eternity
+    /// milestone).
     #[serde(rename = "ipMultBuyer", default)]
     pub ip_mult_buyer: IsActiveDTO,
     /// `player.auto.sacrifice` (Dimensional Sacrifice autobuyer).
     #[serde(default)]
     pub sacrifice: SacrificeAutobuyerDTO,
+    /// `player.auto.infinityDims` (the 8 ID autobuyers, milestones 11–18).
+    #[serde(default)]
+    pub infinity_dims: MilestoneAutobuyerGroupDTO,
+    /// `player.auto.replicantiUpgrades` (3 autobuyers, milestones 50/60/80).
+    #[serde(default)]
+    pub replicanti_upgrades: MilestoneAutobuyerGroupDTO,
+    /// `player.auto.replicantiGalaxies` (the RG toggle, milestone 3).
+    #[serde(default)]
+    pub replicanti_galaxies: IsActiveDTO,
+}
+
+/// `player.auto.infinityDims` / `.replicantiUpgrades` (and later `.timeDims`):
+/// a group `isActive` flag over an array of `{ isActive, lastTick }` entries.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MilestoneAutobuyerGroupDTO {
+    #[serde(default = "bool_true")]
+    pub is_active: bool,
+    #[serde(default)]
+    pub all: Vec<MilestoneAutobuyerEntryDTO>,
+}
+
+impl Default for MilestoneAutobuyerGroupDTO {
+    fn default() -> Self {
+        Self {
+            is_active: true,
+            all: Vec::new(),
+        }
+    }
+}
+
+/// One milestone-autobuyer entry (`{ isActive, lastTick }`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MilestoneAutobuyerEntryDTO {
+    #[serde(default)]
+    pub is_active: bool,
+    #[serde(default)]
+    pub last_tick: f64,
 }
 
 /// `player.auto.sacrifice` — the Dimensional Sacrifice autobuyer: an `isActive`
@@ -2118,6 +2157,20 @@ impl GameState {
             time: dto.auto.reality.time,
         };
         autobuyers.ip_mult_buyer_active = dto.auto.ip_mult_buyer.is_active;
+        // The milestone autobuyers (ID / Replicanti-upgrade / RG): group flags,
+        // per-entry active flags, and the `lastTick` timer phases.
+        autobuyers.infinity_dims_group_active = dto.auto.infinity_dims.is_active;
+        for (i, src) in dto.auto.infinity_dims.all.iter().take(8).enumerate() {
+            autobuyers.infinity_dims[i].is_active = src.is_active;
+            autobuyers.infinity_dims[i].timer_ms = timer_from(src.last_tick);
+        }
+        autobuyers.replicanti_upgrades_group_active =
+            dto.auto.replicanti_upgrades.is_active;
+        for (i, src) in dto.auto.replicanti_upgrades.all.iter().take(3).enumerate() {
+            autobuyers.replicanti_upgrades[i].is_active = src.is_active;
+            autobuyers.replicanti_upgrades[i].timer_ms = timer_from(src.last_tick);
+        }
+        autobuyers.replicanti_galaxies_active = dto.auto.replicanti_galaxies.is_active;
 
         // Options: numeric values must be in range — we reject rather than clamp.
         // Notation is the one intentional exception: a name we don't model (the

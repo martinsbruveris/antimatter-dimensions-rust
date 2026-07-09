@@ -365,16 +365,19 @@ impl GameState {
         self.ticks(tick_size, ticks);
     }
 
-    /// The lump-sum currency award of the original's `simulateTime` (fired once
-    /// per offline catch-up, before the tick replay): the `ipOffline` Infinity
-    /// Upgrade grants 50% of the best IP/min without Max All over the whole away
-    /// interval (`bestIPMsWithoutMaxAll × ms / 2`). The GUI's chunked replay
-    /// calls this once before its first chunk;
-    /// [`simulate_offline`](Self::simulate_offline) calls it itself.
+    /// The lump-sum currency awards of the original's `simulateTime` (fired once
+    /// per offline catch-up, before the tick replay): the Eternity-milestone
+    /// offline generators — `autoEternities` (200) banks Eternities at half the
+    /// best rate, else `autoInfinities` (1000) banks Infinities, else `autoEP`
+    /// (6) grants 25% of the best EP/min — plus the `ipOffline` Infinity
+    /// Upgrade's 50%-of-best-IP/min award. The GUI's chunked replay calls this
+    /// once before its first chunk; [`simulate_offline`](Self::simulate_offline)
+    /// calls it itself.
     ///
-    /// The original gates this on `player.options.offlineProgress`; that toggle
-    /// is not modelled (offline progress is always on here — the 8.8 gap in the
-    /// port audit).
+    /// The original gates these on `player.options.offlineProgress` (not
+    /// modelled — the 8.8 gap) and scales the milestone rewards by the game
+    /// speed; our single `away_ms` is the replayed game-time interval, which
+    /// carries that scaling for the tick replay already.
     pub fn offline_currency_gain(&mut self, away_ms: f64) {
         // 35: be offline for over 6 hours (the original checks `Date.now() -
         // lastUpdate` on the first tick back; the replayed away interval is the
@@ -382,7 +385,35 @@ impl GameState {
         if away_ms >= 21_600_000.0 {
             self.unlock_achievement(35);
         }
-        if self.ip_offline_bought && away_ms > 0.0 {
+        if away_ms <= 0.0 {
+            return;
+        }
+        // `getEternitiedMilestoneReward` / `getInfinitiedMilestoneReward` /
+        // `getOfflineEPGain`, applied in the original's if/else-if order.
+        let eternitied = if self.auto_eternities_available() {
+            (self.records.this_reality.best_eternities_per_ms
+                * Decimal::from_float(away_ms / 2.0))
+            .floor()
+        } else {
+            Decimal::ZERO
+        };
+        let infinitied = if self.auto_infinities_available() {
+            (self.records.this_eternity.best_infinities_per_ms
+                * Decimal::from_float(away_ms / 2.0))
+            .floor()
+        } else {
+            Decimal::ZERO
+        };
+        if eternitied > Decimal::ZERO {
+            self.eternities += eternitied;
+        } else if infinitied > Decimal::ZERO {
+            self.infinities += infinitied;
+        } else if self.eternity_milestone_reached(6) {
+            // `autoEP`: 25% of the best EP/min (bestEPminReality) while away.
+            self.eternity_points += self.records.best_eternity.best_ep_min_reality
+                * Decimal::from_float(away_ms / 60_000.0 / 4.0);
+        }
+        if self.ip_offline_bought {
             self.infinity_points +=
                 self.records.this_eternity.best_ip_ms_without_max_all
                     * Decimal::from_float(away_ms / 2.0);
