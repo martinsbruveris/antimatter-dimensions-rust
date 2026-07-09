@@ -45,6 +45,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Ran the Galaxy autobuyer before the Dim Boost one (original `singleComplex` order) so a galaxy pre-empts a boost at a shared threshold, and made `resetTickOn` buy-max-aware (`INFINITY`, not `ANTIMATTER_GALAXY`) — `00129`/`00154` | 602/1148 |
 | 2026-07-09 | (pending) | Big Crunch now resets `thisInfinity` selectively (keeps `bestIPminVal`, zeroes `bestIPmin` only at the goal) and runs `resetRequirements("infinity")` (clears `maxAll`/`noSacrifice`/`noAD8`) — `00124` | 606/1148 |
 | 2026-07-09 | (pending) | Applied the Infinity Challenge 8 completion reward to AD 2–7 (`(AD1×AD8)^0.02`) and made Infinity Dimension production compound within a tick (was snapshotting all rates up front); together they cut `00241`'s rebuild divergence from ~743 orders to ~1e-4/tier | 607/1148 |
+| 2026-07-09 | (pending) | Advanced the records time (`thisInfinity.time` etc.) before Dimension production instead of at the end of the tick, matching the game loop; time-based AD achievement multipliers (56/76/91/92) and IC8 decay now read this tick's time (fixed the general ~2e-4/tier AD-chain drift) | 706/1148 |
 
 ## Method
 

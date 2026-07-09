@@ -820,3 +820,33 @@ serde default of 0 for older saves).
   general ~2e-4/tier AD-chain floating-point drift). Grid holds at 607/1148;
   round-trip clean (the new `timer` field round-trips).
 - `cargo test -p ad-core --features serde`: 576 pass; fmt + clippy clean.
+
+## Bug 26 — records time was advanced *after* production, not before (the ~2e-4/tier drift)
+
+### Symptom
+Most surviving fixtures failed by a small, per-tier-compounding AD-chain drift
+(~2e-4/tier). On `00241` every per-tier multiplier, tickspeed, and infinity power
+matched JS to ~13–15 figures, yet the AD chain still drifted.
+
+### Diagnosis
+Isolating the AD production proved it was *correct* (running it on JS's exact pre-AD
+state reproduced JS's result to ~1e-13), so the divergence was upstream. Diffing
+Rust's own pre-AD state against JS's intermediate, everything matched **except the
+records time**: Rust's `thisInfinity.time_ms` was 50 ms (one tick) behind JS's.
+Rust advanced the time records at the *end* of `tick`, but the original advances
+them (`records.thisInfinity.time += diff`, etc.) *before* the Dimension ticks. The
+time-based Antimatter Dimension achievement multipliers (56/76/91/92) and Infinity
+Challenge 8's decay therefore read last tick's time — for `00241`, Achievement 56's
+`6/(min+3)` boost came out 2.71e-4 high, an all-tier factor that compounded down the
+AD chain.
+
+### Fix
+Moved the records time advance (`total`/`realTimePlayed`, `thisInfinity`/
+`thisEternity`/`thisReality` game + real time) to run right after the autobuyers and
+before Time/Infinity/Antimatter Dimension production, matching the game loop.
+
+### Verification
+- Fidelity grid: 607 → **706** cells (+99). `00241` now passes @1 and @10.
+- `cargo test -p ad-core --features serde`: 578 pass; fmt + clippy clean; round-trip
+  clean (the autobuyer `lastTick` derivation is unaffected — the final
+  `realTimePlayed` is the same, and the autobuyers still run before the increment).

@@ -59,6 +59,22 @@ impl GameState {
         // Teresa's `epGen` unlock: passive EP from the peak EP/min.
         self.generate_teresa_ep(dt_ms);
 
+        // Advance the time records *before* production, matching the original game
+        // loop (`records.thisInfinity.time += diff`, etc. run before the Dimension
+        // ticks). Dimension production reads these — e.g. the time-based Antimatter
+        // Dimension achievement multipliers (56/76/91/92) and Infinity Challenge 8's
+        // decay — so they must see *this* tick's elapsed time, not last tick's.
+        // Pre-Infinity the game-speed multiplier is 1, so game and real time both
+        // advance by `dt_ms`. Runs during offline replay too, since that loops `tick`.
+        self.records.total_time_played_ms += dt_ms;
+        self.records.real_time_played_ms += real_dt_ms;
+        self.records.this_infinity.time_ms += dt_ms;
+        self.records.this_infinity.real_time_ms += real_dt_ms;
+        self.records.this_eternity.time_ms += dt_ms;
+        self.records.this_eternity.real_time_ms += real_dt_ms;
+        self.records.this_reality.time_ms += dt_ms;
+        self.records.this_reality.real_time_ms += real_dt_ms;
+
         // The original produces Time → Infinity → Antimatter Dimensions in that
         // order each tick (`game.js`), so Antimatter Dimension production reads the
         // Infinity Power (and free Tickspeed) generated *this* tick, not last tick.
@@ -167,18 +183,6 @@ impl GameState {
         // banking whole Infinities and carrying the fraction in `part_infinitied`.
         self.generate_passive_infinities(dt_ms);
 
-        // Advance time records. Pre-Infinity the game-speed multiplier is 1, so
-        // game time and real time both advance by `dt_ms` (mirrors the original's
-        // `records.totalTimePlayed += diff` in the game loop). Runs during offline
-        // replay too, since that loops `tick`.
-        self.records.total_time_played_ms += dt_ms;
-        self.records.real_time_played_ms += real_dt_ms;
-        self.records.this_infinity.time_ms += dt_ms;
-        self.records.this_infinity.real_time_ms += real_dt_ms;
-        self.records.this_eternity.time_ms += dt_ms;
-        self.records.this_eternity.real_time_ms += real_dt_ms;
-        self.records.this_reality.time_ms += dt_ms;
-        self.records.this_reality.real_time_ms += real_dt_ms;
         // Track the peak Infinity Points this eternity (the original updates
         // `thisEternity.maxIP` in the `Currency.infinityPoints` setter; the
         // in-tick IP source is the passive `ipGen` upgrade).
@@ -384,6 +388,34 @@ fn offline_tick_count(game_ms: f64, offline_ticks: u32) -> u32 {
 mod tests {
     use super::*;
     use crate::{AutobuyerMode, GameState};
+
+    #[test]
+    fn dimension_production_uses_this_ticks_advanced_time() {
+        use break_infinity::Decimal;
+        // Achievement 56 boosts Antimatter Dimensions in the first 3 minutes of an
+        // Infinity by `6/(min+3)`. Because the records time advances *before*
+        // production, a tick's antimatter gain must use the post-increment time.
+        let mut game = GameState::new();
+        game.broke_infinity = true; // no Big Crunch goal freeze
+        game.autobuyers.enabled = false; // no purchases perturbing the amounts
+        game.unlock_achievement(56);
+        game.records.this_infinity.time_ms = 60_000.0;
+        game.dimensions[0].bought = 10;
+        game.dimensions[0].amount = Decimal::from_float(1e10);
+
+        // Expected: production reads the time *after* this tick's +50 ms.
+        let mut reference = game.clone();
+        reference.records.this_infinity.time_ms = 60_050.0;
+        let expected_gain =
+            reference.dimension_production_per_second(0) * Decimal::from_float(0.05);
+
+        let before = game.antimatter;
+        game.tick(50.0);
+        let actual_gain = game.antimatter - before;
+
+        let ratio = actual_gain.to_f64() / expected_gain.to_f64();
+        assert!((ratio - 1.0).abs() < 1e-9, "ratio={ratio}");
+    }
 
     #[test]
     fn offline_tick_count_native_resolution_below_cap() {
