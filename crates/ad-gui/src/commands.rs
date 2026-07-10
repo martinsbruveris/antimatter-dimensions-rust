@@ -428,6 +428,12 @@ pub fn buy_enslaved_unlock(id: u8, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().buy_enslaved_unlock(id);
 }
 
+/// Buy a Tesseract (the Infinity-Point cost is a threshold, not spent).
+#[tauri::command]
+pub fn buy_tesseract(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().buy_tesseract();
+}
+
 /// Unlock V (the celestial) once all six main conditions are met.
 #[tauri::command]
 pub fn v_unlock_celestial(state: State<'_, Mutex<GameState>>) {

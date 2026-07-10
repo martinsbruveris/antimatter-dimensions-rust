@@ -33,3 +33,23 @@ EC1 study requirement.
   (`20000 + min(completions, isRunning ? 999 : 4) × 20000`).
 - Test: cap flips 5 ↔ 1000 with the run flag, goal scaling past 5, requirement
   scaling, banking an 11th completion. Fidelity: 1469/1476 (unchanged).
+
+### 1b. Tesseracts
+
+The ID-purchase-cap currency (`Tesseracts` in `enslaved.js`), previously
+state-only. Engine: the hardcoded `BASE_COSTS` table (`10^(1e7·base)` IP,
+a *threshold* — buying does not spend IP), `can_buy/buy_tesseract` gated on a
+completed Enslaved run, `effective_count` (scaled by the
+`tesseractMultFromSingularities` milestone, now implemented:
+`1 + log10(singularities)/80`), and `capIncrease` (`250e3 × 2^total`, times
+`boundless + 1` — the `boundless` alchemy effect accessor also landed:
+`amount/80000`). Wired: the ID purchase cap (`id_purchase_cap` is now
+instance-scoped and adds `floor(capIncrease)`), the `darkFromTesseracts`
+singularity milestone (`1.1^effectiveCount` into the common dark multiplier),
+and IU23's real effect (`floor(0.25 × effectiveCount²)` multiplying IU12's
+free Dim Boosts — the two stubs the audit called out). GUI: the vendored
+tesseract button on the Infinity Dimensions tab (visible once Enslaved is
+completed), `buy_tesseract` command + store action.
+
+Tests: cost table/threshold semantics, cap raise on `id_is_capped`, IU23
+scaling. Fidelity: 1469/1476 (unchanged).

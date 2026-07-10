@@ -216,7 +216,7 @@ impl GameState {
             IMPROVED_SINGULARITY_CAP => 11.0 + c,
             INTERVAL_COST_SCALING_REDUCTION => 1.0 - 0.03 * c,
             // Uniques.
-            DARK_FROM_TESSERACTS => 1.0, // tesseract count inert
+            DARK_FROM_TESSERACTS => 1.1f64.powf(self.tesseract_effective_count()),
             MULT_FROM_INFINITIED => {
                 (self.infinities_total().pos_log10() / 1000.0).max(1.0)
             }
@@ -248,7 +248,7 @@ impl GameState {
                     / 1000.0,
             ),
             INFINITIED_POW => 1.0 + (sing + 1.0).log10() / 300.0,
-            TESSERACT_MULT_FROM_SINGULARITIES => 1.0, // tesseract target inert
+            TESSERACT_MULT_FROM_SINGULARITIES => 1.0 + sing.log10() / 80.0,
             _ => default,
         }
     }

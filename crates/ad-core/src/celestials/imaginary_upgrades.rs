@@ -317,14 +317,19 @@ impl GameState {
 
     /// `DimBoost.imaginaryBoosts`: free Dimension Boosts from Imaginary
     /// Upgrade 12 (`2e4 × total rebuyables`), scaled by IU23's tesseract
-    /// effect (tesseracts are a 7.3 cut, so IU23 contributes ×1 here rather
-    /// than the original's tesseract-count formula). Zero inside Ra's Reality.
+    /// effect (`floor(0.25 × Tesseracts.effectiveCount²)`; ×1 while IU23 is
+    /// unbought, the original's `effectOrDefault(1)`). Zero inside Ra's Reality.
     pub(crate) fn imaginary_dim_boosts(&self) -> f64 {
         if self.celestials.ra.run || !self.imaginary_upgrade_bought(12) {
             return 0.0;
         }
         let rebuyables: u32 = self.reality.imaginary_rebuyables.iter().sum();
-        2e4 * rebuyables as f64
+        let iu23 = if self.imaginary_upgrade_bought(23) {
+            (0.25 * self.tesseract_effective_count().powi(2)).floor()
+        } else {
+            1.0
+        };
+        2e4 * rebuyables as f64 * iu23
     }
 
     /// `DimBoost.totalBoosts`: purchased boosts plus the imaginary free ones.

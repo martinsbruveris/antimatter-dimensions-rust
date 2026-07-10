@@ -189,6 +189,16 @@ impl GameState {
         }
     }
 
+    /// `boundless`: Tesseracts are `amount/80000` stronger; the multiplier on
+    /// `Tesseracts.capIncrease` is `effect + 1`.
+    pub(crate) fn alchemy_boundless(&self) -> f64 {
+        if self.alchemy_resource_unlocked(BOUNDLESS) {
+            self.amt(BOUNDLESS) / 80_000.0
+        } else {
+            0.0
+        }
+    }
+
     /// `replication`: replicanti-speed ×`10^(amount/1000)`.
     pub(crate) fn alchemy_replication_speed(&self) -> f64 {
         if self.alchemy_resource_unlocked(REPLICATION) {

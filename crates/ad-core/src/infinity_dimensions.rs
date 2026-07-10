@@ -85,12 +85,15 @@ impl InfinityDimension {
 }
 
 impl GameState {
-    /// The purchase cap for tier `t` (uncapped for tier 8).
-    fn id_purchase_cap(tier: usize) -> u64 {
+    /// The purchase cap for tier `t` (`purchaseCap`): the hardcap plus the
+    /// Tesseract cap increase (`InfinityDimensions.capIncrease`); uncapped for
+    /// tier 8.
+    fn id_purchase_cap(&self, tier: usize) -> u64 {
+        let increase = self.tesseract_cap_increase().floor() as u64;
         if tier == 7 {
             u64::MAX
         } else {
-            ID_PURCHASE_CAP
+            ID_PURCHASE_CAP + increase
         }
     }
 
@@ -100,7 +103,7 @@ impl GameState {
         let cap = if self.celestials.enslaved.run {
             1
         } else {
-            Self::id_purchase_cap(tier)
+            self.id_purchase_cap(tier)
         };
         self.infinity_dimensions[tier].purchases() >= cap
     }

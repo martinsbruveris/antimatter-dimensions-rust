@@ -12,6 +12,8 @@
 //! frontier), and the hints/progress/`feelEternity`/secret-study flavor are
 //! deferred (see the design doc).
 
+use break_infinity::Decimal;
+
 use crate::state::GameState;
 
 /// `Enslaved.glyphLevelMin` — inside the run glyph levels are boosted to at
@@ -33,6 +35,23 @@ pub const RUN_UNLOCK_PRICE_MS: f64 = 1e40 * MS_PER_YEAR;
 pub const TIME_CAP_MS: f64 = 1e300;
 /// `Enslaved.tachyonNerf` — the TP/DT nerf exponent inside the run.
 pub const TACHYON_NERF: f64 = 0.3;
+
+/// `Tesseracts.BASE_COSTS`: hardcoded log10-cost bases (the IP cost is
+/// `10^(1e7 × base)`) — 2, 4, 6 then successive ×2, ×4, ×6, …
+pub const TESSERACT_BASE_COSTS: [f64; 12] = [
+    2.0,
+    4.0,
+    6.0,
+    12.0,
+    48.0,
+    288.0,
+    2304.0,
+    23040.0,
+    276480.0,
+    3870720.0,
+    61931520.0,
+    1114767360.0,
+];
 
 /// `player.celestials.enslaved`.
 #[derive(Debug, Clone, Default)]
@@ -60,8 +79,8 @@ pub struct EnslavedState {
     /// Whether Enslaved's Reality has been completed (`completed`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub completed: bool,
-    /// Tesseracts bought (`tesseracts`). State only — the cost is unreachable
-    /// in frontier and the cap effect is deferred.
+    /// Tesseracts bought (`tesseracts`): the ID-purchase-cap currency, bought
+    /// with (unspent) Infinity Points once the run is completed.
     #[cfg_attr(feature = "serde", serde(default))]
     pub tesseracts: u32,
     /// A pending game-time release burst (ms), consumed by the next tick.
@@ -228,6 +247,71 @@ impl GameState {
     pub(crate) fn enslaved_complete_run(&mut self) {
         self.celestials.enslaved.completed = true;
     }
+
+    // --- Tesseracts ---------------------------------------------------------------
+
+    /// `Tesseracts.costs(index)`: `10^(1e7 × BASE_COSTS[index])`; past the
+    /// hardcoded table the cost is unreachable.
+    pub fn tesseract_cost(index: u32) -> Decimal {
+        match TESSERACT_BASE_COSTS.get(index as usize) {
+            Some(&base) => Decimal::pow10(1e7 * base),
+            None => Decimal::MAX_VALUE,
+        }
+    }
+
+    /// The IP cost of the next Tesseract (`nextCost`).
+    pub fn next_tesseract_cost(&self) -> Decimal {
+        Self::tesseract_cost(self.celestials.enslaved.tesseracts)
+    }
+
+    /// `Tesseracts.effectiveCount`: bought Tesseracts scaled by the
+    /// `tesseractMultFromSingularities` milestone (`bought × effect`, the
+    /// original's `bought + extra`).
+    pub fn tesseract_effective_count(&self) -> f64 {
+        let mult = self.singularity_milestone_effect_or(
+            crate::celestials::singularity::TESSERACT_MULT_FROM_SINGULARITIES,
+            1.0,
+        );
+        self.celestials.enslaved.tesseracts as f64 * mult
+    }
+
+    /// `Tesseracts.capIncrease(count)`: the extra Infinity-Dimension purchases —
+    /// `250e3 × 2^(count × milestoneMult)` (0 below one effective Tesseract),
+    /// times `boundless + 1`.
+    pub fn tesseract_cap_increase_at(&self, count: f64) -> f64 {
+        let mult = self.singularity_milestone_effect_or(
+            crate::celestials::singularity::TESSERACT_MULT_FROM_SINGULARITIES,
+            1.0,
+        );
+        let total = count * mult;
+        let base = if total < 1.0 {
+            0.0
+        } else {
+            250e3 * 2f64.powf(total)
+        };
+        base * (self.alchemy_boundless() + 1.0)
+    }
+
+    /// The current cap increase from bought Tesseracts.
+    pub fn tesseract_cap_increase(&self) -> f64 {
+        self.tesseract_cap_increase_at(self.celestials.enslaved.tesseracts as f64)
+    }
+
+    /// `Tesseracts.canBuyTesseract`: Enslaved's Reality completed and enough
+    /// Infinity Points (a threshold — buying does **not** spend them).
+    pub fn can_buy_tesseract(&self) -> bool {
+        self.celestials.enslaved.completed
+            && self.infinity_points >= self.next_tesseract_cost()
+    }
+
+    /// `Tesseracts.buyTesseract`. Returns whether one was bought.
+    pub fn buy_tesseract(&mut self) -> bool {
+        if !self.can_buy_tesseract() {
+            return false;
+        }
+        self.celestials.enslaved.tesseracts += 1;
+        true
+    }
 }
 
 #[cfg(test)]
@@ -305,5 +389,48 @@ mod tests {
         // Below the 5000 minimum, the effective level is raised.
         assert_eq!(game.adjusted_glyph_level(&glyph), 5000.0);
         let _ = Decimal::ONE; // silence unused import in some cfgs
+    }
+
+    /// Tesseracts: bought against an IP *threshold* (not spent), gated on a
+    /// completed run; the cap increase is `250e3 × 2^count`.
+    #[test]
+    fn tesseracts_buy_and_raise_the_id_cap() {
+        let mut game = GameState::new();
+        game.infinity_points = Decimal::pow10(2e7);
+        // Not completed yet: no purchase.
+        assert!(!game.can_buy_tesseract());
+        game.celestials.enslaved.completed = true;
+
+        // First cost is 10^(1e7×2).
+        assert_eq!(game.next_tesseract_cost(), Decimal::pow10(2e7));
+        assert!(game.buy_tesseract());
+        // IP is a threshold, not spent.
+        assert_eq!(game.infinity_points, Decimal::pow10(2e7));
+        assert_eq!(game.celestials.enslaved.tesseracts, 1);
+        // Next cost jumps to 10^(1e7×4); unaffordable now.
+        assert!(!game.can_buy_tesseract());
+
+        // Cap increase: 250e3 × 2^1 = 500e3 (no milestone/alchemy scaling).
+        assert_eq!(game.tesseract_cap_increase(), 500e3);
+        // The ID purchase cap reflects it: 2e6 + 5e5.
+        game.infinity_dimensions[0].base_amount = 2_499_999 * 10;
+        assert!(!game.id_is_capped(0));
+        game.infinity_dimensions[0].base_amount = 2_500_000 * 10;
+        assert!(game.id_is_capped(0));
+    }
+
+    /// IU23 multiplies the imaginary free Dim Boosts by
+    /// `floor(0.25 × effectiveCount²)`.
+    #[test]
+    fn iu23_scales_imaginary_boosts_by_tesseracts() {
+        let mut game = GameState::new();
+        game.reality.imaginary_upgrade_bits |= 1 << 12;
+        game.reality.imaginary_rebuyables[0] = 2;
+        assert_eq!(game.imaginary_dim_boosts(), 4e4);
+
+        game.reality.imaginary_upgrade_bits |= 1 << 23;
+        game.celestials.enslaved.tesseracts = 4;
+        // floor(0.25 × 16) = 4 → ×4.
+        assert_eq!(game.imaginary_dim_boosts(), 16e4);
     }
 }

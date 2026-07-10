@@ -88,6 +88,7 @@ pub fn run() {
             commands::toggle_store_game_time,
             commands::enslaved_release,
             commands::buy_enslaved_unlock,
+            commands::buy_tesseract,
             commands::v_unlock_celestial,
             commands::start_celestial_reality,
             commands::ra_level_up,

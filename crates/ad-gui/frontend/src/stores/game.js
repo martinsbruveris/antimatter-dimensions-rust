@@ -250,6 +250,11 @@ export const useGameStore = defineStore("game", {
       await invoke("buy_enslaved_unlock", { id });
       this.snapshot = await this.getState();
     },
+    // Buy a Tesseract (the IP cost is a threshold, not spent).
+    async buyTesseract() {
+      await invoke("buy_tesseract");
+      this.snapshot = await this.getState();
+    },
     async vUnlockCelestial() {
       await invoke("v_unlock_celestial");
       this.snapshot = await this.getState();

@@ -6,6 +6,7 @@ import { computed } from "vue";
 
 import { useGameStore } from "../../stores/game";
 import { formatDecimal, formatMultiplier } from "../../util/format";
+import { floatToNum } from "../../util/num";
 
 const game = useGameStore();
 const s = computed(() => game.snapshot);
@@ -35,6 +36,13 @@ function buy(d) {
 function buyMax(d) {
   if (d.is_unlocked) game.buyMaxInfinityDimension(d.tier);
 }
+
+// Tesseracts (once Enslaved's Reality is completed): "N" or "N + extra".
+const tesseractCountString = computed(() => {
+  const extra = id.value?.extra_tesseracts ?? 0;
+  const bought = id.value?.tesseracts ?? 0;
+  return extra > 0 ? `${bought} + ${extra.toFixed(2)}` : `${bought}`;
+});
 </script>
 
 <template>
@@ -57,6 +65,23 @@ function buyMax(d) {
     >
       Max all
     </button>
+
+    <div
+      v-if="id.tesseract_unlocked"
+      class="l-infinity-dim-tab__tesseract-container"
+    >
+      <button
+        class="c-infinity-dim-tab__tesseract-button"
+        :class="{
+          'c-infinity-dim-tab__tesseract-button--disabled': !id.can_buy_tesseract,
+        }"
+        @click="game.buyTesseract()"
+      >
+        <p>Buy a Tesseract ({{ tesseractCountString }})</p>
+        <p>Increase dimension caps by {{ formatDecimal(floatToNum(id.next_dim_cap_increase), 2) }}</p>
+        <p><b>Costs: {{ formatDecimal(id.tesseract_cost) }} IP</b></p>
+      </button>
+    </div>
 
     <div class="l-infinity-dims-grid">
       <div

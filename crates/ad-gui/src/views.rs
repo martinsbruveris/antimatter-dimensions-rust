@@ -195,6 +195,18 @@ struct InfinityDimensionsView {
     power_mult: Num,
     /// The 8 tiers (index 0 = 1st Infinity Dimension).
     dimensions: Vec<InfinityDimensionView>,
+    /// Whether the Tesseract button shows (Enslaved's Reality completed).
+    tesseract_unlocked: bool,
+    /// Whether the next Tesseract is affordable (`canBuyTesseract`).
+    can_buy_tesseract: bool,
+    /// IP threshold of the next Tesseract (a threshold — not spent).
+    tesseract_cost: Num,
+    /// Tesseracts bought.
+    tesseracts: u32,
+    /// Extra effective Tesseracts from the singularity milestone.
+    extra_tesseracts: f64,
+    /// The cap increase the next Tesseract would add (`nextTesseractIncrease`).
+    next_dim_cap_increase: f64,
 }
 
 /// Serializable view of one Infinity Dimension row.
@@ -2076,11 +2088,21 @@ fn build_infinity_dimensions_view(game: &GameState) -> InfinityDimensionsView {
             }
         })
         .collect();
+    let bought_tesseracts = game.celestials.enslaved.tesseracts;
     InfinityDimensionsView {
         unlocked: game.broke_infinity || game.infinity_dimensions[0].is_unlocked,
         power: num(&game.infinity_power),
         power_mult: num(&game.infinity_power_ad_multiplier()),
         dimensions,
+        tesseract_unlocked: game.celestials.enslaved.completed,
+        can_buy_tesseract: game.can_buy_tesseract(),
+        tesseract_cost: num(&game.next_tesseract_cost()),
+        tesseracts: bought_tesseracts,
+        extra_tesseracts: game.tesseract_effective_count()
+            - bought_tesseracts as f64,
+        next_dim_cap_increase: game
+            .tesseract_cap_increase_at(bought_tesseracts as f64 + 1.0)
+            - game.tesseract_cap_increase(),
     }
 }
 
