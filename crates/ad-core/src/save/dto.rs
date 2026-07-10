@@ -867,6 +867,9 @@ pub struct RealityChecksDTO {
     pub no_infinities: bool,
     pub no_eternities: bool,
     pub max_glyphs: i32,
+    /// Peak Time Study count this reality (`maxStudies`).
+    #[serde(rename = "maxStudies", default)]
+    pub max_studies: u32,
     #[serde(rename = "noAM", default = "bool_true")]
     pub no_am: bool,
     /// Peak 1st Infinity Dimension amount this reality (`maxID1`).
@@ -2040,7 +2043,7 @@ impl GameState {
             reality_no_eternities: dto.requirement_checks.reality.no_eternities,
             reality_max_glyphs: dto.requirement_checks.reality.max_glyphs,
             reality_max_id1: dto.requirement_checks.reality.max_id1,
-            reality_max_studies: 0,
+            reality_max_studies: dto.requirement_checks.reality.max_studies,
             reality_no_continuum: true,
             reality_no_purchased_tt: dto.requirement_checks.reality.no_purchased_tt,
             reality_no_triads: dto.requirement_checks.reality.no_triads,

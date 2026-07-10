@@ -143,6 +143,23 @@ and unfreezes for one explosive tick. The exact unfreeze tick depends on sub-ULP
 and JS's (f64-exponent) `Decimal`. Rust unfreezes ~2 ticks early. Not cleanly
 fixable without bit-matching `Decimal` at the boundary; left as a known residual.
 
+### 6. `requirementChecks.reality.maxStudies` dropped on decode (Eternity block)
+
+*Fixtures 301–368 (the new Eternity batch) @ all horizons.* Almost every new
+fixture diverged on exactly one field: `requirementChecks.reality.maxStudies`
+(JS=1, Rust=0, constant across horizons — a decode passthrough miss, not a tick
+bug). The DTO had no `maxStudies` field and the decoder hardcoded
+`reality_max_studies: 0`, so the saved peak-study count was lost on load (and the
+re-encoded save read back 0).
+
+Added `maxStudies` to `RealityChecksDTO`, wired it through the decoder, and emitted
+it in the encoder (alongside `maxGlyphs`). The engine already maintained
+`reality_max_studies` (bumped in `buy_time_study`); it simply wasn't persisted.
+
+**1199 → 1371 (+172).** The single most impactful fix of the session — it cleared
+the bulk of the new Eternity-batch failures.
+
 ## Tests
 - `cargo test -p ad-core --features serde` — all pass (578 + 22 + 29).
 - Fidelity grid re-run after each fix; deltas recorded above.
+- Final grid: **1371 / 1476**.

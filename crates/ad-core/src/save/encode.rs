@@ -467,6 +467,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         json!(state.requirement_checks.reality_no_eternities);
     player["requirementChecks"]["reality"]["maxGlyphs"] =
         json!(state.requirement_checks.reality_max_glyphs);
+    player["requirementChecks"]["reality"]["maxStudies"] =
+        json!(state.requirement_checks.reality_max_studies);
     player["requirementChecks"]["reality"]["maxID1"] =
         decimal(&state.requirement_checks.reality_max_id1);
     player["requirementChecks"]["reality"]["noPurchasedTT"] =
