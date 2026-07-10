@@ -1018,8 +1018,8 @@ struct EternityUpgradeView {
 struct EternityChallengeView {
     /// Challenge id (1..=12).
     id: u8,
-    /// Completions so far (0..=5).
-    completions: u8,
+    /// Completions so far (0..=5; EC1 in Enslaved allows up to 1000).
+    completions: u16,
     /// Whether this EC is currently running.
     is_running: bool,
     /// Whether its unlock study is currently held.

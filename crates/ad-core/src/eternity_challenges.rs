@@ -19,8 +19,13 @@ use crate::state::GameState;
 /// Number of Eternity Challenges.
 pub const ETERNITY_CHALLENGE_COUNT: usize = 12;
 
-/// Max completions per challenge.
-pub const EC_MAX_COMPLETIONS: u8 = 5;
+/// Base max completions per challenge. EC1 inside Enslaved's Reality raises
+/// this to 1000 (`maxCompletions`); use
+/// [`GameState::ec_max_completions`] for the dynamic per-challenge value.
+pub const EC_MAX_COMPLETIONS: u16 = 5;
+
+/// EC1's raised completion cap inside Enslaved's Reality.
+pub const EC1_ENSLAVED_MAX_COMPLETIONS: u16 = 1000;
 
 /// TT cost of each EC's unlock study (`ec-time-studies.js`), 1-indexed via
 /// [`ec_study_cost`].
@@ -100,11 +105,21 @@ pub fn ec_study_cost(id: u8) -> f64 {
 
 impl GameState {
     /// Completions of EC `id` (0 for an invalid id).
-    pub fn eternity_challenge_completions(&self, id: u8) -> u8 {
+    pub fn eternity_challenge_completions(&self, id: u8) -> u16 {
         if (1..=ETERNITY_CHALLENGE_COUNT as u8).contains(&id) {
             self.eternity_challenges[(id - 1) as usize]
         } else {
             0
+        }
+    }
+
+    /// Max completions of EC `id` (`maxCompletions`): 5, except EC1 inside
+    /// Enslaved's Reality, which allows 1000.
+    pub fn ec_max_completions(&self, id: u8) -> u16 {
+        if id == 1 && self.celestials.enslaved.run {
+            EC1_ENSLAVED_MAX_COMPLETIONS
+        } else {
+            EC_MAX_COMPLETIONS
         }
     }
 
@@ -124,11 +139,11 @@ impl GameState {
     }
 
     /// The IP goal of EC `id` at `completions` (`goalAtCompletions`).
-    pub fn ec_goal_at(&self, id: u8, completions: u8) -> Decimal {
+    pub fn ec_goal_at(&self, id: u8, completions: u16) -> Decimal {
         let i = (id - 1) as usize;
         EC_GOALS[i]
             * EC_GOAL_INCREASES[i].pow(&Decimal::from(
-                completions.min(EC_MAX_COMPLETIONS - 1) as u64,
+                completions.min(self.ec_max_completions(id) - 1) as u64,
             ))
     }
 
@@ -145,10 +160,17 @@ impl GameState {
     pub fn ec_secondary_requirement(&self, id: u8) -> Option<(Decimal, Decimal)> {
         let c = self.eternity_challenge_completions(id).min(4) as f64;
         let pair = match id {
-            1 => (
-                self.eternities,
-                Decimal::from_float(20_000.0 + c * 20_000.0),
-            ),
+            // EC1's requirement keeps scaling inside Enslaved's Reality
+            // (`Math.min(completions, Enslaved.isRunning ? 999 : 4)`).
+            1 => {
+                let c1 = self
+                    .eternity_challenge_completions(1)
+                    .min(self.ec_max_completions(1) - 1) as f64;
+                (
+                    self.eternities,
+                    Decimal::from_float(20_000.0 + c1 * 20_000.0),
+                )
+            }
             2 => (
                 Decimal::from(self.total_tick_gained),
                 Decimal::from_float(1300.0 + c * 150.0),
@@ -309,12 +331,12 @@ impl GameState {
     /// plus what this eternity's IP peak reaches — one completion, or several
     /// with the ECB perk (73). Mirrors [`Self::complete_running_ec`]'s loop
     /// without mutating; used by the Eternity autobuyer's in-EC condition.
-    pub fn ec_pending_total_completions(&self, id: u8) -> u8 {
+    pub fn ec_pending_total_completions(&self, id: u8) -> u16 {
         if id == 0 || id > ETERNITY_CHALLENGE_COUNT as u8 {
             return 0;
         }
         let mut total = self.eternity_challenges[(id - 1) as usize];
-        while total < EC_MAX_COMPLETIONS
+        while total < self.ec_max_completions(id)
             && self.records.this_eternity.max_ip >= self.ec_goal_at(id, total)
         {
             total += 1;
@@ -334,12 +356,12 @@ impl GameState {
             return;
         }
         let i = (id - 1) as usize;
-        self.eternity_challenges[i] =
-            (self.eternity_challenges[i] + 1).min(EC_MAX_COMPLETIONS);
+        let max = self.ec_max_completions(id);
+        self.eternity_challenges[i] = (self.eternity_challenges[i] + 1).min(max);
         // The ECB perk (73): keep banking completions while the higher
         // tiers' scaled goals are already met.
         if self.perk_bought(73) {
-            while self.eternity_challenges[i] < EC_MAX_COMPLETIONS
+            while self.eternity_challenges[i] < max
                 && self.records.this_eternity.max_ip >= self.ec_current_goal(id)
             {
                 self.eternity_challenges[i] += 1;
@@ -590,6 +612,39 @@ mod tests {
         assert!(!game.can_buy_ec_study(11));
         game.studies = vec![231, 71];
         assert!(game.can_buy_ec_study(11));
+    }
+
+    /// EC1's completion cap rises to 1000 inside Enslaved's Reality
+    /// (`maxCompletions`): the goal keeps scaling past 5 completions and the
+    /// study's secondary requirement keeps growing.
+    #[test]
+    fn ec1_allows_1000_completions_inside_enslaved() {
+        let mut game = GameState::new();
+        assert_eq!(game.ec_max_completions(1), 5);
+        game.celestials.enslaved.run = true;
+        assert_eq!(game.ec_max_completions(1), 1000);
+        // Other ECs keep the base cap.
+        assert_eq!(game.ec_max_completions(2), 5);
+
+        // The goal scales past the base cap: at 10 completions the goal is
+        // 1e1800 × (1e200)^10.
+        game.eternity_challenges[0] = 10;
+        assert_eq!(game.ec_current_goal(1), Decimal::new(1.0, 1800 + 200 * 10));
+        // Outside the run the goal clamps back to the base cap's scaling.
+        game.celestials.enslaved.run = false;
+        assert_eq!(game.ec_current_goal(1), Decimal::new(1.0, 1800 + 200 * 4));
+
+        // The secondary requirement keeps scaling inside the run:
+        // 20000 + completions × 20000.
+        game.celestials.enslaved.run = true;
+        let (_, required) = game.ec_secondary_requirement(1).unwrap();
+        assert_eq!(required, Decimal::from_float(20_000.0 + 10.0 * 20_000.0));
+
+        // Completions bank past 5 inside the run.
+        game.eternity_challenge_current = 1;
+        game.records.this_eternity.max_ip = Decimal::new(1.0, 4000);
+        game.complete_running_ec();
+        assert_eq!(game.eternity_challenge_completions(1), 11);
     }
 
     #[test]

@@ -305,7 +305,7 @@ pub struct GlyphUndoData {
     /// Unspent purchased-equivalent TT (`timeTheorems.max − totalPurchased`).
     pub tt: Decimal,
     /// EC completions at equip time.
-    pub ecs: [u8; 12],
+    pub ecs: [u16; 12],
     pub this_infinity_time: f64,
     pub this_infinity_real_time: f64,
     pub this_eternity_time: f64,
@@ -1893,7 +1893,7 @@ impl GameState {
 
     /// `Glyphs.saveUndo(targetSlot)`: snapshot the run state on equip.
     fn save_glyph_undo(&mut self, target_slot: u32) {
-        let mut ecs = [0u8; 12];
+        let mut ecs = [0u16; 12];
         ecs.copy_from_slice(&self.eternity_challenges);
         let data = GlyphUndoData {
             target_slot,

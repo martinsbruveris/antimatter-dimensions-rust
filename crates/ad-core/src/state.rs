@@ -310,7 +310,7 @@ pub struct GameState {
     pub eternity_challenge_unlocked: u8,
     /// Per-EC completion counts (`player.eternityChalls`, "eterc<N>" → count).
     #[cfg_attr(feature = "serde", serde(default))]
-    pub eternity_challenges: [u8; 12],
+    pub eternity_challenges: [u16; 12],
     /// The EC currently running (`player.challenge.eternity.current`, 0 = none).
     #[cfg_attr(feature = "serde", serde(default))]
     pub eternity_challenge_current: u8,

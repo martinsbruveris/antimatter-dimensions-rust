@@ -105,7 +105,7 @@ pub struct PlayerDTO {
     #[serde(with = "break_infinity::serde_string")]
     pub infinities_banked: Decimal,
     /// `player.eternityChalls` — per-EC completion counts (`"eterc<N>"` keys).
-    pub eternity_challs: std::collections::HashMap<String, u8>,
+    pub eternity_challs: std::collections::HashMap<String, u16>,
     /// EC8's per-run purchase budgets.
     pub eterc8ids: i32,
     pub eterc8repl: i32,
@@ -1791,15 +1791,21 @@ impl GameState {
         }
 
         // Per-EC completion counts from the `eternityChalls` map.
-        let mut eternity_challenges = [0u8; 12];
+        let mut eternity_challenges = [0u16; 12];
         for (key, count) in &dto.eternity_challs {
             if let Some(id) = key
                 .strip_prefix("eterc")
                 .and_then(|n| n.parse::<usize>().ok())
             {
                 if (1..=12).contains(&id) {
-                    eternity_challenges[id - 1] =
-                        (*count).min(crate::eternity_challenges::EC_MAX_COMPLETIONS);
+                    // EC1 may legitimately carry up to 1000 completions (banked
+                    // inside Enslaved's Reality); the rest cap at 5.
+                    let max = if id == 1 {
+                        crate::eternity_challenges::EC1_ENSLAVED_MAX_COMPLETIONS
+                    } else {
+                        crate::eternity_challenges::EC_MAX_COMPLETIONS
+                    };
+                    eternity_challenges[id - 1] = (*count).min(max);
                 }
             }
         }
@@ -1977,9 +1983,9 @@ impl GameState {
                     ep: u.ep,
                     tt: u.tt,
                     ecs: {
-                        let mut ecs = [0u8; 12];
+                        let mut ecs = [0u16; 12];
                         for (i, v) in u.ecs.iter().take(12).enumerate() {
-                            ecs[i] = v.max(0.0) as u8;
+                            ecs[i] = v.max(0.0) as u16;
                         }
                         ecs
                     },

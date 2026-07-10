@@ -211,7 +211,7 @@ pub struct AutomatorRuntime {
     /// `findLastPrestigeRecord` log text.
     pub last_prestige_gain: [Decimal; 3],
     /// EC completions banked by the last Eternity (`lastECCompletionCount`).
-    pub last_ec_completions: u8,
+    pub last_ec_completions: u16,
 }
 
 impl AutomatorData {
