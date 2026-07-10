@@ -520,6 +520,17 @@ impl GameState {
 
     /// Per-tick perk automation: EU auto-grants and the auto-unlock perks
     /// for dilation upgrades / Time Dimensions / the Reality study.
+    /// The autobuyer-speed perks (101 `autobuyerFasterID`, 102
+    /// `autobuyerFasterReplicanti`, 103 `autobuyerFasterDilation`): the
+    /// interval factor 1/3 when bought, else 1.
+    pub(crate) fn perk_autobuyer_faster(&self, id: u8) -> f64 {
+        if self.perk_bought(id) {
+            1.0 / 3.0
+        } else {
+            1.0
+        }
+    }
+
     pub(crate) fn tick_perk_effects(&mut self) {
         if self.reality.perks.is_empty() {
             return;

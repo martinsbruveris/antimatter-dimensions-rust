@@ -106,6 +106,13 @@ pub struct RealityState {
     /// totals. See `glyphs.rs`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub glyphs: crate::glyphs::GlyphState,
+    /// Whether EC auto-completion runs (`player.reality.autoEC`, default on).
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub auto_ec: bool,
+    /// Real ms accrued toward the next EC auto-completion
+    /// (`player.reality.lastAutoEC`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub last_auto_ec: f64,
     /// `player.reality.automator.forceUnlock`: the dev/testing flag that
     /// unlocks the Automator regardless of AP (see `automator_points.rs`).
     #[cfg_attr(feature = "serde", serde(default))]
@@ -147,6 +154,8 @@ impl RealityState {
             auto_achieve: true,
             gained_auto_achievements: true,
             glyphs: crate::glyphs::GlyphState::new(),
+            auto_ec: true,
+            last_auto_ec: 0.0,
             automator_force_unlock: false,
             imaginary_machines: Decimal::ZERO,
             max_im: Decimal::ZERO,
@@ -657,6 +666,8 @@ impl GameState {
         self.total_tick_gained = 0;
         self.eternity_challenges = [0; 12];
         self.eternity_challenge_unlocked = 0;
+        // `player.reality.lastAutoEC = 0` (the EC auto-completion accumulator).
+        self.reality.last_auto_ec = 0.0;
         self.eternity_challenge_current = 0;
         self.ec_requirement_bits = 0;
         self.respec = false;

@@ -407,6 +407,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     reality["reqLock"]["reality"] = json!(state.reality.req_lock);
     reality["respec"] = json!(state.reality.respec);
     reality["achTimer"] = json!(state.reality.ach_timer);
+    reality["autoEC"] = json!(state.reality.auto_ec);
+    reality["lastAutoEC"] = json!(state.reality.last_auto_ec);
     reality["autoAchieve"] = json!(state.reality.auto_achieve);
     reality["gainedAutoAchievements"] = json!(state.reality.gained_auto_achievements);
     write_automator(&mut reality["automator"], state);

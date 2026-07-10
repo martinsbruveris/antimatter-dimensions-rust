@@ -873,17 +873,17 @@ impl GameState {
         // the tier's `isAvailableForPurchase`.
         let id_can_autobuy =
             !self.ec_running(2) && !self.ec_running(10) && !self.ec_running(8);
+        // Interval: `1000 × Perk.autobuyerFasterID / PerkShopUpgrade.autoSpeed`.
+        let id_interval = MILESTONE_AUTOBUYER_INTERVAL_MS
+            * self.perk_autobuyer_faster(101)
+            / self.perk_shop_auto_speed_effect();
         for tier in 0..8 {
             let ready = self.autobuyers.infinity_dims_group_active
                 && self.autobuyers.infinity_dims[tier].is_active
                 && self.eternity_milestone_reached(11 + tier as u64)
                 && id_can_autobuy
                 && self.id_available_for_purchase(tier);
-            if self.autobuyers.infinity_dims[tier].advance(
-                dt_ms,
-                MILESTONE_AUTOBUYER_INTERVAL_MS,
-                ready,
-            ) {
+            if self.autobuyers.infinity_dims[tier].advance(dt_ms, id_interval, ready) {
                 self.buy_max_infinity_dimension(tier);
             }
         }
@@ -1043,13 +1043,17 @@ impl GameState {
         // milestones 50/60/80): 1000 ms interval, skipped inside EC8; each fire
         // buys its upgrade to the affordable maximum.
         if !self.ec_running(8) {
+            // `1000 × Perk.autobuyerFasterReplicanti / PerkShop autoSpeed`.
+            let repl_interval = MILESTONE_AUTOBUYER_INTERVAL_MS
+                * self.perk_autobuyer_faster(102)
+                / self.perk_shop_auto_speed_effect();
             for (id, milestone) in [50u64, 60, 80].into_iter().enumerate() {
                 let ready = self.autobuyers.replicanti_upgrades_group_active
                     && self.autobuyers.replicanti_upgrades[id].is_active
                     && self.eternity_milestone_reached(milestone);
                 if self.autobuyers.replicanti_upgrades[id].advance(
                     dt_ms,
-                    MILESTONE_AUTOBUYER_INTERVAL_MS,
+                    repl_interval,
                     ready,
                 ) {
                     // `autobuyerTick`: repeated singles are cost-equivalent to

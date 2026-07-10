@@ -294,6 +294,12 @@ impl GameState {
         entry.initial_cost * entry.increment.powi(self.perk_shop_bought(entry) as i32)
     }
 
+    /// The `autoSpeed` Perk-Shop effect: ×2 per purchase (divides the
+    /// milestone-autobuyer intervals).
+    pub fn perk_shop_auto_speed_effect(&self) -> f64 {
+        2f64.powi(self.perk_shop_bought(PERK_SHOP_AUTO_SPEED) as i32)
+    }
+
     /// Whether a Perk-Shop entry is capped (`cost == cost_cap`).
     pub fn perk_shop_capped(&self, entry: PerkShopEntry) -> bool {
         self.perk_shop_cost(entry) >= entry.cost_cap

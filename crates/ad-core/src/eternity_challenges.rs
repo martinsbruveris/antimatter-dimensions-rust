@@ -383,6 +383,55 @@ impl GameState {
         factor.clamp(1e-300, 1e300)
     }
 
+    /// `EternityChallenges.autoComplete.tick` (the PEC perks 60–62): accrue
+    /// real time toward the interval and complete the next
+    /// not-fully-completed EC sequentially. With Ra's `instantEC` unlock every
+    /// EC completes immediately. The RU12/IU15 requirement-lock guards are out
+    /// of frontier (armed req-locks are not modelled).
+    pub(crate) fn ec_auto_complete_tick(&mut self, real_dt_ms: f64) {
+        // `game.js`: the accumulator only advances with the first PEC perk.
+        if !self.perk_bought(60) {
+            return;
+        }
+        self.reality.last_auto_ec += real_dt_ms;
+        let interval = self.ec_auto_complete_interval_ms();
+        if !self.reality.auto_ec {
+            self.reality.last_auto_ec = self.reality.last_auto_ec.min(interval);
+            return;
+        }
+        if self.ra_unlock_active(crate::celestials::ra::RA_UNLOCK_INSTANT_EC) {
+            for slot in self.eternity_challenges.iter_mut() {
+                *slot = 5;
+            }
+            return;
+        }
+        while self.reality.last_auto_ec - interval > 0.0 {
+            let Some(next) = self.eternity_challenges.iter().position(|&c| c < 5) else {
+                break;
+            };
+            self.reality.last_auto_ec -= interval;
+            self.eternity_challenges[next] += 1;
+        }
+        self.reality.last_auto_ec %= interval;
+    }
+
+    /// The EC auto-completion interval: the best PEC perk (60/40/20 minutes),
+    /// divided by V's `fastAutoEC` reward (the achievement multiplier).
+    pub fn ec_auto_complete_interval_ms(&self) -> f64 {
+        if !self.perk_bought(60) {
+            return f64::INFINITY;
+        }
+        let mut minutes = 60.0;
+        if self.perk_bought(61) {
+            minutes = 40.0;
+        }
+        if self.perk_bought(62) {
+            minutes = 20.0;
+        }
+        minutes /= self.v_fast_auto_ec_effect();
+        minutes * 60_000.0
+    }
+
     /// EC3's reward: `+0.72` to the buy-10 multiplier per completion.
     pub(crate) fn ec3_buy_ten_bonus(&self) -> f64 {
         0.72 * self.eternity_challenge_completions(3) as f64
@@ -451,6 +500,44 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ec_autocomplete_completes_sequentially() {
+        let mut game = GameState::new();
+        // No PEC perk: nothing accrues or completes.
+        game.ec_auto_complete_tick(3_600_000.0);
+        assert_eq!(game.eternity_challenges, [0; 12]);
+
+        // PEC1 (60 min): 2.5 hours completes two ECs (the loop uses a strict
+        // `remaining − interval > 0`, like the original).
+        game.reality.perks.insert(60);
+        game.ec_auto_complete_tick(2.5 * 3_600_000.0);
+        assert_eq!(game.eternity_challenges[0], 2);
+
+        // PEC3 drops the interval to 20 minutes: the next hour (plus the 30
+        // min carried) completes EC1 (5) and rolls into EC2.
+        game.reality.perks.insert(62);
+        game.ec_auto_complete_tick(3_600_000.0);
+        assert_eq!(game.eternity_challenges[0], 5);
+        assert_eq!(game.eternity_challenges[1], 1);
+        // Another hour flows into EC2.
+        game.ec_auto_complete_tick(3_600_000.0);
+        assert_eq!(game.eternity_challenges[1], 4);
+
+        // Toggled off: the accumulator clamps at one interval, no completions.
+        game.reality.auto_ec = false;
+        game.ec_auto_complete_tick(3_600_000.0);
+        assert_eq!(game.eternity_challenges[1], 4);
+        assert!(game.reality.last_auto_ec <= game.ec_auto_complete_interval_ms());
+    }
+
+    #[test]
+    fn autobuyer_faster_perks_shrink_the_interval() {
+        let mut game = GameState::new();
+        assert_eq!(game.perk_autobuyer_faster(101), 1.0);
+        game.reality.perks.insert(101);
+        assert!((game.perk_autobuyer_faster(101) - 1.0 / 3.0).abs() < 1e-12);
+    }
     use crate::ETERNITY_GOAL;
 
     /// A state holding the studies feeding EC1's slot, with plenty of TT.

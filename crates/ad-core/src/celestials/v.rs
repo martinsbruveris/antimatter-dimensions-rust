@@ -193,6 +193,16 @@ impl GameState {
         }
     }
 
+    /// `VUnlocks.fastAutoEC`: the achievement multiplier divides the EC
+    /// auto-completion interval (1 until the reward is unlocked).
+    pub(crate) fn v_fast_auto_ec_effect(&self) -> f64 {
+        if self.celestials.v.unlock_bought(V_UNLOCK_FAST_AUTO_EC) {
+            self.achievement_power().to_f64()
+        } else {
+            1.0
+        }
+    }
+
     /// Whether V's achievements are "flipped" (Ra's `unlockHardV`) — enables the
     /// hard achievements once Ra's V pet reaches level 6.
     fn v_is_flipped(&self) -> bool {

@@ -210,3 +210,23 @@ Upgrade 7 (`+200`/purchase) alongside `effarigglyph` (both were hardcoded
 **Tests:** six new unit tests (pool gating, rm/glyph exclusion, creation +
 thresholds, basic-level boost, filter keep/reject/pick, undo restore).
 Fidelity steady at 1121/1148.
+
+## 6.3 — The deferred perks: EC auto-completion + autobuyer speed
+
+**What shipped:** the PEC chain (perks 60/61/62 — 60/40/20-minute EC
+auto-completion) as a faithful `EternityChallenges.autoComplete.tick` port:
+`reality.autoEC` + `lastAutoEC` state (save round-trip; reset on Reality),
+real-time accrual gated on PEC1, sequential completion of the next
+not-fully-completed EC, the strict `remaining − interval > 0` loop, V's
+`fastAutoEC` reward (achievement power divides the interval — a 7.4 deferred
+effect) and Ra's `instantEC` unlock (immediate full completion — a 7.5
+deferred bit). The autobuyer-speed perks 101/102 (×3 faster ID / Replicanti
+autobuyers) now scale the milestone-autobuyer intervals, together with
+Teresa's `autoSpeed` Perk-Shop effect (×2 per purchase). Perk 103 (dilation
+autobuyers) stays inert until those autobuyers exist (a Ra QoL cut). The
+RU12/IU15 requirement-lock guards on autocompletion are out of frontier
+(armed req-locks unmodelled).
+
+**Tests:** two new unit tests (sequential completion incl. the toggle-off
+clamp and interval changes; the interval factor). Fidelity steady at
+1121/1148.

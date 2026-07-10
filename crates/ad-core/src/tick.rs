@@ -230,6 +230,9 @@ impl GameState {
         // auto-unlock perks.
         self.tick_perk_effects();
 
+        // EC auto-completion (the PEC perks; real time).
+        self.ec_auto_complete_tick(real_dt_ms);
+
         // Reality Upgrades: per-tick requirement checks (RU11/14/20/21/22)
         // and the continuous RU11/RU14 generation.
         self.check_reality_upgrade_reqs_on_tick();

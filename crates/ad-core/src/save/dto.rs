@@ -593,6 +593,11 @@ pub struct RealityDTO {
     pub respec: bool,
     pub ach_timer: f64,
     pub auto_achieve: bool,
+    /// EC auto-completion toggle + accumulator (`autoEC` / `lastAutoEC`).
+    #[serde(default = "bool_true")]
+    pub auto_ec: bool,
+    #[serde(rename = "lastAutoEC", default)]
+    pub last_auto_ec: f64,
     pub gained_auto_achievements: bool,
     pub glyphs: GlyphsDTO,
     /// `player.reality.automator`: scripts, constants, editor + run state
@@ -1969,6 +1974,8 @@ impl GameState {
                 respec: dto.reality.respec,
                 ach_timer: dto.reality.ach_timer,
                 auto_achieve: dto.reality.auto_achieve,
+                auto_ec: dto.reality.auto_ec,
+                last_auto_ec: dto.reality.last_auto_ec,
                 gained_auto_achievements: dto.reality.gained_auto_achievements,
                 glyphs,
                 automator_force_unlock: dto.reality.automator.force_unlock,

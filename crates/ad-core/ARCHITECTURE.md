@@ -152,7 +152,10 @@ not the current state).
   graph, purchase (1 PP, adjacency), on-purchase side effects (START bumps,
   EU1, ACHNR), `starting_ip`/`starting_ep`, and `tick_perk_effects` (EU
   auto-grants, auto TT-gen/TD/Reality-study unlocks). Effects live at their
-  sites; the EC-autocomplete and autobuyer-speed perks are deferred.
+  sites; the PEC perks drive `ec_auto_complete_tick`
+  (eternity_challenges.rs, with V's `fastAutoEC` and Ra's `instantEC`), and
+  `perk_autobuyer_faster` shrinks the ID/Replicanti autobuyer intervals
+  (with Teresa's `autoSpeed` Perk-Shop effect).
 - `src/reality_upgrades.rs` — Reality Upgrades (Feature 6.4): 5 rebuyable
   Amplifiers (the original's hybrid linear cost scaling) + 20 one-time
   upgrades with `upgReqs` requirement tracking checked at the original's
