@@ -561,7 +561,17 @@ impl GameState {
 
         if let Some(u) = dim_pair_upgrade(tier) {
             if self.infinity_upgrade_bought(u) {
-                mult *= self.dim_infinity_mult();
+                // The `dim{18,27,36,45}mult` effect is part of the same
+                // `infinitiedMult` that Time Study 31 raises to the 4th power
+                // (`infinitiedMult.pow(TimeStudy(31).effectOrDefault(1))` in
+                // `antimatterDimensionCommonMultiplier`), so it must be powered up
+                // here too — not just the Break Infinity `infinitiedMult`.
+                let base = self.dim_infinity_mult();
+                mult *= if self.time_study_bought(31) {
+                    base.pow(&Decimal::from_float(4.0))
+                } else {
+                    base
+                };
             }
         }
 

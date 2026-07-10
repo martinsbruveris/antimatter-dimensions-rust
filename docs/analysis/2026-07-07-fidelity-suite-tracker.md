@@ -63,6 +63,7 @@ Commits that don't change the count are omitted.
 | 2026-07-10 | (pending) | Replicanti timer rollover reworked to use `Decimal` (mirrors the original's `Decimal.divide(...).minus(floor).times(interval)`) instead of an f64 form; fixes the slow-Replicanti timing class (`00284`). `00222` regresses to a residual `break_infinity`-vs-JS `Decimal` precision gap | 1199/1476 |
 | 2026-07-10 | (pending) | Decoded/encoded `requirementChecks.reality.maxStudies` (peak Time Study count this Reality); the DTO dropped it and hardcoded 0, so nearly every new Eternity-batch fixture (`00301`–`00368`) diverged on this one field | 1371/1476 |
 | 2026-07-10 | (pending) | Passive-IP `partInfinityPoint` now accumulates unconditionally when the `ipGen` Infinity Upgrade is bought (the too-slow/never-happened cutoff only zeroes the IP granted per gen, not the fraction); Rust froze it after an Eternity when `bestInfinity.time` is the reset sentinel (`00344`+) | 1395/1476 |
+| 2026-07-10 | (pending) | Applied Time Study 31's `^4` to the `dim{18,27,36,45}mult` infinity upgrades too, not just the Break Infinity `infinitiedMult` (the original raises their *product* to `TS31.effect`); the missing `dimInfinityMult³ ≈ 1e12`/tier had stalled AD production entirely on the Eternity batch (`00347`–`00368`) | 1469/1476 |
 
 ## Method
 

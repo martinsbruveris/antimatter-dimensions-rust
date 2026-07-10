@@ -176,7 +176,28 @@ Reordered to always accumulate `part_infinity_point` (guarded only by
 
 **1371 → 1395 (+24).**
 
+### 8. Time Study 31 not applied to the `dim{18,27,36,45}mult` upgrades
+
+*Fixtures 347–368 @ all horizons.* Rust's Antimatter Dimensions were frozen while
+JS's grew — a uniform ~1e12 shortfall in the per-tier production multiplier (so
+production stayed far below the amount and the dimensions barely moved). The
+original's `antimatterDimensionCommonMultiplier` builds
+`infinitiedMult = timesEffectsOf(AntimatterDimension(tier).infinityUpgrade,
+BreakInfinityUpgrade.infinitiedMult)` and then raises the **whole product** to
+`TimeStudy(31).effectOrDefault(1)` (=4 when bought). Rust applied the ^4 only to
+the Break Infinity `infinitiedMult`; the per-tier `dim{18,27,36,45}mult` effect
+(`infinities·0.2 + 1`, all four bought here) was applied *without* the power.
+
+With `dimInfinityMult ≈ 9561`, the missing `^4` costs `dimInfinityMult³ ≈ 1e12`
+per tier — enough to stall production entirely at these magnitudes.
+
+Raised `dim_infinity_mult()` to `^4` under TS31 in `infinity_upgrade_tier_mult`
+(`(a·b)^4 = a^4·b^4`, so powering it separately matches the original's combined
+power).
+
+**1395 → 1469 (+74).** Cleared the rest of the Eternity batch.
+
 ## Tests
 - `cargo test -p ad-core --features serde` — all pass (578 + 22 + 29).
 - Fidelity grid re-run after each fix; deltas recorded above.
-- Final grid: **1395 / 1476**.
+- Final grid: **1469 / 1476**.
