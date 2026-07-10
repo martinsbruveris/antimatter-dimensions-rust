@@ -89,6 +89,28 @@ round-trip). The dense trace is now clean over all 1000 ticks.
 **1187 → 1188 (+1).** (Fixtures 244/284 share the signature but diverge by more —
 a separate/larger cause remains.)
 
+### 4. Free Tickspeed upgrade applied to AD production one tick early
+
+*Fixture 244 @ 100/1000* (trace scan: first divergence tick 11). Same constant
+per-tier signature. The Time Dimensions produce Time Shards, which convert into
+free Tickspeed upgrades (`totalTickGained`); a fresh Eternity fixture with 0
+galaxies, so tickspeed is otherwise constant. `time_shards` and the grant tick
+matched JS exactly — the divergence was *when* within the tick the grant took
+effect.
+
+The original's loop order (game.js) is `TimeDimensions.tick` → `AntimatterDimensions
+.tick` → `totalTickGained += gain`: the free-tickspeed grant runs **after** AD
+production, so an upgrade earned from this tick's shards only speeds up AD from the
+*next* tick. Rust called `update_free_tickspeed()` inside `tick_time_dimensions`
+(before AD production), so the extra ×1.1245 tickspeed hit AD production one tick
+early — a ~0.05%/step drift that compounds through the whole AD chain.
+
+Moved `update_free_tickspeed()` out of `tick_time_dimensions` to right after the
+AD production block in `tick`. Time Dimension production already ran before it
+(so TD still reads the old `totalTickGained`), matching JS.
+
+**1188 → 1198 (+10).** (Fixture 284 still fails — a further cause remains.)
+
 ## Tests
 - `cargo test -p ad-core --features serde` — all pass (578 + 22 + 29).
 - Fidelity grid re-run after each fix; deltas recorded above.

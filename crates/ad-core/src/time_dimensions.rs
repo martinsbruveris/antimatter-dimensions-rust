@@ -367,8 +367,10 @@ impl GameState {
             self.infinity_dimensions[7].amount +=
                 self.ec7_reward_id8_per_second() * Decimal::from_float(dt_s);
         }
-
-        self.update_free_tickspeed();
+        // The free-tickspeed grant (`totalTickGained`) is *not* updated here: the
+        // original runs it after `AntimatterDimensions.tick` (game.js), so a
+        // free upgrade earned from this tick's Time Shards only speeds up
+        // Antimatter Dimensions from the *next* tick. See the call site in `tick`.
     }
 
     /// The free-tickspeed cost multiplier between upgrades (`FreeTickspeed
@@ -588,6 +590,9 @@ mod tests {
         // 1 TD1 × mult 4 for 10 s → 40 shards → floor... ceil(ln40/ln1.33) = 13.
         game.tick_time_dimensions(10_000.0);
         assert_eq!(game.time_shards, Decimal::from_float(40.0));
+        // The free-tickspeed grant is a separate step in the game loop (run after
+        // Antimatter Dimension production), so drive it explicitly here.
+        game.update_free_tickspeed();
         let expected = (40.0f64.ln() / 1.33f64.ln()).ceil() as u64;
         assert_eq!(game.total_tick_gained, expected);
 

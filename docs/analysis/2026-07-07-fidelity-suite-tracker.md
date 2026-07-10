@@ -59,6 +59,7 @@ Commits that don't change the count are omitted.
 | 2026-07-10 | (pending) | Galaxy autobuyer now resets its phase (`lastTick`) on every ready tick even at the `maxGalaxies` cap — its `canTick` never tested the limit (only `requestGalaxyReset` caps the purchase); also added the missing `Galaxy.canBeBought` past-the-Infinity-goal gate to `can_buy_galaxy` (`00072`–`00077`) | 1186/1476 |
 | 2026-07-10 | (pending) | Added the missing `Currency.antimatter.lt(Player.infinityLimit)` gate to `can_sacrifice`; inside IC2 (auto-sacrifice, goal `1e10500`) production freezes at the goal, so Rust was sacrificing (zeroing frozen dims) past the point the original stops (`00144`) | 1187/1476 |
 | 2026-07-10 | (pending) | Replicanti sub-interval timer now rolls over via `total − whole·interval` instead of `(ticks − whole)·interval`; the f64 `(total/interval)·interval` round-trip drifted the timer below the integer and missed an interval boundary by one tick, and the Replicanti→RG→tickspeed path spread that into a ~1e-3 per-tier AD-chain drift (`00222`) | 1188/1476 |
+| 2026-07-10 | (pending) | Free Tickspeed grant (`totalTickGained` from Time Shards) now runs after AD production, not inside `tick_time_dimensions` (before it); the original updates it after `AntimatterDimensions.tick`, so a tickspeed upgrade earned this tick only speeds AD from the next — Rust applied it a tick early, a ~0.05%/step AD-chain drift (`00244`) | 1198/1476 |
 
 ## Method
 

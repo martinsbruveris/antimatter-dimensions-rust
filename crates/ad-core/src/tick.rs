@@ -162,6 +162,12 @@ impl GameState {
             }
         }
 
+        // Convert this tick's Time Shards into free Tickspeed upgrades
+        // (`totalTickGained`). The original does this *after* `AntimatterDimensions
+        // .tick` (game.js), so an upgrade earned this tick only speeds up Antimatter
+        // Dimension production from the next tick — not this one.
+        self.update_free_tickspeed();
+
         // Replicanti grow (multiplying Infinity Dimensions on the next tick, matching
         // the original's `replicantiLoop` running after the dimension ticks).
         self.tick_replicanti(dt_ms);
