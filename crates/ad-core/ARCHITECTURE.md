@@ -157,10 +157,12 @@ not the current state).
   `perk_autobuyer_faster` shrinks the ID/Replicanti autobuyer intervals
   (with Teresa's `autoSpeed` Perk-Shop effect).
 - `src/reality_upgrades.rs` — Reality Upgrades (Feature 6.4): 5 rebuyable
-  Amplifiers (the original's hybrid linear cost scaling) + 20 one-time
-  upgrades with `upgReqs` requirement tracking checked at the original's
-  events, `applyRUPG10`, RU11/RU14 continuous generation. RU13/RU25
-  (autobuyer improvements) deferred.
+  Amplifiers (the original's hybrid linear cost scaling, with the Imaginary
+  Intensifier base adds and the `realityrow1pow` Reality-glyph power) + 20
+  one-time upgrades with `upgReqs` requirement tracking checked at the
+  original's events, `applyRUPG10`, RU11/RU14 continuous generation. RU13
+  unlocks the TD + EP-mult autobuyers and the Eternity autobuyer modes;
+  RU25 the Reality autobuyer (all in autobuyers.rs).
 - `src/black_holes.rs` — Black Holes (Feature 6.5): both holes' state machine
   (BH2's phase advances only while BH1 is active), interval/power/duration
   upgrades, pause + the 5 s unpause power ramp, and the game-speed factor

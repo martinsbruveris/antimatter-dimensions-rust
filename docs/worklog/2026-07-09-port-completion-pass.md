@@ -230,3 +230,17 @@ RU12/IU15 requirement-lock guards on autocompletion are out of frontier
 **Tests:** two new unit tests (sequential completion incl. the toggle-off
 clamp and interval changes; the interval factor). Fidelity steady at
 1121/1148.
+
+## 6.4 — RU13's autobuyer half (TD + EP-mult autobuyers)
+
+**What shipped:** the last missing Reality-Upgrade effects. RU13 now unlocks
+the 8 Time Dimension autobuyers (the `MilestoneAutobuyer` machinery from 4.2:
+1 s interval ÷ Teresa's `autoSpeed`, buy-max above 1e10 EP / singles below,
+timers reset on Reality) and the EP-multiplier autobuyer (intervalless:
+`applyEU2` then `buy_max_ep_mult`, not while Doomed — the original invokes it
+from the TD tick to order it before dimension purchases; our fixed tick order
+achieves the same). RU25's Reality autobuyer and RU13's Eternity-autobuyer
+modes were already wired. Save round-trip for `auto.timeDims` and
+`auto.epMultBuyer`; grouped Autobuyers-tab boxes for both.
+
+**Tests:** one new unit test (RU13 gates both autobuyers).

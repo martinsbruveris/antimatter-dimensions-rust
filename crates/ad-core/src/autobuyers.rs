@@ -477,6 +477,16 @@ pub struct AutobuyerState {
     /// interval — it fires every tick.
     #[cfg_attr(feature = "serde", serde(default))]
     pub replicanti_galaxies_active: bool,
+    /// The 8 Time Dimension autobuyers (`player.auto.timeDims.all`, Reality
+    /// Upgrade 13) and their group flag.
+    #[cfg_attr(feature = "serde", serde(default = "default_milestone_autobuyers"))]
+    pub time_dims: [MilestoneAutobuyer; 8],
+    #[cfg_attr(feature = "serde", serde(default = "default_true"))]
+    pub time_dims_group_active: bool,
+    /// The ×5-EP-upgrade autobuyer's active flag
+    /// (`player.auto.epMultBuyer.isActive`, Reality Upgrade 13).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub ep_mult_buyer_active: bool,
     /// The Dimensional Sacrifice autobuyer's active flag
     /// (`player.auto.sacrifice.isActive`).
     #[cfg_attr(feature = "serde", serde(default = "default_true"))]
@@ -548,6 +558,9 @@ impl AutobuyerState {
             replicanti_upgrades: std::array::from_fn(|_| MilestoneAutobuyer::new()),
             replicanti_upgrades_group_active: true,
             replicanti_galaxies_active: false,
+            time_dims: std::array::from_fn(|_| MilestoneAutobuyer::new()),
+            time_dims_group_active: true,
+            ep_mult_buyer_active: false,
             sacrifice_active: true,
             sacrifice_multiplier: Decimal::from_float(2.0),
         }
@@ -824,6 +837,9 @@ impl GameState {
             for ab in &mut self.autobuyers.replicanti_upgrades {
                 ab.timer_ms += dt_ms;
             }
+            for ab in &mut self.autobuyers.time_dims {
+                ab.timer_ms += dt_ms;
+            }
             return;
         }
 
@@ -1076,6 +1092,38 @@ impl GameState {
             }
         }
 
+        // The EP Multiplier autobuyer (`EPMultAutobuyerState`, Reality Upgrade
+        // 13): no interval — applies EU2 then buys max `epMult` every tick.
+        // The original also invokes it from each TD autobuyer tick so it runs
+        // before dimensions are bought; our fixed order achieves the same.
+        if self.autobuyers.ep_mult_buyer_active
+            && self.reality_upgrade_bought(13)
+            && !self.is_doomed()
+        {
+            self.apply_eu2();
+            self.buy_max_ep_mult();
+        }
+
+        // Time Dimension autobuyers (`TimeDimensionAutobuyerState`, Reality
+        // Upgrade 13): 1000 ms interval (÷ Teresa's autoSpeed); buy max above
+        // 1e10 EP, singles below.
+        let td_interval =
+            MILESTONE_AUTOBUYER_INTERVAL_MS / self.perk_shop_auto_speed_effect();
+        for tier in 0..8 {
+            let ready = self.autobuyers.time_dims_group_active
+                && self.autobuyers.time_dims[tier].is_active
+                && self.reality_upgrade_bought(13)
+                && !self.is_doomed()
+                && self.td_available_for_purchase(tier);
+            if self.autobuyers.time_dims[tier].advance(dt_ms, td_interval, ready) {
+                if self.eternity_points.exponent() >= 10 {
+                    self.buy_max_time_dimension(tier);
+                } else {
+                    self.buy_time_dimension(tier);
+                }
+            }
+        }
+
         // Eternity and Reality autobuyers: no interval — their conditions are
         // checked every tick (plain `AutobuyerState`s in the original). The
         // prestige calls gate themselves on availability.
@@ -1158,6 +1206,12 @@ impl GameState {
                 ab.timer_ms = rt;
             }
             for ab in &mut self.autobuyers.replicanti_upgrades {
+                ab.timer_ms = rt;
+            }
+        }
+        if event >= PRESTIGE_REALITY {
+            // The TD autobuyers reset on a Reality.
+            for ab in &mut self.autobuyers.time_dims {
                 ab.timer_ms = rt;
             }
         }

@@ -317,6 +317,11 @@ struct AutobuyersView {
     /// The Replicanti Galaxy autobuyer (milestone 3): unlocked + active.
     replicanti_galaxy_unlocked: bool,
     replicanti_galaxy_active: bool,
+    /// The 8 Time Dimension autobuyers (Reality Upgrade 13).
+    time_dims: MilestoneAutobuyerGroupView,
+    /// The EP-multiplier autobuyer (Reality Upgrade 13): unlocked + active.
+    ep_mult_unlocked: bool,
+    ep_mult_active: bool,
 }
 
 /// A milestone-autobuyer group (ID / Replicanti-upgrade): the group toggle plus
@@ -1894,6 +1899,19 @@ fn build_autobuyers_view(game: &GameState) -> AutobuyersView {
         },
         replicanti_galaxy_unlocked: game.eternity_milestone_reached(3),
         replicanti_galaxy_active: game.autobuyers.replicanti_galaxies_active,
+        time_dims: MilestoneAutobuyerGroupView {
+            any_unlocked: game.reality_upgrade_bought(13),
+            group_active: game.autobuyers.time_dims_group_active,
+            entries: (0..8)
+                .map(|tier| MilestoneAutobuyerEntryView {
+                    name: DIMENSION_ORDINALS[tier].to_string(),
+                    is_unlocked: game.reality_upgrade_bought(13),
+                    is_active: game.autobuyers.time_dims[tier].is_active,
+                })
+                .collect(),
+        },
+        ep_mult_unlocked: game.reality_upgrade_bought(13) && !game.is_doomed(),
+        ep_mult_active: game.autobuyers.ep_mult_buyer_active,
     }
 }
 
@@ -3670,6 +3688,15 @@ fn toggle_milestone_autobuyer(
         }
         ("replicantiGalaxy", _) => {
             a.replicanti_galaxies_active = !a.replicanti_galaxies_active;
+        }
+        ("timeDims", Some(i)) if i < 8 => {
+            a.time_dims[i].is_active = !a.time_dims[i].is_active;
+        }
+        ("timeDims", None) => {
+            a.time_dims_group_active = !a.time_dims_group_active;
+        }
+        ("epMult", _) => {
+            a.ep_mult_buyer_active = !a.ep_mult_buyer_active;
         }
         _ => {}
     }

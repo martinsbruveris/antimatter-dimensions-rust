@@ -55,10 +55,27 @@ const auto = computed(() => game.snapshot.autobuyers);
       name="Infinity Dimension"
     />
     <MilestoneAutobuyerGroupBox
+      :group="auto.time_dims"
+      kind="timeDims"
+      name="Time Dimension"
+    />
+    <MilestoneAutobuyerGroupBox
       :group="auto.replicanti_upgrades"
       kind="replicantiUpgrades"
       name="Replicanti Upgrade"
     />
+    <span
+      v-if="auto.ep_mult_unlocked"
+      class="c-autobuyer-box-row"
+    >
+      <AutobuyerToggleFooter
+        :is-active="auto.ep_mult_active"
+        @toggle="game.toggleMilestoneAutobuyer('epMult')"
+      />
+      <div class="l-autobuyer-box__title">
+        Eternity Point Multiplier<br>Autobuyer
+      </div>
+    </span>
     <span
       v-if="auto.replicanti_galaxy_unlocked"
       class="c-autobuyer-box-row"

@@ -8,12 +8,13 @@
 //! 10 unlockReplicanti) are applied in `eternity.rs::eternity_reset`; the
 //! per-tick effects (7 autoIC, 25 autoUnlockID) hook into `tick`; 30
 //! unlockAllND and 40 replicantiNoReset are read at their sites (dimension
-//! availability / tickspeed unlock / Replicanti-Galaxy purchase). Milestones
-//! 5 (`bigCrunchModes`) and 100 (`autobuyerEternity`) are wired in
-//! `autobuyers.rs` (Automator Stage A). The milestones that unlock autobuyer
-//! types we haven't built yet (1, 3, 9, 11–18, 50, 60, 80) and the offline
-//! generators (6, 200, 1000) display as reached but have no engine effect
-//! until those systems exist. See `docs/design/2026-07-04-eternity.md` §2.
+//! availability / tickspeed unlock / Replicanti-Galaxy purchase). The
+//! milestone autobuyers (1 IP-mult, 3 RG, 5 bigCrunchModes, 9 buy-max
+//! Galaxies, 11–18 ID, 50/60/80 Replicanti upgrades, 100 autobuyerEternity)
+//! are wired in `autobuyers.rs`; the offline generators (6 autoEP, 200
+//! autoEternities, 1000 autoInfinities — `auto_eternities_available` /
+//! `auto_infinities_available` below) fire from `offline_currency_gain`
+//! (tick.rs). See `docs/design/2026-07-04-eternity.md` §2.
 
 use crate::state::GameState;
 
@@ -356,6 +357,33 @@ mod tests {
         capped.dimensions[7].amount = Decimal::from_float(220.0);
         assert!(capped.max_buy_galaxies(2));
         assert_eq!(capped.galaxies, 2);
+    }
+
+    #[test]
+    fn td_and_ep_mult_autobuyers_run_with_ru13() {
+        let mut game = GameState::new();
+        game.reality.realities = 1;
+        game.reality.upgrade_bits |= 1 << 13;
+        game.eternity_unlocked = true;
+        game.eternity_points = Decimal::new(1.0, 20);
+        game.autobuyers.time_dims[0].is_active = true;
+        game.autobuyers.time_dims[0].timer_ms = 1_000.0;
+        game.autobuyers.ep_mult_buyer_active = true;
+        game.tick(50.0);
+        // The epMult buyer bought rebuyables and the TD autobuyer bought TDs.
+        assert!(game.epmult_upgrades > 0);
+        assert!(game.time_dimensions[0].bought > 0);
+
+        // Without RU13 neither runs.
+        let mut locked = GameState::new();
+        locked.eternity_unlocked = true;
+        locked.eternity_points = Decimal::new(1.0, 20);
+        locked.autobuyers.time_dims[0].is_active = true;
+        locked.autobuyers.time_dims[0].timer_ms = 1_000.0;
+        locked.autobuyers.ep_mult_buyer_active = true;
+        locked.tick(50.0);
+        assert_eq!(locked.epmult_upgrades, 0);
+        assert_eq!(locked.time_dimensions[0].bought, 0);
     }
 
     #[test]

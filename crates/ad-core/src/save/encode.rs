@@ -888,6 +888,15 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     }
     player["auto"]["replicantiGalaxies"]["isActive"] =
         json!(state.autobuyers.replicanti_galaxies_active);
+    player["auto"]["timeDims"]["isActive"] =
+        json!(state.autobuyers.time_dims_group_active);
+    for (i, ab) in state.autobuyers.time_dims.iter().enumerate() {
+        let entry = &mut player["auto"]["timeDims"]["all"][i];
+        entry["isActive"] = json!(ab.is_active);
+        entry["lastTick"] = last_tick(ab.timer_ms);
+    }
+    player["auto"]["epMultBuyer"]["isActive"] =
+        json!(state.autobuyers.ep_mult_buyer_active);
 }
 
 /// A `Decimal` as the JSON string the original stores (`Decimal::toJSON =

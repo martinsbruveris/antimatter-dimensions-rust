@@ -1238,6 +1238,12 @@ pub struct AutoDTO {
     /// `player.auto.replicantiGalaxies` (the RG toggle, milestone 3).
     #[serde(default)]
     pub replicanti_galaxies: IsActiveDTO,
+    /// `player.auto.timeDims` (the 8 TD autobuyers, Reality Upgrade 13).
+    #[serde(default)]
+    pub time_dims: MilestoneAutobuyerGroupDTO,
+    /// `player.auto.epMultBuyer` (the ×5-EP-upgrade autobuyer, RU13).
+    #[serde(rename = "epMultBuyer", default)]
+    pub ep_mult_buyer: IsActiveDTO,
 }
 
 /// `player.auto.infinityDims` / `.replicantiUpgrades` (and later `.timeDims`):
@@ -2359,6 +2365,12 @@ impl GameState {
             autobuyers.replicanti_upgrades[i].timer_ms = timer_from(src.last_tick);
         }
         autobuyers.replicanti_galaxies_active = dto.auto.replicanti_galaxies.is_active;
+        autobuyers.time_dims_group_active = dto.auto.time_dims.is_active;
+        for (i, src) in dto.auto.time_dims.all.iter().take(8).enumerate() {
+            autobuyers.time_dims[i].is_active = src.is_active;
+            autobuyers.time_dims[i].timer_ms = timer_from(src.last_tick);
+        }
+        autobuyers.ep_mult_buyer_active = dto.auto.ep_mult_buyer.is_active;
 
         // Options: numeric values must be in range — we reject rather than clamp.
         // Notation is the one intentional exception: a name we don't model (the

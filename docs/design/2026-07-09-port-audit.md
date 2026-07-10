@@ -107,7 +107,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 6.1 | Reality prestige | ✅ | RM formula, full reset, records, glyph-choice modal |
 | 6.2 | Glyphs | 🟡 | 5 base + Effarig + Reality types (generation rules, all 11 new effects, sacrifice/refinement), the auto-glyph filter (all 7 modes + 3 rejection modes), Teresa's undo. **Deferred: cosmetics, cursed glyphs (V), glyph sets** |
 | 6.3 | Perks (35) | ✅ | tree + all effects, incl. the PEC EC-auto-completion chain (with V's `fastAutoEC` + Ra's `instantEC`) and the autobuyer-speed perks (with Teresa's `autoSpeed`); the dilation-autobuyer speed perk is inert until those autobuyers exist (Ra QoL cut) |
-| 6.4 | Reality Upgrades (25) | 🟡 | all 25 upgrades. **Deferred: RU13/RU25 autobuyer halves** |
+| 6.4 | Reality Upgrades (25) | ✅ | all 25 upgrades incl. RU13's autobuyer half (the 8 TD autobuyers + the EP-mult autobuyer + Eternity modes) and RU25's Reality autobuyer |
 | 6.5 | Black Holes (2) | 🟡 | unlock, 3 upgrades/hole, phase machine, pause/unpause. **Deferred: inversion + auto-pause** |
 | 6.6 | Automator | ✅ | all 5 stages: lexer/parser/compiler/executor, text + block editor, templates, import/export |
 | 6.7 | Imaginary Machines & Upgrades (25) | 🟡 | **now built** (Lai'tela's gate). iM currency, 10 rebuyables + 15 one-time. Deferred: deep requirements (11–14, 22–24 never auto-satisfy), the `1e10000×iM`-in-maxRM save encoding (re-earned from cap) |
