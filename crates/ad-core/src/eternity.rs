@@ -116,6 +116,23 @@ impl GameState {
         gain
     }
 
+    /// Banked Infinities an Eternity would grant right now: `floor(infinities
+    /// × 0.05)` once from Achievement 131 and once more from TS191 (the
+    /// original's `new Decimal(0).plusEffectsOf(Achievement(131).effects
+    /// .bankedInfinitiesGain, TimeStudy(191))`). Also shown on the Statistics
+    /// tab as the projected bank.
+    pub fn banked_infinities_gain(&self) -> Decimal {
+        let five_percent = (self.infinities * Decimal::from_float(0.05)).floor();
+        let mut gain = Decimal::ZERO;
+        if self.achievement_unlocked(131) {
+            gain += five_percent;
+        }
+        if self.time_study_bought(191) {
+            gain += five_percent;
+        }
+        gain
+    }
+
     /// Perform an Eternity: award EP / an Eternity, then reset the whole
     /// Infinity layer. Returns whether it happened.
     pub fn eternity(&mut self) -> bool {
@@ -188,15 +205,9 @@ impl GameState {
                 self.eternity_challenge_completions(ec) - before;
         }
 
-        // Bank 5% of the Infinities on each Eternity, once from TS191 and once
-        // more from Achievement 131 (the original `plusEffectsOf` adds both).
-        let five_percent = (self.infinities * Decimal::from_float(0.05)).floor();
-        if self.achievement_unlocked(131) {
-            self.infinities_banked += five_percent;
-        }
-        if self.time_study_bought(191) {
-            self.infinities_banked += five_percent;
-        }
+        // Bank a share of the Infinities on each Eternity (5% each from TS191
+        // and Achievement 131; see `banked_infinities_gain`).
+        self.infinities_banked += self.banked_infinities_gain();
 
         // `addEternityTime`: push this run onto the last-10-eternities ring.
         self.records.recent_eternities.pop();
@@ -512,6 +523,23 @@ mod tests {
         game.records.this_eternity.max_ip = game.infinity_points;
         assert!(!game.can_eternity());
         assert!(!game.eternity());
+    }
+
+    /// `banked_infinities_gain`: 0 without a source, `floor(infinities × 0.05)`
+    /// per source (Achievement 131 / TS191), stacking additively.
+    #[test]
+    fn banked_infinities_gain_stacks_per_source() {
+        let mut game = GameState::new();
+        game.infinities = Decimal::from_float(1030.0);
+        assert_eq!(game.banked_infinities_gain(), Decimal::ZERO);
+
+        game.unlock_achievement(131);
+        // floor(1030 × 0.05) = 51.
+        assert_eq!(game.banked_infinities_gain(), Decimal::from_float(51.0));
+
+        game.time_theorems = Decimal::from_float(1e10);
+        game.studies.push(191);
+        assert_eq!(game.banked_infinities_gain(), Decimal::from_float(102.0));
     }
 
     #[test]

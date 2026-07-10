@@ -105,6 +105,13 @@ export function timeDisplayShort(ms) {
   return `${(ms / 31536e6).toFixed(2)} years`;
 }
 
+// Format a wall-clock timestamp (ms since the epoch) as the original
+// `Time.toDateTimeString`: `Date.toString()` trimmed to "Mon dd yyyy hh:mm:ss"
+// (drops the weekday prefix and the timezone suffix).
+export function formatDateTime(timestampMs) {
+  return new Date(timestampMs).toString().replace(/^.{4}(.*:..:..).*$/u, "$1");
+}
+
 // Format a sample number for the Exponent Notation modal's live preview, using
 // the slider's in-flight `commaDigits`/`notationDigits` (not the stored ones, so
 // dragging updates immediately) with the current notation. Mirrors the

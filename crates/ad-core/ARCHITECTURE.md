@@ -46,8 +46,9 @@ not the current state).
   in `galaxy.rs` and `sacrifice.rs`. See
   `../../docs/design/2026-07-03-normal-challenges.md`.
 - `src/records.rs` — `Records`: the modelled slice of `player.records` (total time
-  played, this-infinity time/`maxAM`, best-infinity time). Advanced in `tick`; the
-  current-infinity records reset on a Big Crunch.
+  played, this-infinity time/`maxAM`, best-infinity time, the wall-clock
+  `game_created_time_ms` passthrough shown on the Statistics tab). Advanced in
+  `tick`; the current-infinity records reset on a Big Crunch.
 - `src/infinity_upgrades.rs` — Infinity Upgrades (Feature 2.2): the `InfinityUpgrade`
   enum + data table (cost, save-id, column prerequisite), purchase logic
   (`buy_infinity_upgrade`, IP-gated bitmask on `GameState::infinity_upgrades`), and
@@ -334,8 +335,10 @@ not the current state).
   `player.options`), held in `GameState`, preserved across a Big Crunch.
   Includes the per-action `Confirmations` toggles (boost/galaxy/sacrifice/crunch),
   the `Animations`/`ShowHintText`/`AwayProgress` toggle groups, header-gain
-  coloring, the sidebar resource id, and the hidden-tab bitmasks
-  (`hidden_tab_bits`/`hidden_subtab_bits`, keyed by the original tab ids)
+  coloring, the sidebar resource id, the hidden-tab bitmasks
+  (`hidden_tab_bits`/`hidden_subtab_bits`, keyed by the original tab ids), and the
+  Past Prestige Runs resource pair (`stat_tab_resources`; the related per-layer
+  expand flags live on `GameState.shown_runs`, mirroring `player.shownRuns`)
 - `src/observed.rs` — `ObservedState`: read-only snapshot of `GameState` plus
   computed fields (costs, affordability, `next_sacrifice_boost`). The decision
   input for `ad-sim` controllers and the trace/GUI view.

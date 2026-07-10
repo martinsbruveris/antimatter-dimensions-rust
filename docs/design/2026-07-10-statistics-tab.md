@@ -1,5 +1,5 @@
 ---
-status: Draft
+status: Implemented
 feature: statistics-tab
 ---
 
@@ -233,13 +233,13 @@ only improves round-trip completeness.
 
 ## 8. Plan
 
-- [ ] Engine: `game_created_time_ms` passthrough + `Options.stat_tab_resources`
+- [x] Engine: `game_created_time_ms` passthrough + `Options.stat_tab_resources`
       + `shown_runs` + `banked_infinities_gain()` refactor (+ tests)
-- [ ] Backend: `StatisticsView` in `build_game_view`, the two commands,
+- [x] Backend: `StatisticsView` in `build_game_view`, the two commands,
       new-game/hard-reset stamps `game_created_time_ms`
-- [ ] Frontend: `matterScale.js` + `formatDateTime`
-- [ ] Frontend: `StatisticsTab.vue`
-- [ ] Frontend: `ChallengeRecordsTab.vue` (+ list)
-- [ ] Frontend: `PastPrestigeRunsTab.vue` (+ container)
-- [ ] `config/tabs.js` wiring + conditions
-- [ ] Living docs (`crates/ad-gui/AGENTS.md`, ARCHITECTURE if touched) + worklog
+- [x] Frontend: `matterScale.js` + `formatDateTime`
+- [x] Frontend: `StatisticsTab.vue`
+- [x] Frontend: `ChallengeRecordsTab.vue` (+ list)
+- [x] Frontend: `PastPrestigeRunsTab.vue` (+ container)
+- [x] `config/tabs.js` wiring + conditions
+- [x] Living docs (`crates/ad-gui/AGENTS.md`, ARCHITECTURE if touched) + worklog

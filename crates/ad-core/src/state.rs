@@ -55,6 +55,26 @@ fn default_infinity_dimensions() -> [InfinityDimension; 8] {
     std::array::from_fn(InfinityDimension::new)
 }
 
+/// The Past Prestige Runs tables' expand/collapse flags (`player.shownRuns`).
+/// All expanded by default, matching the original's initial player object.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ShownRuns {
+    pub infinity: bool,
+    pub eternity: bool,
+    pub reality: bool,
+}
+
+impl Default for ShownRuns {
+    fn default() -> Self {
+        Self {
+            infinity: true,
+            eternity: true,
+            reality: true,
+        }
+    }
+}
+
 /// serde default for `ic_best_times_ms` (`Number.MAX_VALUE` = never completed).
 #[cfg(feature = "serde")]
 fn default_ic_best_times() -> [f64; 8] {
@@ -480,6 +500,11 @@ pub struct GameState {
     /// are **not** reset by a Big Crunch; they persist for the whole save.
     #[cfg_attr(feature = "serde", serde(default))]
     pub options: Options,
+    /// Whether each Past Prestige Runs table is expanded (`player.shownRuns`,
+    /// keys `Infinity`/`Eternity`/`Reality`). UI state persisted in the save,
+    /// like the options; consumed by the Statistics tab.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub shown_runs: ShownRuns,
     /// Whether the game has ended (`player.isGameEnd`, Pelle's finale).
     #[cfg_attr(feature = "serde", serde(default))]
     pub is_game_end: bool,
@@ -569,6 +594,7 @@ impl GameState {
             celestials: crate::celestials::CelestialsState::new(),
             autobuyers: AutobuyerState::new(),
             options: Options::new(),
+            shown_runs: ShownRuns::default(),
             is_game_end: false,
             ach_marathon1_ms: 0.0,
             ach_marathon2_ms: 0.0,

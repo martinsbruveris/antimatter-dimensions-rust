@@ -189,6 +189,10 @@ pub struct PlayerDTO {
     pub reality: RealityDTO,
     /// `player.requirementChecks` — the "avoided X" run flags (modelled subset).
     pub requirement_checks: RequirementChecksDTO,
+    /// `player.shownRuns` — the Past Prestige Runs expand/collapse flags,
+    /// keyed by the capitalized layer name (`Infinity`/`Eternity`/`Reality`).
+    #[serde(default)]
+    pub shown_runs: ShownRunsDTO,
     /// `player.celestials` — Teresa/Effarig/Enslaved/V (Phase 7). Defaulted so
     /// pre-celestial saves (and hand-built test JSON) load; the Ra/Laitela/Pelle
     /// sub-objects are unmodelled and round-trip via the encode template.
@@ -1066,6 +1070,10 @@ pub struct RecordsDTO {
     pub total_time_played: f64,
     /// `player.records.realTimePlayed` — real time (ms), monotonic.
     pub real_time_played: f64,
+    /// `records.gameCreatedTime` — wall-clock save-creation timestamp (ms since
+    /// the Unix epoch). Pure passthrough (0 = unknown).
+    #[serde(default)]
+    pub game_created_time: f64,
     /// `records.timePlayedAtBHUnlock` (`Number.MAX_VALUE` = not yet).
     #[serde(rename = "timePlayedAtBHUnlock")]
     pub time_played_at_bh_unlock: f64,
@@ -1524,6 +1532,32 @@ pub struct OptionsDTO {
     pub hidden_subtab_bits: Vec<u32>,
     /// `player.options.automatorEvents` — the Automator event-log settings.
     pub automator_events: AutomatorEventsDTO,
+    /// `player.options.statTabResources` — the Past Prestige Runs resource
+    /// pair (0–3).
+    #[serde(default)]
+    pub stat_tab_resources: u8,
+}
+
+/// `player.shownRuns` — the Past Prestige Runs expand/collapse flags. The
+/// original keys are capitalized layer names.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShownRunsDTO {
+    #[serde(rename = "Infinity", default = "bool_true")]
+    pub infinity: bool,
+    #[serde(rename = "Eternity", default = "bool_true")]
+    pub eternity: bool,
+    #[serde(rename = "Reality", default = "bool_true")]
+    pub reality: bool,
+}
+
+impl Default for ShownRunsDTO {
+    fn default() -> Self {
+        Self {
+            infinity: true,
+            eternity: true,
+            reality: true,
+        }
+    }
 }
 
 /// `player.options.automatorEvents`.
@@ -1792,6 +1826,7 @@ impl GameState {
         let records = Records {
             total_time_played_ms: dto.records.total_time_played,
             real_time_played_ms: dto.records.real_time_played,
+            game_created_time_ms: dto.records.game_created_time,
             time_played_at_bh_unlock_ms: dto.records.time_played_at_bh_unlock,
             this_infinity: ThisInfinity {
                 time_ms: dto.records.this_infinity.time,
@@ -2501,6 +2536,7 @@ impl GameState {
             clear_on_reality: dto.options.automator_events.clear_on_reality,
             clear_on_restart: dto.options.automator_events.clear_on_restart,
         };
+        options.stat_tab_resources = dto.options.stat_tab_resources.min(3);
 
         Ok(GameState {
             antimatter: dto.antimatter,
@@ -2667,6 +2703,11 @@ impl GameState {
             celestials,
             autobuyers,
             options,
+            shown_runs: crate::state::ShownRuns {
+                infinity: dto.shown_runs.infinity,
+                eternity: dto.shown_runs.eternity,
+                reality: dto.shown_runs.reality,
+            },
             is_game_end: dto.is_game_end,
             // Transient achievement marathon timers (not persisted; the original
             // keeps them in a module-level `AchievementTimers`, reset on load).

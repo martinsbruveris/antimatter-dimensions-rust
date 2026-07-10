@@ -13,6 +13,9 @@ import EternityMilestonesTab from "../components/tabs/EternityMilestonesTab.vue"
 import TimeDimensionsTab from "../components/tabs/TimeDimensionsTab.vue";
 import TimeStudiesTab from "../components/tabs/TimeStudiesTab.vue";
 import NormalAchievementsTab from "../components/tabs/NormalAchievementsTab.vue";
+import StatisticsTab from "../components/tabs/StatisticsTab.vue";
+import ChallengeRecordsTab from "../components/tabs/ChallengeRecordsTab.vue";
+import PastPrestigeRunsTab from "../components/tabs/PastPrestigeRunsTab.vue";
 // Lazy-loaded: the Automator subtab pulls in CodeMirror + vuedraggable, which
 // are only reachable post-Reality. Splitting it into its own chunk keeps those
 // deps out of the initial bundle. Rendered via <component :is> in App.vue, so
@@ -268,7 +271,30 @@ export const TABS = [
     name: "Statistics",
     hideId: 2,
     subtabs: [
-      { key: "statistics", name: "Statistics", symbol: "<i class='fas fa-clipboard-list'></i>", component: null, hideId: [2, 0] },
+      { key: "statistics", name: "Statistics", symbol: "<i class='fas fa-clipboard-list'></i>", component: StatisticsTab, hideId: [2, 0] },
+      // Challenge records: appear once a challenge has been completed (or a
+      // later prestige layer reached) — original `PlayerProgress
+      // .challengeCompleted() || eternityUnlocked() || realityUnlocked()`.
+      {
+        key: "challenges",
+        name: "Challenge records",
+        symbol: "<i class='fas fa-stopwatch'></i>",
+        component: ChallengeRecordsTab,
+        condition: (s) =>
+          Boolean(s?.eternity_unlocked) ||
+          Boolean(s?.reality?.unlocked) ||
+          (s?.challenges ?? []).some((c) => c.is_completed),
+        hideId: [2, 1],
+      },
+      // Past Prestige Runs: appear after the first Infinity.
+      {
+        key: "prestige runs",
+        name: "Past Prestige Runs",
+        symbol: "<i class='fas fa-list-ol'></i>",
+        component: PastPrestigeRunsTab,
+        condition: (s) => Boolean(s?.infinity_unlocked),
+        hideId: [2, 2],
+      },
     ],
   },
   {

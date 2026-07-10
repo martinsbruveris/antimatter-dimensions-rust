@@ -392,6 +392,12 @@ pub struct Records {
     /// Total real time ever played (ms), monotonic. Mirrors
     /// `player.records.realTimePlayed`.
     pub real_time_played_ms: f64,
+    /// Wall-clock timestamp the save was created (`records.gameCreatedTime`,
+    /// ms since the Unix epoch). Pure passthrough: the engine never reads a
+    /// wall clock, so `new()` leaves it `0.0` ("unknown") and the embedding
+    /// backend stamps it on new-game/hard-reset. Shown on the Statistics tab.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub game_created_time_ms: f64,
     /// Total game time played when the Black Hole was unlocked
     /// (`records.timePlayedAtBHUnlock`; `f64::MAX` = not yet). Feeds Reality
     /// Upgrade 20's requirement.
@@ -432,6 +438,7 @@ impl Records {
         Self {
             total_time_played_ms: 0.0,
             real_time_played_ms: 0.0,
+            game_created_time_ms: 0.0,
             time_played_at_bh_unlock_ms: f64::MAX,
             this_infinity: ThisInfinity::new(),
             best_infinity: BestInfinity::new(),

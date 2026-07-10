@@ -785,6 +785,16 @@ export const useGameStore = defineStore("game", {
     setUpdateRate(rate) {
       return invoke("set_update_rate", { rate });
     },
+    // Which resource pair the Past Prestige Runs tables show (0–3, original
+    // `player.options.statTabResources`).
+    setStatTabResources(value) {
+      return invoke("set_stat_tab_resources", { value });
+    },
+    // Flip a Past Prestige Runs table's expand/collapse flag (original
+    // `player.shownRuns`; layer is "infinity" / "eternity" / "reality").
+    toggleShownRuns(layer) {
+      return invoke("toggle_shown_runs", { layer });
+    },
     // Number-formatting notation (original `player.options.notation`); the
     // engine ignores names outside its known set.
     setNotation(notation) {

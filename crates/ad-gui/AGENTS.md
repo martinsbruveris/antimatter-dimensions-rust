@@ -67,6 +67,10 @@ frontend/
       tabs/                  # one component per page (subtab):
         AntimatterDimensionsTab.vue, NormalAchievementsTab.vue,
         AutobuyersTab.vue
+        StatisticsTab.vue, ChallengeRecordsTab.vue, PastPrestigeRunsTab.vue
+        statistics/          # ChallengeRecordsList (one best-times list),
+                             #   PastPrestigeRunsContainer (one layer's
+                             #   last-10-runs table)
         autobuyers/          # AutobuyerBox (shared row/purchase box),
                              #   DimensionAutobuyerBox, TickspeedAutobuyerBox,
                              #   PrestigeAutobuyerBox (Dim Boost / Galaxy),
@@ -578,6 +582,41 @@ renders the result. See `docs/design/2026-06-30-ui-reveal-and-tutorial.md` and
   `unlock_black_hole`, `buy_black_hole_upgrade`, `toggle_black_hole_pause` —
   mirrored by `stores/game.js` actions. `ui.showModal(name, payload)` now
   carries an optional payload (`ui.modalPayload`) for the sacrifice confirm.
+
+## Statistics tab
+
+Design: `docs/design/2026-07-10-statistics-tab.md`. Three subtabs (hide-bits
+[2,0]–[2,2]); the original's Multiplier Breakdown / Glyph Set Records /
+Speedrun subtabs are deferred.
+
+- **Statistics** (`StatisticsTab.vue`): the records page — General (total
+  antimatter, times played, save-created line, the matter-scale comparison
+  from `util/matterScale.js`, throttled to 1/s) plus the Infinity / Eternity /
+  Reality blocks, gated by the top-level unlock flags. Everything reads the
+  snapshot's `statistics` view (`build_statistics_view` in `main.rs`);
+  omitted vs the original: news/secret-achievement/paperclip lines,
+  full-game completions, the Doomed real-time line, the Content Summary
+  button (systems not modelled).
+- **Challenge records** (`ChallengeRecordsTab.vue` +
+  `statistics/ChallengeRecordsList.vue`): NC (start 2) and IC (start 1)
+  best-times lists from `statistics.nc/ic_best_times_ms`
+  (`Number.MAX_VALUE` = never completed); subtab condition = any NC
+  completed ∨ Eternity/Reality unlocked.
+- **Past Prestige Runs** (`PastPrestigeRunsTab.vue` +
+  `statistics/PastPrestigeRunsContainer.vue`): the last-10 run tables per
+  prestige layer with a frontend-computed Average row. The "Showing X"
+  button cycles the engine-owned `options.stat_tab_resources` (0–3); the
+  per-layer collapse headers flip the engine's `shown_runs` flags. The
+  engine rings store only `[time, realTime, currency, count]`, so the
+  Challenge / extra columns are omitted, and the Real Time column shows once
+  Reality is unlocked (instead of the original's `seenAlteredSpeed`).
+- **Commands:** `set_stat_tab_resources(value)`, `toggle_shown_runs(layer)` —
+  store actions `setStatTabResources` / `toggleShownRuns`. The backend stamps
+  `records.game_created_time_ms` in `fresh_game()` (new game / hard reset);
+  imported saves carry their own.
+- `util/format.js` gained `formatDateTime` (the original
+  `Time.toDateTimeString`); `util/matterScale.js` ports `matter-scale.js` in
+  log10 space over the raw `{ m, e }` numbers.
 
 ## Conventions
 

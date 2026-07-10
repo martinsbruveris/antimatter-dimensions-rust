@@ -378,6 +378,78 @@ struct RealityAutobuyerView {
     time: f64,
 }
 
+/// One row of a Past Prestige Runs table: `[time, realTime, currency, count]`
+/// (the engine's recent-run rings; the original tuples' trailing entries —
+/// challenge name, TT/glyph extras — are not modelled).
+#[derive(Serialize)]
+struct RecentRunView {
+    time_ms: f64,
+    real_time_ms: f64,
+    currency: Num,
+    count: Num,
+}
+
+/// The Past Prestige Runs expand/collapse flags (`player.shownRuns`).
+#[derive(Serialize)]
+struct ShownRunsView {
+    infinity: bool,
+    eternity: bool,
+    reality: bool,
+}
+
+/// The Statistics tab (main page + Challenge records + Past Prestige Runs).
+/// Read-only records, shipped display-ready; section visibility comes from the
+/// top-level `infinity_unlocked` / `eternity_unlocked` / `reality.unlocked`.
+#[derive(Serialize)]
+struct StatisticsView {
+    total_antimatter: Num,
+    real_time_played_ms: f64,
+    /// Game time; its line is shown once Reality is unlocked.
+    total_time_played_ms: f64,
+    /// Wall-clock save-creation timestamp (0 = unknown; line hidden).
+    game_created_time_ms: f64,
+    // Infinity block.
+    infinities: Num,
+    infinities_banked: Num,
+    /// `999999999999` sentinel = "no fastest Infinity yet".
+    best_infinity_time_ms: f64,
+    this_infinity_time_ms: f64,
+    this_infinity_real_time_ms: f64,
+    /// Best IP/min this Eternity (`bestInfinity.bestIPminEternity`).
+    best_ip_min: Num,
+    // Eternity block.
+    eternities: Num,
+    /// Banked Infinities an Eternity would grant now (Ach 131 + TS191).
+    projected_banked: Num,
+    /// `projected_banked / clampMin(33, thisEternity time) × 60000`
+    /// (real time once Reality is unlocked, like the original).
+    banked_rate_per_min: Num,
+    best_eternity_time_ms: f64,
+    this_eternity_time_ms: f64,
+    this_eternity_real_time_ms: f64,
+    /// Best EP/min this Reality (`bestEternity.bestEPminReality`).
+    best_ep_min: Num,
+    // Reality block.
+    realities: u32,
+    best_reality_time_ms: f64,
+    best_reality_real_time_ms: f64,
+    this_reality_time_ms: f64,
+    this_reality_real_time_ms: f64,
+    /// Best RM/min (`bestReality.RMmin`).
+    best_rm_min: Num,
+    /// Best Glyph rarity in percent (`strengthToRarity`, clamped ≥ 0).
+    best_glyph_rarity: f64,
+    is_doomed: bool,
+    // Challenge records.
+    nc_best_times_ms: Vec<f64>,
+    ic_best_times_ms: Vec<f64>,
+    // Past Prestige Runs (each 10 entries, newest first).
+    recent_infinities: Vec<RecentRunView>,
+    recent_eternities: Vec<RecentRunView>,
+    recent_realities: Vec<RecentRunView>,
+    shown_runs: ShownRunsView,
+}
+
 /// Serializable game view sent to the frontend each frame.
 #[derive(Serialize)]
 struct GameView {
@@ -523,6 +595,8 @@ struct GameView {
     automator: AutomatorTabView,
     /// Celestials tab state (Phase 7).
     celestials: CelestialsView,
+    /// Statistics tab state (records + challenge times + recent runs).
+    statistics: StatisticsView,
 }
 
 /// Serializable view of the Automator tab.
@@ -1041,6 +1115,9 @@ struct OptionsView {
     hidden_tab_bits: u32,
     /// Per-tab hidden-subtab bitmasks (original `hiddenSubtabBits`, 11 entries).
     hidden_subtab_bits: Vec<u32>,
+    /// Which resource pair the Past Prestige Runs tables show (original
+    /// `statTabResources`, 0–3).
+    stat_tab_resources: u8,
 }
 
 /// Serializable view of the per-action confirmation toggles.
@@ -2531,6 +2608,94 @@ fn build_eternity_challenges_view(game: &GameState) -> Vec<EternityChallengeView
         .collect()
 }
 
+/// The Statistics tab's snapshot (main page + Challenge records + Past
+/// Prestige Runs).
+fn build_statistics_view(game: &GameState) -> StatisticsView {
+    let records = &game.records;
+    // The banked-Infinities rate line: `projectedBanked / clampMin(33,
+    // thisEternity.time) × 60000` — real time once Reality is unlocked (the
+    // original's reality branch recomputes it with `realTime`).
+    let projected_banked = game.banked_infinities_gain();
+    let bank_divisor_ms = if game.reality_unlocked() {
+        records.this_eternity.real_time_ms
+    } else {
+        records.this_eternity.time_ms
+    }
+    .max(33.0);
+    let banked_rate_per_min =
+        projected_banked / Decimal::from_float(bank_divisor_ms / 60_000.0);
+
+    let run_view =
+        |time_ms: f64, real_time_ms: f64, currency: &Decimal, count: &Decimal| {
+            RecentRunView {
+                time_ms,
+                real_time_ms,
+                currency: num(currency),
+                count: num(count),
+            }
+        };
+
+    StatisticsView {
+        total_antimatter: num(&game.total_antimatter),
+        real_time_played_ms: records.real_time_played_ms,
+        total_time_played_ms: records.total_time_played_ms,
+        game_created_time_ms: records.game_created_time_ms,
+        infinities: num(&game.infinities),
+        infinities_banked: num(&game.infinities_banked),
+        best_infinity_time_ms: records.best_infinity.time_ms,
+        this_infinity_time_ms: records.this_infinity.time_ms,
+        this_infinity_real_time_ms: records.this_infinity.real_time_ms,
+        best_ip_min: num(&records.best_infinity.best_ip_min_eternity),
+        eternities: num(&game.eternities),
+        projected_banked: num(&projected_banked),
+        banked_rate_per_min: num(&banked_rate_per_min),
+        best_eternity_time_ms: records.best_eternity.time_ms,
+        this_eternity_time_ms: records.this_eternity.time_ms,
+        this_eternity_real_time_ms: records.this_eternity.real_time_ms,
+        best_ep_min: num(&records.best_eternity.best_ep_min_reality),
+        realities: game.reality.realities,
+        best_reality_time_ms: records.best_reality.time_ms,
+        best_reality_real_time_ms: records.best_reality.real_time_ms,
+        this_reality_time_ms: records.this_reality.time_ms,
+        this_reality_real_time_ms: records.this_reality.real_time_ms,
+        best_rm_min: num(&records.best_reality.rm_min),
+        best_glyph_rarity: ad_core::strength_to_rarity(
+            records.best_reality.glyph_strength,
+        )
+        .max(0.0),
+        is_doomed: game.is_doomed(),
+        nc_best_times_ms: game.nc_best_times_ms.to_vec(),
+        ic_best_times_ms: game.ic_best_times_ms.to_vec(),
+        recent_infinities: records
+            .recent_infinities
+            .iter()
+            .map(|r| run_view(r.time_ms, r.real_time_ms, &r.ip, &r.infinities))
+            .collect(),
+        recent_eternities: records
+            .recent_eternities
+            .iter()
+            .map(|r| run_view(r.time_ms, r.real_time_ms, &r.ep, &r.eternities))
+            .collect(),
+        recent_realities: records
+            .recent_realities
+            .iter()
+            .map(|r| {
+                run_view(
+                    r.time_ms,
+                    r.real_time_ms,
+                    &r.rm,
+                    &Decimal::from_float(r.reality_count),
+                )
+            })
+            .collect(),
+        shown_runs: ShownRunsView {
+            infinity: game.shown_runs.infinity,
+            eternity: game.shown_runs.eternity,
+            reality: game.shown_runs.reality,
+        },
+    }
+}
+
 fn build_game_view(game: &GameState) -> GameView {
     let unlocked = game.unlocked_dimensions();
     let mut dimensions = Vec::with_capacity(8);
@@ -2685,6 +2850,7 @@ fn build_game_view(game: &GameState) -> GameView {
         tutorial_active: game.tutorial_active,
         automator: build_automator_view(game),
         celestials: build_celestials_view(game),
+        statistics: build_statistics_view(game),
         options: OptionsView {
             hotkeys: game.options.hotkeys,
             retry_challenge: game.options.retry_challenge,
@@ -2730,6 +2896,7 @@ fn build_game_view(game: &GameState) -> GameView {
             sidebar_resource_id: game.options.sidebar_resource_id,
             hidden_tab_bits: game.options.hidden_tab_bits,
             hidden_subtab_bits: game.options.hidden_subtab_bits.to_vec(),
+            stat_tab_resources: game.options.stat_tab_resources,
         },
     }
 }
@@ -4400,6 +4567,27 @@ fn set_update_rate(rate: u32, state: State<'_, Mutex<GameState>>) {
     game.options.set_update_rate(rate);
 }
 
+/// Set which resource pair the Past Prestige Runs tables show
+/// (`statTabResources`, clamped to 0–3).
+#[tauri::command]
+fn set_stat_tab_resources(value: u8, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.options.stat_tab_resources = value.min(3);
+}
+
+/// Flip one Past Prestige Runs table's expand/collapse flag. `layer` is
+/// "infinity" / "eternity" / "reality"; unknown names are ignored.
+#[tauri::command]
+fn toggle_shown_runs(layer: String, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    match layer.as_str() {
+        "infinity" => game.shown_runs.infinity = !game.shown_runs.infinity,
+        "eternity" => game.shown_runs.eternity = !game.shown_runs.eternity,
+        "reality" => game.shown_runs.reality = !game.shown_runs.reality,
+        _ => {}
+    }
+}
+
 #[tauri::command]
 fn set_notation(notation: String, state: State<'_, Mutex<GameState>>) {
     let mut game = state.lock().unwrap();
@@ -4831,6 +5019,9 @@ fn me_to_num(me: Option<(f64, f64)>) -> Num {
 fn fresh_game() -> GameState {
     #[allow(unused_mut)]
     let mut game = GameState::new();
+    // Stamp the save-creation wall-clock time (the engine avoids wall clocks,
+    // so `GameState::new()` leaves it 0). Shown on the Statistics tab.
+    game.records.game_created_time_ms = now_ms() as f64;
     #[cfg(debug_assertions)]
     {
         game.tutorial_state = 5;
@@ -4982,6 +5173,8 @@ pub fn run() {
             toggle_autobuyer,
             set_hotkeys,
             set_update_rate,
+            set_stat_tab_resources,
+            toggle_shown_runs,
             set_notation,
             set_notation_digits,
             set_offline_ticks,
@@ -5075,6 +5268,40 @@ mod tests {
         let z = num(&Decimal::ZERO);
         assert_eq!(z.m, 0.0);
         assert_eq!(z.e, 0.0);
+    }
+
+    #[test]
+    fn statistics_view_reflects_records() {
+        let mut game = GameState::new();
+        // A fresh game: no runs, sentinel best times, unknown creation time.
+        let view = build_statistics_view(&game);
+        assert_eq!(view.game_created_time_ms, 0.0);
+        assert_eq!(view.nc_best_times_ms.len(), 11);
+        assert_eq!(view.ic_best_times_ms.len(), 8);
+        assert_eq!(view.recent_infinities.len(), 10);
+        assert_eq!(view.recent_infinities[0].time_ms, f64::MAX);
+        assert!(view.shown_runs.infinity);
+        assert_eq!(view.projected_banked.m, 0.0);
+
+        // With Achievement 131, the projected bank mirrors the engine helper
+        // (floor(infinities × 0.05)) and the rate divisor is the clamped
+        // this-eternity time.
+        game.infinities = Decimal::from_float(1000.0);
+        // Unlock Achievement 131 (row 13 / column 1) directly via the bitmask.
+        game.achievement_bits[12] |= 1;
+        game.records.this_eternity.time_ms = 120_000.0;
+        game.records.game_created_time_ms = 1_650_000_000_000.0;
+        let view = build_statistics_view(&game);
+        assert_eq!(view.projected_banked.m, 5.0);
+        assert_eq!(view.projected_banked.e, 1.0);
+        // 50 banked / 2 minutes = 25 per minute.
+        assert_eq!(view.banked_rate_per_min.m, 2.5);
+        assert_eq!(view.banked_rate_per_min.e, 1.0);
+        assert_eq!(view.game_created_time_ms, 1_650_000_000_000.0);
+
+        // The whole snapshot (including the statistics view) serializes.
+        let json = serde_json::to_string(&build_game_view(&game)).unwrap();
+        assert!(json.contains("\"statistics\""));
     }
 
     #[test]

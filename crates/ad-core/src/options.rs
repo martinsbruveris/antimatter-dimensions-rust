@@ -261,6 +261,11 @@ pub struct Options {
     /// Automator event-log settings (original `automatorEvents`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub automator_events: AutomatorEventsOptions,
+    /// Which resource pair the Past Prestige Runs tables show (original
+    /// `statTabResources`): 0 = absolute gain, 1 = rate, 2 = prestige
+    /// currency, 3 = prestige count.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub stat_tab_resources: u8,
 }
 
 /// `player.options.automatorEvents`: how the Automator's event log displays
@@ -321,6 +326,7 @@ impl Options {
             hidden_tab_bits: 0,
             hidden_subtab_bits: [0; TAB_COUNT],
             automator_events: AutomatorEventsOptions::new(),
+            stat_tab_resources: 0,
         }
     }
 

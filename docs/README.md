@@ -113,7 +113,7 @@ decisions.
 | Accepted | [`2026-07-06-fidelity-testing.md`](design/2026-07-06-fidelity-testing.md) | Save-replay differential fidelity harness (design agreed; not yet built) |
 | Partial | [`2026-07-06-celestials.md`](design/2026-07-06-celestials.md) | Phase 7 celestials 1–4 (Teresa, Effarig, Enslaved, V): mechanics, frontier cuts, Rust design, save/load, UI |
 | Reference | [`2026-07-09-port-audit.md`](design/2026-07-09-port-audit.md) | Numbered code-level audit of what is ported vs remaining (2026-07-09) — the authoritative status snapshot |
-| Draft | [`2026-07-10-statistics-tab.md`](design/2026-07-10-statistics-tab.md) | Statistics tab: main Statistics page + Challenge records + Past Prestige Runs (Multiplier Breakdown / Glyph Sets / Speedrun deferred) |
+| Implemented | [`2026-07-10-statistics-tab.md`](design/2026-07-10-statistics-tab.md) | Statistics tab: main Statistics page + Challenge records + Past Prestige Runs (Multiplier Breakdown / Glyph Sets / Speedrun deferred) |
 
 ## Analysis (study of the original JS game)
 

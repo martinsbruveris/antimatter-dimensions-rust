@@ -125,6 +125,12 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     let records = &mut player["records"];
     records["totalTimePlayed"] = json!(state.records.total_time_played_ms);
     records["realTimePlayed"] = json!(state.records.real_time_played_ms);
+    // Wall-clock save-creation timestamp — a passthrough; the template's
+    // constant only stands in when the state carries none (a fresh
+    // `GameState::new()` the embedding backend hasn't stamped).
+    if state.records.game_created_time_ms > 0.0 {
+        records["gameCreatedTime"] = json!(state.records.game_created_time_ms);
+    }
     records["thisInfinity"]["time"] = json!(state.records.this_infinity.time_ms);
     records["thisInfinity"]["realTime"] =
         json!(state.records.this_infinity.real_time_ms);
@@ -787,6 +793,12 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     ae["maxEntries"] = json!(state.options.automator_events.max_entries);
     ae["clearOnReality"] = json!(state.options.automator_events.clear_on_reality);
     ae["clearOnRestart"] = json!(state.options.automator_events.clear_on_restart);
+    options["statTabResources"] = json!(state.options.stat_tab_resources);
+
+    // The Past Prestige Runs expand/collapse flags (capitalized layer keys).
+    player["shownRuns"]["Infinity"] = json!(state.shown_runs.infinity);
+    player["shownRuns"]["Eternity"] = json!(state.shown_runs.eternity);
+    player["shownRuns"]["Reality"] = json!(state.shown_runs.reality);
 
     // Autobuyers. We write the flags/modes plus the interval-upgrade state
     // (interval + IP cost, Feature 2.6), the AD-only "Buys max" bulk multiplier,
@@ -1100,6 +1112,22 @@ mod tests {
             }
             assert_eq!(reloaded.options, state.options);
         }
+    }
+
+    #[test]
+    fn statistics_fields_round_trip() {
+        // The Statistics-tab passthroughs survive decode → encode → decode:
+        // gameCreatedTime, statTabResources, and the shownRuns flags.
+        let mut state = decode_save(SAMPLE_SAVE.trim()).unwrap();
+        state.records.game_created_time_ms = 1_650_000_000_123.0;
+        state.options.stat_tab_resources = 2;
+        state.shown_runs.eternity = false;
+        let reloaded = decode_save(&encode_save(&state, 1_700_000_000_000)).unwrap();
+        assert_eq!(reloaded.records.game_created_time_ms, 1_650_000_000_123.0);
+        assert_eq!(reloaded.options.stat_tab_resources, 2);
+        assert!(reloaded.shown_runs.infinity);
+        assert!(!reloaded.shown_runs.eternity);
+        assert!(reloaded.shown_runs.reality);
     }
 
     #[test]
