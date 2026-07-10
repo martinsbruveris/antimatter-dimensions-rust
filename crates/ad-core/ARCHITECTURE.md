@@ -1,9 +1,13 @@
 # ad-core architecture
 
 `ad-core` is the game engine — the rules. Pure logic, no IO. It owns `GameState`
-(all mutable state), the `Action` IR plus the `apply_action` mutation seam that
-every action producer (GUI, autobuyers, simulation) routes through, the tick
-loop, and the `data` module of static config. It never depends on `ad-sim`.
+(all mutable state), the tick loop, the `data` module of static config, and the
+`Action` IR + `apply_action` adapter used by action-as-data consumers (`ad-sim`,
+the Python bindings). The shared mutation interface is the `GameState` method
+surface itself (`can_x()`/`buy_x()` pairs); the GUI's commands, the autobuyers,
+and the Automator call those methods directly — deliberately, since the original
+game gives the "same" action different per-caller semantics (see `src/action.rs`).
+It never depends on `ad-sim`.
 
 This is a **living** file map: keep it in sync with the code. Each entry links
 the design doc that introduced the system (historical — read it for the *why*,
@@ -12,8 +16,12 @@ not the current state).
 ## Key source files
 
 - `src/state.rs` — `GameState` struct (all mutable game state)
-- `src/action.rs` — `Action` IR + `GameState::apply_action`: the single mutation
-  seam every action producer (GUI, autobuyers, simulation) routes through
+- `src/action.rs` — `Action` IR + `GameState::apply_action`: the serializable
+  action vocabulary for action-as-data consumers (`ad-sim`, Python bindings).
+  Covers the manual-play subset the simulation uses (pre-Infinity + a few
+  prestige actions); grown demand-driven with the simulation frontier, **not**
+  a universal seam — the GUI/autobuyers/Automator call `GameState` methods
+  directly (per-caller semantics; see the module docs)
 - `src/tick.rs` — Main game loop (`tick()` and `simulate()`)
 - `src/dimensions.rs` — Dimension purchasing, production, multipliers
 - `src/tickspeed.rs` — Tickspeed upgrades and effects
@@ -341,5 +349,7 @@ not the current state).
   expand flags live on `GameState.shown_runs`, mirroring `player.shownRuns`)
 - `src/observed.rs` — `ObservedState`: read-only snapshot of `GameState` plus
   computed fields (costs, affordability, `next_sacrifice_boost`). The decision
-  input for `ad-sim` controllers and the trace/GUI view.
+  input for `ad-sim` controllers and the Python trace. Frozen at the
+  pre-Infinity frontier alongside `ad-sim` (the GUI does **not** use it — it
+  builds its own `GameView` snapshot in `ad-gui`).
 - `src/data/` — Static game configuration (constants, costs, dimension configs)

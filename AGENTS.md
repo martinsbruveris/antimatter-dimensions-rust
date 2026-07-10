@@ -29,7 +29,7 @@ antimatter-dimensions-rust/
 ├── crates/
 │   ├── break_infinity/     # Vendored big-number library (Decimal type)
 │   ├── ad-core/            # Game engine (rules) + static config; see its ARCHITECTURE.md
-│   ├── ad-sim/             # Simulation driver (depends on ad-core); see its ARCHITECTURE.md
+│   ├── ad-sim/             # Simulation driver (planned future feature, frozen pre-Infinity); see its ARCHITECTURE.md
 │   ├── ad-format/          # Number formatting (notations): format(value, &FormatOptions)
 │   ├── ad-fidelity/        # Rust-vs-JS fidelity test harness
 │   ├── ad-python/          # PyO3 bindings (antimatter_dimensions._native)
@@ -69,7 +69,9 @@ cargo build                    # Build all crates
 cargo test                     # Run all tests
 cargo test -p break_infinity   # Test only the number library
 cargo test -p ad-core          # Test only the game engine
-cargo test -p ad-sim           # Test only the simulation driver
+# ad-sim is a planned future feature, not under active development: its tests
+# are disabled (autotests = false) and it only needs to keep compiling. See
+# crates/ad-sim/ARCHITECTURE.md.
 cargo clippy                   # Lint
 cargo fmt                      # Format
 ```

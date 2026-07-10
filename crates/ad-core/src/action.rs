@@ -4,18 +4,26 @@ use crate::state::GameState;
 /// A single legal player action.
 ///
 /// This is an *action vocabulary* — a caller's intent expressed as a value that
-/// [`GameState::apply_action`] turns into a state mutation. Today the simulation
-/// layer (`ad-sim`) is its only consumer: it produces `Action`s and feeds them to
-/// `apply_action`. The GUI and the autobuyers do **not** go through this seam —
-/// they call the underlying `GameState` methods directly.
+/// [`GameState::apply_action`] turns into a state mutation. It exists for
+/// consumers that must treat actions as **data**: the simulation layer
+/// (`ad-sim`, its only consumer today), the Python bindings, and a potential
+/// future replay/recording format.
 ///
-/// Because of that, the vocabulary is *not* exhaustive over the engine's action
-/// surface. It holds the variants the simulation needs, plus a few prestige
-/// actions; several implemented mechanics (Break Infinity, Infinity Challenges,
-/// Infinity Dimensions, Break Infinity upgrades) have no `Action` yet. The
-/// intended end state is to route every caller — including the GUI — through
-/// `apply_action`, so the set becomes exhaustive and a mechanic that forgets to
-/// wire up its action is a compile error; that refactor is still pending.
+/// It is deliberately **not** a universal mutation seam. The GUI's commands,
+/// the autobuyers, and the Automator call the underlying `GameState` methods
+/// directly, and should keep doing so: in the original game the "same" action
+/// often has different per-caller semantics (e.g. the manual Galaxy purchase
+/// checks confirmations and the RU7 lock, while the Galaxy autobuyer's
+/// `requestGalaxyReset(bulk, limit)` applies its cap to the purchase but not
+/// the timer reset). A unified vocabulary would either need per-caller
+/// variants or would flatten those distinctions and break fidelity — so the
+/// per-caller engine methods *are* the shared interface, and this enum is a
+/// thin adapter over the manual-play subset of them.
+///
+/// The vocabulary therefore only covers what `ad-sim` plays today (pre-Infinity
+/// strategy runs plus a few prestige actions). Grow it demand-driven — one
+/// prestige layer at a time as the simulation frontier advances — rather than
+/// per GUI command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Action {
@@ -84,10 +92,12 @@ impl ActionOutcome {
 impl GameState {
     /// Apply an [`Action`], routing it to the corresponding game logic.
     ///
-    /// This is the single mutation seam used by every action producer. Actions
-    /// that are not currently legal (unaffordable purchase, unmet requirement) are
-    /// no-ops that return `applied == false` — the per-mechanic `can_*` checks
-    /// already guard each path.
+    /// This is the mutation seam for action-as-data consumers (`ad-sim`, the
+    /// Python bindings); other callers use the `GameState` methods directly —
+    /// see the [`Action`] docs. Actions that are not currently legal
+    /// (unaffordable purchase, unmet requirement) are no-ops that return
+    /// `applied == false` — the per-mechanic `can_*` checks already guard each
+    /// path.
     pub fn apply_action(&mut self, action: Action) -> ActionOutcome {
         match action {
             Action::BuyDimension(tier) => {
