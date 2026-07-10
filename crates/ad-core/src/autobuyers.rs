@@ -931,14 +931,15 @@ impl GameState {
         // two fires first consumes it via its reset, so galaxy-before-boost is what
         // lets a galaxy pre-empt a boost at the same threshold.
 
-        // Galaxy limit gate (`GalaxyAutobuyerState.tick`: the cap passed to
-        // `requestGalaxyReset` stops it at `maxGalaxies`).
-        let galaxy_limit_ok = !self.autobuyers.galaxy_config.limit_galaxies
-            || (self.galaxies as f64) < self.autobuyers.galaxy_config.max_galaxies;
+        // The Galaxy autobuyer's `canTick` is `Galaxy.canBeBought &&
+        // requirement.isSatisfied && super.canTick` — it does *not* test the
+        // `maxGalaxies` limit. That limit is applied only inside `tick()`'s
+        // `requestGalaxyReset(_, limit)` call, which caps the *purchase*. So the
+        // phase (`lastTick`) resets on every ready tick even at the cap; only the
+        // galaxy count stops growing.
         let ready = self.autobuyers.galaxy.is_active
             && self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy)
-            && self.can_buy_galaxy()
-            && galaxy_limit_ok;
+            && self.can_buy_galaxy();
         // The `autobuyMaxGalaxies` milestone (9 Eternities) switches the
         // interval to the player's `buyMaxInterval` (seconds; no
         // `autobuyerSpeed` halving, like the Dim Boost buy-max branch) and the
@@ -955,10 +956,14 @@ impl GameState {
             } else {
                 u64::MAX
             };
+            // `requestGalaxyReset(_, limit)` buys nothing once `galaxies >= limit`
+            // (buy-max clamps to `limit` internally); the phase still reset above.
             let bought = if galaxy_buy_max {
                 self.max_buy_galaxies(limit)
-            } else {
+            } else if (self.galaxies as u64) < limit {
                 self.buy_galaxy()
+            } else {
+                false
             };
             if bought {
                 self.reset_autobuyer_ticks(PRESTIGE_ANTIMATTER_GALAXY, dt_ms);

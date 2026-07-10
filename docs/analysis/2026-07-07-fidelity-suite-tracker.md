@@ -56,6 +56,7 @@ Commits that don't change the count are omitted.
 | 2026-07-09 | (pending) | Ported `buyMaxTickSpeed`'s closed form: the analytic `getMaxBought` (charging only the top purchase) replaces the repeated-single-buy loop, with the original's NC9 purchase-by-purchase branch; `buyTickSpeed` now carries the full `isAvailableForPurchase` guard | 1118/1148 |
 | 2026-07-10 | (pending) | Wired the achievements tail (Feature 2.4): conditions 35/61/62/65/74/111/117/156/165/172 + row 18, effects 126/133/138/156/168/171/175/183/187, the `noPurchasedTT`/`noTriads` requirement flags, and the AD-autobuyer `upgradeBulk` purchase path | 1121/1148 |
 | 2026-07-10 | (pending) | A third fixture batch landed (82 new late-game saves; the grid is now 369×4). The original 287-fixture range still passes 1121/1148 after the 6.2–6.7 feature work; the new fixtures are fresh late-game coverage to chase | 1172/1476 |
+| 2026-07-10 | (pending) | Galaxy autobuyer now resets its phase (`lastTick`) on every ready tick even at the `maxGalaxies` cap — its `canTick` never tested the limit (only `requestGalaxyReset` caps the purchase); also added the missing `Galaxy.canBeBought` past-the-Infinity-goal gate to `can_buy_galaxy` (`00072`–`00077`) | 1186/1476 |
 
 ## Method
 

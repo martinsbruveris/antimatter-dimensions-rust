@@ -109,6 +109,14 @@ impl GameState {
         if self.ec_running(6) {
             return false;
         }
+        // Past the Infinity goal, galaxies are locked (`Galaxy.canBeBought`: max
+        // antimatter this Infinity over `Player.infinityGoal`, while unbroken or
+        // inside an antimatter challenge) — same gate as `can_dim_boost`.
+        if self.records.this_infinity.max_am > self.infinity_goal()
+            && (!self.broke_infinity || self.in_antimatter_challenge())
+        {
+            return false;
+        }
         // Check total amount (floor) of the required-tier dimension.
         let tier = self.galaxy_required_tier();
         let amount = self.dimensions[tier].amount.to_f64().floor() as u64;
