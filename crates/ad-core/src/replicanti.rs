@@ -192,12 +192,19 @@ impl GameState {
         if interval <= 0.0 {
             return;
         }
-        let ticks = (dt_ms + self.replicanti.timer_ms) / interval;
+        let total = dt_ms + self.replicanti.timer_ms;
+        let ticks = total / interval;
         let whole = ticks.floor();
         // Roll leftover sub-interval time back into the timer (JS drops it above 100
-        // ticks/loop to avoid round-off).
+        // ticks/loop to avoid round-off). Subtract the consumed whole intervals
+        // directly (`total - whole·interval`) rather than round-tripping through
+        // `(ticks - whole)·interval`: the latter's `(total/interval)·interval`
+        // accrues f64 error every non-growth tick, so the timer drifts a hair below
+        // the exact integer and eventually misses an interval boundary by one game
+        // tick. The original computes this in `Decimal`, which stays on the clean
+        // value; the subtraction form matches it.
         self.replicanti.timer_ms = if ticks < 100.0 {
-            (ticks - whole) * interval
+            total - whole * interval
         } else {
             0.0
         };

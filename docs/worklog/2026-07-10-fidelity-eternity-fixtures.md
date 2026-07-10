@@ -65,6 +65,30 @@ a single extra sacrifice on the final tick fully accounts for the divergence.
 
 **1186 → 1187 (+1).**
 
+### 3. Replicanti interval timer drifted a hair below the integer (f64 round-trip)
+
+*Fixture 222 @ 1000* (dense-trace scan pinned the first divergence to tick 218,
+field `replicanti.amount`). A tiny ~1e-3 log drift compounded across the whole AD
+chain: the Replicanti amount feeds Replicanti Galaxies → `effectiveBaseGalaxies`
+→ the tickspeed multiplier, which multiplies every dimension's production once per
+chain step (hence the clean constant per-tier error increment, ~2e-4 log10 in
+this fixture).
+
+The Replicanti sub-interval timer was recomputed each game tick as
+`(ticks - whole)·interval` with `ticks = (dt + timer)/interval`. That
+`(total/interval)·interval` round-trip loses a little in f64 every non-growth
+tick, so the timer drifts a hair below the exact integer and eventually crosses an
+interval boundary one game tick late (here JS grows Replicanti at tick 218, Rust
+at 219). The original computes the rollover in `Decimal`, staying on the clean
+value.
+
+Fixed by subtracting the consumed whole intervals directly:
+`timer = total - whole·interval` (algebraically identical, no division
+round-trip). The dense trace is now clean over all 1000 ticks.
+
+**1187 → 1188 (+1).** (Fixtures 244/284 share the signature but diverge by more —
+a separate/larger cause remains.)
+
 ## Tests
 - `cargo test -p ad-core --features serde` — all pass (578 + 22 + 29).
 - Fidelity grid re-run after each fix; deltas recorded above.
