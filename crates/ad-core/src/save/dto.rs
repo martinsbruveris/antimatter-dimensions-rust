@@ -677,11 +677,94 @@ pub struct GlyphsDTO {
     pub inventory: Vec<GlyphDTO>,
     /// Cumulative sacrifice per type, keyed by type name.
     pub sac: std::collections::HashMap<String, f64>,
+    /// Whether a Reality Glyph was ever created (`createdRealityGlyph`).
+    #[serde(default)]
+    pub created_reality_glyph: bool,
+    /// The auto-glyph filter settings.
+    #[serde(default)]
+    pub filter: GlyphFilterDTO,
+    /// The Glyph-undo stack.
+    #[serde(default)]
+    pub undo: Vec<GlyphUndoDTO>,
     pub protected_rows: u32,
 }
 
-/// One glyph. Types we don't model (effarig/reality/cursed) are skipped on
-/// load rather than failing it.
+/// `player.reality.glyphs.filter`.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlyphFilterDTO {
+    #[serde(default)]
+    pub select: u8,
+    #[serde(default)]
+    pub trash: u8,
+    #[serde(default)]
+    pub simple: u32,
+    /// Per-type settings, keyed by type name.
+    #[serde(default)]
+    pub types: std::collections::HashMap<String, GlyphFilterTypeDTO>,
+}
+
+/// One `filter.types[type]` entry.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlyphFilterTypeDTO {
+    #[serde(default)]
+    pub rarity: f64,
+    #[serde(default)]
+    pub score: f64,
+    #[serde(default)]
+    pub effect_count: u32,
+    #[serde(default)]
+    pub specified_mask: u32,
+    #[serde(default)]
+    pub effect_scores: Vec<f64>,
+}
+
+/// One `player.reality.glyphs.undo[]` snapshot. The dilation studies/upgrades
+/// are stored as `toBitmask()` numbers in the original save.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlyphUndoDTO {
+    #[serde(default)]
+    pub target_slot: f64,
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub am: Decimal,
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub ip: Decimal,
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub ep: Decimal,
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub tt: Decimal,
+    #[serde(default)]
+    pub ecs: Vec<f64>,
+    #[serde(default)]
+    pub this_infinity_time: f64,
+    #[serde(default)]
+    pub this_infinity_real_time: f64,
+    #[serde(default)]
+    pub this_eternity_time: f64,
+    #[serde(default)]
+    pub this_eternity_real_time: f64,
+    #[serde(default)]
+    pub this_reality_time: f64,
+    #[serde(default)]
+    pub this_reality_real_time: f64,
+    #[serde(default)]
+    pub stored_time: f64,
+    #[serde(default)]
+    pub dilation_studies: f64,
+    #[serde(default)]
+    pub dilation_upgrades: f64,
+    #[serde(default)]
+    pub dilation_rebuyables: std::collections::HashMap<String, u32>,
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub tp: Decimal,
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub dt: Decimal,
+}
+
+/// One glyph. Types we don't model (cursed) are skipped on load rather than
+/// failing it.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GlyphDTO {
@@ -1752,14 +1835,111 @@ impl GameState {
             active: parse_glyphs(&dto.reality.glyphs.active),
             inventory: parse_glyphs(&dto.reality.glyphs.inventory),
             sac: {
-                let mut sac = [0.0f64; 5];
-                for (i, kind) in crate::glyphs::BASIC_GLYPH_TYPES.iter().enumerate() {
+                let mut sac = [0.0f64; 7];
+                let kinds = [
+                    crate::glyphs::GlyphType::Power,
+                    crate::glyphs::GlyphType::Infinity,
+                    crate::glyphs::GlyphType::Replication,
+                    crate::glyphs::GlyphType::Time,
+                    crate::glyphs::GlyphType::Dilation,
+                    crate::glyphs::GlyphType::Effarig,
+                    crate::glyphs::GlyphType::Reality,
+                ];
+                for kind in kinds {
                     if let Some(v) = dto.reality.glyphs.sac.get(kind.save_id()) {
-                        sac[i] = *v;
+                        sac[kind.sacrifice_index().unwrap()] = *v;
                     }
                 }
                 sac
             },
+            created_reality_glyph: dto.reality.glyphs.created_reality_glyph,
+            filter: {
+                let src = &dto.reality.glyphs.filter;
+                let mut filter = crate::glyphs::GlyphFilter::new();
+                filter.select = src.select;
+                filter.trash = src.trash;
+                filter.simple = src.simple;
+                let names = [
+                    "time",
+                    "dilation",
+                    "replication",
+                    "infinity",
+                    "power",
+                    "effarig",
+                ];
+                for (name, kind) in names.iter().zip([
+                    crate::glyphs::GlyphType::Time,
+                    crate::glyphs::GlyphType::Dilation,
+                    crate::glyphs::GlyphType::Replication,
+                    crate::glyphs::GlyphType::Infinity,
+                    crate::glyphs::GlyphType::Power,
+                    crate::glyphs::GlyphType::Effarig,
+                ]) {
+                    if let Some(t) = src.types.get(*name) {
+                        let i = crate::glyphs::GlyphFilter::type_index(kind).unwrap();
+                        let cfg = &mut filter.types[i];
+                        cfg.rarity = t.rarity;
+                        cfg.score = t.score;
+                        cfg.effect_count = t.effect_count;
+                        cfg.specified_mask = t.specified_mask;
+                        for (j, v) in t
+                            .effect_scores
+                            .iter()
+                            .take(cfg.effect_scores.len())
+                            .enumerate()
+                        {
+                            cfg.effect_scores[j] = *v;
+                        }
+                    }
+                }
+                filter
+            },
+            undo: dto
+                .reality
+                .glyphs
+                .undo
+                .iter()
+                .map(|u| crate::glyphs::GlyphUndoData {
+                    target_slot: u.target_slot.max(0.0) as u32,
+                    am: u.am,
+                    ip: u.ip,
+                    ep: u.ep,
+                    tt: u.tt,
+                    ecs: {
+                        let mut ecs = [0u8; 12];
+                        for (i, v) in u.ecs.iter().take(12).enumerate() {
+                            ecs[i] = v.max(0.0) as u8;
+                        }
+                        ecs
+                    },
+                    this_infinity_time: u.this_infinity_time,
+                    this_infinity_real_time: u.this_infinity_real_time,
+                    this_eternity_time: u.this_eternity_time,
+                    this_eternity_real_time: u.this_eternity_real_time,
+                    this_reality_time: u.this_reality_time,
+                    this_reality_real_time: u.this_reality_real_time,
+                    stored_time: u.stored_time,
+                    dilation_studies: {
+                        // `toBitmask()` numbers: bit `1 << id` per study id.
+                        let bits = u.dilation_studies.max(0.0) as u64;
+                        (0..32).filter(|id| bits & (1 << id) != 0).collect()
+                    },
+                    dilation_upgrades: u.dilation_upgrades.max(0.0) as u32,
+                    dilation_rebuyables: {
+                        let mut r = [0u32; 3];
+                        for (k, v) in &u.dilation_rebuyables {
+                            if let Ok(id) = k.parse::<usize>() {
+                                if (1..=3).contains(&id) {
+                                    r[id - 1] = *v;
+                                }
+                            }
+                        }
+                        r
+                    },
+                    tp: u.tp,
+                    dt: u.dt,
+                })
+                .collect(),
             protected_rows: dto.reality.glyphs.protected_rows,
         };
 

@@ -139,10 +139,15 @@ not the current state).
 - `src/glyphs.rs` — Glyphs (Feature 6.2): the JS-faithful seeded `GlyphRng`
   (xorshift32 + Marsaglia spare, ToInt32 seed semantics; outputs verified
   bit-for-bit against the original's algorithm), generation (strength/effect
-  rolls, the early-reality uniformity code, the uncommon guarantee), the
-  120-slot inventory + equip/respec, sacrifice (RU19-gated, 5 type boosts),
-  and the 20 generated effects' combiners; effects are applied at their
-  engine sites (each names its glyph effect).
+  rolls with the Effarig rarity boosts, the early-reality uniformity code, the
+  uncommon guarantee, the Effarig type's 7-effect pool with the rm/glyph
+  exclusion), the 120-slot inventory + equip/respec (one Effarig glyph max),
+  sacrifice (RU19-gated, 7 type boosts incl. effarig rarity + reality memory
+  chunks), the 27 generated + 4 Reality-glyph effects' combiners (applied at
+  their engine sites), Reality-glyph creation from the reality Alchemy
+  resource, the auto-glyph filter (`AutoGlyphProcessor`: 7 score modes, 3
+  rejection modes, per-type configs — consumed by `auto_reality`), and
+  Teresa's Glyph undo (equip snapshots + the rewinding reset).
 - `src/perks.rs` — Perks (Feature 6.3): the 35-perk catalogue + connection
   graph, purchase (1 PP, adjacency), on-purchase side effects (START bumps,
   EU1, ACHNR), `starting_ip`/`starting_ep`, and `tick_perk_effects` (EU

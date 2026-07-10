@@ -838,6 +838,16 @@ struct RealityView {
     sac_effects: Vec<f64>,
     /// Combined active glyph effects, in the panel's display order.
     active_effects: Vec<ActiveGlyphEffectView>,
+    /// The glyph filter (Effarig unlock): unlocked flag + settings.
+    filter_unlocked: bool,
+    filter: GlyphFilterView,
+    /// Glyph undo (Teresa unlock): availability + stack depth.
+    undo_unlocked: bool,
+    can_undo: bool,
+    undo_depth: usize,
+    /// Reality-glyph creation (the reality Alchemy resource).
+    can_create_reality_glyph: bool,
+    reality_glyph_level: u32,
     /// Bought perk ids + the currently purchasable ones (Feature 6.3).
     perks_bought: Vec<u8>,
     perks_buyable: Vec<u8>,
@@ -846,6 +856,29 @@ struct RealityView {
     upgrades: Vec<RealityUpgradeView>,
     /// The Black Holes (Feature 6.5).
     black_holes: BlackHolesView,
+}
+
+/// The auto-glyph filter settings (select/trash/simple + per-type configs,
+/// keyed by type name).
+#[derive(Serialize)]
+struct GlyphFilterView {
+    select: u8,
+    trash: u8,
+    simple: u32,
+    types: Vec<GlyphFilterTypeView>,
+}
+
+#[derive(Serialize)]
+struct GlyphFilterTypeView {
+    /// Type name ("time" … "effarig").
+    kind: String,
+    rarity: f64,
+    score: f64,
+    effect_count: u32,
+    specified_mask: u32,
+    effect_scores: Vec<f64>,
+    /// The type's lowest effect bit (for labelling the score/mask entries).
+    bit_offset: u8,
 }
 
 #[derive(Serialize)]
@@ -2143,19 +2176,30 @@ fn build_dilation_view(game: &GameState) -> DilationView {
 
 /// The Current Glyph Effects panel's display order (`glyphEffectsOrder` in
 /// CurrentGlyphEffects.vue), restricted to the generated bits.
-const GLYPH_EFFECT_DISPLAY_ORDER: [u8; 20] = [
+const GLYPH_EFFECT_DISPLAY_ORDER: [u8; 27] = [
     16, 17, 18, 19, // power
     12, 15, 14, 13, // infinity
     9, 10, 8, 11, // replication
     0, 3, 1, 2, // time
     7, 6, 4, 5, // dilation
+    20, 21, 22, 23, 24, 25, 26, // effarig
 ];
 
 fn build_glyph_view(game: &GameState, glyph: &ad_core::Glyph) -> GlyphView {
     // The companion's effect bits live in the non-generated bit space (its
     // "effects" are flavour text), so it gets no numeric effect values.
+    // Reality glyphs also use the non-generated space (bits 4–7); their view
+    // bits are offset by 100 so the frontend can key them separately.
     let effect_values = if glyph.kind == ad_core::GlyphType::Companion {
         Vec::new()
+    } else if glyph.kind == ad_core::GlyphType::Reality {
+        (4u8..=7)
+            .filter(|&bit| glyph.effects & (1u32 << bit) != 0)
+            .map(|bit| GlyphEffectValueView {
+                bit: 100 + bit,
+                value: num(&GameState::reality_glyph_single_effect_value(glyph, bit)),
+            })
+            .collect()
     } else {
         GLYPH_EFFECT_DISPLAY_ORDER
             .iter()
@@ -2271,7 +2315,47 @@ fn build_reality_view(game: &GameState) -> RealityView {
             game.glyph_sac_replication_effect() as f64,
             game.glyph_sac_time_effect(),
             game.glyph_sac_dilation_effect(),
+            game.glyph_sac_effarig_effect(),
+            game.glyph_sac_reality_effect(),
         ],
+        filter_unlocked: game.glyph_filter_unlocked(),
+        filter: {
+            let f = &game.reality.glyphs.filter;
+            let kinds = [
+                ad_core::GlyphType::Time,
+                ad_core::GlyphType::Dilation,
+                ad_core::GlyphType::Replication,
+                ad_core::GlyphType::Infinity,
+                ad_core::GlyphType::Power,
+                ad_core::GlyphType::Effarig,
+            ];
+            GlyphFilterView {
+                select: f.select,
+                trash: f.trash,
+                simple: f.simple,
+                types: kinds
+                    .iter()
+                    .map(|&kind| {
+                        let i = ad_core::glyphs::GlyphFilter::type_index(kind).unwrap();
+                        let cfg = &f.types[i];
+                        GlyphFilterTypeView {
+                            kind: kind.save_id().to_string(),
+                            rarity: cfg.rarity,
+                            score: cfg.score,
+                            effect_count: cfg.effect_count,
+                            specified_mask: cfg.specified_mask,
+                            effect_scores: cfg.effect_scores.clone(),
+                            bit_offset: ad_core::glyphs::GlyphFilter::bit_offset(kind),
+                        }
+                    })
+                    .collect(),
+            }
+        },
+        undo_unlocked: game.glyph_undo_unlocked(),
+        can_undo: game.can_undo_glyph(),
+        undo_depth: game.reality.glyphs.undo.len(),
+        can_create_reality_glyph: game.can_create_reality_glyph(),
+        reality_glyph_level: game.reality_glyph_creation_level(),
         active_effects,
         rebuyables: (1u8..=5)
             .map(|id| RealityRebuyableView {
@@ -3375,6 +3459,72 @@ fn buy_ip_offline(state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn set_ip_mult_autobuyer(active: bool, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().autobuyers.ip_mult_buyer_active = active;
+}
+
+/// Undo the last equipped glyph (Teresa's undo unlock).
+#[tauri::command]
+fn undo_glyph(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().undo_glyph();
+}
+
+/// Create a Reality Glyph from the reality Alchemy resource.
+#[tauri::command]
+fn create_reality_glyph(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().create_reality_glyph();
+}
+
+/// Set the glyph filter's selection / rejection modes and the shared
+/// effect-count threshold.
+#[tauri::command]
+fn set_glyph_filter_modes(
+    select: u8,
+    trash: u8,
+    simple: u32,
+    state: State<'_, Mutex<GameState>>,
+) {
+    let mut game = state.lock().unwrap();
+    let filter = &mut game.reality.glyphs.filter;
+    if select <= 6 {
+        filter.select = select;
+    }
+    if trash <= 2 {
+        filter.trash = trash;
+    }
+    filter.simple = simple;
+}
+
+/// Set one type's glyph-filter config (thresholds, required-effect mask,
+/// per-effect scores).
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+fn set_glyph_filter_type(
+    kind: String,
+    rarity: f64,
+    score: f64,
+    effect_count: u32,
+    specified_mask: u32,
+    effect_scores: Vec<f64>,
+    state: State<'_, Mutex<GameState>>,
+) {
+    let Some(kind) = ad_core::GlyphType::from_save_id(&kind) else {
+        return;
+    };
+    let Some(index) = ad_core::glyphs::GlyphFilter::type_index(kind) else {
+        return;
+    };
+    let mut game = state.lock().unwrap();
+    let cfg = &mut game.reality.glyphs.filter.types[index];
+    cfg.rarity = rarity.clamp(0.0, 100.0);
+    cfg.score = score;
+    cfg.effect_count = effect_count.min(7);
+    cfg.specified_mask = specified_mask;
+    for (i, v) in effect_scores
+        .iter()
+        .take(cfg.effect_scores.len())
+        .enumerate()
+    {
+        cfg.effect_scores[i] = *v;
+    }
 }
 
 /// The lump-sum offline currency award (`ipOffline`), fired once by the
@@ -4736,6 +4886,10 @@ pub fn run() {
             buy_max_ip_mult,
             buy_ip_offline,
             set_ip_mult_autobuyer,
+            undo_glyph,
+            create_reality_glyph,
+            set_glyph_filter_modes,
+            set_glyph_filter_type,
             offline_currency_gain,
             start_challenge,
             exit_challenge,

@@ -328,6 +328,11 @@ impl GameState {
     /// `MachineHandler.gainedRealityMachines`: hardcapped at `1e1000`.
     pub fn gained_reality_machines(&self) -> Decimal {
         let mut rm = self.uncapped_rm();
+        // The `effarigrm` glyph effect multiplies the RM gain.
+        let effarigrm = self.glyph_effect_effarigrm();
+        if effarigrm != 1.0 {
+            rm *= Decimal::from_float(effarigrm);
+        }
         // Achievement 167: more RM based on current RM (`max(1, log2(RM))`).
         if self.achievement_unlocked(167) {
             let factor =
@@ -391,13 +396,15 @@ impl GameState {
             .powf(repl_pow)
             * 0.025;
 
+        // `realityDTglyph` raises the DT factor's exponent (`^1.3 → ^(1.3+x)`).
+        let dt_pow = 1.3 + self.glyph_effect_reality_dt_glyph();
         let dt_base = self
             .records
             .this_reality
             .max_dt
             .pos_log10()
             .max(1.0)
-            .powf(1.3)
+            .powf(dt_pow)
             * 0.025;
 
         // RU18: eternity-count factor `max(√(log10(eternities+1))·0.45, 1)`.
@@ -424,8 +431,13 @@ impl GameState {
                 begin + 0.5 * rate * ((1.0 + 4.0 * excess).sqrt() - 1.0)
             }
         };
-        let mut scaled = instability_softcap(base_level, 1000.0, 500.0);
-        scaled = instability_softcap(scaled, 4000.0, 400.0);
+        // `Glyphs.instabilityThreshold = 1000 + effarigglyph + IU7`; the hyper
+        // threshold sits a flat 3000 above it.
+        let instability_start = 1000.0
+            + self.glyph_effect_effarigglyph()
+            + self.imaginary_rebuyable_effect(7);
+        let mut scaled = instability_softcap(base_level, instability_start, 500.0);
+        scaled = instability_softcap(scaled, instability_start + 3000.0, 400.0);
 
         // Static post-instability adders: +1 per fully-bought Reality Upgrade
         // row, Ra's `relicShardGlyphLevelBoost`, and the achievement adders

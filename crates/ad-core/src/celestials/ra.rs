@@ -324,10 +324,12 @@ impl GameState {
             return 0.0;
         }
         let chunk_mult = 1.5f64.powi(self.celestials.ra.pets[pet].chunk_upgrades as i32);
-        // GlyphSacrifice.reality (Reality-glyph sacrifice) is 1 in frontier.
+        // `GlyphSacrifice.reality`: Reality-glyph sacrifice multiplies Memory
+        // Chunk gain.
         let mut res = self.ra_raw_memory_chunks_per_second(pet)
             * chunk_mult
-            * self.ra_continuous_tt_memory_factor();
+            * self.ra_continuous_tt_memory_factor()
+            * self.glyph_sac_reality_effect();
         // Remembrance.
         if self.celestials.ra.pet_with_remembrance == pet as i8 {
             res *= 5.0;

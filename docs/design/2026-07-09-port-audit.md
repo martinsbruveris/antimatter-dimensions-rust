@@ -105,7 +105,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | ID | Feature | Status | Notes |
 |---|---|---|---|
 | 6.1 | Reality prestige | ✅ | RM formula, full reset, records, glyph-choice modal |
-| 6.2 | Glyphs | 🟡 | 5 base types, bit-exact seeded RNG, inventory/equip/respec/sacrifice; alchemy refining now wired (7.5). **Deferred: Effarig + Reality glyph types, the filter, undo, cosmetics** |
+| 6.2 | Glyphs | 🟡 | 5 base + Effarig + Reality types (generation rules, all 11 new effects, sacrifice/refinement), the auto-glyph filter (all 7 modes + 3 rejection modes), Teresa's undo. **Deferred: cosmetics, cursed glyphs (V), glyph sets** |
 | 6.3 | Perks (35) | 🟡 | tree + effects. **Deferred: EC-auto-completion + autobuyer-speed perks** |
 | 6.4 | Reality Upgrades (25) | 🟡 | all 25 upgrades. **Deferred: RU13/RU25 autobuyer halves** |
 | 6.5 | Black Holes (2) | 🟡 | unlock, 3 upgrades/hole, phase machine, pause/unpause. **Deferred: inversion + auto-pause** |
@@ -117,7 +117,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | ID | Feature | Status | Notes |
 |---|---|---|---|
 | 7.1 | Teresa | ✅ | pour-RM → `rmMultiplier`, 6 unlocks, Teresa's Reality, 4-entry Perk Shop |
-| 7.2 | Effarig | 🟡 | Relic Shards, 3-stage Reality, dilation-like nerfs, glyph-level cap. **Deferred: Effarig glyph type, `maxRarityBoost`, Replicanti-cap mult / `bonusRG`** |
+| 7.2 | Effarig | 🟡 | Relic Shards, 3-stage Reality, dilation-like nerfs, glyph-level cap, the Effarig glyph type + `maxRarityBoost` (via 6.2). **Deferred: Replicanti-cap mult / `bonusRG`** |
 | 7.3 | Enslaved | 🟡 | game-time storage + release, stored-time unlocks, run restrictions. **Deferred: real-time storage + `boostReality`, auto-release/store, Tesseracts, EC1 goal-1000** |
 | 7.4 | V | 🟡 | 6 main-unlock conditions, run modifiers, 9 V-achievements, Space Theorems. **Deferred: Perk-Point goal reduction; `fastAutoEC`/`autoAutoClean`/`achievementBH`/`raUnlock` effects; hard achievements 6–8 (need Ra flip)** |
 | 7.5 | Ra + Glyph Alchemy | 🟡 | 4 pets/memories/levels, 28 unlocks, Remembrance, 21-resource Alchemy + refinement. **Deferred: charged-IU effect variants, `uncountability` passive gen (u32 realities), the Reality-resource glyph, `boundless`/`multiversal`** |

@@ -4,9 +4,9 @@
 import { computed } from "vue";
 
 import {
-  BASIC_TYPE_ORDER,
   GLYPH_TYPES,
   SACRIFICE_DESCRIPTIONS,
+  SACRIFICE_TYPE_ORDER,
 } from "../../../data/glyphs";
 import { useGameStore } from "../../../stores/game";
 import { formatDecimal } from "../../../util/format";
@@ -17,7 +17,7 @@ const reality = computed(() => game.snapshot?.reality);
 const rows = computed(() => {
   const totals = reality.value?.sac_totals ?? [];
   const effects = reality.value?.sac_effects ?? [];
-  return BASIC_TYPE_ORDER.map((type, i) => ({
+  return SACRIFICE_TYPE_ORDER.map((type, i) => ({
     type,
     symbol: GLYPH_TYPES[type].symbol,
     color: GLYPH_TYPES[type].color,

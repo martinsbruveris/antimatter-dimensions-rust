@@ -10,6 +10,8 @@ export const GLYPH_TYPES = {
   replication: { symbol: "Ξ", color: "#03a9f4", adjective: "Replication" },
   time: { symbol: "Δ", color: "#b241e3", adjective: "Time" },
   dilation: { symbol: "Ψ", color: "#64dd17", adjective: "Dilation" },
+  effarig: { symbol: "Ϙ", color: "#e21717", adjective: "Effarig" },
+  reality: { symbol: "Ϟ", color: "#0b600e", adjective: "Reality" },
   companion: { symbol: "♥", color: "#feaec9", adjective: "Companion" },
 };
 
@@ -147,6 +149,63 @@ export const GLYPH_EFFECTS = {
     single: (x) => `Increase the bonus from buying 10 Antimatter Dimensions by ${f(x, 2, 2)}`,
     total: (x) => `Multiplier from "Buy 10" ×${f(x, 2, 2)}`,
   },
+  // Effarig glyph effects (bits 20–26).
+  20: {
+    id: "effarigrm",
+    single: (x) => `Reality Machine multiplier ×${f(x, 2, 2)}`,
+    total: (x) => `Reality Machine multiplier ×${f(x, 2, 2)}`,
+  },
+  21: {
+    id: "effarigglyph",
+    single: (x) => `Glyph Instability starting level +${f(x, 0, 0)}`,
+    total: (x) => `Glyph Instability delay +${f(x, 0, 0)}`,
+  },
+  22: {
+    id: "effarigblackhole",
+    single: (x) => `Game speed power +${f(minusOne(x), 3, 3)}`,
+    total: (x) => `Game speed ^${f(x, 3, 3)}`,
+  },
+  23: {
+    id: "effarigachievement",
+    single: (x) => `Achievement multiplier power +${f(minusOne(x), 3, 3)}`,
+    total: (x) => `Achievement multiplier ^${f(x, 3, 3)}`,
+  },
+  24: {
+    id: "effarigforgotten",
+    single: (x) => `Bonus from buying 10 Dimensions ^${f(x, 2, 2)}`,
+    total: (x) => `Multiplier from "Buy 10" ^${f(x, 2, 2)}`,
+  },
+  25: {
+    id: "effarigdimensions",
+    single: (x) => `All Dimension power +${f(minusOne(x), 3, 3)}`,
+    total: (x) => `All Dimension multipliers ^${f(x, 3, 3)}`,
+  },
+  26: {
+    id: "effarigantimatter",
+    single: (x) => `Antimatter production: 10^x ➜ 10^(x^${f(x, 4, 4)})`,
+    total: (x) => `Antimatter production exponent ^${f(x, 4, 4)}`,
+  },
+  // Reality glyph effects (non-generated bits 4–7, offset by 100 in the view).
+  104: {
+    id: "realityglyphlevel",
+    single: (x) => `Increase the effective level of equipped basic Glyphs by ${f(x, 0, 0)}`,
+    total: (x) => `Equipped basic Glyph level +${f(x, 0, 0)}`,
+  },
+  105: {
+    id: "realitygalaxies",
+    single: (x) => `All Galaxies are ${((toNumber(x) - 1) * 100).toFixed(2)}% stronger`,
+    total: (x) => `All Galaxy strength +${((toNumber(x) - 1) * 100).toFixed(2)}%`,
+  },
+  106: {
+    id: "realityrow1pow",
+    single: (x) => `Multiplier from Reality Upgrade Amplifiers ^${f(x, 3, 3)}`,
+    total: (x) => `Reality Upgrade Amplifier multiplier ^${f(x, 3, 3)}`,
+  },
+  107: {
+    id: "realityDTglyph",
+    single: (x) => `Dilated Time factor for Glyph level: ^1.3 ➜ ^(1.3 + ${f(x, 2, 2)})`,
+    total: (x) => `Dilated Time factor for Glyph level +${f(x, 2, 2)}`,
+  },
 };
 
 // The companion glyph's fixed flavour text (bits 8/9 in its own space).
@@ -158,7 +217,7 @@ export const COMPANION_TEXT = [
     "amount on your first Reality.",
 ];
 
-// The sacrifice-boost descriptions (BASIC_GLYPH_TYPES order matches the
+// The sacrifice-boost descriptions (sacrifice-index order, matching the
 // snapshot's sac_totals / sac_effects arrays).
 export const SACRIFICE_DESCRIPTIONS = [
   (v) => `Distant Galaxy scaling starts ${v.toFixed(0)} later`,
@@ -166,8 +225,15 @@ export const SACRIFICE_DESCRIPTIONS = [
   (v) => `Replicanti Galaxy scaling starts ${v.toFixed(0)} later`,
   (v) => `×${v.toFixed(2)} bigger multiplier when buying 8th Time Dimension`,
   (v) => `Multiply Tachyon Particle gain by ×${v.toFixed(2)}`,
+  (v) => `+${v.toFixed(2)}% additional Glyph rarity`,
+  (v) => `Multiply Memory Chunk gain by ×${v.toFixed(3)}`,
 ];
 
 export const BASIC_TYPE_ORDER = ["power", "infinity", "replication", "time", "dilation"];
+
+// Sacrifice-index order (basic types, then effarig and reality).
+export const SACRIFICE_TYPE_ORDER = [
+  "power", "infinity", "replication", "time", "dilation", "effarig", "reality",
+];
 
 export { toNumber };

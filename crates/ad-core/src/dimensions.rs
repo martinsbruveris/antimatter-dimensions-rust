@@ -518,9 +518,11 @@ impl GameState {
         } else {
             mult.pow(&Decimal::from_float(power))
         };
-        // Ra's `momentumValue` folds into the glyph power exponent
-        // (`applyNDPowers`).
-        let glyph_pow = self.glyph_effect_powerpow() * self.ra_momentum_value();
+        // Ra's `momentumValue` and the `effarigdimensions` power fold into the
+        // glyph power exponent (`applyNDPowers`).
+        let glyph_pow = self.glyph_effect_powerpow()
+            * self.glyph_effect_effarigdimensions()
+            * self.ra_momentum_value();
         if glyph_pow != 1.0 {
             mult = mult.pow(&Decimal::from_float(glyph_pow));
         }
@@ -635,6 +637,14 @@ impl GameState {
         // exponential `chall3Pow` (which also weakens it to ×0.01 at the start).
         if tier == 0 && self.challenge_running(3) {
             production *= self.chall3_pow;
+        }
+        // The `effarigantimatter` glyph effect bends the 1st dimension's
+        // production exponent: `10^x → 10^(x^value)` (above 10 only).
+        if tier == 0 {
+            let eff = self.glyph_effect_effarigantimatter();
+            if eff != 1.0 && production > Decimal::from_float(10.0) {
+                production = Decimal::pow10(production.log10().powf(eff));
+            }
         }
 
         // `cappedProductionInNormalChallenges`: unless post-break (Infinity broken

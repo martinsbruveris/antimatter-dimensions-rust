@@ -15,6 +15,12 @@ import {
 } from "../../../data/celestials";
 
 const game = useGameStore();
+const canCreateRealityGlyph = computed(
+  () => game.snapshot?.reality?.can_create_reality_glyph ?? false,
+);
+const realityGlyphLevel = computed(
+  () => game.snapshot?.reality?.reality_glyph_level ?? 0,
+);
 const ra = computed(() => game.snapshot?.celestials?.ra);
 
 const isRunning = computed(() => Boolean(ra.value?.is_running));
@@ -196,6 +202,18 @@ function toggleReaction(id) {
             @click="toggleReaction(res.id)"
           >
             {{ res.reaction_active ? "Reaction ON" : "Reaction OFF" }}
+          </button>
+          <button
+            v-if="res.id === 20 && res.unlocked"
+            class="c-alchemy-reaction"
+            :disabled="!canCreateRealityGlyph"
+            :title="canCreateRealityGlyph
+              ? `Create a level ${realityGlyphLevel} Reality Glyph (consumes all
+                Reality resource)`
+              : 'Requires Reality resource and inventory space'"
+            @click="game.createRealityGlyph()"
+          >
+            Create Reality Glyph (lvl {{ realityGlyphLevel }})
           </button>
         </div>
       </div>

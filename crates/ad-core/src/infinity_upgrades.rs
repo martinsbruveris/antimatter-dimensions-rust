@@ -413,8 +413,13 @@ impl GameState {
         if self.achievement_unlocked(58) {
             mult *= Decimal::from_float(1.01);
         }
-        // The `powerbuy10` glyph effect multiplies the base.
+        // The `powerbuy10` glyph effect multiplies the base; `effarigforgotten`
+        // raises the whole multiplier to a power.
         mult *= Decimal::from_float(self.glyph_effect_powerbuy10());
+        let forgotten = self.glyph_effect_effarigforgotten();
+        if forgotten != 1.0 {
+            mult = mult.pow(&Decimal::from_float(forgotten));
+        }
         mult
     }
 

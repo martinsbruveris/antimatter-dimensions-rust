@@ -134,9 +134,11 @@ impl GameState {
         }
         let power =
             1.25f64.powi(completed_rows as i32) * 1.03f64.powi(total_unlocked as i32);
-        // Ra's `achievementPower` unlock (V pet level 25) raises the whole
-        // multiplier `^1.5`; the exponent is 1 until then.
-        Decimal::from_float(power.powf(self.ra_achievement_power_exponent()))
+        // The exponent is the `effarigachievement` glyph effect times Ra's
+        // `achievementPower` unlock (V pet level 25, `^1.5`).
+        let exponent = self.glyph_effect_effarigachievement()
+            * self.ra_achievement_power_exponent();
+        Decimal::from_float(power.powf(exponent))
     }
 
     /// Antimatter to reset to after a dimension boost, galaxy, or Big Crunch.
@@ -1891,7 +1893,7 @@ mod tests {
     #[test]
     fn achievement_171_needs_every_glyph_type_sacrificed() {
         let mut game = GameState::new();
-        game.reality.glyphs.sac = [1.0; 5];
+        game.reality.glyphs.sac = [1.0; 7];
         game.check_tick_achievements(50.0);
         assert!(game.achievement_unlocked(171));
     }

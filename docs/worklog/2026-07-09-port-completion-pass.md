@@ -161,3 +161,52 @@ allRebuyables/allSingleUpgrades layout.
 **Tests:** five new unit tests (doom gating + costs, the Doomed DT formula,
 TG multiplier, threshold cube root, tickspeed power). Fidelity steady at
 1121/1148.
+
+## 6.2 — Effarig + Reality glyph types, the glyph filter, undo
+
+**What shipped:** the two remaining glyph types and both deferred QoL
+systems.
+
+*Effarig glyphs:* `GlyphType::Effarig` with the 7 effarig effects (bits
+20–26) — RM multiplier, instability delay, game-speed power, achievement
+power, buy-10 power, all-Dimension power, AM-exponent bend — each applied at
+its original site (reality.rs / eternity_challenges.rs / achievements.rs /
+infinity_upgrades.rs / dimensions.rs / infinity_dimensions.rs /
+time_dimensions.rs). Generation is RNG-stream-faithful: the type joins the
+random pool once Effarig's Reality is completed, `randomStrength` now carries
+the full `increasedRarity` term (relic-shard `maxRarityBoost`, Achievement
+146, the effarig sacrifice boost), the effect roll caps at 7 with Ra's
+`glyphEffectCount`, and `effarigrm`/`effarigglyph` are mutually exclusive at
+the roll. One Effarig glyph may be equipped at a time. Sacrifice widened to 7
+types (`sac: [f64; 7]`), which also makes Achievement 171 faithful; effarig
+glyphs refine into the effarig Alchemy resource.
+
+*Reality glyphs:* constructed (never rolled) at 100% rarity from the reality
+Alchemy resource (`create_reality_glyph`, consuming the whole resource, with
+the 0/9k/15k/25k effect thresholds). Their 4 effects live in the
+non-generated bit space: basic-glyph level boost (into
+`adjusted_glyph_level`), galaxy strength (tickspeed ≥3 branch), Amplifier
+power (`reality_rebuyable_effect`, which also gained the previously-unwired
+Imaginary Intensifier bases), and the DT-exponent bump in
+`getGlyphLevelInputs`. Reality sacrifice multiplies Ra Memory Chunk gain.
+
+*Filter:* the full `AutoGlyphProcessor` port — 7 score modes (lowest
+sacrifice / effect count / rarity / specified effect / effect score / lowest
+alchemy / refinement value), 3 rejection modes (sacrifice / refine /
+refine-to-cap), per-type configs, `pick`/`wouldKeep` wired into
+`auto_reality` behind Effarig's glyph-filter unlock. Save round-trip for
+`filter` settings. Compact filter panel in the Glyphs tab.
+
+*Undo:* Teresa's unlock — every equip snapshots the run
+(`Glyphs.saveUndo`: currencies, TT, EC completions, run clocks, stored time,
+dilation state), `undo_glyph` unequips, performs the reward-free Reality
+reset preserving the celestial run flags, and restores the snapshot. The
+undo stack round-trips (`toBitmask` numbers for dilation studies/upgrades).
+
+**Also fixed en route:** the instability thresholds now honour Imaginary
+Upgrade 7 (`+200`/purchase) alongside `effarigglyph` (both were hardcoded
+1000/4000).
+
+**Tests:** six new unit tests (pool gating, rm/glyph exclusion, creation +
+thresholds, basic-level boost, filter keep/reject/pick, undo restore).
+Fidelity steady at 1121/1148.

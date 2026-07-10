@@ -365,6 +365,12 @@ impl GameState {
             crate::celestials::singularity::GAMESPEED_FROM_SINGULARITIES,
             1.0,
         );
+        // The `effarigblackhole` glyph effect raises the whole factor `^x`
+        // (`game.js`: `factor = Math.pow(factor, effarigblackhole)`).
+        let bh_pow = self.glyph_effect_effarigblackhole();
+        if bh_pow != 1.0 {
+            factor = factor.powf(bh_pow);
+        }
         // Pelle: the `timeSpeedMult` rebuyable (while doomed).
         factor *= self.pelle_time_speed_mult();
         // Effarig's Reality compresses game speed too (`getGameSpeedupFactor`

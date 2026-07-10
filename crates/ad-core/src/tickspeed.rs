@@ -227,7 +227,10 @@ impl GameState {
             } else {
                 TICKSPEED_GALAXY_BASE
             };
-            let adjusted = (galaxies - 2.0) * effects;
+            // `realitygalaxies` scales the effective galaxy count in this
+            // branch (`galaxies *= getAdjustedGlyphEffect("realitygalaxies")`).
+            let adjusted =
+                (galaxies - 2.0) * effects * self.glyph_effect_realitygalaxies();
             galaxy_base * TICKSPEED_GALAXY_DECAY.powf(adjusted - 2.0)
         }
     }

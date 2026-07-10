@@ -82,6 +82,14 @@ impl GameState {
         self.teresa_effarig_unlocked()
     }
 
+    /// `EffarigUnlock.reality.isUnlocked`: completing Effarig's Reality stage
+    /// unlocks the Effarig glyph type.
+    pub fn effarig_glyphs_unlocked(&self) -> bool {
+        self.celestials
+            .effarig
+            .unlock_bought(EFFARIG_UNLOCK_REALITY)
+    }
+
     /// `Effarig.currentStage`: the lowest stage whose unlock bit is unset.
     pub fn effarig_current_stage(&self) -> EffarigStage {
         let e = &self.celestials.effarig;

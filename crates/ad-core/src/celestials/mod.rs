@@ -101,6 +101,30 @@ impl GameState {
         self.celestials.laitela.run = false;
     }
 
+    /// The current per-celestial run flags (used by the Glyph undo to restore
+    /// the run across its reward-free Reality reset — the original's
+    /// `restoreCelestialState`).
+    pub(crate) fn celestials_run_flags(&self) -> [bool; 6] {
+        [
+            self.celestials.teresa.run,
+            self.celestials.effarig.run,
+            self.celestials.enslaved.run,
+            self.celestials.v.run,
+            self.celestials.ra.run,
+            self.celestials.laitela.run,
+        ]
+    }
+
+    /// Restore run flags captured by [`Self::celestials_run_flags`].
+    pub(crate) fn restore_celestial_runs(&mut self, flags: [bool; 6]) {
+        self.celestials.teresa.run = flags[0];
+        self.celestials.effarig.run = flags[1];
+        self.celestials.enslaved.run = flags[2];
+        self.celestials.v.run = flags[3];
+        self.celestials.ra.run = flags[4];
+        self.celestials.laitela.run = flags[5];
+    }
+
     /// Whether the Celestials tab / features are available. The original gates
     /// Teresa on Achievement 147 (first Reality); we gate on `reality_unlocked`
     /// since our achievement grid is display-only past the early rows (see the

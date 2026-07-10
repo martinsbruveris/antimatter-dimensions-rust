@@ -291,11 +291,16 @@ impl GameState {
                 .max(&Decimal::ONE)
                 .min(&Decimal::new_unchecked(1.0, 30_000));
         }
-        // The `infinitypow` glyph power, then Time Dilation compresses the
-        // final multiplier.
+        // The `infinitypow` glyph power and the all-Dimension
+        // `effarigdimensions` power, then Time Dilation compresses the final
+        // multiplier.
         let infinitypow = self.glyph_effect_infinitypow();
         if infinitypow != 1.0 {
             mult = mult.pow(&Decimal::from_float(infinitypow));
+        }
+        let effarig_dims = self.glyph_effect_effarigdimensions();
+        if effarig_dims != 1.0 {
+            mult = mult.pow(&Decimal::from_float(effarig_dims));
         }
         // Ra Alchemy `infinity` (ID `^(1 + amount/200000)`) then `momentumValue`.
         let alch_inf =

@@ -87,8 +87,12 @@ impl GameState {
     /// Rebuyable `id`'s effect multiplier (`effect^count`).
     pub fn reality_rebuyable_effect(&self, id: u8) -> Decimal {
         let i = (id - 1) as usize;
-        Decimal::from_float(REBUYABLE_EFFECT[i])
-            .pow(&Decimal::from(self.reality.rebuyables[i] as u64))
+        // The Imaginary Intensifiers (IU 1–5) add to the per-purchase base;
+        // the `realityrow1pow` Reality-glyph effect scales the exponent.
+        let base = REBUYABLE_EFFECT[i] + self.imaginary_rebuyable_effect(id);
+        let exponent =
+            self.reality.rebuyables[i] as f64 * self.glyph_effect_realityrow1pow();
+        Decimal::from_float(base).pow(&Decimal::from_float(exponent))
     }
 
     /// Buy one purchase of rebuyable `id`.

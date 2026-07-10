@@ -285,11 +285,15 @@ impl GameState {
             let log = self.sacrifice_multiplier().pos_log10();
             mult *= Decimal::from_float(log.powi(10).max(1.0));
         }
-        // The `timepow` glyph power, then Time Dilation compresses the final
-        // multiplier.
+        // The `timepow` glyph power and the all-Dimension `effarigdimensions`
+        // power, then Time Dilation compresses the final multiplier.
         let timepow = self.glyph_effect_timepow();
         if timepow != 1.0 {
             mult = mult.pow(&Decimal::from_float(timepow));
+        }
+        let effarig_dims = self.glyph_effect_effarigdimensions();
+        if effarig_dims != 1.0 {
+            mult = mult.pow(&Decimal::from_float(effarig_dims));
         }
         // Ra Alchemy `time` (TD `^(1 + amount/200000)`) then `momentumValue`.
         let alch_time = self.alchemy_dimension_power(crate::celestials::alchemy::TIME);

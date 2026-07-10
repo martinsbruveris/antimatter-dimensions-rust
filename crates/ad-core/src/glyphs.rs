@@ -41,6 +41,8 @@ pub enum GlyphType {
     Replication,
     Time,
     Dilation,
+    Effarig,
+    Reality,
     Companion,
 }
 
@@ -62,6 +64,8 @@ impl GlyphType {
             GlyphType::Replication => "replication",
             GlyphType::Time => "time",
             GlyphType::Dilation => "dilation",
+            GlyphType::Effarig => "effarig",
+            GlyphType::Reality => "reality",
             GlyphType::Companion => "companion",
         }
     }
@@ -73,14 +77,27 @@ impl GlyphType {
             "replication" => GlyphType::Replication,
             "time" => GlyphType::Time,
             "dilation" => GlyphType::Dilation,
+            "effarig" => GlyphType::Effarig,
+            "reality" => GlyphType::Reality,
             "companion" => GlyphType::Companion,
             _ => return None,
         })
     }
 
-    /// Index into [`BASIC_GLYPH_TYPES`] / the sacrifice array.
+    /// Index into [`BASIC_GLYPH_TYPES`].
     pub fn basic_index(self) -> Option<usize> {
         BASIC_GLYPH_TYPES.iter().position(|&t| t == self)
+    }
+
+    /// Index into the sacrifice array (`player.reality.glyphs.sac`): the five
+    /// basic types, then effarig (5) and reality (6).
+    pub fn sacrifice_index(self) -> Option<usize> {
+        match self {
+            GlyphType::Effarig => Some(5),
+            GlyphType::Reality => Some(6),
+            GlyphType::Companion => None,
+            basic => basic.basic_index(),
+        }
     }
 
     /// The generated-effect bitmask bits this type can roll, in the
@@ -92,7 +109,10 @@ impl GlyphType {
             GlyphType::Replication => &[8, 9, 10, 11],
             GlyphType::Infinity => &[12, 13, 14, 15],
             GlyphType::Power => &[16, 17, 18, 19],
-            GlyphType::Companion => &[],
+            GlyphType::Effarig => &[20, 21, 22, 23, 24, 25, 26],
+            // Reality glyphs are constructed (level thresholds), not rolled;
+            // the companion has no numeric effects.
+            GlyphType::Reality | GlyphType::Companion => &[],
         }
     }
 
@@ -148,12 +168,163 @@ pub struct GlyphState {
     pub active: Vec<Glyph>,
     /// Inventory glyphs (`idx` = inventory slot).
     pub inventory: Vec<Glyph>,
-    /// Cumulative sacrifice value per basic type
-    /// ([`BASIC_GLYPH_TYPES`] order).
-    pub sac: [f64; 5],
+    /// Cumulative sacrifice value per type ([`BASIC_GLYPH_TYPES`] order, then
+    /// effarig and reality — [`GlyphType::sacrifice_index`]).
+    #[cfg_attr(feature = "serde", serde(default = "default_sac"))]
+    pub sac: [f64; 7],
+    /// Whether a Reality Glyph has ever been created
+    /// (`player.reality.glyphs.createdRealityGlyph`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub created_reality_glyph: bool,
+    /// The auto-glyph filter (`player.reality.glyphs.filter`), unlocked by
+    /// Effarig's glyph-filter Relic-Shard unlock.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub filter: GlyphFilter,
+    /// The Glyph-undo stack (`player.reality.glyphs.undo`, Teresa's undo
+    /// unlock): one snapshot per mid-reality equip.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub undo: Vec<GlyphUndoData>,
     /// Protected inventory rows (top `protected_rows × 10` slots; new glyphs
     /// never land there). Default 2.
     pub protected_rows: u32,
+}
+
+/// `AUTO_GLYPH_SCORE` — the filter's selection mode.
+pub const FILTER_LOWEST_SACRIFICE: u8 = 0;
+pub const FILTER_EFFECT_COUNT: u8 = 1;
+pub const FILTER_RARITY_THRESHOLD: u8 = 2;
+pub const FILTER_SPECIFIED_EFFECT: u8 = 3;
+pub const FILTER_EFFECT_SCORE: u8 = 4;
+pub const FILTER_LOWEST_ALCHEMY: u8 = 5;
+pub const FILTER_ALCHEMY_VALUE: u8 = 6;
+
+/// `AUTO_GLYPH_REJECT` — what happens to rejected glyphs.
+pub const REJECT_SACRIFICE: u8 = 0;
+pub const REJECT_REFINE: u8 = 1;
+pub const REJECT_REFINE_TO_CAP: u8 = 2;
+
+/// Per-type glyph-filter settings (`filter.types[type]`).
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GlyphFilterTypeConfig {
+    /// Rarity threshold (Rarity/Specified-Effect modes).
+    pub rarity: f64,
+    /// Score threshold (Effect-Score mode).
+    pub score: f64,
+    /// Minimum effect count (Specified-Effect mode).
+    pub effect_count: u32,
+    /// Required-effect bitmask (Specified-Effect mode).
+    pub specified_mask: u32,
+    /// Per-effect scores (Effect-Score mode), indexed by `bit − type offset`.
+    pub effect_scores: Vec<f64>,
+}
+
+impl GlyphFilterTypeConfig {
+    fn new(effect_count: usize) -> Self {
+        Self {
+            rarity: 0.0,
+            score: 0.0,
+            effect_count: 0,
+            specified_mask: 0,
+            effect_scores: vec![0.0; effect_count],
+        }
+    }
+}
+
+/// The auto-glyph filter (`player.reality.glyphs.filter`). `types` is indexed
+/// by [`GlyphFilter::type_index`] (time/dilation/replication/infinity/power/
+/// effarig — the effect-bit offset order).
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GlyphFilter {
+    /// `AUTO_GLYPH_SCORE` selection mode (`select`).
+    pub select: u8,
+    /// `AUTO_GLYPH_REJECT` rejection mode (`trash`).
+    pub trash: u8,
+    /// The Effect-Count mode's shared threshold (`simple`).
+    pub simple: u32,
+    pub types: Vec<GlyphFilterTypeConfig>,
+}
+
+impl GlyphFilter {
+    pub fn new() -> Self {
+        Self {
+            select: FILTER_LOWEST_SACRIFICE,
+            trash: REJECT_SACRIFICE,
+            simple: 0,
+            // time/dilation/replication/infinity/power (4 effects each) +
+            // effarig (7).
+            types: (0..6)
+                .map(|i| GlyphFilterTypeConfig::new(if i == 5 { 7 } else { 4 }))
+                .collect(),
+        }
+    }
+
+    /// The `types` index for a filterable type — the effect-bit offset order
+    /// (`AutoGlyphProcessor.bitmaskIndexOffset / 4`).
+    pub fn type_index(kind: GlyphType) -> Option<usize> {
+        match kind {
+            GlyphType::Time => Some(0),
+            GlyphType::Dilation => Some(1),
+            GlyphType::Replication => Some(2),
+            GlyphType::Infinity => Some(3),
+            GlyphType::Power => Some(4),
+            GlyphType::Effarig => Some(5),
+            _ => None,
+        }
+    }
+
+    /// The effect-bit offset of a filterable type.
+    pub fn bit_offset(kind: GlyphType) -> u8 {
+        match kind {
+            GlyphType::Time => 0,
+            GlyphType::Dilation => 4,
+            GlyphType::Replication => 8,
+            GlyphType::Infinity => 12,
+            GlyphType::Power => 16,
+            _ => 20,
+        }
+    }
+}
+
+impl Default for GlyphFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// One Glyph-undo snapshot (`player.reality.glyphs.undo[]`): the run state
+/// saved when a glyph is equipped mid-Reality, restored on undo.
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GlyphUndoData {
+    pub target_slot: u32,
+    pub am: Decimal,
+    pub ip: Decimal,
+    pub ep: Decimal,
+    /// Unspent purchased-equivalent TT (`timeTheorems.max − totalPurchased`).
+    pub tt: Decimal,
+    /// EC completions at equip time.
+    pub ecs: [u8; 12],
+    pub this_infinity_time: f64,
+    pub this_infinity_real_time: f64,
+    pub this_eternity_time: f64,
+    pub this_eternity_real_time: f64,
+    pub this_reality_time: f64,
+    pub this_reality_real_time: f64,
+    pub stored_time: f64,
+    /// Dilation studies / one-time upgrades / rebuyables at equip time.
+    pub dilation_studies: Vec<u8>,
+    pub dilation_upgrades: u32,
+    pub dilation_rebuyables: [u32; 3],
+    pub tp: Decimal,
+    pub dt: Decimal,
+}
+
+/// serde default for the widened sacrifice array.
+#[cfg(feature = "serde")]
+fn default_sac() -> [f64; 7] {
+    [0.0; 7]
 }
 
 impl GlyphState {
@@ -161,7 +332,10 @@ impl GlyphState {
         Self {
             active: Vec::new(),
             inventory: Vec::new(),
-            sac: [0.0; 5],
+            sac: [0.0; 7],
+            created_reality_glyph: false,
+            filter: GlyphFilter::new(),
+            undo: Vec::new(),
             protected_rows: 2,
         }
     }
@@ -294,9 +468,25 @@ impl GameState {
     fn random_strength(&self, rng: &mut GlyphRng) -> f64 {
         let mut result =
             Self::gaussian_bell_curve(rng) * self.glyph_strength_multiplier();
-        let _relic_shard_factor = rng.uniform();
-        // increasedRarity: Effarig / Achievement 146 / effarig sacrifice — all
-        // out of frontier (0).
+        // (Ra's `maxGlyphRarityAndShardSacrificeBoost` short-circuit to 100%
+        // rarity is out of frontier; the stream stays aligned regardless.)
+        let relic_shard_factor = rng.uniform();
+        // `increasedRarity`: the relic-shard boost (`Effarig.maxRarityBoost =
+        // 5·log10(log10(shards + 10))`), Achievement 146 (+1% rarity), and the
+        // effarig sacrifice effect.
+        let max_rarity_boost = 5.0
+            * (self.celestials.effarig.relic_shards + 10.0)
+                .log10()
+                .log10();
+        let ach146 = if self.achievement_unlocked(146) {
+            1.0
+        } else {
+            0.0
+        };
+        let increased_rarity = relic_shard_factor * max_rarity_boost
+            + ach146
+            + self.glyph_sac_effarig_effect();
+        result += increased_rarity / 40.0;
         result = (result * 400.0).ceil() / 400.0;
         result.min(MAX_STRENGTH)
     }
@@ -305,20 +495,33 @@ impl GameState {
     /// keep the stream aligned; RU17 grants a 50% chance of one extra.
     fn random_number_of_effects(
         &self,
+        kind: GlyphType,
         strength: f64,
         level: u32,
         rng: &mut GlyphRng,
     ) -> u32 {
         let random1 = rng.uniform();
         let random2 = rng.uniform();
-        let mut num = (4.0f64).min(
+        // Ra's `glyphEffectCount` unlock forces 4 effects on non-effarig
+        // glyphs and raises the cap to 7 for effarig ones.
+        let effect_count_unlock =
+            self.ra_unlock_active(crate::celestials::ra::RA_UNLOCK_GLYPH_EFFECT_COUNT);
+        if kind != GlyphType::Effarig && effect_count_unlock {
+            return 4;
+        }
+        let max_effects = if effect_count_unlock { 7 } else { 4 };
+        let mut num = (max_effects as f64).min(
             (random1.powf(1.0 - (level as f64 * strength).sqrt() / 100.0) * 1.5 + 1.0)
                 .floor(),
         ) as u32;
         if self.reality_upgrade_bought(17) && random2 < 0.5 {
-            num = (num + 1).min(4);
+            num = (num + 1).min(max_effects);
         }
-        num
+        if effect_count_unlock {
+            num.max(4)
+        } else {
+            num
+        }
     }
 
     /// `GlyphGenerator.generateEffects`: weight each possible effect with a
@@ -330,6 +533,18 @@ impl GameState {
             bits.iter().map(|&b| (b, rng.uniform())).collect();
         for _ in 0..(7 - bits.len()) {
             rng.uniform();
+        }
+        // Effarig: `effarigrm` (20) and `effarigglyph` (21) are mutually
+        // exclusive — the lower-weighted of the two is pushed out of range.
+        if kind == GlyphType::Effarig {
+            let w20 = weighted.iter().find(|e| e.0 == 20).unwrap().1;
+            let w21 = weighted.iter().find(|e| e.0 == 21).unwrap().1;
+            let unincluded = if w20 < w21 { 20 } else { 21 };
+            for entry in weighted.iter_mut() {
+                if entry.0 == unincluded {
+                    entry.1 = -1.0;
+                }
+            }
         }
         if let Some(primary) = kind.primary_effect_bit() {
             for entry in weighted.iter_mut() {
@@ -349,22 +564,28 @@ impl GameState {
 
     /// `GlyphGenerator.randomType`: uniform over the basic types, excluding
     /// the most-repeated types so far.
-    fn random_type(rng: &mut GlyphRng, types_so_far: &[GlyphType]) -> GlyphType {
+    fn random_type(&self, rng: &mut GlyphRng, types_so_far: &[GlyphType]) -> GlyphType {
+        // `generatedTypes` filtered on the Effarig-Reality unlock: completing
+        // Effarig's Reality adds the effarig type to the random pool.
+        let mut generatable = BASIC_GLYPH_TYPES.to_vec();
+        if self.effarig_glyphs_unlocked() {
+            generatable.push(GlyphType::Effarig);
+        }
         let count = |t: GlyphType| types_so_far.iter().filter(|&&x| x == t).count();
-        let max_count = BASIC_GLYPH_TYPES.iter().map(|&t| count(t)).max().unwrap();
+        let max_count = generatable.iter().map(|&t| count(t)).max().unwrap();
         let candidates: Vec<GlyphType> = if types_so_far.is_empty() {
-            BASIC_GLYPH_TYPES.to_vec()
+            generatable.clone()
         } else {
-            BASIC_GLYPH_TYPES
+            generatable
                 .iter()
                 .copied()
                 .filter(|&t| count(t) != max_count)
                 .collect()
         };
-        // `GlyphTypes.random` over the non-blacklisted types; an empty list
-        // can't happen for 4 draws over 5 types, but fall back to all.
+        // `GlyphTypes.random` over the non-blacklisted types; fall back to the
+        // whole pool if everything is blacklisted.
         let pool = if candidates.is_empty() {
-            BASIC_GLYPH_TYPES.to_vec()
+            generatable
         } else {
             candidates
         };
@@ -380,7 +601,7 @@ impl GameState {
     ) -> Glyph {
         let strength = self.random_strength(rng);
         let num_effects =
-            self.random_number_of_effects(strength, level.actual_level, rng);
+            self.random_number_of_effects(kind, strength, level.actual_level, rng);
         let effects = Self::generate_effects(kind, num_effects, rng);
         Glyph {
             id: 0,
@@ -512,7 +733,7 @@ impl GameState {
         } else {
             let mut types: Vec<GlyphType> = Vec::with_capacity(count);
             for _ in 0..count {
-                types.push(Self::random_type(rng, &types));
+                types.push(self.random_type(rng, &types));
             }
             types
                 .iter()
@@ -612,10 +833,9 @@ impl GameState {
 
     /// An automatic Reality (`autoReality()` → `processAutoGlyph`): used by
     /// the Reality autobuyer (and later the Automator's `reality` command).
-    /// Generates `choiceCount` glyphs and keeps the first — with the START
-    /// perk this matches the manual no-modal path; without it the original's
-    /// auto path generates a single glyph (unlike the manual 4-then-pick), and
-    /// we mirror that. The Effarig glyph-filter branch is out of frontier.
+    /// With Effarig's glyph filter unlocked the choice list is scored and the
+    /// pick kept only if it passes the filter; otherwise the first choice is
+    /// kept (the original's pre-filter behaviour).
     pub fn auto_reality(&mut self) -> bool {
         if !self.is_reality_available() {
             return false;
@@ -633,11 +853,17 @@ impl GameState {
         self.reality.seed = rng.state as f64;
         self.reality.second_gaussian = rng.second_gaussian;
 
-        let picked = glyphs[0].clone();
-        if self.glyph_free_inventory_space() == 0 {
-            self.sacrifice_or_delete(&picked);
+        let (picked, keep) = if self.glyph_filter_unlocked() {
+            let picked = self.glyph_filter_pick(&glyphs);
+            let keep = self.glyph_would_keep(&picked);
+            (picked, keep)
         } else {
+            (glyphs[0].clone(), true)
+        };
+        if keep && self.glyph_free_inventory_space() > 0 {
             self.add_glyph_to_inventory(picked);
+        } else {
+            self.get_rid_of_glyph(&picked);
         }
         self.finish_process_reality();
         true
@@ -768,6 +994,20 @@ impl GameState {
         else {
             return false;
         };
+        // At most one Effarig glyph may be equipped at a time
+        // (`Glyphs.equip`'s type restriction).
+        if self.reality.glyphs.inventory[pos].kind == GlyphType::Effarig
+            && self
+                .reality
+                .glyphs
+                .active
+                .iter()
+                .any(|g| g.kind == GlyphType::Effarig)
+        {
+            return false;
+        }
+        // `Glyphs.saveUndo(targetSlot)`: snapshot for the Teresa undo.
+        self.save_glyph_undo(target_slot);
         let mut glyph = self.reality.glyphs.inventory.remove(pos);
         glyph.idx = target_slot;
         self.reality.glyphs.active.push(glyph);
@@ -840,6 +1080,8 @@ impl GameState {
             GlyphType::Time => Some(alchemy::TIME),
             GlyphType::Replication => Some(alchemy::REPLICATION),
             GlyphType::Dilation => Some(alchemy::DILATION),
+            GlyphType::Effarig => Some(alchemy::EFFARIG),
+            GlyphType::Reality => Some(alchemy::REALITY),
             _ => None,
         }
     }
@@ -848,6 +1090,16 @@ impl GameState {
     pub fn glyph_sacrifice_gain(&self, glyph: &Glyph) -> f64 {
         if !self.can_sacrifice_glyphs() || glyph.kind == GlyphType::Companion {
             return 0.0;
+        }
+        // Achievement 171 doubles every sacrifice, including a Reality glyph's.
+        // Reality glyphs use the flat `0.01 × level` value.
+        if glyph.kind == GlyphType::Reality {
+            let ach171 = if self.achievement_unlocked(171) {
+                2.0
+            } else {
+                1.0
+            };
+            return 0.01 * glyph.level as f64 * ach171;
         }
         let level = glyph.level as f64;
         let pre10k = (level.min(10_000.0) + 10.0).powf(2.5);
@@ -882,9 +1134,9 @@ impl GameState {
             return true;
         }
         if let (true, Some(index)) =
-            (self.can_sacrifice_glyphs(), glyph.kind.basic_index())
+            (self.can_sacrifice_glyphs(), glyph.kind.sacrifice_index())
         {
-            // Ra's Glyph Alchemy (`attemptRefineGlyph`): once unlocked, a basic
+            // Ra's Glyph Alchemy (`attemptRefineGlyph`): once unlocked, a
             // generated Glyph is *refined* into its type's Alchemy resource
             // instead of sacrificed, provided the refinement is beneficial.
             let rarity = strength_to_rarity(glyph.strength);
@@ -908,15 +1160,15 @@ impl GameState {
     /// reality pick when sacrificing or out of space).
     fn sacrifice_or_delete(&mut self, glyph: &Glyph) {
         if self.can_sacrifice_glyphs() {
-            if let Some(index) = glyph.kind.basic_index() {
+            if let Some(index) = glyph.kind.sacrifice_index() {
                 self.reality.glyphs.sac[index] += self.glyph_sacrifice_gain(glyph);
             }
         }
     }
 
-    /// The capped sacrifice total for a basic type's effect.
+    /// The capped sacrifice total for a type's effect.
     fn sac_capped(&self, kind: GlyphType) -> f64 {
-        let index = kind.basic_index().expect("basic type");
+        let index = kind.sacrifice_index().expect("sacrificable type");
         self.reality.glyphs.sac[index].min(MAX_SACRIFICE_FOR_EFFECTS)
     }
 
@@ -949,6 +1201,22 @@ impl GameState {
         (1500.0 * base.powf(1.2)).floor() as u32
     }
 
+    /// Effarig sacrifice: additional Glyph rarity (%). Capped earlier than the
+    /// generic sacrifice cap (`+100%` at 1e70).
+    pub fn glyph_sac_effarig_effect(&self) -> f64 {
+        let index = GlyphType::Effarig.sacrifice_index().unwrap();
+        let capped = self.reality.glyphs.sac[index].min(1e70);
+        2.0 * (capped / 1e20 + 1.0).log10()
+    }
+
+    /// Reality sacrifice: Memory Chunk gain multiplier
+    /// (`1 + √sac / 15`, capped ×100).
+    pub fn glyph_sac_reality_effect(&self) -> f64 {
+        let index = GlyphType::Reality.sacrifice_index().unwrap();
+        let sac = self.reality.glyphs.sac[index];
+        (1.0 + sac.sqrt() / 15.0).min(100.0)
+    }
+
     /// Dilation sacrifice: Tachyon Particle gain multiplier.
     pub fn glyph_sac_dilation_effect(&self) -> f64 {
         let sac = self.sac_capped(GlyphType::Dilation);
@@ -971,18 +1239,52 @@ impl GameState {
         if self.celestials.effarig.run {
             return level.min(self.effarig_glyph_level_cap() as f64);
         }
-        level
+        // `realityglyphlevel`: equipped Reality glyphs raise the effective
+        // level of equipped *basic* glyphs (skipped inside celestial runs,
+        // which return above; the Pelle cap is out of frontier).
+        if glyph.kind.basic_index().is_some() {
+            level + self.reality_glyph_level_boost()
+        } else {
+            level
+        }
     }
 
-    /// Effect values of `bit` across the equipped basic-type glyphs.
+    /// `Glyphs.levelBoost` — the `realityglyphlevel` effect total (bit 4 of
+    /// the non-generated space): `floor(√(90·level))` per equipped Reality
+    /// glyph, combined additively.
+    pub fn reality_glyph_level_boost(&self) -> f64 {
+        self.reality_glyph_effect_values(4)
+            .iter()
+            .map(|&l| (l * 90.0).sqrt().floor())
+            .sum()
+    }
+
+    /// Effect values of generated-effect `bit` across the equipped generated
+    /// (basic + effarig) glyphs. Reality/companion glyphs use the separate
+    /// non-generated bit space and are excluded.
     fn glyph_effect_values(&self, bit: u8) -> Vec<(f64, f64)> {
         self.reality
             .glyphs
             .active
             .iter()
-            .filter(|g| g.kind != GlyphType::Companion)
+            .filter(|g| g.kind != GlyphType::Companion && g.kind != GlyphType::Reality)
             .filter(|g| g.effects & (1 << bit) != 0)
             .map(|g| (self.adjusted_glyph_level(g), g.strength))
+            .collect()
+    }
+
+    /// Effect values of non-generated `bit` across the equipped Reality
+    /// glyphs (level only; their strength is fixed at 100% rarity).
+    fn reality_glyph_effect_values(&self, bit: u8) -> Vec<f64> {
+        self.reality
+            .glyphs
+            .active
+            .iter()
+            .filter(|g| g.kind == GlyphType::Reality)
+            .filter(|g| g.effects & (1 << bit) != 0)
+            // A Reality glyph is not "basic", so this is just the celestial
+            // level clamp (no self-boost — no recursion).
+            .map(|g| self.adjusted_glyph_level(g))
             .collect()
     }
 
@@ -1227,6 +1529,26 @@ impl GameState {
             }
             18 => v((l * s).sqrt()),
             19 => v(1.0 + l * s / 12.0),
+            20 => v(l.powf(0.6) * s),
+            21 => v((10.0 * (l * s).sqrt()).floor()),
+            22 => v(1.0 + l.powf(0.25) * s.powf(0.4) / 75.0),
+            23 => v(1.0 + l.powf(0.4) * s.powf(0.6) / 60.0),
+            24 => v(1.0 + 2.0 * l.powf(0.25) * s.powf(0.4)),
+            25 => v(1.0 + l.powf(0.25) * s.powf(0.4) / 500.0),
+            26 => v(1.0 + l.powf(0.25) * s.powf(0.4) / 5000.0),
+            _ => Decimal::ZERO,
+        }
+    }
+
+    /// A single Reality glyph's effect value for non-generated `bit` (4–7).
+    pub fn reality_glyph_single_effect_value(glyph: &Glyph, bit: u8) -> Decimal {
+        let l = glyph.level as f64;
+        let v = |x: f64| Decimal::from_float(x);
+        match bit {
+            4 => v((l * 90.0).sqrt().floor()),
+            5 => v(1.0 + (l / 100_000.0).powf(0.5)),
+            6 => v(1.0 + l / 125_000.0),
+            7 => v(0.1),
             _ => Decimal::ZERO,
         }
     }
@@ -1239,6 +1561,409 @@ impl GameState {
             .map(|&(l, s)| 1.0 + l * s / 12.0)
             .collect();
         Self::combine_add_exponents(&v)
+    }
+
+    // --- Effarig glyph effects (bits 20–26) ---------------------------------------
+
+    /// effarigrm (bit 20): Reality Machine multiplier `×x`.
+    pub fn glyph_effect_effarigrm(&self) -> f64 {
+        self.glyph_effect_values(20)
+            .iter()
+            .map(|&(l, s)| l.powf(0.6) * s)
+            .product()
+    }
+
+    /// effarigglyph (bit 21): Glyph Instability starting level `+x`.
+    pub fn glyph_effect_effarigglyph(&self) -> f64 {
+        self.glyph_effect_values(21)
+            .iter()
+            .map(|&(l, s)| (10.0 * (l * s).sqrt()).floor())
+            .sum()
+    }
+
+    /// effarigblackhole (bit 22): game speed `^x`.
+    pub fn glyph_effect_effarigblackhole(&self) -> f64 {
+        let v: Vec<f64> = self
+            .glyph_effect_values(22)
+            .iter()
+            .map(|&(l, s)| 1.0 + l.powf(0.25) * s.powf(0.4) / 75.0)
+            .collect();
+        Self::combine_add_exponents(&v)
+    }
+
+    /// effarigachievement (bit 23): achievement multiplier `^x`.
+    pub fn glyph_effect_effarigachievement(&self) -> f64 {
+        let v: Vec<f64> = self
+            .glyph_effect_values(23)
+            .iter()
+            .map(|&(l, s)| 1.0 + l.powf(0.4) * s.powf(0.6) / 60.0)
+            .collect();
+        Self::combine_add_exponents(&v)
+    }
+
+    /// effarigforgotten (bit 24): "Buy 10" multiplier `^x`.
+    pub fn glyph_effect_effarigforgotten(&self) -> f64 {
+        self.glyph_effect_values(24)
+            .iter()
+            .map(|&(l, s)| 1.0 + 2.0 * l.powf(0.25) * s.powf(0.4))
+            .product()
+    }
+
+    /// effarigdimensions (bit 25): all Dimension multipliers `^x`.
+    pub fn glyph_effect_effarigdimensions(&self) -> f64 {
+        let v: Vec<f64> = self
+            .glyph_effect_values(25)
+            .iter()
+            .map(|&(l, s)| 1.0 + l.powf(0.25) * s.powf(0.4) / 500.0)
+            .collect();
+        Self::combine_add_exponents(&v)
+    }
+
+    /// effarigantimatter (bit 26): antimatter production `10^x → 10^(x^value)`.
+    pub fn glyph_effect_effarigantimatter(&self) -> f64 {
+        self.glyph_effect_values(26)
+            .iter()
+            .map(|&(l, s)| 1.0 + l.powf(0.25) * s.powf(0.4) / 5000.0)
+            .product()
+    }
+
+    // --- Reality glyph effects (non-generated bits 4–7) ---------------------------
+
+    /// realitygalaxies (bit 5): all Galaxies `×x` stronger.
+    pub fn glyph_effect_realitygalaxies(&self) -> f64 {
+        self.reality_glyph_effect_values(5)
+            .iter()
+            .map(|&l| 1.0 + (l / 100_000.0).powf(0.5))
+            .product()
+    }
+
+    /// realityrow1pow (bit 6): Reality-Upgrade Amplifier multiplier `^x`.
+    pub fn glyph_effect_realityrow1pow(&self) -> f64 {
+        let v: Vec<f64> = self
+            .reality_glyph_effect_values(6)
+            .iter()
+            .map(|&l| 1.0 + l / 125_000.0)
+            .collect();
+        Self::combine_add_exponents(&v)
+    }
+
+    /// realityDTglyph (bit 7): the Dilated-Time factor for Glyph level
+    /// `^1.3 → ^(1.3 + x)` (flat 0.1 per glyph, additive).
+    pub fn glyph_effect_reality_dt_glyph(&self) -> f64 {
+        0.1 * self.reality_glyph_effect_values(7).len() as f64
+    }
+
+    // --- Reality glyph creation ----------------------------------------------------
+
+    /// `realityGlyphEffectLevelThresholds`: effect count by creation level.
+    const REALITY_GLYPH_EFFECT_THRESHOLDS: [u32; 4] = [0, 9_000, 15_000, 25_000];
+
+    /// The Reality-glyph creation level (`AlchemyResource.reality.effectValue`
+    /// — the reality resource amount, floored).
+    pub fn reality_glyph_creation_level(&self) -> u32 {
+        self.alchemy_amount(crate::celestials::alchemy::REALITY)
+            .floor() as u32
+    }
+
+    /// Whether a Reality Glyph can be created now: the reality Alchemy
+    /// resource unlocked with a nonzero level and inventory space.
+    pub fn can_create_reality_glyph(&self) -> bool {
+        self.alchemy_resource_unlocked(crate::celestials::alchemy::REALITY)
+            && self.reality_glyph_creation_level() > 0
+            && self.find_free_inventory_slot().is_some()
+    }
+
+    /// `GlyphGenerator.realityGlyph(level)` + the creation-modal action:
+    /// construct a 100%-rarity Reality glyph whose effects are the
+    /// level-threshold prefix of bits 4–7, consume the whole reality Alchemy
+    /// resource, and add it to the inventory.
+    pub fn create_reality_glyph(&mut self) -> bool {
+        if !self.can_create_reality_glyph() {
+            return false;
+        }
+        let level = self.reality_glyph_creation_level();
+        let count = Self::REALITY_GLYPH_EFFECT_THRESHOLDS
+            .iter()
+            .filter(|&&t| t <= level)
+            .count();
+        let effects = (0..count).fold(0u32, |mask, i| mask | (1 << (4 + i)));
+        let glyph = Glyph {
+            id: 0,
+            idx: 0,
+            kind: GlyphType::Reality,
+            strength: rarity_to_strength(100.0),
+            level,
+            raw_level: level,
+            effects,
+        };
+        self.add_glyph_to_inventory(glyph);
+        self.celestials.ra.alchemy[crate::celestials::alchemy::REALITY].amount = 0.0;
+        self.reality.glyphs.created_reality_glyph = true;
+        true
+    }
+
+    // --- The auto-glyph filter (`AutoGlyphProcessor`) ------------------------------
+
+    /// Whether the glyph filter is unlocked (Effarig's Relic-Shard unlock).
+    pub fn glyph_filter_unlocked(&self) -> bool {
+        self.celestials
+            .effarig
+            .unlock_bought(crate::celestials::effarig::EFFARIG_UNLOCK_GLYPH_FILTER)
+    }
+
+    /// `glyphRefinementGain`: the alchemy amount a refinement of `glyph` would
+    /// grant right now (0 when locked; capped by the effective resource cap).
+    pub fn glyph_refinement_gain(&self, glyph: &Glyph) -> f64 {
+        let Some(res) = self.glyph_type_alchemy_res(glyph.kind) else {
+            return 0.0;
+        };
+        if !self.alchemy_resource_unlocked(res) {
+            return 0.0;
+        }
+        let rarity = strength_to_rarity(glyph.strength);
+        let raw = self.glyph_raw_refinement_gain(glyph.level, rarity);
+        let highest = raw / 0.05;
+        let effective_cap = self
+            .alchemy_cap(res)
+            .max(highest)
+            .min(crate::celestials::alchemy::ALCHEMY_RESOURCE_CAP);
+        let until_cap = effective_cap - self.alchemy_amount(res);
+        raw.clamp(0.0, until_cap.max(0.0))
+    }
+
+    /// `AutoGlyphProcessor.filterValue`: the filter score of `glyph`.
+    pub fn glyph_filter_value(&self, glyph: &Glyph) -> f64 {
+        if matches!(glyph.kind, GlyphType::Companion | GlyphType::Reality) {
+            return f64::INFINITY;
+        }
+        let Some(type_index) = GlyphFilter::type_index(glyph.kind) else {
+            return f64::NEG_INFINITY;
+        };
+        let cfg = &self.reality.glyphs.filter.types[type_index];
+        let rarity = strength_to_rarity(glyph.strength);
+        match self.reality.glyphs.filter.select {
+            FILTER_LOWEST_SACRIFICE => {
+                let sac_index = glyph.kind.sacrifice_index().unwrap();
+                let cap = if glyph.kind == GlyphType::Effarig {
+                    1e70
+                } else {
+                    MAX_SACRIFICE_FOR_EFFECTS
+                };
+                if self.reality.glyphs.sac[sac_index] >= cap {
+                    f64::NEG_INFINITY
+                } else {
+                    -self.reality.glyphs.sac[sac_index]
+                }
+            }
+            FILTER_EFFECT_COUNT => rarity / 1000.0 + glyph.effects.count_ones() as f64,
+            FILTER_RARITY_THRESHOLD => rarity,
+            FILTER_SPECIFIED_EFFECT => {
+                let effect_count = glyph.effects.count_ones();
+                if effect_count < cfg.effect_count {
+                    return rarity - 200.0 * (cfg.effect_count - effect_count) as f64;
+                }
+                let missing = (cfg.specified_mask
+                    & !(cfg.specified_mask & glyph.effects))
+                    .count_ones();
+                rarity - 200.0 * missing as f64
+            }
+            FILTER_EFFECT_SCORE => {
+                let offset = GlyphFilter::bit_offset(glyph.kind);
+                let score: f64 = (0..32)
+                    .filter(|&b| glyph.effects & (1u32 << b) != 0)
+                    .filter_map(|b: u8| cfg.effect_scores.get((b - offset) as usize))
+                    .sum();
+                rarity + score
+            }
+            FILTER_LOWEST_ALCHEMY => {
+                let unlocked = self
+                    .glyph_type_alchemy_res(glyph.kind)
+                    .map(|res| self.alchemy_resource_unlocked(res))
+                    .unwrap_or(false);
+                if unlocked && self.glyph_refinement_gain(glyph) > 0.0 {
+                    -self
+                        .alchemy_amount(self.glyph_type_alchemy_res(glyph.kind).unwrap())
+                } else {
+                    f64::NEG_INFINITY
+                }
+            }
+            FILTER_ALCHEMY_VALUE => {
+                let unlocked = self
+                    .glyph_type_alchemy_res(glyph.kind)
+                    .map(|res| self.alchemy_resource_unlocked(res))
+                    .unwrap_or(false);
+                if unlocked {
+                    self.glyph_refinement_gain(glyph)
+                } else {
+                    f64::NEG_INFINITY
+                }
+            }
+            _ => f64::NEG_INFINITY,
+        }
+    }
+
+    /// `AutoGlyphProcessor.thresholdValue`.
+    fn glyph_threshold_value(&self, glyph: &Glyph) -> f64 {
+        let Some(type_index) = GlyphFilter::type_index(glyph.kind) else {
+            return -f64::MAX;
+        };
+        let cfg = &self.reality.glyphs.filter.types[type_index];
+        match self.reality.glyphs.filter.select {
+            FILTER_EFFECT_COUNT => self.reality.glyphs.filter.simple as f64,
+            FILTER_RARITY_THRESHOLD | FILTER_SPECIFIED_EFFECT => cfg.rarity,
+            FILTER_EFFECT_SCORE => cfg.score,
+            _ => f64::MAX,
+        }
+    }
+
+    /// `AutoGlyphProcessor.wouldKeep`.
+    pub fn glyph_would_keep(&self, glyph: &Glyph) -> bool {
+        self.glyph_filter_value(glyph) >= self.glyph_threshold_value(glyph)
+    }
+
+    /// `AutoGlyphProcessor.pick`: the highest-scoring choice, scored relative
+    /// to each type's threshold (absolute in never-keep modes).
+    fn glyph_filter_pick(&self, glyphs: &[Glyph]) -> Glyph {
+        glyphs
+            .iter()
+            .max_by(|a, b| {
+                let score = |g: &Glyph| {
+                    let threshold = self.glyph_threshold_value(g);
+                    let filter = self.glyph_filter_value(g);
+                    if threshold == f64::MAX {
+                        filter
+                    } else {
+                        filter - threshold
+                    }
+                };
+                score(a)
+                    .partial_cmp(&score(b))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .expect("non-empty choice list")
+            .clone()
+    }
+
+    /// `AutoGlyphProcessor.getRidOfGlyph` for a not-yet-added glyph: route by
+    /// the rejection mode (sacrifice / refine / refine-to-cap).
+    fn get_rid_of_glyph(&mut self, glyph: &Glyph) {
+        if !self.can_sacrifice_glyphs() {
+            return;
+        }
+        let refine = |game: &mut GameState| {
+            if let Some(res) = game.glyph_type_alchemy_res(glyph.kind) {
+                if game.alchemy_resource_unlocked(res) {
+                    let rarity = strength_to_rarity(glyph.strength);
+                    game.alchemy_refine_glyph(res, glyph.level, rarity);
+                    return true;
+                }
+            }
+            false
+        };
+        match self.reality.glyphs.filter.trash {
+            REJECT_REFINE => {
+                if !refine(self) {
+                    self.sacrifice_or_delete(glyph);
+                }
+            }
+            REJECT_REFINE_TO_CAP => {
+                if self.glyph_refinement_gain(glyph) == 0.0 || !refine(self) {
+                    self.sacrifice_or_delete(glyph);
+                }
+            }
+            _ => self.sacrifice_or_delete(glyph),
+        }
+    }
+
+    // --- Glyph undo (Teresa's undo unlock) -----------------------------------------
+
+    /// Whether the undo affordance is unlocked (Teresa, 1e10 poured RM).
+    pub fn glyph_undo_unlocked(&self) -> bool {
+        self.celestials
+            .teresa
+            .unlock_bought(crate::celestials::teresa::TERESA_UNLOCK_UNDO.id)
+    }
+
+    /// Whether an undo is possible right now.
+    pub fn can_undo_glyph(&self) -> bool {
+        self.glyph_undo_unlocked()
+            && !self.reality.glyphs.undo.is_empty()
+            && self.find_free_inventory_slot().is_some()
+    }
+
+    /// `Glyphs.saveUndo(targetSlot)`: snapshot the run state on equip.
+    fn save_glyph_undo(&mut self, target_slot: u32) {
+        let mut ecs = [0u8; 12];
+        ecs.copy_from_slice(&self.eternity_challenges);
+        let data = GlyphUndoData {
+            target_slot,
+            am: self.antimatter,
+            ip: self.infinity_points,
+            ep: self.eternity_points,
+            tt: self.max_theorem - Decimal::from_float(self.tt_total_purchased() as f64),
+            ecs,
+            this_infinity_time: self.records.this_infinity.time_ms,
+            this_infinity_real_time: self.records.this_infinity.real_time_ms,
+            this_eternity_time: self.records.this_eternity.time_ms,
+            this_eternity_real_time: self.records.this_eternity.real_time_ms,
+            this_reality_time: self.records.this_reality.time_ms,
+            this_reality_real_time: self.records.this_reality.real_time_ms,
+            stored_time: self.celestials.enslaved.stored,
+            dilation_studies: self.dilation.studies.clone(),
+            dilation_upgrades: self.dilation.upgrades,
+            dilation_rebuyables: self.dilation.rebuyables,
+            tp: self.dilation.tachyon_particles,
+            dt: self.dilation.dilated_time,
+        };
+        self.reality.glyphs.undo.push(data);
+    }
+
+    /// `Glyphs.undo()`: unequip the last equipped glyph, rewind the Reality
+    /// (a reward-free reset preserving the celestial run), and restore the
+    /// snapshotted run state.
+    pub fn undo_glyph(&mut self) -> bool {
+        if !self.can_undo_glyph() {
+            return false;
+        }
+        let data = self.reality.glyphs.undo.pop().expect("checked non-empty");
+        // Unequip the glyph in the snapshot's slot back to the inventory.
+        if let Some(pos) = self
+            .reality
+            .glyphs
+            .active
+            .iter()
+            .position(|g| g.idx == data.target_slot)
+        {
+            let glyph = self.reality.glyphs.active.remove(pos);
+            self.add_glyph_to_inventory(glyph);
+        }
+        // `finishProcessReality({reset: true, glyphUndo: true,
+        // restoreCelestialState: true})`: a reward-free Reality reset that
+        // keeps the celestial run flags.
+        let runs = self.celestials_run_flags();
+        self.reset_reality();
+        self.restore_celestial_runs(runs);
+        // Restore the snapshotted run state.
+        self.antimatter = data.am;
+        self.infinity_points = data.ip;
+        self.eternity_points = data.ep;
+        self.time_theorems = data.tt.max(&Decimal::ZERO);
+        self.eternity_challenges.copy_from_slice(&data.ecs);
+        self.records.this_infinity.time_ms = data.this_infinity_time;
+        self.records.this_infinity.real_time_ms = data.this_infinity_real_time;
+        self.records.this_eternity.time_ms = data.this_eternity_time;
+        self.records.this_eternity.real_time_ms = data.this_eternity_real_time;
+        self.records.this_reality.time_ms = data.this_reality_time;
+        self.records.this_reality.real_time_ms = data.this_reality_real_time;
+        self.celestials.enslaved.stored = data.stored_time;
+        if !data.dilation_studies.is_empty() {
+            self.dilation.studies = data.dilation_studies.clone();
+            self.dilation.upgrades = data.dilation_upgrades;
+            self.dilation.rebuyables = data.dilation_rebuyables;
+            self.dilation.tachyon_particles = data.tp;
+            self.dilation.dilated_time = data.dt;
+        }
+        true
     }
 }
 
@@ -1253,6 +1978,124 @@ mod tests {
         game.records.this_reality.max_ep = Decimal::new(1.0, 4000);
         game.dilation.studies = vec![1, 2, 3, 4, 5, 6];
         game
+    }
+
+    #[test]
+    fn effarig_glyphs_join_the_pool_once_unlocked() {
+        let mut game = game_with_reality();
+        game.reality.realities = 25; // past the uniformity window
+        let mut rng = GlyphRng::new(12345.0, SECOND_GAUSSIAN_DEFAULT);
+        // Locked: 200 draws never produce an effarig type.
+        let mut types = Vec::new();
+        for _ in 0..200 {
+            types.push(game.random_type(&mut rng, &types));
+        }
+        assert!(!types.contains(&GlyphType::Effarig));
+
+        // Unlocked: effarig appears.
+        game.celestials.effarig.unlock_bits |=
+            1 << crate::celestials::effarig::EFFARIG_UNLOCK_REALITY;
+        let mut types = Vec::new();
+        for _ in 0..200 {
+            types.push(game.random_type(&mut rng, &types));
+        }
+        assert!(types.contains(&GlyphType::Effarig));
+    }
+
+    #[test]
+    fn effarig_effects_exclude_one_of_rm_and_glyph() {
+        let mut rng = GlyphRng::new(777.0, SECOND_GAUSSIAN_DEFAULT);
+        // With 6 effects requested, the excluded one of 20/21 keeps the mask
+        // from ever containing both.
+        for _ in 0..50 {
+            let mask = GameState::generate_effects(GlyphType::Effarig, 6, &mut rng);
+            let both = (mask & (1 << 20) != 0) && (mask & (1 << 21) != 0);
+            assert!(!both, "mask={mask:b}");
+            assert_eq!(mask.count_ones(), 6);
+        }
+    }
+
+    #[test]
+    fn reality_glyph_creation_consumes_the_resource() {
+        let mut game = game_with_reality();
+        let reality_res = crate::celestials::alchemy::REALITY;
+        game.celestials.ra.alchemy[reality_res].amount = 16_000.0;
+        game.celestials.ra.unlock_bits |=
+            1 << crate::celestials::ra::RA_UNLOCK_GLYPH_ALCHEMY;
+        // The reality resource unlocks at Effarig level 25 with alchemy.
+        game.celestials.ra.unlock_bits |=
+            1 << crate::celestials::ra::RA_UNLOCK_EFFARIG_MEMORIES;
+        game.celestials.ra.pets[crate::celestials::ra::PET_EFFARIG].level = 25;
+        assert!(game.can_create_reality_glyph());
+        assert!(game.create_reality_glyph());
+        let created = game
+            .reality
+            .glyphs
+            .inventory
+            .iter()
+            .find(|g| g.kind == GlyphType::Reality)
+            .expect("created");
+        assert_eq!(created.level, 16_000);
+        // 16000 passes the 0/9000/15000 thresholds but not 25000: 3 effects.
+        assert_eq!(created.effects, (1 << 4) | (1 << 5) | (1 << 6));
+        assert_eq!(game.alchemy_amount(reality_res), 0.0);
+        assert!(game.reality.glyphs.created_reality_glyph);
+    }
+
+    #[test]
+    fn reality_glyph_boosts_equipped_basic_levels() {
+        let mut game = game_with_reality();
+        let basic = glyph(GlyphType::Power, 100, 2.0, 1 << 16);
+        // A level-1000 reality glyph with realityglyphlevel (bit 4):
+        // floor(√90000) = 300.
+        let reality_glyph = glyph(GlyphType::Reality, 1000, 3.5, 1 << 4);
+        game.reality.glyphs.active.push(reality_glyph);
+        assert_eq!(game.reality_glyph_level_boost(), 300.0);
+        assert_eq!(game.adjusted_glyph_level(&basic), 400.0);
+    }
+
+    #[test]
+    fn glyph_filter_rarity_mode_keeps_and_rejects() {
+        let mut game = game_with_reality();
+        game.reality.glyphs.filter.select = FILTER_RARITY_THRESHOLD;
+        let i = GlyphFilter::type_index(GlyphType::Power).unwrap();
+        game.reality.glyphs.filter.types[i].rarity = 50.0;
+        // Strength 2.5 = 60% rarity ≥ 50 → keep; 1.5 = 20% → reject.
+        let rare = glyph(GlyphType::Power, 100, 2.5, 1 << 16);
+        let common = glyph(GlyphType::Power, 100, 1.5, 1 << 16);
+        assert!(game.glyph_would_keep(&rare));
+        assert!(!game.glyph_would_keep(&common));
+        // The pick prefers the higher-scoring glyph.
+        let picked = game.glyph_filter_pick(&[common.clone(), rare.clone()]);
+        assert_eq!(picked.strength, rare.strength);
+    }
+
+    #[test]
+    fn glyph_undo_restores_the_snapshot() {
+        let mut game = game_with_reality();
+        game.reality.realities = 1;
+        game.celestials.teresa.unlock_bits |=
+            1 << crate::celestials::teresa::TERESA_UNLOCK_UNDO.id;
+        // Equip a glyph mid-run with some progress on the clock.
+        game.antimatter = Decimal::new(1.0, 300);
+        game.records.this_reality.time_ms = 123_456.0;
+        let g = glyph(GlyphType::Power, 100, 2.0, 1 << 16);
+        game.reality.glyphs.inventory.push(g);
+        assert!(game.equip_glyph(1, 0));
+        assert_eq!(game.reality.glyphs.undo.len(), 1);
+
+        // Some further progress, then undo.
+        game.antimatter = Decimal::new(1.0, 5000);
+        assert!(game.undo_glyph());
+        assert!(game.reality.glyphs.active.is_empty());
+        assert_eq!(game.antimatter, Decimal::new(1.0, 300));
+        assert_eq!(game.records.this_reality.time_ms, 123_456.0);
+        assert!(game
+            .reality
+            .glyphs
+            .inventory
+            .iter()
+            .any(|x| x.kind == GlyphType::Power));
     }
 
     fn glyph(kind: GlyphType, level: u32, strength: f64, effects: u32) -> Glyph {

@@ -316,9 +316,91 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         .iter()
         .map(glyph_json)
         .collect::<Vec<_>>());
-    for (i, kind) in crate::glyphs::BASIC_GLYPH_TYPES.iter().enumerate() {
+    for kind in [
+        crate::glyphs::GlyphType::Power,
+        crate::glyphs::GlyphType::Infinity,
+        crate::glyphs::GlyphType::Replication,
+        crate::glyphs::GlyphType::Time,
+        crate::glyphs::GlyphType::Dilation,
+        crate::glyphs::GlyphType::Effarig,
+        crate::glyphs::GlyphType::Reality,
+    ] {
+        let i = kind.sacrifice_index().unwrap();
         reality["glyphs"]["sac"][kind.save_id()] = json!(state.reality.glyphs.sac[i]);
     }
+    reality["glyphs"]["createdRealityGlyph"] =
+        json!(state.reality.glyphs.created_reality_glyph);
+    // The auto-glyph filter.
+    {
+        let f = &state.reality.glyphs.filter;
+        let filter = &mut reality["glyphs"]["filter"];
+        filter["select"] = json!(f.select);
+        filter["trash"] = json!(f.trash);
+        filter["simple"] = json!(f.simple);
+        for (name, kind) in [
+            "time",
+            "dilation",
+            "replication",
+            "infinity",
+            "power",
+            "effarig",
+        ]
+        .iter()
+        .zip([
+            crate::glyphs::GlyphType::Time,
+            crate::glyphs::GlyphType::Dilation,
+            crate::glyphs::GlyphType::Replication,
+            crate::glyphs::GlyphType::Infinity,
+            crate::glyphs::GlyphType::Power,
+            crate::glyphs::GlyphType::Effarig,
+        ]) {
+            let i = crate::glyphs::GlyphFilter::type_index(kind).unwrap();
+            let cfg = &f.types[i];
+            let entry = &mut filter["types"][*name];
+            entry["rarity"] = json!(cfg.rarity);
+            entry["score"] = json!(cfg.score);
+            entry["effectCount"] = json!(cfg.effect_count);
+            entry["specifiedMask"] = json!(cfg.specified_mask);
+            entry["effectScores"] = json!(cfg.effect_scores);
+        }
+    }
+    // The Glyph-undo stack (dilation studies/upgrades as `toBitmask` numbers).
+    reality["glyphs"]["undo"] = json!(state
+        .reality
+        .glyphs
+        .undo
+        .iter()
+        .map(|u| {
+            let mut rebuyables = serde_json::Map::new();
+            for (i, count) in u.dilation_rebuyables.iter().enumerate() {
+                rebuyables.insert((i + 1).to_string(), json!(count));
+            }
+            let studies_mask = u
+                .dilation_studies
+                .iter()
+                .fold(0u64, |bits, &id| bits | (1 << id));
+            serde_json::json!({
+                "targetSlot": u.target_slot,
+                "am": u.am.to_string(),
+                "ip": u.ip.to_string(),
+                "ep": u.ep.to_string(),
+                "tt": u.tt.to_string(),
+                "ecs": u.ecs,
+                "thisInfinityTime": u.this_infinity_time,
+                "thisInfinityRealTime": u.this_infinity_real_time,
+                "thisEternityTime": u.this_eternity_time,
+                "thisEternityRealTime": u.this_eternity_real_time,
+                "thisRealityTime": u.this_reality_time,
+                "thisRealityRealTime": u.this_reality_real_time,
+                "storedTime": u.stored_time,
+                "dilationStudies": studies_mask,
+                "dilationUpgrades": u.dilation_upgrades,
+                "dilationRebuyables": rebuyables,
+                "tp": u.tp.to_string(),
+                "dt": u.dt.to_string(),
+            })
+        })
+        .collect::<Vec<_>>());
     reality["glyphs"]["protectedRows"] = json!(state.reality.glyphs.protected_rows);
     reality["upgradeBits"] = json!(state.reality.upgrade_bits);
     reality["upgReqs"] = json!(state.reality.upg_reqs);
@@ -1439,7 +1521,7 @@ mod tests {
             raw_level: 1,
             effects: (1 << 8) | (1 << 9),
         });
-        state.reality.glyphs.sac = [1.0, 2.0, 3.0, 4.0, 5.0];
+        state.reality.glyphs.sac = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
         state.reality.glyphs.protected_rows = 3;
 
         let reloaded = decode_save(&encode_save(&state, 0)).unwrap();
@@ -1457,7 +1539,10 @@ mod tests {
             reloaded.reality.glyphs.inventory[0].kind,
             GlyphType::Companion
         );
-        assert_eq!(reloaded.reality.glyphs.sac, [1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(
+            reloaded.reality.glyphs.sac,
+            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+        );
         assert_eq!(reloaded.reality.glyphs.protected_rows, 3);
     }
 

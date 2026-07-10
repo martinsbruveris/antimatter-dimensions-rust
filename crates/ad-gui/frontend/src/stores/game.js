@@ -469,6 +469,28 @@ export const useGameStore = defineStore("game", {
     offlineCurrencyGain(awayMs) {
       return invoke("offline_currency_gain", { awayMs });
     },
+    // Glyph undo (Teresa unlock): rewind the last equipped glyph.
+    undoGlyph() {
+      return invoke("undo_glyph");
+    },
+    // Create a Reality Glyph from the reality Alchemy resource.
+    createRealityGlyph() {
+      return invoke("create_reality_glyph");
+    },
+    // The auto-glyph filter: modes + per-type settings.
+    setGlyphFilterModes(select, trash, simple) {
+      return invoke("set_glyph_filter_modes", { select, trash, simple });
+    },
+    setGlyphFilterType(kind, cfg) {
+      return invoke("set_glyph_filter_type", {
+        kind,
+        rarity: cfg.rarity,
+        score: cfg.score,
+        effectCount: cfg.effect_count,
+        specifiedMask: cfg.specified_mask,
+        effectScores: cfg.effect_scores,
+      });
+    },
     // Start Normal Challenge `id` (a forced Big Crunch, then enter). Navigates to
     // the Antimatter Dimensions tab like the original's `start()`.
     startChallenge(id) {

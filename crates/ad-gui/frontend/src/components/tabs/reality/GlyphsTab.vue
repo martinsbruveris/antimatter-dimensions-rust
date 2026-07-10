@@ -9,6 +9,7 @@ import { useGameStore } from "../../../stores/game";
 import { useUiStore } from "../../../stores/ui";
 import CurrentGlyphEffects from "./CurrentGlyphEffects.vue";
 import EquippedGlyphs from "./EquippedGlyphs.vue";
+import GlyphFilterPanel from "./GlyphFilterPanel.vue";
 import GlyphInventory from "./GlyphInventory.vue";
 import SacrificedGlyphs from "./SacrificedGlyphs.vue";
 
@@ -75,6 +76,7 @@ const sacrificeDisplayed = ref(false);
             />
           </div>
         </div>
+        <GlyphFilterPanel v-if="reality.filter_unlocked" />
         <GlyphInventory />
       </div>
     </div>

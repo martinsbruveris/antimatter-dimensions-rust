@@ -1,6 +1,6 @@
 <script setup>
-// The equipped-glyph circle + the respec button (EquippedGlyphs.vue; the
-// undo / protected-slot-target / cosmetic buttons are out of frontier).
+// The equipped-glyph circle + the respec and undo buttons (EquippedGlyphs.vue;
+// the protected-slot-target / cosmetic buttons are out of frontier).
 import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
@@ -34,6 +34,8 @@ function positionStyle(idx) {
 }
 
 const respec = computed(() => Boolean(reality.value?.respec));
+const undoVisible = computed(() => Boolean(reality.value?.undo_unlocked));
+const undoAvailable = computed(() => Boolean(reality.value?.can_undo));
 const respecStyle = computed(() =>
   respec.value
     ? {
@@ -77,6 +79,16 @@ const respecStyle = computed(() =>
         @click="game.setGlyphRespec(!respec)"
       >
         Unequip Glyphs on Reality
+      </button>
+      <button
+        v-if="undoVisible"
+        class="c-reality-upgrade-btn l-glyph-equip-button-short"
+        :class="{ 'c-reality-upgrade-btn--unavailable': !undoAvailable }"
+        title="Unequips the last equipped Glyph and rewinds this Reality's
+          progress to the point it was equipped."
+        @click="undoAvailable && game.undoGlyph()"
+      >
+        <span>Rewind to <b>undo</b> the last equipped Glyph</span>
       </button>
     </div>
   </div>
