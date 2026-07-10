@@ -70,7 +70,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 2.1 | Big Crunch (Infinity prestige) | ✅ | IP, infinities, records, save round-trip |
 | 2.2 | Infinity Upgrades (16-grid) | ✅ | all 16 + the Ach-41 bottom row (`ipMult` rebuyable with two-regime costs + buy-max + autobuyer, `ipOffline` offline IP award) |
 | 2.3 | Break Infinity + 12 upgrades | ✅ | post-break IP formula + all 12 upgrades with effects (cost-scaling rebuyables feed `dimensionMultDecrease`/`tickSpeedMultDecrease`; passive IP/Infinity generation ticks) |
-| 2.4 | Achievements (normal, 144) | 🟡 | **rows 1–18 wired** (conditions + effects), including the former deferred tail (35/61/62/65/74/111/117/156/165/172 + effects 126/133/138/168/171/175/183/187) and row 18 (Pelle). Remaining: 22 (News, needs 8.1); 165's weight-equality and 171's Effarig/Reality sac types await 6.2/7.2; 172's `noTriads` carried but unclearable. Secret achievements → 8.6 |
+| 2.4 | Achievements (normal, 144) | 🟡 | **rows 1–18 wired** (conditions + effects), including the former deferred tail (35/61/62/65/74/111/117/156/165/172 + effects 126/133/138/168/171/175/183/187) and row 18 (Pelle). Remaining: 22 (News, needs 8.1); 171 counts only the 7 modelled sacrifice types (no cursed); 172's `noTriads` carried but unclearable (Triads are Ra content). Secret achievements → 8.6 |
 | 2.5 | Normal Challenges (12) | ✅ | all 12 modifiers + reward→autobuyer wiring |
 | 2.6 | Autobuyers | ✅ | all AD/tickspeed + prestige autobuyers, modes, interval upgrades |
 | 2.7 | Infinity Challenges (8) | ✅ | all 8 restrictions + rewards |
@@ -121,7 +121,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 7.3 | Enslaved | 🟡 | game-time storage + release, stored-time unlocks, run restrictions. **Deferred: real-time storage + `boostReality`, auto-release/store, Tesseracts, EC1 goal-1000** |
 | 7.4 | V | 🟡 | 6 main-unlock conditions, run modifiers, 9 V-achievements, Space Theorems, `fastAutoEC` (6.3) + `achievementBH` (6.5) effects. **Deferred: Perk-Point goal reduction; `autoAutoClean`; hard achievements 6–8 need Ra's flip (state exists)** |
 | 7.5 | Ra + Glyph Alchemy | 🟡 | 4 pets/memories/levels, 28 unlocks, Remembrance, 21-resource Alchemy + refinement. **Deferred: charged-IU effect variants, `uncountability` passive gen (u32 realities), the Reality-resource glyph, `boundless`/`multiversal`** |
-| 7.6 | Lai'tela + Dark Matter Dimensions | 🟡 | 4 DMDs, Dark Energy, Singularities (30 milestones), Continuum, entropy run. **Deferred: Continuum super-exp branch, DMD/annihilation/condense autobuyers, deep imaginary reqs, tesseract effects** |
+| 7.6 | Lai'tela + Dark Matter Dimensions | 🟡 | 4 DMDs, Dark Energy, Singularities (30 milestones), Continuum, entropy run. **Deferred: Continuum super-exp branch, DMD/annihilation/condense autobuyers, Tesseracts + their effects** (the deep imaginary requirements landed with 6.7) |
 | 7.7 | Pelle (final) | 🟡 | dooming/Armageddon, Remnants → Reality Shards, 5 Rifts, Strikes, Pelle Upgrades, Galaxy Generator, game-end. **Deferred: the full `isDisabled` disable-everything sweep, keep-on-Armageddon gates, deep rift-milestone effects, special Pelle glyph. Cut: credits/song/`zalgo` finale** |
 
 ## Phase 8 — Cross-cutting presentation & QoL 🟡
