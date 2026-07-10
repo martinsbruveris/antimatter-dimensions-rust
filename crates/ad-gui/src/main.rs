@@ -909,6 +909,12 @@ struct BlackHolesView {
     unlocked: bool,
     can_unlock: bool,
     paused: bool,
+    /// Inversion: slider availability, current strength, active state.
+    negative_unlocked: bool,
+    negative: f64,
+    is_inverted: bool,
+    /// Auto-pause mode (0 never / 1 before BH1 / 2 before BH2).
+    auto_pause_mode: u8,
     holes: Vec<BlackHoleView>,
 }
 
@@ -2396,6 +2402,10 @@ fn build_reality_view(game: &GameState) -> RealityView {
             unlocked: game.black_holes.holes[0].unlocked,
             can_unlock: game.can_unlock_black_hole(),
             paused: game.black_holes.paused,
+            negative_unlocked: game.black_hole_negative_unlocked(),
+            negative: game.black_holes.negative,
+            is_inverted: game.black_holes_are_negative(),
+            auto_pause_mode: game.black_holes.auto_pause_mode,
             holes: (0..2usize)
                 .map(|i| BlackHoleView {
                     unlocked: game.black_holes.holes[i].unlocked,
@@ -3356,6 +3366,20 @@ fn unlock_black_hole(state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn buy_black_hole_upgrade(hole: usize, kind: u8, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().buy_black_hole_upgrade(hole, kind);
+}
+
+/// Set the Black-Hole inversion strength as the slider exponent (0..=300 →
+/// `10^-x`).
+#[tauri::command]
+fn set_black_hole_negative(exponent: f64, state: State<'_, Mutex<GameState>>) {
+    let negative = 10f64.powf(-exponent.clamp(0.0, 300.0));
+    state.lock().unwrap().set_black_hole_negative(negative);
+}
+
+/// Set the Black-Hole auto-pause mode (0 never / 1 before BH1 / 2 before BH2).
+#[tauri::command]
+fn set_black_hole_auto_pause(mode: u8, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().black_holes.auto_pause_mode = mode.min(2);
 }
 
 #[tauri::command]
@@ -4897,6 +4921,8 @@ pub fn run() {
             unlock_black_hole,
             buy_black_hole_upgrade,
             toggle_black_hole_pause,
+            set_black_hole_negative,
+            set_black_hole_auto_pause,
             buy_break_infinity_upgrade,
             buy_break_infinity_rebuyable,
             buy_infinity_dimension,

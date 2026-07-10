@@ -179,6 +179,12 @@ pub struct PlayerDTO {
     /// `player.blackHolePause` / `blackHolePauseTime`.
     pub black_hole_pause: bool,
     pub black_hole_pause_time: f64,
+    /// `player.blackHoleNegative` (inversion strength) and
+    /// `blackHoleAutoPauseMode` (0/1/2).
+    #[serde(default = "f64_one")]
+    pub black_hole_negative: f64,
+    #[serde(default)]
+    pub black_hole_auto_pause_mode: u8,
     /// `player.reality` — the Reality-layer state (modelled subset).
     pub reality: RealityDTO,
     /// `player.requirementChecks` — the "avoided X" run flags (modelled subset).
@@ -859,6 +865,9 @@ pub struct RealityChecksDTO {
     /// No Triad Studies bought this reality (`noTriads`).
     #[serde(rename = "noTriads", default = "bool_true")]
     pub no_triads: bool,
+    /// The slowest Black-Hole inversion this reality (`slowestBH`).
+    #[serde(rename = "slowestBH", default = "f64_one")]
+    pub slowest_bh: f64,
 }
 
 /// `player.replicanti` (modelled subset). `galCost` is present in the save but
@@ -2018,6 +2027,7 @@ impl GameState {
             reality_no_continuum: true,
             reality_no_purchased_tt: dto.requirement_checks.reality.no_purchased_tt,
             reality_no_triads: dto.requirement_checks.reality.no_triads,
+            reality_slowest_bh: dto.requirement_checks.reality.slowest_bh,
         };
 
         // Celestials (Phase 7). Vec→array copies clamp to the modelled length,
@@ -2528,6 +2538,8 @@ impl GameState {
                 }
                 state.paused = dto.black_hole_pause;
                 state.pause_time_ms = dto.black_hole_pause_time;
+                state.negative = dto.black_hole_negative;
+                state.auto_pause_mode = dto.black_hole_auto_pause_mode.min(2);
                 state
             },
             dilation: {

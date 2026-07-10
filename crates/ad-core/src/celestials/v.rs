@@ -203,6 +203,16 @@ impl GameState {
         }
     }
 
+    /// `VUnlocks.achievementBH`: the achievement multiplier boosts Black Hole
+    /// power (1 until the reward is unlocked).
+    pub(crate) fn v_achievement_bh_effect(&self) -> f64 {
+        if self.celestials.v.unlock_bought(V_UNLOCK_ACHIEVEMENT_BH) {
+            self.achievement_power().to_f64()
+        } else {
+            1.0
+        }
+    }
+
     /// Whether V's achievements are "flipped" (Ra's `unlockHardV`) — enables the
     /// hard achievements once Ra's V pet reaches level 6.
     fn v_is_flipped(&self) -> bool {

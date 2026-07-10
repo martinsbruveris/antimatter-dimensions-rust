@@ -165,8 +165,12 @@ not the current state).
   RU25 the Reality autobuyer (all in autobuyers.rs).
 - `src/black_holes.rs` — Black Holes (Feature 6.5): both holes' state machine
   (BH2's phase advances only while BH1 is active), interval/power/duration
-  upgrades, pause + the 5 s unpause power ramp, and the game-speed factor
-  consumed by `game_speed_factor` (stacked with the `timespeed` glyph).
+  upgrades, pause + the 5 s unpause power ramp, the inversion
+  (`blackHoleNegative` slows the game while paused; `slowestBH` tracked for
+  Imaginary Upgrade 24), the auto-pause modes (`timeToNextPause`: analytic
+  for BH1, the bounded transition scan for BH2), and the game-speed factor
+  consumed by `game_speed_factor` (stacked with the `timespeed` glyph and
+  V's `achievementBH` reward).
 - `src/automator/` — The Automator (Feature 6.6, all five stages): `mod.rs`
   (script/constant storage + limits, AP unlock at 100), `lexer.rs` +
   `parser.rs` + `compile.rs` (hand-written line-oriented scanner,

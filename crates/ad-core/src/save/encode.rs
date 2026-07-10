@@ -473,6 +473,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         json!(state.requirement_checks.reality_no_purchased_tt);
     player["requirementChecks"]["reality"]["noTriads"] =
         json!(state.requirement_checks.reality_no_triads);
+    player["requirementChecks"]["reality"]["slowestBH"] =
+        json!(state.requirement_checks.reality_slowest_bh);
     player["postC4Tier"] = json!(state.post_c4_tier);
 
     // Celestials (Phase 7). Modelled sub-fields are overwritten in place; the
@@ -687,6 +689,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         .collect::<Vec<_>>());
     player["blackHolePause"] = json!(state.black_holes.paused);
     player["blackHolePauseTime"] = json!(state.black_holes.pause_time_ms);
+    player["blackHoleNegative"] = json!(state.black_holes.negative);
+    player["blackHoleAutoPauseMode"] = json!(state.black_holes.auto_pause_mode);
     player["records"]["timePlayedAtBHUnlock"] =
         json!(state.records.time_played_at_bh_unlock_ms);
 

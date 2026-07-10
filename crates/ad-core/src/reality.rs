@@ -234,6 +234,15 @@ pub struct RequirementChecks {
     /// Achievement 172.
     #[cfg_attr(feature = "serde", serde(default = "default_true"))]
     pub reality_no_triads: bool,
+    /// The slowest Black-Hole inversion this reality (`reality.slowestBH`):
+    /// reset to 1 on unpause / EC12 / a discharge; gates Imaginary Upgrade 24.
+    #[cfg_attr(feature = "serde", serde(default = "default_one_f64"))]
+    pub reality_slowest_bh: f64,
+}
+
+#[cfg(feature = "serde")]
+fn default_one_f64() -> f64 {
+    1.0
 }
 
 impl RequirementChecks {
@@ -255,6 +264,7 @@ impl RequirementChecks {
             reality_no_continuum: true,
             reality_no_purchased_tt: true,
             reality_no_triads: true,
+            reality_slowest_bh: 1.0,
         }
     }
 }
@@ -675,6 +685,13 @@ impl GameState {
         self.eterc8_repl = 40;
 
         self.requirement_checks = RequirementChecks::new();
+        // `resetRequirements`: `slowestBH` starts at the current inversion when
+        // the new Reality begins inverted.
+        self.requirement_checks.reality_slowest_bh = if self.black_holes_are_negative() {
+            self.black_holes.negative
+        } else {
+            1.0
+        };
         self.requirement_checks.reality_max_glyphs = self.equipped_glyph_count();
 
         self.records.this_reality = ThisReality::new();

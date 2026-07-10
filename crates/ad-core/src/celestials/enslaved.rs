@@ -183,6 +183,8 @@ impl GameState {
         if self.ec_running(12) || self.celestials.enslaved.stored <= 0.0 {
             return false;
         }
+        // A discharge resets the slowest-inversion tracker (IU24's gate).
+        self.requirement_checks.reality_slowest_bh = 1.0;
         let mut release = self.celestials.enslaved.stored;
         if self.celestials.enslaved.run {
             release = Self::stored_time_inside_enslaved(release);

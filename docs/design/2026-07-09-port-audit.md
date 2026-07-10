@@ -108,7 +108,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 6.2 | Glyphs | 🟡 | 5 base + Effarig + Reality types (generation rules, all 11 new effects, sacrifice/refinement), the auto-glyph filter (all 7 modes + 3 rejection modes), Teresa's undo. **Deferred: cosmetics, cursed glyphs (V), glyph sets** |
 | 6.3 | Perks (35) | ✅ | tree + all effects, incl. the PEC EC-auto-completion chain (with V's `fastAutoEC` + Ra's `instantEC`) and the autobuyer-speed perks (with Teresa's `autoSpeed`); the dilation-autobuyer speed perk is inert until those autobuyers exist (Ra QoL cut) |
 | 6.4 | Reality Upgrades (25) | ✅ | all 25 upgrades incl. RU13's autobuyer half (the 8 TD autobuyers + the EP-mult autobuyer + Eternity modes) and RU25's Reality autobuyer |
-| 6.5 | Black Holes (2) | 🟡 | unlock, 3 upgrades/hole, phase machine, pause/unpause. **Deferred: inversion + auto-pause** |
+| 6.5 | Black Holes (2) | ✅ | unlock, 3 upgrades/hole, phase machine, pause/unpause, inversion (`blackHoleNegative` + `slowestBH` tracking, V's `achievementBH`), and the auto-pause modes (analytic BH1 / 100-step BH2 `timeToNextPause`) |
 | 6.6 | Automator | ✅ | all 5 stages: lexer/parser/compiler/executor, text + block editor, templates, import/export |
 | 6.7 | Imaginary Machines & Upgrades (25) | 🟡 | **now built** (Lai'tela's gate). iM currency, 10 rebuyables + 15 one-time. Deferred: deep requirements (11–14, 22–24 never auto-satisfy), the `1e10000×iM`-in-maxRM save encoding (re-earned from cap) |
 
@@ -119,7 +119,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 7.1 | Teresa | ✅ | pour-RM → `rmMultiplier`, 6 unlocks, Teresa's Reality, 4-entry Perk Shop |
 | 7.2 | Effarig | 🟡 | Relic Shards, 3-stage Reality, dilation-like nerfs, glyph-level cap, the Effarig glyph type + `maxRarityBoost` (via 6.2). **Deferred: Replicanti-cap mult / `bonusRG`** |
 | 7.3 | Enslaved | 🟡 | game-time storage + release, stored-time unlocks, run restrictions. **Deferred: real-time storage + `boostReality`, auto-release/store, Tesseracts, EC1 goal-1000** |
-| 7.4 | V | 🟡 | 6 main-unlock conditions, run modifiers, 9 V-achievements, Space Theorems. **Deferred: Perk-Point goal reduction; `fastAutoEC`/`autoAutoClean`/`achievementBH`/`raUnlock` effects; hard achievements 6–8 (need Ra flip)** |
+| 7.4 | V | 🟡 | 6 main-unlock conditions, run modifiers, 9 V-achievements, Space Theorems, `fastAutoEC` (6.3) + `achievementBH` (6.5) effects. **Deferred: Perk-Point goal reduction; `autoAutoClean`; hard achievements 6–8 need Ra's flip (state exists)** |
 | 7.5 | Ra + Glyph Alchemy | 🟡 | 4 pets/memories/levels, 28 unlocks, Remembrance, 21-resource Alchemy + refinement. **Deferred: charged-IU effect variants, `uncountability` passive gen (u32 realities), the Reality-resource glyph, `boundless`/`multiversal`** |
 | 7.6 | Lai'tela + Dark Matter Dimensions | 🟡 | 4 DMDs, Dark Energy, Singularities (30 milestones), Continuum, entropy run. **Deferred: Continuum super-exp branch, DMD/annihilation/condense autobuyers, deep imaginary reqs, tesseract effects** |
 | 7.7 | Pelle (final) | 🟡 | dooming/Armageddon, Remnants → Reality Shards, 5 Rifts, Strikes, Pelle Upgrades, Galaxy Generator, game-end. **Deferred: the full `isDisabled` disable-everything sweep, keep-on-Armageddon gates, deep rift-milestone effects, special Pelle glyph. Cut: credits/song/`zalgo` finale** |

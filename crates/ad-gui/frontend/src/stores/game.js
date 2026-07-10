@@ -473,6 +473,13 @@ export const useGameStore = defineStore("game", {
     undoGlyph() {
       return invoke("undo_glyph");
     },
+    // Black Hole inversion strength (slider exponent, 10^-x) and auto-pause.
+    setBlackHoleNegative(exponent) {
+      return invoke("set_black_hole_negative", { exponent });
+    },
+    setBlackHoleAutoPause(mode) {
+      return invoke("set_black_hole_auto_pause", { mode });
+    },
     // Create a Reality Glyph from the reality Alchemy resource.
     createRealityGlyph() {
       return invoke("create_reality_glyph");

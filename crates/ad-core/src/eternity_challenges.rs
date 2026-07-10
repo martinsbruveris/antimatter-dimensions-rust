@@ -247,6 +247,10 @@ impl GameState {
             self.eternity_with_options(true);
         }
         self.eternity_challenge_current = id;
+        // Starting EC12 resets the slowest-inversion tracker (IU24's gate).
+        if id == 12 {
+            self.requirement_checks.reality_slowest_bh = 1.0;
+        }
         self.start_ec_reset();
         true
     }

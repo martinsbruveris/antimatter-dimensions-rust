@@ -244,3 +244,25 @@ modes were already wired. Save round-trip for `auto.timeDims` and
 `auto.epMultBuyer`; grouped Autobuyers-tab boxes for both.
 
 **Tests:** one new unit test (RU13 gates both autobuyers).
+
+## 6.5 — Black Holes: inversion + auto-pause
+
+**What shipped:** the two deferred Black-Hole mechanics. *Inversion:*
+`blackHoleNegative` (set via the 10^−x slider, unlocked by Ra's hard-V flip
+with both holes permanent) makes the game run *slower* than 1 while paused
+(`areNegative`, disabled in Enslaved/Lai'tela runs), and the
+`requirementChecks.reality.slowestBH` tracker now exists for Imaginary
+Upgrade 24's gate — following the original's write points (reality reset
+seeds it from the current inversion; unpausing, starting EC12, and an
+Enslaved discharge reset it to 1; weakening the slider raises it). V's
+`achievementBH` reward (another 7.4 deferred effect) multiplies each active
+hole's power. *Auto-pause:* `blackHoleAutoPauseMode` (never / before BH1 /
+before BH2) with the faithful `timeToNextPause` — analytic for BH1, the
+100-step transition scan for BH2 — wired into `tick_black_holes` via
+`autoPauseData` (the tick advances exactly to the pause point 5 s before the
+activation, then pauses). Save round-trip for all three fields plus
+`slowestBH`; the Black Hole tab gains the auto-pause selector and the
+inversion slider.
+
+**Tests:** two new unit tests (inversion + tracker resets; the auto-pause
+stopping 5 s before the first activation).

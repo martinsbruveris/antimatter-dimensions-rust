@@ -1,7 +1,7 @@
 <script setup>
-// The Black Hole tab (BlackHoleTab.vue, without the canvas animation and the
-// celestial inversion/auto-pause extras): unlock button, per-hole status
-// line, the three upgrade buttons per hole, and the pause toggle.
+// The Black Hole tab (BlackHoleTab.vue, without the canvas animation): unlock
+// button, per-hole status line, the three upgrade buttons per hole, the pause
+// toggle, the auto-pause mode selector, and the inversion slider.
 import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
@@ -10,6 +10,15 @@ import { formatDecimal } from "../../../util/format";
 const game = useGameStore();
 const reality = computed(() => game.snapshot?.reality);
 const blackHoles = computed(() => reality.value?.black_holes);
+
+// Inversion slider: the exponent x of the 10^-x divisor.
+const negativeExponent = computed(() =>
+  Math.round(-Math.log10(blackHoles.value?.negative ?? 1)),
+);
+const negativeDivisorText = computed(() => {
+  const x = negativeExponent.value;
+  return x >= 21 ? `1e${x}` : Math.pow(10, x).toLocaleString("en-US");
+});
 
 const UPGRADES = [
   { kind: 0, name: "Interval", description: "Reduce the time between activations by 20%" },
@@ -66,6 +75,38 @@ function holeDescription(hole, index) {
       >
         {{ blackHoles.paused ? "Unpause" : "Pause" }} Black Hole
       </button>
+      <div class="l-black-hole-auto-pause">
+        <label>
+          Auto-pause:
+          <select
+            :value="blackHoles.auto_pause_mode"
+            @change="game.setBlackHoleAutoPause(Number($event.target.value))"
+          >
+            <option :value="0">Never</option>
+            <option :value="1">Before Black Hole 1</option>
+            <option :value="2">Before Black Hole 2</option>
+          </select>
+        </label>
+      </div>
+      <div
+        v-if="blackHoles.negative_unlocked"
+        class="l-black-hole-sliders"
+      >
+        <b>
+          Inverted Black Hole divides game speed by
+          {{ negativeDivisorText }}
+          {{ blackHoles.is_inverted ? "(active)" : "(requires pause)" }}
+        </b>
+        <input
+          type="range"
+          min="0"
+          max="300"
+          step="1"
+          :value="negativeExponent"
+          style="width: 55rem"
+          @input="game.setBlackHoleNegative(Number($event.target.value))"
+        >
+      </div>
       <div
         v-for="(hole, index) in blackHoles.holes"
         :key="index"
