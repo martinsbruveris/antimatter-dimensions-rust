@@ -7,6 +7,7 @@ import { computed, onUnmounted, ref } from "vue";
 
 import { useGameStore } from "../../../stores/game";
 import { formatDecimal, formatMultiplier } from "../../../util/format";
+import { floatToNum, numLog10 } from "../../../util/num";
 import {
   PERK_SHOP_DESCRIPTIONS,
   TERESA_RUN_DESCRIPTION,
@@ -23,19 +24,6 @@ const showRunReward = computed(() => (teresa.value?.run_reward_multiplier ?? 1) 
 const hasEpGen = computed(() =>
   Boolean(teresa.value?.unlocks?.find((u) => u.id === 1)?.unlocked));
 
-// Convert an engine `Num { m, e }` to a log10 exponent, for the 0..1 bar/marker
-// positioning (`log10(x) / 24`).
-function numLog10(n) {
-  if (!n || n.m <= 0) return -Infinity;
-  return n.e + Math.log10(n.m);
-}
-// Convert a plain float to a normalized engine `Num { m, e }`.
-function floatToNum(f) {
-  if (!isFinite(f)) return { m: 1, e: 308 };
-  if (f === 0) return { m: 0, e: 0 };
-  const e = Math.floor(Math.log10(Math.abs(f)));
-  return { m: f / 10 ** e, e };
-}
 // Format a plain float as a `×N` multiplier via the WASM formatter.
 function xFloat(f) {
   if (!isFinite(f)) return "×Infinite";

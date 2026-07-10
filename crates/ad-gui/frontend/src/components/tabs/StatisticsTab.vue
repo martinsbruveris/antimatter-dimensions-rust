@@ -14,6 +14,7 @@ import {
   timeDisplayShort,
 } from "../../util/format";
 import { estimateMatterScale } from "../../util/matterScale";
+import { floatToNum, gtZero, numLog10 } from "../../util/num";
 
 const game = useGameStore();
 const s = computed(() => game.snapshot);
@@ -28,9 +29,8 @@ const eternityUnlocked = computed(() => Boolean(s.value?.eternity_unlocked));
 const realityUnlocked = computed(() => Boolean(s.value?.reality?.unlocked));
 const isDoomed = computed(() => Boolean(stats.value?.is_doomed));
 
-// log10-safe comparisons on raw { m, e } numbers.
-const gtZero = (num) => Boolean(num) && num.m > 0;
-const gtOneBillion = (num) => gtZero(num) && Math.log10(num.m) + num.e > 9;
+// The original formatDecimalAmount's 1e9 switch point.
+const gtOneBillion = (num) => numLog10(num) > 9;
 
 // The original `formatDecimalAmount`: full notation above 1e9, else the
 // floored integer (run through the formatter for thousand separators, like
@@ -40,8 +40,7 @@ function formatDecimalAmount(num) {
   if (gtOneBillion(num)) return formatDecimal(num, 3, 0);
   const floored = Math.floor(num.m * Math.pow(10, num.e));
   if (floored === 0) return "0";
-  const e = Math.floor(Math.log10(floored));
-  return formatDecimal({ m: floored / Math.pow(10, e), e }, 2, 0);
+  return formatDecimal(floatToNum(floored), 2, 0);
 }
 
 // pluralize("Infinity", n) — "y" → "ies" like the original's default rule.

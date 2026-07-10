@@ -52,7 +52,10 @@ frontend/
                             #   credits.js, shortcuts.js (Hotkey List content)
     util/                   # small helpers: dimensionText, responsive,
                             #   shortcuts.js (keyboard handler),
-                            #   tutorial.js (step ids + hasTutorial/emphasizeH2P)
+                            #   tutorial.js (step ids + hasTutorial/emphasizeH2P),
+                            #   num.js (shared { m, e } Num math — log10/
+                            #   normalize/scale/average; use it instead of
+                            #   per-component copies)
     components/
       Sidebar.vue, SidebarCurrency.vue, GameHeader.vue, InfoButtons.vue
       DimensionRow.vue, TickspeedRow.vue, DimBoostRow.vue, GalaxyRow.vue,

@@ -3,15 +3,7 @@
 // lives frontend-side; it works in log10 space on the snapshot's raw
 // `{ m, e }` numbers because antimatter far exceeds the f64 range.
 import { formatDecimal, formatTime } from "./format";
-
-// log10 of a snapshot number ({ m, e } = mantissa × 10^exponent).
-const log10 = (num) => Math.log10(num.m) + num.e;
-
-// Rebuild an { m, e } number from a log10 value so formatDecimal can render it.
-function numFromLog10(lg) {
-  const e = Math.floor(lg);
-  return { m: Math.pow(10, lg - e), e };
-}
+import { numFromLog10, numLog10 as log10 } from "./num";
 
 // The original tables, converted to log10. `2.82e-45` m³ per proton,
 // `4.22419e-105` m³ per planck volume.

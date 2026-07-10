@@ -9,16 +9,11 @@ import { computed, ref } from "vue";
 
 import { useGameStore } from "../stores/game";
 import { formatDecimal } from "../util/format";
+import { numLog10 as log10, scaleNum } from "../util/num";
 
 const game = useGameStore();
 const s = computed(() => game.snapshot);
 const hover = ref(false);
-
-// log10 of a snapshot Num ({m, e}); 0 for non-positive values.
-function log10(num) {
-  if (!num || num.m <= 0) return 0;
-  return Math.log10(num.m) + num.e;
-}
 
 // Show EP/min below this threshold, color the EP number above it.
 const RATE_THRESHOLD_LOG10 = 40;
@@ -48,14 +43,7 @@ const showEPRate = computed(
 // Current EP/min (gained EP over this eternity's real minutes).
 const currentEPRate = computed(() => {
   const minutes = Math.max(s.value.this_eternity_real_time_ms / 60000, 0.0005);
-  const g = s.value.gained_eternity_points;
-  const scaled = { m: g.m / minutes, e: g.e };
-  // Renormalize the mantissa into [1, 10).
-  if (scaled.m > 0) {
-    const shift = Math.floor(Math.log10(scaled.m));
-    return { m: scaled.m / 10 ** shift, e: scaled.e + shift };
-  }
-  return scaled;
+  return scaleNum(s.value.gained_eternity_points, 1 / minutes);
 });
 
 const epIsOne = computed(

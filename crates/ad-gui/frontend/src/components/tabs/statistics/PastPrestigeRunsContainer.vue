@@ -9,6 +9,7 @@ import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
 import { formatDecimal, timeDisplayShort } from "../../../util/format";
+import { averageNums, numLog10, scaleNum } from "../../../util/num";
 
 const props = defineProps({
   // { key, name, plural, currency } — key is the engine layer id
@@ -22,26 +23,6 @@ const props = defineProps({
 });
 
 const game = useGameStore();
-
-// ----- { m, e } helpers -------------------------------------------------
-const numLog10 = (num) => (num.m === 0 ? -Infinity : Math.log10(num.m) + num.e);
-
-function normalizeNum(m, e) {
-  if (m === 0 || !Number.isFinite(m)) return { m: 0, e: 0 };
-  const shift = Math.floor(Math.log10(Math.abs(m)));
-  return { m: m / Math.pow(10, shift), e: e + shift };
-}
-
-// Scale a Num by an f64 factor (used for the per-minute/per-hour rates).
-const scaleNum = (num, factor) => normalizeNum(num.m * factor, num.e);
-
-// Arithmetic mean of Nums: sum mantissas relative to the largest exponent
-// (terms > ~15 orders below it underflow to 0 — negligible in a mean).
-function averageNums(nums) {
-  const maxE = Math.max(...nums.map((n) => n.e));
-  const sum = nums.reduce((acc, n) => acc + n.m * Math.pow(10, n.e - maxE), 0);
-  return normalizeNum(sum / nums.length, maxE);
-}
 
 // ----- the 11 table rows (10 runs + average) ------------------------------
 // The original's `averageRun`: average the valid runs; with none, reuse the
