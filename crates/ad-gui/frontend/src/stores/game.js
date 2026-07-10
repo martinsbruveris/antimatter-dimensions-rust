@@ -320,6 +320,22 @@ export const useGameStore = defineStore("game", {
       await invoke("glyph_purge", { threshold });
       this.snapshot = await this.getState();
     },
+    async giveCursedGlyph() {
+      await invoke("give_cursed_glyph");
+      this.snapshot = await this.getState();
+    },
+    async saveGlyphSet(slot) {
+      await invoke("save_glyph_set", { slot });
+      this.snapshot = await this.getState();
+    },
+    async loadGlyphSet(slot) {
+      await invoke("load_glyph_set", { slot });
+      this.snapshot = await this.getState();
+    },
+    async deleteGlyphSet(slot) {
+      await invoke("delete_glyph_set", { slot });
+      this.snapshot = await this.getState();
+    },
     async vUnlockCelestial() {
       await invoke("v_unlock_celestial");
       this.snapshot = await this.getState();

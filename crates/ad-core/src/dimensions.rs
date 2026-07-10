@@ -555,6 +555,11 @@ impl GameState {
         if self.achievement_unlocked(183) {
             mult = mult.pow(&Decimal::from_float(1.0812403840463596));
         }
+        // The `curseddimensions` power (`applyNDPowers`).
+        let cursed_dims = self.glyph_effect_curseddimensions();
+        if cursed_dims != 1.0 {
+            mult = mult.pow(&Decimal::from_float(cursed_dims));
+        }
         // V's `adPow` reward: a persistent AD power `1 + √ST/100`
         // (`applyNDPowers`' `VUnlocks.adPow`).
         let ad_pow = self.v_ad_pow();

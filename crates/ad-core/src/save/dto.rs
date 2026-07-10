@@ -713,7 +713,7 @@ pub struct BlackHoleDTO {
     pub duration_upgrades: f64,
 }
 
-/// `player.reality.glyphs` (modelled subset: no undo/sets/filter/cosmetics).
+/// `player.reality.glyphs` (modelled subset: no cosmetics).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GlyphsDTO {
@@ -731,6 +731,19 @@ pub struct GlyphsDTO {
     #[serde(default)]
     pub undo: Vec<GlyphUndoDTO>,
     pub protected_rows: u32,
+    /// The 7 saved glyph presets (`sets`; Effarig's set-saves unlock).
+    #[serde(default)]
+    pub sets: Vec<GlyphSetDTO>,
+}
+
+/// One saved glyph preset (`{ name, glyphs }`).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlyphSetDTO {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub glyphs: Vec<GlyphDTO>,
 }
 
 /// `player.reality.glyphs.filter`.
@@ -807,8 +820,7 @@ pub struct GlyphUndoDTO {
     pub dt: Decimal,
 }
 
-/// One glyph. Types we don't model (cursed) are skipped on load rather than
-/// failing it.
+/// One glyph. Unmodelled types are skipped on load rather than failing it.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GlyphDTO {
@@ -1981,6 +1993,23 @@ impl GameState {
                 sac
             },
             created_reality_glyph: dto.reality.glyphs.created_reality_glyph,
+            sets: {
+                let mut sets: Vec<crate::glyphs::GlyphSet> = dto
+                    .reality
+                    .glyphs
+                    .sets
+                    .iter()
+                    .take(7)
+                    .map(|s| crate::glyphs::GlyphSet {
+                        name: s.name.clone(),
+                        glyphs: parse_glyphs(&s.glyphs),
+                    })
+                    .collect();
+                while sets.len() < 7 {
+                    sets.push(crate::glyphs::GlyphSet::default());
+                }
+                sets
+            },
             filter: {
                 let src = &dto.reality.glyphs.filter;
                 let mut filter = crate::glyphs::GlyphFilter::new();

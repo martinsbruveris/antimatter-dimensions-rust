@@ -284,3 +284,51 @@ RU11/14 carries, Effarig cap/bonusRG/eternity-infinities, V reduction
 Continuum quadratic branch + effective amounts, maxAll bulk-buy,
 annihilation/condense autobuyers. ad-core suite: 604. Fidelity: 1469/1476
 (unchanged). **Cluster 3 complete.**
+
+## Cluster 4 — glyph extras (6.2)
+
+### Cursed glyphs
+
+- `GlyphType::Cursed` (save id `"cursed"`, non-generated effect bits 0–3, no
+  sacrifice value): previously *skipped on save load*, now round-tripped.
+- `give_cursed_glyph` (`Glyphs.giveCursedGlyph`): a level-6666, 100%-rarity
+  glyph with all four effects; needs free inventory space and at most 5
+  cursed glyphs in existence; surfaced on the V tab behind Ra's Hard-V flip.
+- The four effects at their sites: `cursedgalaxies` (`level^-0.03`) into the
+  ≥3-galaxy tickspeed branch, `curseddimensions` (`level^-0.035`) as a power
+  on the AD/ID/TD multipliers, `cursedtickspeed` (`max(log10(level), 1)`,
+  additive) widening the free-tickspeed threshold
+  (`1 + (base − 1) × effect`), and `cursedEP` (`10^(-level/10)`) leading
+  `totalEPMult`. The original's conflicting-effect combination is ported:
+  when `cursedgalaxies`/`realitygalaxies` (or `curseddimensions`/
+  `effarigdimensions`) are both present and their product is under 1, the
+  cursed side absorbs the product and the conflicting effect goes neutral
+  (`timeEP`'s pair stays out of frontier with Glyph Alteration).
+- Cursed glyphs count −4 in the `maxGlyphs` requirement check (each equipped
+  one nets −3), which makes Imaginary Upgrade 22's `< −10` gate and V's hard
+  "Requiem for a Glyph" achievement reachable. While Doomed they are
+  forbidden from equipping (with Effarig/Reality); purges skip them except
+  "sacrifice all".
+
+### Glyph presets (Effarig's `setSaves` unlock)
+
+`player.reality.glyphs.sets` (7 presets of `{name, glyphs}`) now
+round-trips — the data previously vanished through the Rust engine.
+`save_glyph_set` (empty slot + something equipped), `delete_glyph_set`, and
+`load_glyph_set`, which equips exactly-matching inventory glyphs (same type/
+level/strength/effects) into free slots — a documented simplification of the
+original's fuzzy greedy/lenient matching options. GUI: a presets panel on
+the Glyphs tab, save/load/delete per slot.
+
+### Cosmetics decision
+
+Glyph cosmetics (custom colors/symbols, the cosmetic sets from the shop) are
+**cut**: they are pure presentation with zero engine effect, and the save
+fields pass through untouched. The only mechanical touchpoint — customized
+glyphs being protected from non-harsh purges — is dropped along with them
+(no glyph can be customized in our port).
+
+Tests: creation + 5-cap, the four effect formulas, the conflict combination,
+preset save/load/delete. ad-core suite: 608. Fidelity: 1469/1476 (unchanged).
+**Cluster 4 complete — all four port-gap clusters done.** The audit doc's
+status rows (4.5, 6.2, 6.7 note, 7.2–7.7) were brought current.

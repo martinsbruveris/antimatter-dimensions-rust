@@ -43,6 +43,7 @@ pub enum GlyphType {
     Dilation,
     Effarig,
     Reality,
+    Cursed,
     Companion,
 }
 
@@ -66,6 +67,7 @@ impl GlyphType {
             GlyphType::Dilation => "dilation",
             GlyphType::Effarig => "effarig",
             GlyphType::Reality => "reality",
+            GlyphType::Cursed => "cursed",
             GlyphType::Companion => "companion",
         }
     }
@@ -79,6 +81,7 @@ impl GlyphType {
             "dilation" => GlyphType::Dilation,
             "effarig" => GlyphType::Effarig,
             "reality" => GlyphType::Reality,
+            "cursed" => GlyphType::Cursed,
             "companion" => GlyphType::Companion,
             _ => return None,
         })
@@ -95,7 +98,7 @@ impl GlyphType {
         match self {
             GlyphType::Effarig => Some(5),
             GlyphType::Reality => Some(6),
-            GlyphType::Companion => None,
+            GlyphType::Cursed | GlyphType::Companion => None,
             basic => basic.basic_index(),
         }
     }
@@ -110,9 +113,10 @@ impl GlyphType {
             GlyphType::Infinity => &[12, 13, 14, 15],
             GlyphType::Power => &[16, 17, 18, 19],
             GlyphType::Effarig => &[20, 21, 22, 23, 24, 25, 26],
-            // Reality glyphs are constructed (level thresholds), not rolled;
-            // the companion has no numeric effects.
-            GlyphType::Reality | GlyphType::Companion => &[],
+            // Reality glyphs are constructed (level thresholds), cursed
+            // glyphs always carry all four effects, and the companion has no
+            // numeric effects — none are rolled.
+            GlyphType::Reality | GlyphType::Cursed | GlyphType::Companion => &[],
         }
     }
 
@@ -154,13 +158,21 @@ pub struct Glyph {
     /// Pre-instability level (display only).
     pub raw_level: u32,
     /// Effect bitmask. For the 5 basic types these are the generated-effect
-    /// bit indices (0–19); the companion glyph uses the non-generated bits
-    /// 8/9 (its effects are display-only).
+    /// bit indices (0–19); cursed glyphs use the non-generated bits 0–3,
+    /// Reality glyphs 4–7, and the companion 8/9 (display-only).
     pub effects: u32,
 }
 
-/// `player.reality.glyphs` (modelled subset: no undo stack, sets, filter, or
-/// cosmetics).
+/// A saved glyph preset (`player.reality.glyphs.sets[i]`, Effarig's
+/// set-saves unlock): a display name and copies of the saved glyphs.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GlyphSet {
+    pub name: String,
+    pub glyphs: Vec<Glyph>,
+}
+
+/// `player.reality.glyphs` (modelled subset: no cosmetics).
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlyphState {
@@ -187,6 +199,14 @@ pub struct GlyphState {
     /// Protected inventory rows (top `protected_rows × 10` slots; new glyphs
     /// never land there). Default 2.
     pub protected_rows: u32,
+    /// The 7 saved glyph presets (`sets`; Effarig's set-saves unlock).
+    #[cfg_attr(feature = "serde", serde(default = "default_glyph_sets"))]
+    pub sets: Vec<GlyphSet>,
+}
+
+#[cfg(feature = "serde")]
+fn default_glyph_sets() -> Vec<GlyphSet> {
+    vec![GlyphSet::default(); 7]
 }
 
 /// `AUTO_GLYPH_SCORE` — the filter's selection mode.
@@ -337,6 +357,7 @@ impl GlyphState {
             filter: GlyphFilter::new(),
             undo: Vec::new(),
             protected_rows: 2,
+            sets: vec![GlyphSet::default(); 7],
         }
     }
 }
@@ -952,6 +973,119 @@ impl GameState {
         self.reality.glyphs.inventory.push(glyph);
     }
 
+    /// `Glyphs.giveCursedGlyph`: create a level-6666, 100%-rarity Cursed
+    /// glyph (all four cursed effects) into a free inventory slot. At most 5
+    /// cursed glyphs may exist at once; needs Ra's Hard-V flip to be visible.
+    pub fn give_cursed_glyph(&mut self) -> bool {
+        if self.glyph_free_inventory_space() == 0 {
+            return false;
+        }
+        let cursed_count = self
+            .reality
+            .glyphs
+            .inventory
+            .iter()
+            .chain(self.reality.glyphs.active.iter())
+            .filter(|g| g.kind == GlyphType::Cursed)
+            .count();
+        if cursed_count >= 5 {
+            return false;
+        }
+        // `rarityToStrength(100)` = 3.5.
+        let glyph = Glyph {
+            id: 0,
+            idx: 0,
+            kind: GlyphType::Cursed,
+            strength: 3.5,
+            level: 6666,
+            raw_level: 6666,
+            effects: 0b1111,
+        };
+        self.add_glyph_to_inventory(glyph);
+        true
+    }
+
+    /// Whether glyph presets are unlocked (Effarig's `setSaves` unlock).
+    pub fn glyph_sets_unlocked(&self) -> bool {
+        self.celestials
+            .effarig
+            .unlock_bought(crate::celestials::effarig::EFFARIG_UNLOCK_SET_SAVES)
+    }
+
+    /// Save the equipped glyphs into preset `slot` (only when the slot is
+    /// empty and something is equipped, as the original panel).
+    pub fn save_glyph_set(&mut self, slot: usize) -> bool {
+        if !self.glyph_sets_unlocked() || slot >= self.reality.glyphs.sets.len() {
+            return false;
+        }
+        let glyphs: Vec<Glyph> = self
+            .reality
+            .glyphs
+            .active
+            .iter()
+            .filter(|g| g.kind != GlyphType::Companion)
+            .cloned()
+            .collect();
+        if glyphs.is_empty() || !self.reality.glyphs.sets[slot].glyphs.is_empty() {
+            return false;
+        }
+        self.reality.glyphs.sets[slot].glyphs = glyphs;
+        true
+    }
+
+    /// Delete preset `slot`.
+    pub fn delete_glyph_set(&mut self, slot: usize) -> bool {
+        if !self.glyph_sets_unlocked() || slot >= self.reality.glyphs.sets.len() {
+            return false;
+        }
+        self.reality.glyphs.sets[slot].glyphs.clear();
+        true
+    }
+
+    /// Load preset `slot`: for each saved glyph not already covered by an
+    /// equipped one, equip an exactly-matching inventory glyph (same type,
+    /// level, strength, and effects) into the next free slot. Exact matching
+    /// is a documented simplification of the original's fuzzy greedy/lenient
+    /// matching options.
+    pub fn load_glyph_set(&mut self, slot: usize) -> bool {
+        if !self.glyph_sets_unlocked() || slot >= self.reality.glyphs.sets.len() {
+            return false;
+        }
+        let wanted = self.reality.glyphs.sets[slot].glyphs.clone();
+        let mut equipped_any = false;
+        let mut used: Vec<u32> = Vec::new();
+        for target in &wanted {
+            // Skip targets an equipped glyph already satisfies.
+            if self.reality.glyphs.active.iter().any(|g| {
+                g.kind == target.kind
+                    && g.level == target.level
+                    && g.strength == target.strength
+                    && g.effects == target.effects
+                    && !used.contains(&g.id)
+            }) {
+                continue;
+            }
+            let candidate = self.reality.glyphs.inventory.iter().find(|g| {
+                g.kind == target.kind
+                    && g.level == target.level
+                    && g.strength == target.strength
+                    && g.effects == target.effects
+            });
+            let Some(candidate) = candidate else { continue };
+            let id = candidate.id;
+            // The next free active slot.
+            let slot_count = self.glyph_active_slot_count();
+            let free = (0..slot_count as u32)
+                .find(|s| !self.reality.glyphs.active.iter().any(|g| g.idx == *s));
+            let Some(free) = free else { break };
+            if self.equip_glyph(id, free) {
+                used.push(id);
+                equipped_any = true;
+            }
+        }
+        equipped_any
+    }
+
     /// Number of equipped glyph slots (`Glyphs.activeSlotCount`):
     /// `3 + RU9 + RU24`; while Doomed, 1 with the vacuum rift's first
     /// milestone, else 0.
@@ -1005,7 +1139,10 @@ impl GameState {
         // (`Glyphs.equip`'s `forbiddenByPelle` check).
         if self.is_doomed() {
             let kind = self.reality.glyphs.inventory[pos].kind;
-            let forbidden_type = matches!(kind, GlyphType::Effarig | GlyphType::Reality);
+            let forbidden_type = matches!(
+                kind,
+                GlyphType::Effarig | GlyphType::Reality | GlyphType::Cursed
+            );
             if self.pelle_is_disabled("glyphs") || forbidden_type {
                 return false;
             }
@@ -1027,8 +1164,9 @@ impl GameState {
         let mut glyph = self.reality.glyphs.inventory.remove(pos);
         glyph.idx = target_slot;
         self.reality.glyphs.active.push(glyph);
-        // `Glyphs.updateMaxGlyphCount`.
-        let count = self.active_glyphs_without_companion().len() as i32;
+        // `Glyphs.updateMaxGlyphCount`: each cursed glyph counts −4 on top
+        // of its slot (net −3).
+        let count = self.equipped_glyph_count();
         self.requirement_checks.reality_max_glyphs =
             self.requirement_checks.reality_max_glyphs.max(count);
         true
@@ -1278,6 +1416,90 @@ impl GameState {
         } else {
             level
         }
+    }
+
+    /// Effect levels of the equipped Cursed glyphs carrying non-generated
+    /// bit `bit` (0–3).
+    fn cursed_glyph_effect_values(&self, bit: u8) -> Vec<f64> {
+        self.reality
+            .glyphs
+            .active
+            .iter()
+            .filter(|g| g.kind == GlyphType::Cursed)
+            .filter(|g| g.effects & (1 << bit) != 0)
+            .map(|g| self.adjusted_glyph_level(g))
+            .collect()
+    }
+
+    /// The `cursedgalaxies`/`realitygalaxies` pair with the original's
+    /// conflicting-effect combination: when both are present and their product
+    /// is below 1, the cursed side absorbs the product and the conflicting
+    /// side goes neutral (`glyph-effects.js`).
+    fn cursed_galaxies_pair(&self) -> (f64, f64) {
+        let cursed_vals = self.cursed_glyph_effect_values(0);
+        // cursedgalaxies (bit 0): ×`level^-0.03` per glyph.
+        let cursed: f64 = cursed_vals.iter().map(|&l| l.powf(-0.03)).product();
+        let reality_vals = self.reality_glyph_effect_values(5);
+        let reality: f64 = reality_vals
+            .iter()
+            .map(|&l| 1.0 + (l / 100_000.0).powf(0.5))
+            .product();
+        if !cursed_vals.is_empty() && !reality_vals.is_empty() && cursed * reality < 1.0
+        {
+            (cursed * reality, 1.0)
+        } else {
+            (cursed, reality)
+        }
+    }
+
+    /// cursedgalaxies (non-generated bit 0): all Galaxies ×`level^-0.03`.
+    pub fn glyph_effect_cursedgalaxies(&self) -> f64 {
+        self.cursed_galaxies_pair().0
+    }
+
+    /// The `curseddimensions`/`effarigdimensions` conflict pair (see
+    /// [`cursed_galaxies_pair`](Self::cursed_galaxies_pair)).
+    fn cursed_dimensions_pair(&self) -> (f64, f64) {
+        let cursed_vals = self.cursed_glyph_effect_values(1);
+        // curseddimensions (bit 1): all Dimensions ^`level^-0.035` per glyph.
+        let cursed: f64 = cursed_vals.iter().map(|&l| l.powf(-0.035)).product();
+        let effarig_vals: Vec<f64> = self
+            .glyph_effect_values(25)
+            .iter()
+            .map(|&(l, s)| 1.0 + l.powf(0.25) * s.powf(0.4) / 500.0)
+            .collect();
+        let effarig = Self::combine_add_exponents(&effarig_vals);
+        if !cursed_vals.is_empty() && !effarig_vals.is_empty() && cursed * effarig < 1.0
+        {
+            (cursed * effarig, 1.0)
+        } else {
+            (cursed, effarig)
+        }
+    }
+
+    /// curseddimensions (non-generated bit 1): all Dimension multipliers
+    /// `^(level^-0.035)` per glyph.
+    pub fn glyph_effect_curseddimensions(&self) -> f64 {
+        self.cursed_dimensions_pair().0
+    }
+
+    /// cursedtickspeed (non-generated bit 2): the Time-Dimension free-
+    /// tickspeed threshold multiplier `max(log10(level), 1)`, added across
+    /// glyphs (0 with none equipped; the consumer clamps at 1).
+    pub fn glyph_effect_cursedtickspeed(&self) -> f64 {
+        self.cursed_glyph_effect_values(2)
+            .iter()
+            .map(|&l| l.log10().max(1.0))
+            .sum()
+    }
+
+    /// cursedEP (non-generated bit 3): EP gain ×`10^(-level/10)` per glyph.
+    /// (The `timeEP` conflict partner is a Glyph-Alteration secondary effect,
+    /// out of frontier.)
+    pub fn glyph_effect_cursed_ep(&self) -> Decimal {
+        self.cursed_glyph_effect_values(3)
+            .iter()
+            .fold(Decimal::ONE, |acc, &l| acc * Decimal::pow10(-l / 10.0))
     }
 
     /// `Glyphs.levelBoost` — the `realityglyphlevel` effect total (bit 4 of
@@ -1642,12 +1864,8 @@ impl GameState {
 
     /// effarigdimensions (bit 25): all Dimension multipliers `^x`.
     pub fn glyph_effect_effarigdimensions(&self) -> f64 {
-        let v: Vec<f64> = self
-            .glyph_effect_values(25)
-            .iter()
-            .map(|&(l, s)| 1.0 + l.powf(0.25) * s.powf(0.4) / 500.0)
-            .collect();
-        Self::combine_add_exponents(&v)
+        // Neutralized when a conflicting cursed effect absorbs it.
+        self.cursed_dimensions_pair().1
     }
 
     /// effarigantimatter (bit 26): antimatter production `10^x → 10^(x^value)`.
@@ -1662,10 +1880,8 @@ impl GameState {
 
     /// realitygalaxies (bit 5): all Galaxies `×x` stronger.
     pub fn glyph_effect_realitygalaxies(&self) -> f64 {
-        self.reality_glyph_effect_values(5)
-            .iter()
-            .map(|&l| 1.0 + (l / 100_000.0).powf(0.5))
-            .product()
+        // Neutralized when a conflicting cursed effect absorbs it.
+        self.cursed_galaxies_pair().1
     }
 
     /// realityrow1pow (bit 6): Reality-Upgrade Amplifier multiplier `^x`.
@@ -1980,6 +2196,10 @@ impl GameState {
             if glyph.kind == GlyphType::Companion {
                 continue;
             }
+            // Cursed glyphs only go with "sacrifice all".
+            if glyph.kind == GlyphType::Cursed && threshold != 0 {
+                continue;
+            }
             if threshold == 0 || self.glyph_objectively_useless(&glyph, threshold) {
                 self.get_rid_of_glyph(&glyph);
                 if let Some(pos) = self
@@ -2123,6 +2343,109 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cursed_glyphs_are_created_and_capped_at_five() {
+        let mut game = GameState::new();
+        for i in 0..5 {
+            assert!(game.give_cursed_glyph(), "glyph {i}");
+        }
+        assert!(!game.give_cursed_glyph());
+        let cursed: Vec<_> = game
+            .reality
+            .glyphs
+            .inventory
+            .iter()
+            .filter(|g| g.kind == GlyphType::Cursed)
+            .collect();
+        assert_eq!(cursed.len(), 5);
+        assert_eq!(cursed[0].level, 6666);
+        assert_eq!(cursed[0].strength, 3.5);
+        assert_eq!(cursed[0].effects, 0b1111);
+    }
+
+    #[test]
+    fn cursed_effects_curse() {
+        let mut game = GameState::new();
+        game.reality.glyphs.active.push(Glyph {
+            id: 1,
+            idx: 0,
+            kind: GlyphType::Cursed,
+            strength: 3.5,
+            level: 6666,
+            raw_level: 6666,
+            effects: 0b1111,
+        });
+        // curseddimensions: 6666^-0.035 < 1.
+        let dims = game.glyph_effect_curseddimensions();
+        assert!((dims - 6666f64.powf(-0.035)).abs() < 1e-12);
+        // cursedgalaxies < 1; cursedtickspeed = log10(6666) ≈ 3.82.
+        assert!(game.glyph_effect_cursedgalaxies() < 1.0);
+        assert!((game.glyph_effect_cursedtickspeed() - 6666f64.log10()).abs() < 1e-12);
+        // cursedEP divides by 1e666.6.
+        assert!(game.glyph_effect_cursed_ep() < Decimal::ONE);
+        // The free-tickspeed threshold widens: 1 + 0.33×3.82…
+        let mult = game.free_tickspeed_mult();
+        assert!((mult - (1.0 + 0.33 * 6666f64.log10())).abs() < 1e-9);
+    }
+
+    #[test]
+    fn cursed_and_reality_galaxy_effects_combine_when_conflicting() {
+        let mut game = GameState::new();
+        game.reality.glyphs.active.push(Glyph {
+            id: 1,
+            idx: 0,
+            kind: GlyphType::Cursed,
+            strength: 3.5,
+            level: 6666,
+            raw_level: 6666,
+            effects: 0b1111,
+        });
+        game.reality.glyphs.active.push(Glyph {
+            id: 2,
+            idx: 1,
+            kind: GlyphType::Reality,
+            strength: 3.5,
+            level: 100,
+            raw_level: 100,
+            effects: 1 << 5, // realitygalaxies
+        });
+        let cursed = 6666f64.powf(-0.03);
+        let reality = 1.0 + (100.0 / 100_000.0f64).powf(0.5);
+        // Product < 1 → the cursed side absorbs it, the reality side is 1.
+        assert!(cursed * reality < 1.0);
+        assert!((game.glyph_effect_cursedgalaxies() - cursed * reality).abs() < 1e-12);
+        assert_eq!(game.glyph_effect_realitygalaxies(), 1.0);
+    }
+
+    #[test]
+    fn glyph_sets_save_load_and_delete() {
+        let mut game = GameState::new();
+        game.celestials.effarig.unlock_bits |=
+            1 << crate::celestials::effarig::EFFARIG_UNLOCK_SET_SAVES;
+        let glyph = Glyph {
+            id: 7,
+            idx: 0,
+            kind: GlyphType::Power,
+            strength: 2.0,
+            level: 100,
+            raw_level: 100,
+            effects: 1 << 16,
+        };
+        game.reality.glyphs.active.push(glyph.clone());
+        assert!(game.save_glyph_set(0));
+        assert!(!game.save_glyph_set(0)); // occupied
+        assert_eq!(game.reality.glyphs.sets[0].glyphs.len(), 1);
+        // Unequip, then loading re-equips the matching inventory glyph.
+        game.reality.glyphs.active.clear();
+        let mut inv = glyph.clone();
+        inv.id = 9;
+        game.reality.glyphs.inventory.push(inv);
+        assert!(game.load_glyph_set(0));
+        assert_eq!(game.reality.glyphs.active.len(), 1);
+        assert!(game.delete_glyph_set(0));
+        assert!(game.reality.glyphs.sets[0].glyphs.is_empty());
+    }
 
     #[test]
     fn auto_clean_purges_objectively_useless_glyphs() {

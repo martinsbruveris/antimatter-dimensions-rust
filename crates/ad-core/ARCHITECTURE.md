@@ -155,8 +155,13 @@ not the current state).
   chunks), the 27 generated + 4 Reality-glyph effects' combiners (applied at
   their engine sites), Reality-glyph creation from the reality Alchemy
   resource, the auto-glyph filter (`AutoGlyphProcessor`: 7 score modes, 3
-  rejection modes, per-type configs — consumed by `auto_reality`), and
-  Teresa's Glyph undo (equip snapshots + the rewinding reset).
+  rejection modes, per-type configs — consumed by `auto_reality`),
+  Teresa's Glyph undo (equip snapshots + the rewinding reset), Cursed glyphs
+  (`give_cursed_glyph`, the 4 cursed effects + their conflicting-effect
+  combination, the −4 `maxGlyphs` counting), inventory purges
+  (`glyph_auto_clean` / `isObjectivelyUseless`, V's auto-purge on Reality),
+  and the 7 glyph presets (`save/load/delete_glyph_set`; exact-match loading
+  is a documented simplification). Cosmetics are cut (pure UI).
 - `src/perks.rs` — Perks (Feature 6.3): the 35-perk catalogue + connection
   graph, purchase (1 PP, adjacency), on-purchase side effects (START bumps,
   EU1, ACHNR), `starting_ip`/`starting_ep`, and `tick_perk_effects` (EU

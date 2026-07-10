@@ -64,7 +64,8 @@ impl GameState {
             }
             return mult;
         }
-        let mut mult = self.ep_mult_effect();
+        // The `cursedEP` glyph effect leads the product (÷e666.6 per glyph).
+        let mut mult = self.glyph_effect_cursed_ep() * self.ep_mult_effect();
         if self.time_study_bought(61) {
             mult *= Decimal::from_float(15.0);
         }

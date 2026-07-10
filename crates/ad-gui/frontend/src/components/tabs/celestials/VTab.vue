@@ -137,6 +137,12 @@ function startRun() {
         </div>
       </div>
 
+      <div v-if="v.is_flipped" class="l-v-cursed-row">
+        <button class="c-v-reduce-btn" @click="game.giveCursedGlyph()">
+          Get a Cursed Glyph (level 6666; four negative effects)
+        </button>
+      </div>
+
       <div class="l-v-unlocks-container">
         <div
           v-for="reward in v.rewards"
@@ -247,5 +253,10 @@ function startRun() {
 .c-v-reduce-btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+.l-v-cursed-row {
+  display: flex;
+  justify-content: center;
+  margin: 0.6rem;
 }
 </style>

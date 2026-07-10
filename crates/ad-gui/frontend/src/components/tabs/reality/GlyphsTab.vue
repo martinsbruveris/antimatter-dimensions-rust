@@ -173,6 +173,40 @@ function setWeight(index, valueIn) {
             Auto-purge on Reality
           </label>
         </div>
+        <div v-if="reality.set_saves_unlocked" class="c-glyph-sets-panel">
+          <b>Glyph presets</b>
+          <div
+            v-for="(set, i) in reality.glyph_sets"
+            :key="i"
+            class="c-glyph-set-row"
+          >
+            <span class="c-glyph-set-label">
+              {{ set.name || `Preset ${i + 1}` }}
+              ({{ set.glyphs.length }} glyphs)
+            </span>
+            <button
+              class="c-glyph-purge-btn"
+              :disabled="set.glyphs.length > 0"
+              @click="game.saveGlyphSet(i)"
+            >
+              Save
+            </button>
+            <button
+              class="c-glyph-purge-btn"
+              :disabled="set.glyphs.length === 0"
+              @click="game.loadGlyphSet(i)"
+            >
+              Load
+            </button>
+            <button
+              class="c-glyph-purge-btn"
+              :disabled="set.glyphs.length === 0"
+              @click="game.deleteGlyphSet(i)"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
         <GlyphInventory />
       </div>
     </div>
@@ -208,5 +242,24 @@ function setWeight(index, valueIn) {
   border-radius: 0.3rem;
   padding: 0.2rem 0.6rem;
   cursor: pointer;
+}
+.c-glyph-sets-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: center;
+  margin: 0.4rem;
+  font-size: 1.2rem;
+}
+
+.c-glyph-set-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.c-glyph-set-label {
+  min-width: 14rem;
+  text-align: right;
 }
 </style>

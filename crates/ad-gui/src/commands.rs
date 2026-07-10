@@ -809,6 +809,30 @@ pub fn glyph_purge(threshold: u32, state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().glyph_auto_clean(threshold.min(5));
 }
 
+/// Create a Cursed Glyph (Hard-V flip; at most 5 exist at once).
+#[tauri::command]
+pub fn give_cursed_glyph(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().give_cursed_glyph();
+}
+
+/// Save the equipped glyphs into preset `slot`.
+#[tauri::command]
+pub fn save_glyph_set(slot: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().save_glyph_set(slot);
+}
+
+/// Equip the glyphs of preset `slot` (exact inventory matches).
+#[tauri::command]
+pub fn load_glyph_set(slot: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().load_glyph_set(slot);
+}
+
+/// Clear preset `slot`.
+#[tauri::command]
+pub fn delete_glyph_set(slot: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().delete_glyph_set(slot);
+}
+
 /// Buy a single ×2 IP-multiplier (`ipMult`) purchase.
 #[tauri::command]
 pub fn buy_ip_mult(state: State<'_, Mutex<GameState>>) {

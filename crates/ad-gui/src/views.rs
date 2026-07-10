@@ -915,6 +915,9 @@ struct RealityView {
     auto_auto_clean_unlocked: bool,
     auto_auto_clean: bool,
     apply_filter_to_purge: bool,
+    /// Glyph presets (Effarig's set-saves unlock).
+    set_saves_unlocked: bool,
+    glyph_sets: Vec<GlyphSetView>,
     /// Glyph undo (Teresa unlock): availability + stack depth.
     undo_unlocked: bool,
     can_undo: bool,
@@ -934,6 +937,13 @@ struct RealityView {
     upgrades: Vec<RealityUpgradeView>,
     /// The Black Holes (Feature 6.5).
     black_holes: BlackHolesView,
+}
+
+/// One saved glyph preset.
+#[derive(Serialize)]
+struct GlyphSetView {
+    name: String,
+    glyphs: Vec<GlyphView>,
 }
 
 /// The auto-glyph filter settings (select/trash/simple + per-type configs,
@@ -1363,6 +1373,8 @@ struct VView {
     /// shard-reduction unlock is owned.
     perk_points: f64,
     shard_reduction_unlocked: bool,
+    /// Ra's Hard-V flip (also gates cursed-glyph creation).
+    is_flipped: bool,
     achievements: Vec<VAchievementView>,
     rewards: Vec<VRewardView>,
 }
@@ -1806,6 +1818,7 @@ fn build_v_view(game: &GameState) -> VView {
             .celestials
             .v
             .unlock_bought(ad_core::celestials::v::V_UNLOCK_SHARD_REDUCTION),
+        is_flipped: game.v_is_flipped(),
         achievements,
         rewards,
     }
@@ -2535,6 +2548,17 @@ fn build_reality_view(game: &GameState) -> RealityView {
         auto_auto_clean_unlocked: game.v_auto_auto_clean_unlocked(),
         auto_auto_clean: game.reality.auto_auto_clean,
         apply_filter_to_purge: game.reality.apply_filter_to_purge,
+        set_saves_unlocked: game.glyph_sets_unlocked(),
+        glyph_sets: game
+            .reality
+            .glyphs
+            .sets
+            .iter()
+            .map(|s| GlyphSetView {
+                name: s.name.clone(),
+                glyphs: s.glyphs.iter().map(|g| build_glyph_view(game, g)).collect(),
+            })
+            .collect(),
         undo_unlocked: game.glyph_undo_unlocked(),
         can_undo: game.can_undo_glyph(),
         undo_depth: game.reality.glyphs.undo.len(),

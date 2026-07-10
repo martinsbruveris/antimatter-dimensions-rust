@@ -245,10 +245,10 @@ impl GameState {
             };
             // `realitygalaxies` scales the effective galaxy count in this
             // branch (`galaxies *= getAdjustedGlyphEffect("realitygalaxies")`).
-            // (`cursedgalaxies` would divide here too — cursed glyphs are a
-            // later feature.)
-            let mut adjusted =
-                (galaxies - 2.0) * effects * self.glyph_effect_realitygalaxies();
+            let mut adjusted = (galaxies - 2.0)
+                * effects
+                * self.glyph_effect_cursedgalaxies()
+                * self.glyph_effect_realitygalaxies();
             // Imaginary Upgrade 9 (Cosmic Filament): `1 + 0.03 × count`.
             adjusted *= 1.0 + self.imaginary_rebuyable_effect(9);
             if self.is_doomed() {

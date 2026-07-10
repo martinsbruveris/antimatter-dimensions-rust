@@ -70,7 +70,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 2.1 | Big Crunch (Infinity prestige) | ✅ | IP, infinities, records, save round-trip |
 | 2.2 | Infinity Upgrades (16-grid) | ✅ | all 16 + the Ach-41 bottom row (`ipMult` rebuyable with two-regime costs + buy-max + autobuyer, `ipOffline` offline IP award) |
 | 2.3 | Break Infinity + 12 upgrades | ✅ | post-break IP formula + all 12 upgrades with effects (cost-scaling rebuyables feed `dimensionMultDecrease`/`tickSpeedMultDecrease`; passive IP/Infinity generation ticks) |
-| 2.4 | Achievements (normal, 144) | 🟡 | **rows 1–18 wired** (conditions + effects), including the former deferred tail (35/61/62/65/74/111/117/156/165/172 + effects 126/133/138/168/171/175/183/187) and row 18 (Pelle). Remaining: 22 (News, needs 8.1); 171 counts only the 7 modelled sacrifice types (no cursed); 172's `noTriads` carried but unclearable (Triads are Ra content). Secret achievements → 8.6 |
+| 2.4 | Achievements (normal, 144) | 🟡 | **rows 1–18 wired** (conditions + effects), including the former deferred tail (35/61/62/65/74/111/117/156/165/172 + effects 126/133/138/168/171/175/183/187) and row 18 (Pelle). Remaining: 22 (News, needs 8.1); 171 counts the 7 sacrificable types (cursed glyphs exist but are not sacrificable, as the original); 172's `noTriads` carried but unclearable (Triads are Ra content). Secret achievements → 8.6 |
 | 2.5 | Normal Challenges (12) | ✅ | all 12 modifiers + reward→autobuyer wiring |
 | 2.6 | Autobuyers | ✅ | all AD/tickspeed + prestige autobuyers, modes, interval upgrades |
 | 2.7 | Infinity Challenges (8) | ✅ | all 8 restrictions + rewards |
@@ -90,7 +90,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 4.2 | Eternity Milestones (27) | ✅ | all 27 wired: keeps, autoIC/autoUnlockID, the milestone autobuyers (IP-mult, RG, buy-max Galaxies, ID 1–8, Replicanti upgrades), and the offline generators (autoEP/autoEternities/autoInfinities) |
 | 4.3 | Time Dimensions (8) | ✅ | TD5–8 via dilation studies; free-tickspeed curve + softcap |
 | 4.4 | Time Studies (tree) | ✅ | 58-study pre-dilation catalogue, all effects at their sites, tree UI, presets/import strings (Triad studies remain out of frontier — Ra content) |
-| 4.5 | Eternity Challenges (12) | 🟡 | all 12 restrictions + rewards (EC6/EC11 feed the cost-scale knobs; EC8's ID/Replicanti budgets enforced). Remaining: EC1 Enslaved goal-1000 (needs `u16` widening, → 7.3) |
+| 4.5 | Eternity Challenges (12) | ✅ | all 12 restrictions + rewards (EC6/EC11 feed the cost-scale knobs; EC8's ID/Replicanti budgets enforced), EC1's Enslaved goal-1000 (`ec_max_completions`, `u16` completions) |
 | 4.6 | Eternity Upgrades | ✅ | 3 ID + 3 TD mults + rebuyable `epMult` |
 
 ## Phase 5 — Dilation 🟡
@@ -105,24 +105,24 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | ID | Feature | Status | Notes |
 |---|---|---|---|
 | 6.1 | Reality prestige | ✅ | RM formula, full reset, records, glyph-choice modal |
-| 6.2 | Glyphs | 🟡 | 5 base + Effarig + Reality types (generation rules, all 11 new effects, sacrifice/refinement), the auto-glyph filter (all 7 modes + 3 rejection modes), Teresa's undo. **Deferred: cosmetics, cursed glyphs (V), glyph sets** |
+| 6.2 | Glyphs | ✅ | 5 base + Effarig + Reality + Cursed types (generation rules, all new effects incl. the 4 cursed ones with the conflict combination), sacrifice/refinement, the auto-glyph filter (all 7 modes + 3 rejection modes), purge/auto-clean, glyph presets (exact-match loading), Teresa's undo. **Cut: cosmetics (pure UI); fuzzy preset matching** |
 | 6.3 | Perks (35) | ✅ | tree + all effects, incl. the PEC EC-auto-completion chain (with V's `fastAutoEC` + Ra's `instantEC`) and the autobuyer-speed perks (with Teresa's `autoSpeed`); the dilation-autobuyer speed perk is inert until those autobuyers exist (Ra QoL cut) |
 | 6.4 | Reality Upgrades (25) | ✅ | all 25 upgrades incl. RU13's autobuyer half (the 8 TD autobuyers + the EP-mult autobuyer + Eternity modes) and RU25's Reality autobuyer |
 | 6.5 | Black Holes (2) | ✅ | unlock, 3 upgrades/hole, phase machine, pause/unpause, inversion (`blackHoleNegative` + `slowestBH` tracking, V's `achievementBH`), and the auto-pause modes (analytic BH1 / 100-step BH2 `timeToNextPause`) |
 | 6.6 | Automator | ✅ | all 5 stages: lexer/parser/compiler/executor, text + block editor, templates, import/export |
-| 6.7 | Imaginary Machines & Upgrades (25) | ✅ | iM currency (balance + ratcheted `iMCap` now saved), 10 rebuyables + 15 one-time with all requirements (deep ones latch via `imaginaryUpgReqs`; 22's cursed-glyph gate stays unreachable — cursed glyphs are V content) and effects (11 TD pow, 12/23 free Dimboosts, 13 cap mult, 14 `^1.5`, 22 sac fill); Teresa's `1e10000×iM` machine record; Effarig's glyph-weight adjuster landed en route |
+| 6.7 | Imaginary Machines & Upgrades (25) | ✅ | iM currency (balance + ratcheted `iMCap` now saved), 10 rebuyables + 15 one-time with all requirements (deep ones latch via `imaginaryUpgReqs`; 22's cursed-glyph gate is reachable now that cursed glyphs exist) and effects (11 TD pow, 12/23 free Dimboosts, 13 cap mult, 14 `^1.5`, 22 sac fill); Teresa's `1e10000×iM` machine record; Effarig's glyph-weight adjuster landed en route |
 
 ## Phase 7 — Celestials 🟡 (all shipped since 2026-07-05, each with cuts)
 
 | ID | Feature | Status | Notes |
 |---|---|---|---|
 | 7.1 | Teresa | ✅ | pour-RM → `rmMultiplier`, 6 unlocks, Teresa's Reality, 4-entry Perk Shop |
-| 7.2 | Effarig | 🟡 | Relic Shards, 3-stage Reality, dilation-like nerfs, glyph-level cap, the Effarig glyph type + `maxRarityBoost` (via 6.2). **Deferred: Replicanti-cap mult / `bonusRG`** |
-| 7.3 | Enslaved | 🟡 | game-time storage + release, stored-time unlocks, run restrictions. **Deferred: real-time storage + `boostReality`, auto-release/store, Tesseracts, EC1 goal-1000** |
-| 7.4 | V | 🟡 | 6 main-unlock conditions, run modifiers, 9 V-achievements, Space Theorems, `fastAutoEC` (6.3) + `achievementBH` (6.5) effects. **Deferred: Perk-Point goal reduction; `autoAutoClean`; hard achievements 6–8 need Ra's flip (state exists)** |
-| 7.5 | Ra + Glyph Alchemy | 🟡 | 4 pets/memories/levels, 28 unlocks, Remembrance, 21-resource Alchemy + refinement. **Deferred: charged-IU effect variants, `uncountability` passive gen (u32 realities), the Reality-resource glyph, `boundless`/`multiversal`** |
-| 7.6 | Lai'tela + Dark Matter Dimensions | 🟡 | 4 DMDs, Dark Energy, Singularities (30 milestones), Continuum, entropy run. **Deferred: Continuum super-exp branch, DMD/annihilation/condense autobuyers, Tesseracts + their effects** (the deep imaginary requirements landed with 6.7) |
-| 7.7 | Pelle (final) | 🟡 | dooming/Armageddon, Remnants → Reality Shards, 5 Rifts, Strikes, Pelle Upgrades, Galaxy Generator, game-end. **Deferred: the full `isDisabled` disable-everything sweep, keep-on-Armageddon gates, deep rift-milestone effects, special Pelle glyph. Cut: credits/song/`zalgo` finale** |
+| 7.2 | Effarig | ✅ | Relic Shards, 3-stage Reality, dilation-like nerfs, glyph-level cap, the Effarig glyph type + `maxRarityBoost` (via 6.2), the Replicanti-cap mult + `bonusRG`, Eternities-generate-Infinities, glyph presets |
+| 7.3 | Enslaved | ✅ | game-time storage + release, stored-time unlocks, run restrictions, real-time storage + `boostReality` (amplified Realities), auto-release/store, Tesseracts, EC1 goal-1000 |
+| 7.4 | V | ✅ | 6 main-unlock conditions, run modifiers, 9 V-achievements (hard ones via Ra's flip), Space Theorems, `fastAutoEC` + `achievementBH` effects, Perk-Point goal reduction, `autoAutoClean`, cursed-glyph creation. ST-cost study purchases remain with the study tree (4.4/Triads) |
+| 7.5 | Ra + Glyph Alchemy | 🟡 | 4 pets/memories/levels, 28 unlocks, Remembrance, 21-resource Alchemy + refinement, all charged-IU effect variants, `uncountability` passive gen, `boundless`/`multiversal`. **Deferred: the Reality-resource glyph auto-creation trigger; QoL/automation unlocks** |
+| 7.6 | Lai'tela + Dark Matter Dimensions | ✅ | 4 DMDs, Dark Energy, Singularities (30 milestones), the exact Continuum (super-exp branch + effective amounts), the DMD/ascension/annihilation/condense autobuyers + faithful `maxAllDMDimensions`, Tesseracts, entropy run |
+| 7.7 | Pelle (final) | ✅ | dooming/Armageddon, Remnants → Reality Shards, 5 Rifts (all milestone effects), Strikes, Pelle Upgrades (incl. all rebuyable effects + keep/re-enable gates), Galaxy Generator, the full `isDisabled` sweep, the special Pelle glyph effects, game-end. **Cut: credits/song/`zalgo` finale** |
 
 ## Phase 8 — Cross-cutting presentation & QoL 🟡
 
@@ -165,10 +165,10 @@ Ordered roughly by leverage (impact × readiness), not strict dependency.
 7. **Secret achievements (8.6)** + secret themes.
 8. **Speedrun mode (8.7)**.
 
-**Celestial polish (per-celestial cuts, 7.2–7.7):**
-9. Effarig/Reality glyph types (unblocks 6.2, 7.2, and Ra's `reality` resource);
-   Enslaved real-time storage + `boostReality`; the celestial autobuyers; the
-   Pelle `isDisabled` disable-everything sweep.
+**Celestial polish (per-celestial cuts, 7.2–7.7):** *(done — landed as the
+2026-07-10 port-gap clusters: Tesseracts/real-time storage, the Pelle
+`isDisabled` sweep + rift milestones, the per-celestial polish, and the glyph
+extras.)*
 
 **Large / long-term:**
 10. **`break_eternity` (0.2)** + **Endgame mod** support (stated long-term goal).

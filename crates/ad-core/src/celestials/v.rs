@@ -345,7 +345,7 @@ impl GameState {
 
     /// Whether V's achievements are "flipped" (Ra's `unlockHardV`) — enables the
     /// hard achievements once Ra's V pet reaches level 6.
-    fn v_is_flipped(&self) -> bool {
+    pub fn v_is_flipped(&self) -> bool {
         self.ra_hard_v_unlocked()
     }
 

@@ -334,6 +334,10 @@ impl GameState {
         if effarig_dims != 1.0 {
             mult = mult.pow(&Decimal::from_float(effarig_dims));
         }
+        let cursed_dims = self.glyph_effect_curseddimensions();
+        if cursed_dims != 1.0 {
+            mult = mult.pow(&Decimal::from_float(cursed_dims));
+        }
         // Imaginary Upgrade 11: TD power from total antimatter.
         let iu11 = self.imaginary_upgrade_11_td_pow();
         if iu11 != 1.0 {
@@ -411,13 +415,16 @@ impl GameState {
     }
 
     /// The free-tickspeed cost multiplier between upgrades (`FreeTickspeed
-    /// .multToNext` base): 1.33, improved to 1.25 by Time Study 171.
+    /// .multToNext` base): 1.33, improved to 1.25 by Time Study 171; the
+    /// `cursedtickspeed` effect widens the gap
+    /// (`1 + (base − 1) × max(effect, 1)`).
     pub fn free_tickspeed_mult(&self) -> f64 {
-        if self.time_study_bought(171) {
+        let base = if self.time_study_bought(171) {
             1.25
         } else {
             1.33
-        }
+        };
+        1.0 + (base - 1.0) * self.glyph_effect_cursedtickspeed().max(1.0)
     }
 
     /// Convert Time Shards into the total free-Tickspeed-upgrade count

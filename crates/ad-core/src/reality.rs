@@ -1014,7 +1014,13 @@ impl GameState {
 
     /// Currently equipped glyph count (excluding the companion).
     pub(crate) fn equipped_glyph_count(&self) -> i32 {
-        self.active_glyphs_without_companion().len() as i32
+        let active = self.active_glyphs_without_companion();
+        let cursed = active
+            .iter()
+            .filter(|g| g.kind == crate::glyphs::GlyphType::Cursed)
+            .count() as i32;
+        // `updateMaxGlyphCount`: cursed glyphs count −4 each.
+        active.len() as i32 - 4 * cursed
     }
 
     /// The glyph grant on a plain `reality()` call (no explicit choice: the

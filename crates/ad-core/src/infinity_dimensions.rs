@@ -323,6 +323,10 @@ impl GameState {
         if effarig_dims != 1.0 {
             mult = mult.pow(&Decimal::from_float(effarig_dims));
         }
+        let cursed_dims = self.glyph_effect_curseddimensions();
+        if cursed_dims != 1.0 {
+            mult = mult.pow(&Decimal::from_float(cursed_dims));
+        }
         // Ra Alchemy `infinity` (ID `^(1 + amount/200000)`) then `momentumValue`.
         let alch_inf =
             self.alchemy_dimension_power(crate::celestials::alchemy::INFINITY);

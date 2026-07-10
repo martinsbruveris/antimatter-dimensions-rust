@@ -327,6 +327,18 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         .iter()
         .map(glyph_json)
         .collect::<Vec<_>>());
+    reality["glyphs"]["sets"] = json!(state
+        .reality
+        .glyphs
+        .sets
+        .iter()
+        .map(|s| {
+            json!({
+                "name": s.name,
+                "glyphs": s.glyphs.iter().map(glyph_json).collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>());
     for kind in [
         crate::glyphs::GlyphType::Power,
         crate::glyphs::GlyphType::Infinity,
