@@ -853,6 +853,10 @@ struct RealityView {
     /// Reality-glyph creation (the reality Alchemy resource).
     can_create_reality_glyph: bool,
     reality_glyph_level: u32,
+    /// Effarig's glyph-level weight adjuster: unlocked + the 4 weights
+    /// (ep/repl/dt/eternities, summing 100).
+    weights_unlocked: bool,
+    glyph_weights: Vec<f64>,
     /// Bought perk ids + the currently purchasable ones (Feature 6.3).
     perks_bought: Vec<u8>,
     perks_buyable: Vec<u8>,
@@ -2380,6 +2384,11 @@ fn build_reality_view(game: &GameState) -> RealityView {
         undo_depth: game.reality.glyphs.undo.len(),
         can_create_reality_glyph: game.can_create_reality_glyph(),
         reality_glyph_level: game.reality_glyph_creation_level(),
+        weights_unlocked: game
+            .celestials
+            .effarig
+            .unlock_bought(ad_core::celestials::effarig::EFFARIG_UNLOCK_ADJUSTER),
+        glyph_weights: game.celestials.effarig.glyph_weights.to_vec(),
         active_effects,
         rebuyables: (1u8..=5)
             .map(|id| RealityRebuyableView {
@@ -3507,6 +3516,17 @@ fn set_ip_mult_autobuyer(active: bool, state: State<'_, Mutex<GameState>>) {
 #[tauri::command]
 fn undo_glyph(state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().undo_glyph();
+}
+
+/// Set Effarig's glyph-level factor weights (ep/repl/dt/eternities). Values
+/// are clamped to 0..=100; the caller keeps the sum at 100 like the original
+/// slider group.
+#[tauri::command]
+fn set_glyph_weights(weights: Vec<f64>, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    for (i, w) in weights.iter().take(4).enumerate() {
+        game.celestials.effarig.glyph_weights[i] = w.clamp(0.0, 100.0);
+    }
 }
 
 /// Create a Reality Glyph from the reality Alchemy resource.
@@ -4940,6 +4960,7 @@ pub fn run() {
             buy_ip_offline,
             set_ip_mult_autobuyer,
             undo_glyph,
+            set_glyph_weights,
             create_reality_glyph,
             set_glyph_filter_modes,
             set_glyph_filter_type,

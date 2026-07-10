@@ -58,13 +58,29 @@ impl GameState {
         (log_rm - 1000.0).max(0.0).powi(2) * (log_rm - 100000.0).max(1.0).powf(0.2)
     }
 
-    /// The iM cap right now (`currentIMCap`; iU13 out of frontier → ×1).
+    /// The iM cap right now (`currentIMCap = player.reality.iMCap × IU13`).
     pub fn imaginary_machine_cap(&self) -> f64 {
-        self.base_im_cap()
+        self.reality.im_cap * self.imaginary_upgrade_13_effect()
     }
 
-    /// Approach the iM cap over real time (`gainedImaginaryMachines`).
+    /// Imaginary Upgrade 13's cap multiplier:
+    /// `1 + totalRebuyables/20 + totalSinglePurchase/2`.
+    fn imaginary_upgrade_13_effect(&self) -> f64 {
+        if !self.imaginary_upgrade_bought(13) {
+            return 1.0;
+        }
+        let rebuyables: u32 = self.reality.imaginary_rebuyables.iter().sum();
+        let one_time = self.reality.imaginary_upgrade_bits.count_ones();
+        1.0 + rebuyables as f64 / 20.0 + one_time as f64 / 2.0
+    }
+
+    /// Approach the iM cap over real time (`gainedImaginaryMachines`), after
+    /// ratcheting the stored base cap (`MachineHandler.updateIMCap`).
     pub(crate) fn tick_imaginary_machines(&mut self, dt_ms: f64) {
+        let base_cap = self.base_im_cap();
+        if base_cap > self.reality.im_cap {
+            self.reality.im_cap = base_cap;
+        }
         let cap = self.imaginary_machine_cap();
         if cap <= 0.0 {
             return;
@@ -140,11 +156,77 @@ impl GameState {
         true
     }
 
-    /// Whether one-time upgrade `id`'s requirement is currently satisfied
-    /// (observable state). The deep record-based ones (11–14, 22–24) are stubbed.
+    /// Per-tick requirement latching for the deep Imaginary Upgrades
+    /// (`checkRequirement` on GAME_TICK_AFTER → `imaginaryUpgReqs`). The
+    /// reset-event checks (11/12) run from the Reality reset hooks.
+    pub(crate) fn check_imaginary_upgrade_reqs_on_tick(&mut self) {
+        // 13: ≥ Number.MAX_VALUE projected RM inside Enslaved's Reality (the
+        // stored-real-time amplification is a 7.3 cut → count 0).
+        if self.celestials.enslaved.run
+            && self.uncapped_rm() >= break_infinity::Decimal::NUMBER_MAX_VALUE
+        {
+            self.reality.imaginary_upg_reqs |= 1 << 13;
+        }
+        // 14: tickspeed ≥ 1e7.5e10 /sec inside EC5.
+        if self.ec_running(5) {
+            let per_second = break_infinity::Decimal::from_float(1000.0)
+                / self.current_tickspeed_ms();
+            if per_second.exponent() >= 75_000_000_000 {
+                self.reality.imaginary_upg_reqs |= 1 << 14;
+            }
+        }
+        // 22: 1e1.5e11 AM in Effarig's Reality with ≥ 4 Cursed Glyphs
+        // (maxGlyphs < −10; cursed glyphs are unmodelled, so this stays
+        // unreachable but the check is wired).
+        if self.celestials.effarig.run
+            && self.requirement_checks.reality_max_glyphs < -10
+            && self.antimatter.exponent() >= 150_000_000_000
+        {
+            self.reality.imaginary_upg_reqs |= 1 << 22;
+        }
+        // 23: glyph level ≥ 20000 in Ra's Reality with no equipped glyphs.
+        if self.celestials.ra.run
+            && self.requirement_checks.reality_max_glyphs <= 0
+            && self.gained_glyph_level().actual_level >= 20_000
+        {
+            self.reality.imaginary_upg_reqs |= 1 << 23;
+        }
+        // 24: 13000 Antimatter Galaxies in Ra's Reality with a fully inverted
+        // Black Hole.
+        if self.celestials.ra.run
+            && self.requirement_checks.reality_slowest_bh <= 1e-300
+            && self.galaxies >= 13_000
+        {
+            self.reality.imaginary_upg_reqs |= 1 << 24;
+        }
+    }
+
+    /// The Reality-reset requirement checks for Imaginary Upgrades 11
+    /// (REALITY_RESET_AFTER: 1e90 total Relic Shards) and 12
+    /// (REALITY_RESET_BEFORE: a level-9000 Glyph with a single weight at 100).
+    pub(crate) fn check_imaginary_upgrade_reqs_on_reality_before(&mut self) {
+        if self.celestials.effarig.glyph_weights.contains(&100.0)
+            && self.gained_glyph_level().actual_level >= 9_000
+        {
+            self.reality.imaginary_upg_reqs |= 1 << 12;
+        }
+    }
+
+    pub(crate) fn check_imaginary_upgrade_reqs_on_reality_after(&mut self) {
+        if self.celestials.effarig.relic_shards >= 1e90 {
+            self.reality.imaginary_upg_reqs |= 1 << 11;
+        }
+    }
+
+    /// Whether one-time upgrade `id`'s requirement is currently satisfied.
+    /// The Lai'tela-adjacent ones (15–21, 25) are observable live; the deep
+    /// ones (11–14, 22–24) latch into `imaginaryUpgReqs` at their events.
     pub fn imaginary_upgrade_available(&self, id: u8) -> bool {
         if self.imaginary_upgrade_bought(id) {
             return false;
+        }
+        if (11..=14).contains(&id) || (22..=24).contains(&id) {
+            return self.reality.imaginary_upg_reqs & (1 << id) != 0;
         }
         match id {
             // 15: reach 1e1.5e12 AM with no ID1 this Reality.
@@ -205,13 +287,124 @@ impl GameState {
         if (15..=18).contains(&id) {
             self.celestials.laitela.dimensions[(id - 15) as usize].amount = Decimal::ONE;
         }
+        // Upgrade 22 raises every Glyph Sacrifice total to 1e100.
+        if id == 22 {
+            for slot in self.reality.glyphs.sac.iter_mut() {
+                *slot = 1e100;
+            }
+        }
         true
+    }
+
+    /// Imaginary Upgrade 11's Time-Dimension power:
+    /// `1 + log10(log10(totalAntimatter)) / 100`.
+    pub(crate) fn imaginary_upgrade_11_td_pow(&self) -> f64 {
+        if !self.imaginary_upgrade_bought(11) {
+            return 1.0;
+        }
+        1.0 + self.total_antimatter.pos_log10().max(1.0).log10().max(0.0) / 100.0
+    }
+
+    /// Imaginary Upgrade 14's per-purchase-multiplier power (^1.5 on the
+    /// AD buy-ten, ID, and TD per-purchase multipliers).
+    pub(crate) fn imaginary_upgrade_14_pow(&self) -> f64 {
+        if self.imaginary_upgrade_bought(14) {
+            1.5
+        } else {
+            1.0
+        }
+    }
+
+    /// `DimBoost.imaginaryBoosts`: free Dimension Boosts from Imaginary
+    /// Upgrade 12 (`2e4 × total rebuyables`), scaled by IU23's tesseract
+    /// effect (tesseracts are a 7.3 cut, so IU23 contributes ×1 here rather
+    /// than the original's tesseract-count formula). Zero inside Ra's Reality.
+    pub(crate) fn imaginary_dim_boosts(&self) -> f64 {
+        if self.celestials.ra.run || !self.imaginary_upgrade_bought(12) {
+            return 0.0;
+        }
+        let rebuyables: u32 = self.reality.imaginary_rebuyables.iter().sum();
+        2e4 * rebuyables as f64
+    }
+
+    /// `DimBoost.totalBoosts`: purchased boosts plus the imaginary free ones.
+    pub(crate) fn total_dim_boosts(&self) -> f64 {
+        self.dim_boosts as f64 + self.imaginary_dim_boosts()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deep_requirements_latch_at_their_events() {
+        let mut game = GameState::new();
+        game.reality.realities = 1;
+        // 11: 1e90 relic shards, latched on the after-reality hook.
+        game.celestials.effarig.relic_shards = 1e91;
+        game.check_imaginary_upgrade_reqs_on_reality_after();
+        assert!(game.imaginary_upgrade_available(11));
+
+        // 24: 13000 galaxies + full inversion inside Ra's Reality (per tick).
+        game.celestials.ra.run = true;
+        game.requirement_checks.reality_slowest_bh = 1e-300;
+        game.galaxies = 13_000;
+        game.check_imaginary_upgrade_reqs_on_tick();
+        assert!(game.imaginary_upgrade_available(24));
+        // The latch persists after the momentary condition passes.
+        game.galaxies = 0;
+        assert!(game.imaginary_upgrade_available(24));
+    }
+
+    #[test]
+    fn iu13_multiplies_the_ratcheted_cap() {
+        let mut game = GameState::new();
+        game.reality.realities = 1;
+        game.reality.im_cap = 1000.0;
+        assert_eq!(game.imaginary_machine_cap(), 1000.0);
+        game.reality.imaginary_upgrade_bits |= 1 << 13;
+        game.reality.imaginary_rebuyables[0] = 20; // +1 from rebuyables
+                                                   // 1 + 20/20 + 1/2 (one one-time upgrade bought) = 2.5.
+        assert_eq!(game.imaginary_machine_cap(), 2500.0);
+    }
+
+    #[test]
+    fn iu12_grants_free_dim_boosts() {
+        let mut game = GameState::new();
+        game.reality.realities = 1;
+        game.reality.imaginary_upgrade_bits |= 1 << 12;
+        game.reality.imaginary_rebuyables[0] = 3;
+        assert_eq!(game.imaginary_dim_boosts(), 6e4);
+        assert_eq!(game.total_dim_boosts(), 6e4);
+        // All 8 dimensions unlock from the free boosts.
+        assert_eq!(game.unlocked_dimensions(), 8);
+        // Inside Ra's Reality the free boosts vanish.
+        game.celestials.ra.run = true;
+        assert_eq!(game.imaginary_dim_boosts(), 0.0);
+    }
+
+    #[test]
+    fn glyph_weights_adjust_the_level_formula() {
+        let mut game = GameState::new();
+        game.eternity_points = Decimal::new(1.0, 8000);
+        game.records.this_reality.max_ep = Decimal::new(1.0, 8000);
+        game.records.this_reality.max_replicanti = Decimal::new(1.0, 100);
+        game.records.this_reality.max_dt = Decimal::new(1.0, 100);
+        let equal = game.gained_glyph_level_exact();
+        // A full skew *hurts* here — the preScale punishes zeroed factors
+        // (matching the original's design comment) — but it must change the
+        // outcome.
+        game.celestials.effarig.glyph_weights = [100.0, 0.0, 0.0, 0.0];
+        let skewed = game.gained_glyph_level_exact();
+        assert!(
+            skewed < equal,
+            "skewed={skewed} equal={equal} (full skew is nerfed by preScale)"
+        );
+        // Equal weights are the identity: restoring them restores the level.
+        game.celestials.effarig.glyph_weights = [25.0; 4];
+        assert!((game.gained_glyph_level_exact() - equal).abs() < 1e-9);
+    }
 
     #[test]
     fn rebuyable_cost_and_effect_scale() {

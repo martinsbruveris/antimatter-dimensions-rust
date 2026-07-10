@@ -587,7 +587,7 @@ impl GameState {
             return self.max_dimensions_unlockable();
         }
         let base = 4;
-        let from_boosts = (self.dim_boosts as usize).min(4);
+        let from_boosts = (self.total_dim_boosts().floor() as usize).min(4);
         (base + from_boosts).min(self.max_dimensions_unlockable())
     }
 
@@ -617,7 +617,7 @@ impl GameState {
         if self.eternity_milestone_reached(30) {
             return true;
         }
-        if tier > self.dim_boosts as usize + 3 {
+        if tier > self.total_dim_boosts().floor() as usize + 3 {
             return false;
         }
         tier == 0 || self.dimensions[tier - 1].amount > Decimal::ZERO

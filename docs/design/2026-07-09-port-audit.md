@@ -35,7 +35,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 2 | Infinity | 🟡 |
 | 3 | Infinity Dimensions & Replicanti | ✅ |
 | 4 | Eternity | 🟡 |
-| 5 | Dilation | 🟡 |
+| 5 | Dilation | ✅ |
 | 6 | Reality | 🟡 |
 | 7 | Celestials | 🟡 (all shipped, each with documented cuts) |
 | 8 | Cross-cutting presentation & QoL | 🟡 |
@@ -110,7 +110,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 6.4 | Reality Upgrades (25) | ✅ | all 25 upgrades incl. RU13's autobuyer half (the 8 TD autobuyers + the EP-mult autobuyer + Eternity modes) and RU25's Reality autobuyer |
 | 6.5 | Black Holes (2) | ✅ | unlock, 3 upgrades/hole, phase machine, pause/unpause, inversion (`blackHoleNegative` + `slowestBH` tracking, V's `achievementBH`), and the auto-pause modes (analytic BH1 / 100-step BH2 `timeToNextPause`) |
 | 6.6 | Automator | ✅ | all 5 stages: lexer/parser/compiler/executor, text + block editor, templates, import/export |
-| 6.7 | Imaginary Machines & Upgrades (25) | 🟡 | **now built** (Lai'tela's gate). iM currency, 10 rebuyables + 15 one-time. Deferred: deep requirements (11–14, 22–24 never auto-satisfy), the `1e10000×iM`-in-maxRM save encoding (re-earned from cap) |
+| 6.7 | Imaginary Machines & Upgrades (25) | ✅ | iM currency (balance + ratcheted `iMCap` now saved), 10 rebuyables + 15 one-time with all requirements (deep ones latch via `imaginaryUpgReqs`; 22's cursed-glyph gate stays unreachable — cursed glyphs are V content) and effects (11 TD pow, 12/23 free Dimboosts, 13 cap mult, 14 `^1.5`, 22 sac fill); Teresa's `1e10000×iM` machine record; Effarig's glyph-weight adjuster landed en route |
 
 ## Phase 7 — Celestials 🟡 (all shipped since 2026-07-05, each with cuts)
 

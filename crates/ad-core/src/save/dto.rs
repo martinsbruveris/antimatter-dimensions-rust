@@ -238,6 +238,10 @@ pub struct TeresaDTO {
         with = "break_infinity::serde_string"
     )]
     pub best_run_am: Decimal,
+    /// Machines at the best run (`lastRepeatedMachines`; iM encoded as
+    /// `1e10000 × iM`).
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub last_repeated_machines: Decimal,
     #[serde(default)]
     pub perk_shop: Vec<u32>,
 }
@@ -252,6 +256,9 @@ pub struct EffarigDTO {
     pub unlock_bits: u32,
     #[serde(default)]
     pub run: bool,
+    /// Glyph-level factor weights (`glyphWeights`), keyed ep/repl/dt/eternities.
+    #[serde(default)]
+    pub glyph_weights: std::collections::HashMap<String, f64>,
 }
 
 /// `player.celestials.enslaved`.
@@ -609,13 +616,19 @@ pub struct RealityDTO {
     /// `player.reality.automator`: scripts, constants, editor + run state
     /// (Feature 6.6 Stage B), and the force-unlock flag.
     pub automator: RealityAutomatorDTO,
-    /// Imaginary Upgrades (Feature 6.4-late / 7.6). The iM currency is encoded
-    /// into `maxRM` in the real save (out of frontier); we round-trip the bits
-    /// + rebuyables (the iM balance is re-earned from the cap each session).
+    /// Imaginary Upgrades (Feature 6.4-late / 7.6): the one-time bits, the
+    /// latched deep-requirement bits, the rebuyables, the iM balance (a plain
+    /// number in the save), and the ratcheted base cap.
     #[serde(default)]
     pub imaginary_upgrade_bits: u32,
+    #[serde(rename = "imaginaryUpgReqs", default)]
+    pub imaginary_upg_reqs: u32,
     #[serde(default)]
     pub imaginary_rebuyables: std::collections::HashMap<String, u32>,
+    #[serde(default)]
+    pub imaginary_machines: f64,
+    #[serde(rename = "iMCap", default)]
+    pub i_m_cap: f64,
 }
 
 /// `player.reality.automator`.
@@ -1994,9 +2007,13 @@ impl GameState {
                 gained_auto_achievements: dto.reality.gained_auto_achievements,
                 glyphs,
                 automator_force_unlock: dto.reality.automator.force_unlock,
-                imaginary_machines: Decimal::ZERO,
-                max_im: Decimal::ZERO,
+                imaginary_machines: Decimal::from_float(
+                    dto.reality.imaginary_machines.max(0.0),
+                ),
+                max_im: Decimal::from_float(dto.reality.imaginary_machines.max(0.0)),
                 imaginary_upgrade_bits: dto.reality.imaginary_upgrade_bits,
+                imaginary_upg_reqs: dto.reality.imaginary_upg_reqs,
+                im_cap: dto.reality.i_m_cap.max(0.0),
                 imaginary_rebuyables: {
                     let mut r = [0u32; 10];
                     for (k, v) in &dto.reality.imaginary_rebuyables {
@@ -2039,6 +2056,7 @@ impl GameState {
             teresa.unlock_bits = cel.teresa.unlock_bits;
             teresa.run = cel.teresa.run;
             teresa.best_run_am = cel.teresa.best_run_am;
+            teresa.last_repeated_machines = cel.teresa.last_repeated_machines;
             for (i, v) in cel.teresa.perk_shop.iter().take(5).enumerate() {
                 teresa.perk_shop[i] = *v;
             }
@@ -2047,6 +2065,11 @@ impl GameState {
             effarig.relic_shards = cel.effarig.relic_shards;
             effarig.unlock_bits = cel.effarig.unlock_bits;
             effarig.run = cel.effarig.run;
+            for (i, key) in ["ep", "repl", "dt", "eternities"].iter().enumerate() {
+                if let Some(w) = cel.effarig.glyph_weights.get(*key) {
+                    effarig.glyph_weights[i] = *w;
+                }
+            }
 
             let mut enslaved = crate::celestials::EnslavedState::new();
             enslaved.is_storing = cel.enslaved.is_storing;

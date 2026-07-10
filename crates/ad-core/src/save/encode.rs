@@ -487,10 +487,14 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         teresa["unlockBits"] = json!(cel.teresa.unlock_bits);
         teresa["run"] = json!(cel.teresa.run);
         teresa["bestRunAM"] = decimal(&cel.teresa.best_run_am);
+        teresa["lastRepeatedMachines"] = decimal(&cel.teresa.last_repeated_machines);
         teresa["perkShop"] = json!(cel.teresa.perk_shop);
 
         let effarig = &mut player["celestials"]["effarig"];
         effarig["relicShards"] = json!(cel.effarig.relic_shards);
+        for (i, key) in ["ep", "repl", "dt", "eternities"].iter().enumerate() {
+            effarig["glyphWeights"][*key] = json!(cel.effarig.glyph_weights[i]);
+        }
         effarig["unlockBits"] = json!(cel.effarig.unlock_bits);
         effarig["run"] = json!(cel.effarig.run);
 
@@ -593,6 +597,10 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     // Imaginary Upgrades (Feature 6.4-late / 7.6).
     player["reality"]["imaginaryUpgradeBits"] =
         json!(state.reality.imaginary_upgrade_bits);
+    player["reality"]["imaginaryUpgReqs"] = json!(state.reality.imaginary_upg_reqs);
+    player["reality"]["imaginaryMachines"] =
+        json!(state.reality.imaginary_machines.to_f64());
+    player["reality"]["iMCap"] = json!(state.reality.im_cap);
     player["reality"]["imaginaryRebuyables"] = json!(state
         .reality
         .imaginary_rebuyables

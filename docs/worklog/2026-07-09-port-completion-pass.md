@@ -266,3 +266,39 @@ inversion slider.
 
 **Tests:** two new unit tests (inversion + tracker resets; the auto-pause
 stopping 5 s before the first activation).
+
+## 6.7 — Imaginary Upgrades: deep requirements, iM persistence, weights
+
+**What shipped:** the last audit item. The deep requirements for Imaginary
+Upgrades 11–14 and 22–24 now latch into `player.reality.imaginaryUpgReqs`
+(save round-trip) at the original's events: 11 (1e90 Relic Shards,
+after-Reality), 12 (level-9000 glyph with a single weight at 100,
+before-Reality), 13 (projected RM ≥ 1.8e308 in Enslaved's run — the
+stored-real-time amplification stays a 7.3 cut, so the simulated-reality
+count is 0), 14 (1e7.5e10 tickspeed in EC5), 22 (1e1.5e11 AM in Effarig with
+maxGlyphs < −10 — wired but unreachable until cursed glyphs exist), 23
+(level-20000 glyph, no glyphs equipped, in Ra), 24 (13000 galaxies fully
+inverted in Ra — enabled by 6.5's inversion). Their effects landed too:
+iU11's TD power, iU12+iU23's free Dimension Boosts (a new
+`total_dim_boosts()` consumed at the boost-multiplier/unlock/NC7/TS221/TS231
+sites), iU13's iM-cap multiplier, iU14's per-purchase `^1.5` (AD buy-ten,
+ID, TD), and iU22's sacrifice fill to 1e100.
+
+The iM economy is now persistent: `player.reality.imaginaryMachines` and the
+ratcheted `iMCap` round-trip (previously iM was re-earned from a cap derived
+live from RM each session). Teresa's best-run machine record
+(`lastRepeatedMachines`) is stored with the original's `1e10000 × iM`
+encoding. Effarig's glyph-weight adjuster (`glyphWeights`, the shard
+"adjuster" unlock) is modelled with the faithful `adjustFactor` math
+(`preScale = 5`, `blendExp = 1/3`, identity at equal weights) — unblocking
+iU12's requirement and making Achievement 165's weight-equality condition
+real; a compact weights panel joins the Glyphs tab.
+
+**Note:** a third fidelity fixture batch (82 late-game saves) appeared
+during this work; the grid is now 369×4 = 1476 cells. The original 287
+fixtures still pass 1121/1148 — no regression from the 6.x features; the new
+fixtures are fresh coverage to chase in a follow-up.
+
+**Tests:** four new unit tests (requirement latching + persistence, the iU13
+cap multiplier, iU12's free boosts incl. the Ra-run zeroing and dimension
+unlocks, the weight adjustment identity/change).

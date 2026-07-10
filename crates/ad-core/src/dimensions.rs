@@ -332,7 +332,7 @@ impl GameState {
         // EC11: every multiplier is disabled except Infinity Power and
         // Dimension Boosts (`getDimensionFinalMultiplierUncached`).
         if self.ec_running(11) {
-            let exponent = (self.dim_boosts as i64 - tier as i64).max(0);
+            let exponent = (self.total_dim_boosts().floor() as i64 - tier as i64).max(0);
             let mut mult = self.infinity_power_ad_multiplier();
             if exponent > 0 {
                 mult *= self
@@ -363,7 +363,7 @@ impl GameState {
         // power^(boosts + 1 - js_tier) where js_tier = tier+1
         // so exponent = boosts + 1 - (tier + 1) = boosts - tier.
         // Power is 2, or 2.5 with the `dimboostMult` Infinity Upgrade.
-        let exponent = (self.dim_boosts as i64 - tier as i64).max(0);
+        let exponent = (self.total_dim_boosts().floor() as i64 - tier as i64).max(0);
         if exponent > 0 {
             mult *= self
                 .dim_boost_power()

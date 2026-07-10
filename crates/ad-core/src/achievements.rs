@@ -804,10 +804,11 @@ impl GameState {
         if self.requirement_checks.reality_no_purchased_tt {
             self.unlock_achievement(156);
         }
-        // 165: a level-5000 Glyph with all level factors equally weighted. The
-        // per-factor weights are unmodelled and therefore always sit at the
-        // equal defaults, so only the level condition remains.
-        if self.gained_glyph_level().actual_level >= 5000 {
+        // 165: a level-5000 Glyph with all level factors equally weighted
+        // (`glyphWeights` all equal to the ep weight).
+        let w = self.celestials.effarig.glyph_weights;
+        if self.gained_glyph_level().actual_level >= 5000 && w.iter().all(|&x| x == w[0])
+        {
             self.unlock_achievement(165);
         }
         // 166: a Glyph with level exactly 6969.

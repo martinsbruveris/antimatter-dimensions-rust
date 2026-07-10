@@ -126,6 +126,13 @@ pub struct RealityState {
     /// One-time Imaginary Upgrades (ids 11–25), bit `1 << id`.
     #[cfg_attr(feature = "serde", serde(default))]
     pub imaginary_upgrade_bits: u32,
+    /// Latched requirement bits for the deep Imaginary Upgrades
+    /// (`player.reality.imaginaryUpgReqs`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub imaginary_upg_reqs: u32,
+    /// The ratcheted base Imaginary-Machine cap (`player.reality.iMCap`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub im_cap: f64,
     /// Rebuyable Imaginary Upgrade counts, ids 1–10 (`imaginaryRebuyables`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub imaginary_rebuyables: [u32; 10],
@@ -160,6 +167,8 @@ impl RealityState {
             imaginary_machines: Decimal::ZERO,
             max_im: Decimal::ZERO,
             imaginary_upgrade_bits: 0,
+            imaginary_upg_reqs: 0,
+            im_cap: 0.0,
             imaginary_rebuyables: [0; 10],
         }
     }
@@ -433,6 +442,23 @@ impl GameState {
             1.0
         };
 
+        // Effarig's adjustable glyph-level weights (`adjustFactor`): each
+        // factor is rescaled by `(5·x)^(4w)^(1/3) / 5` — the identity at the
+        // default equal weights (25 each ⇒ powEffect 1).
+        let weights = self.celestials.effarig.glyph_weights;
+        let adjust = |value: f64, weight: f64| -> f64 {
+            let pow_effect = (4.0 * weight / 100.0).powf(1.0 / 3.0);
+            if value > 0.0 {
+                (value * 5.0).powf(pow_effect) / 5.0
+            } else {
+                0.0
+            }
+        };
+        let ep_base = adjust(ep_base, weights[0]);
+        let repl_base = adjust(repl_base, weights[1]);
+        let dt_base = adjust(dt_base, weights[2]);
+        let eter_base = adjust(eter_base, weights[3]);
+
         let mut base_level = ep_base * repl_base * dt_base * eter_base;
         // Lai'tela's `glyphLevelFromSingularities` milestone boosts the
         // pre-instability level.
@@ -525,6 +551,7 @@ impl GameState {
         self.check_reality_upgrade_reqs_on_reality();
         // REALITY_RESET_BEFORE achievements (141, 148, 153, 154).
         self.check_reality_before_achievements();
+        self.check_imaginary_upgrade_reqs_on_reality_before();
 
         // -- Rewards (read from pre-reset state) --
         let final_ep = self.eternity_points + self.gained_eternity_points();
@@ -591,6 +618,7 @@ impl GameState {
 
         // REALITY_RESET_AFTER achievements (175).
         self.check_reality_after_achievements();
+        self.check_imaginary_upgrade_reqs_on_reality_after();
 
         // The Automator's REALITY_RESET_AFTER handling: the prestige
         // notification, the optional event-log clear, and the force-restart

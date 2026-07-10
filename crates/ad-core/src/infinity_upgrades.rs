@@ -394,7 +394,7 @@ impl GameState {
     /// original, ignores the `buy10Mult` upgrade ("unaffected by any upgrades").
     pub fn buy_ten_multiplier(&self) -> Decimal {
         if self.challenge_running(7) {
-            let value = (1.0 + self.dim_boosts as f64 / 5.0).min(2.0);
+            let value = (1.0 + self.total_dim_boosts() / 5.0).min(2.0);
             return Decimal::from_float(value);
         }
         // EC3's reward adds +0.72/completion to the base before the ×1.1;
@@ -419,6 +419,11 @@ impl GameState {
         let forgotten = self.glyph_effect_effarigforgotten();
         if forgotten != 1.0 {
             mult = mult.pow(&Decimal::from_float(forgotten));
+        }
+        // Imaginary Upgrade 14: per-purchase multipliers ^1.5.
+        let iu14 = self.imaginary_upgrade_14_pow();
+        if iu14 != 1.0 {
+            mult = mult.pow(&Decimal::from_float(iu14));
         }
         mult
     }
@@ -454,7 +459,7 @@ impl GameState {
         }
         // TS231: Dimension Boosts are stronger based on their amount.
         if self.time_study_bought(231) {
-            boost *= Decimal::from(self.dim_boosts as u64)
+            boost *= Decimal::from_float(self.total_dim_boosts())
                 .pow(&Decimal::from_float(0.3))
                 .max(&Decimal::ONE);
         }

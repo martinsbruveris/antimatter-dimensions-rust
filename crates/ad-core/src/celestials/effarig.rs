@@ -43,7 +43,7 @@ pub enum EffarigStage {
 }
 
 /// `player.celestials.effarig`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EffarigState {
     /// Relic Shards (`relicShards`), the Effarig currency.
@@ -55,6 +55,26 @@ pub struct EffarigState {
     /// Whether Effarig's Reality is running (`run`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub run: bool,
+    /// Glyph-level factor weights (`glyphWeights`: ep/repl/dt/eternities,
+    /// summing 100; the shard "adjuster" unlock exposes them).
+    #[cfg_attr(feature = "serde", serde(default = "default_glyph_weights"))]
+    pub glyph_weights: [f64; 4],
+}
+
+/// serde/struct default: all four weights equal (the identity adjustment).
+fn default_glyph_weights() -> [f64; 4] {
+    [25.0; 4]
+}
+
+impl Default for EffarigState {
+    fn default() -> Self {
+        Self {
+            relic_shards: 0.0,
+            unlock_bits: 0,
+            run: false,
+            glyph_weights: default_glyph_weights(),
+        }
+    }
 }
 
 impl EffarigState {

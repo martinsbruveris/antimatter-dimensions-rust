@@ -214,8 +214,8 @@ impl GameState {
         }
         // TS221: based on Dimension Boosts.
         if self.time_study_bought(221) {
-            mult *=
-                Decimal::from_float(1.0025).pow(&Decimal::from(self.dim_boosts as u64));
+            mult *= Decimal::from_float(1.0025)
+                .pow(&Decimal::from_float(self.total_dim_boosts()));
         }
         // Eternity Upgrades 4–6 (achievement power / unspent TT / days played).
         mult *= self.eternity_upgrade_td_mult();
@@ -267,6 +267,8 @@ impl GameState {
             bought = bought.min(TD8_MULT_BOUGHT_CAP);
             power_mult *= self.glyph_sac_time_effect();
         }
+        // Imaginary Upgrade 14: per-purchase multipliers ^1.5.
+        power_mult = power_mult.powf(self.imaginary_upgrade_14_pow());
         let mut mult = self.td_common_multiplier()
             * Decimal::from_float(power_mult).pow(&Decimal::from(bought));
         // Per-tier studies: TS11 (tier 1, tickspeed-based), TS73 (tier 3,
@@ -294,6 +296,11 @@ impl GameState {
         let effarig_dims = self.glyph_effect_effarigdimensions();
         if effarig_dims != 1.0 {
             mult = mult.pow(&Decimal::from_float(effarig_dims));
+        }
+        // Imaginary Upgrade 11: TD power from total antimatter.
+        let iu11 = self.imaginary_upgrade_11_td_pow();
+        if iu11 != 1.0 {
+            mult = mult.pow(&Decimal::from_float(iu11));
         }
         // Ra Alchemy `time` (TD `^(1 + amount/200000)`) then `momentumValue`.
         let alch_time = self.alchemy_dimension_power(crate::celestials::alchemy::TIME);

@@ -19,6 +19,22 @@ const reality = computed(() => game.snapshot?.reality);
 
 const showInstability = computed(() => (reality.value?.best_glyph_level ?? 0) > 800);
 const sacrificeDisplayed = ref(false);
+
+// Effarig's glyph-level weight adjuster (4 factors summing 100). Adjusting
+// one weight proportionally rebalances the other three, like the original's
+// slider group.
+const WEIGHT_NAMES = ["EP", "Replicanti", "DT", "Eternities"];
+function setWeight(index, valueIn) {
+  const weights = [...(reality.value?.glyph_weights ?? [25, 25, 25, 25])];
+  const value = Math.min(100, Math.max(0, Number(valueIn)));
+  const othersTotal = 100 - value;
+  const oldOthers = weights.reduce((a, w, i) => (i === index ? a : a + w), 0);
+  for (let i = 0; i < 4; i++) {
+    if (i === index) weights[i] = value;
+    else weights[i] = oldOthers > 0 ? (weights[i] / oldOthers) * othersTotal : othersTotal / 3;
+  }
+  game.setGlyphWeights(weights);
+}
 </script>
 
 <template>
@@ -76,9 +92,43 @@ const sacrificeDisplayed = ref(false);
             />
           </div>
         </div>
+        <div
+          v-if="reality.weights_unlocked"
+          class="c-glyph-weights-panel"
+        >
+          <b>Glyph level factor weights</b>
+          <label
+            v-for="(name, i) in WEIGHT_NAMES"
+            :key="name"
+          >
+            {{ name }}:
+            <input
+              type="number"
+              min="0"
+              max="100"
+              :value="Math.round(reality.glyph_weights[i])"
+              @change="setWeight(i, $event.target.value)"
+            >
+          </label>
+        </div>
         <GlyphFilterPanel v-if="reality.filter_unlocked" />
         <GlyphInventory />
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.c-glyph-weights-panel {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+  margin: 0.4rem;
+  font-size: 1.2rem;
+}
+
+.c-glyph-weights-panel input {
+  width: 5rem;
+}
+</style>

@@ -100,12 +100,16 @@ pub struct TeresaState {
     #[cfg_attr(feature = "serde", serde(default))]
     pub run: bool,
     /// Best antimatter reached in a Teresa run (`bestRunAM`), drives the
-    /// glyph-sacrifice reward.
+    /// glyph-sacrifice reward. `lastRepeatedMachines` records the machines at
+    /// the best run — Imaginary Machines are encoded as `1e10000 × iM` so RM
+    /// and iM share one Decimal field, like the original.
     #[cfg_attr(
         feature = "serde",
         serde(default = "crate::state::default_decimal_one")
     )]
     pub best_run_am: Decimal,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub last_repeated_machines: Decimal,
     /// Perk-Shop purchase counts, ids 0–4 (`perkShop`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub perk_shop: [u32; 5],
@@ -125,6 +129,7 @@ impl TeresaState {
             unlock_bits: 0,
             run: false,
             best_run_am: Decimal::ONE,
+            last_repeated_machines: Decimal::ZERO,
             perk_shop: [0; 5],
         }
     }
@@ -260,6 +265,18 @@ impl GameState {
     pub(crate) fn teresa_complete_run(&mut self) {
         if self.antimatter > self.celestials.teresa.best_run_am {
             self.celestials.teresa.best_run_am = self.antimatter;
+            // Record the machines at the best run; iM is encoded into the RM
+            // variable as `1e10000 × iM` so one field carries both.
+            let machine_record = if self.reality.imaginary_machines == Decimal::ZERO {
+                self.reality.max_rm
+            } else {
+                Decimal::new_unchecked(1.0, 10_000) * self.reality.imaginary_machines
+            };
+            self.celestials.teresa.last_repeated_machines = self
+                .celestials
+                .teresa
+                .last_repeated_machines
+                .max(&machine_record);
         }
     }
 

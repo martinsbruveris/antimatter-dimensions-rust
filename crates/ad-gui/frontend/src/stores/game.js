@@ -488,6 +488,10 @@ export const useGameStore = defineStore("game", {
     setGlyphFilterModes(select, trash, simple) {
       return invoke("set_glyph_filter_modes", { select, trash, simple });
     },
+    // Effarig's glyph-level factor weights (ep/repl/dt/eternities, sum 100).
+    setGlyphWeights(weights) {
+      return invoke("set_glyph_weights", { weights });
+    },
     setGlyphFilterType(kind, cfg) {
       return invoke("set_glyph_filter_type", {
         kind,

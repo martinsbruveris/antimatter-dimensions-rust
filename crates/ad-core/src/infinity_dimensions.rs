@@ -267,6 +267,8 @@ impl GameState {
         if tier == INFINITY_DIMENSION_COUNT - 1 {
             power_mult *= self.glyph_sac_infinity_effect();
         }
+        // Imaginary Upgrade 14: per-purchase multipliers ^1.5.
+        power_mult = power_mult.powf(self.imaginary_upgrade_14_pow());
         let mut mult = self.id_common_multiplier()
             * Decimal::from_float(power_mult).pow(&Decimal::from(purchases));
         // Achievement 94: double the 1st Infinity Dimension (doubles Infinity

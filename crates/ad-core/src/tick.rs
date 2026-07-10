@@ -236,6 +236,8 @@ impl GameState {
         // Reality Upgrades: per-tick requirement checks (RU11/14/20/21/22)
         // and the continuous RU11/RU14 generation.
         self.check_reality_upgrade_reqs_on_tick();
+        // Imaginary Upgrades: the deep requirement latches (13/14/22/23/24).
+        self.check_imaginary_upgrade_reqs_on_tick();
         self.tick_reality_upgrade_generation(dt_ms);
 
         // The Automator executes on real time, after production and

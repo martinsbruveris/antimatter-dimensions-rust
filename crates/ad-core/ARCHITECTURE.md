@@ -245,13 +245,17 @@ not the current state).
   top AD/ID/TD tiers). Milestone effects wired: DMD-internal (dark mult/interval/
   cost/ascension), plus `gamespeedFromSingularities` (`game_speed_factor`),
   `glyphLevelFromSingularities` (`reality.rs`). `imaginary_upgrades.rs`: Imaginary
-  Machines (approach `baseIMCap`), the 10 rebuyables + 15 one-time upgrades
-  (requirement-gated, purchase seeds the DMDs for 15–18; effects wired: iU8 ID
-  mult, iU10 singularity gain, iU21 annihilation, iU15 Lai'tela/Continuum unlock,
-  iU19 annihilation unlock). Deferred: the Continuum super-exponential branch, the
-  DMD/annihilation/condense autobuyers, the deep imaginary-upgrade requirements
-  (11–14/22–24), and the tesseract-linked effects. iU25 (Pelle unlock) lands with
-  7.7. See `../../docs/design/2026-07-07-laitela.md`. `pelle.rs` (Feature 7.7):
+  Machines (the ratcheted `iMCap` + balance, both saved; approach the cap ×
+  iU13's multiplier), the 10 rebuyables + 15 one-time upgrades — all
+  requirements wired (the deep 11–14/22–24 latch into `imaginaryUpgReqs` at
+  their tick/Reality events; 22's cursed-glyph gate stays unreachable) and
+  effects (iU8 ID mult, iU10 singularity gain, iU11 TD pow, iU12+iU23 free
+  Dimboosts via `total_dim_boosts`, iU13 cap mult, iU14 per-purchase `^1.5`,
+  iU15/19/21 Lai'tela wiring, iU22 sacrifice fill). Effarig's glyph-weight
+  adjuster (`glyph_weights` in `getGlyphLevelInputs`) landed with iU12's
+  requirement. Deferred: the Continuum super-exponential branch, the
+  DMD/annihilation/condense autobuyers, and the tesseract-linked effects.
+  iU25 (Pelle unlock) lands with 7.7. See `../../docs/design/2026-07-07-laitela.md`. `pelle.rs` (Feature 7.7):
   Pelle's `PelleState` — dooming (`doom_reality`, gated on Imaginary Upgrade 25) +
   Armageddon, Remnants (`remnants_gain` from the doomed records) → Reality Shards
   (`pelle_tick` in `tick.rs`), the 5 Rifts (fill/percentage/effect/milestones,
