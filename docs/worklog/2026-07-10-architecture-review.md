@@ -88,3 +88,26 @@ the same session (doc truth-up + a shared frontend Num-math util).
   --features serde` + `-p ad-gui` all pass (docs-only Rust changes).
 - Frontend `npm run build` clean; app boots without errors (Num-util change
   is render-identical by inspection of every call site).
+
+## Addendum (same session): the main.rs split
+
+The first follow-up was executed immediately after: `ad-gui/src/main.rs`
+(5,364 lines) split into
+
+- `views.rs` (3,137) — the ~90 `*View` structs + 27 `build_*_view` builders,
+  `Num`/`num()`, the view helper fns/consts, and the view tests;
+- `commands.rs` (2,057) — all 184 `#[tauri::command]` fns, their payload
+  structs (`LoadResult`, `OfflinePlan`, the automator import/template views,
+  the slot/backup summaries), the parse helpers, and `fresh_game`;
+- `main.rs` (234) — Tauri setup, managed state, and the
+  `generate_handler![commands::…]` registration.
+
+Done as a scripted pure move (items extracted with their comment blocks in
+original order; a first attempt missed `async fn` items — caught because their
+bodies surfaced as stray text in `views.rs`). The only non-move edits, all
+compiler-forced: command fns became `pub` (the generated `__cmd__` macros
+follow fn visibility), 13 payload structs and 4 shared view items became
+`pub(crate)`, `PendingOffline`'s field became `pub`, and each file got a
+pruned use block. A normalization audit confirmed every original line lands
+in exactly one new file modulo those rewrite classes. `cargo test -p ad-gui`
+(10 pass), clippy/fmt clean, frontend untouched, app boots clean.

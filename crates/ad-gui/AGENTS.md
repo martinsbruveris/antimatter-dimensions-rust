@@ -32,7 +32,9 @@ via `beforeBuildCommand`. Run from `crates/ad-gui/` (requires
 ## Layout
 
 ```
-src/main.rs                 # Tauri commands + GameView snapshot (build_game_view)
+src/main.rs                 # entry point: Tauri setup, managed state, command registration
+src/views.rs                # GameView snapshot: the ~90 *View structs + build_*_view builders
+src/commands.rs             # the #[tauri::command] layer (+ payload structs, parse helpers)
 src/persistence.rs          # SaveManager: on-disk saves, slots, backups (§12)
 tauri.conf.json             # frontendDist = ./frontend/dist (no devUrl)
 frontend/
@@ -103,12 +105,14 @@ frontend/
 
 ## How it works
 
-- **Backend** (`src/main.rs`): owns `Mutex<GameState>`. `tick_and_get_state`
-  ticks the engine and returns a serialized `GameView` snapshot each frame.
-  Other commands (`buy_dimension`, `sacrifice`, …) mutate state. Numbers ship
-  **raw** in the snapshot as `Num { m, e }` (mantissa × 10^exponent); the
-  webview formats them via the `ad-format` WASM module (Option C in the
-  formatting doc), so no formatting crosses IPC.
+- **Backend** (`src/main.rs` setup + `src/commands.rs` + `src/views.rs`): owns
+  `Mutex<GameState>`. `tick_and_get_state` ticks the engine and returns a
+  serialized `GameView` snapshot each frame. Other commands (`buy_dimension`,
+  `sacrifice`, …) mutate state. Commands are thin (lock, one engine call,
+  optional snapshot); the view structs + `build_*_view` builders live in
+  `views.rs`. Numbers ship **raw** in the snapshot as `Num { m, e }`
+  (mantissa × 10^exponent); the webview formats them via the `ad-format` WASM
+  module (Option C in the formatting doc), so no formatting crosses IPC.
 - **Number formatting** (`frontend/src/util/format.js`): `formatDecimal(num,
   places, placesUnder1000)` calls the WASM `format` synchronously in-process,
   reading the active notation from `snapshot.options.notation`. The WASM module
