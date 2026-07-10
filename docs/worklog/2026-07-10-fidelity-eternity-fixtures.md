@@ -197,7 +197,28 @@ power).
 
 **1395 → 1469 (+74).** Cleared the rest of the Eternity batch.
 
+## Remaining failures (7 cells) — all precision/timing residuals
+
+Every remaining diverged cell is a floating-point precision or discrete-event
+timing artifact at a `Decimal` boundary or an astronomical magnitude, not a logic
+bug. Closing them would require bit-matching Rust's `break_infinity` `Decimal` to
+JS's (i64 vs f64 exponent), which is a separate undertaking.
+
+- **`00222` @ 1000** — Replicanti timer Decimal-rollover drift (fix #5): Rust's
+  `Decimal` divide/multiply drifts a hair where JS's doesn't for interval 729.
+- **`00258`–`00261` @ 1000** — pre-break "wall" unfreeze timing (see the #5-area
+  note): the Tickspeed autobuyer drains antimatter across the `1e308` ceiling and
+  the unfreeze tick turns on sub-ULP `Decimal` arithmetic at that boundary.
+- **`00342` @ 1000** — a chaotic post-break runaway/reset at ~`1e94508`: antimatter
+  explodes and a soft reset snaps it back; the reset lands a tick apart between
+  engines, and one tick at that growth rate is a ~90000-order gap. No auto-crunch/
+  eternity involved; purely the reset-tick precision at extreme magnitude.
+- **`00359` @ 1000** — a small (~1e-3/tier) AD-chain drift during a large buy-max
+  Tickspeed spree (`totalTickBought` 0→624 over a few ticks); the tickspeed value
+  differs sub-ULP under the huge exponent. Not a count mismatch and not TS51
+  (IP/EP only).
+
 ## Tests
 - `cargo test -p ad-core --features serde` — all pass (578 + 22 + 29).
 - Fidelity grid re-run after each fix; deltas recorded above.
-- Final grid: **1469 / 1476**.
+- Final grid: **1469 / 1476** (from 1172; the 7 residuals above are precision-bound).
