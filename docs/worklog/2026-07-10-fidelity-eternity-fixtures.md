@@ -44,6 +44,27 @@ Two changes:
 
 **1172 → 1186 (+14).**
 
+### 2. Dimensional Sacrifice ignored the antimatter ceiling inside IC2
+
+*Fixture 144 @ 1000.* AD 1–7 amounts were 0 in Rust but huge in JS, and
+`sacrificed`/`chall8TotalSacrifice` diverged by ~295 orders. The save is running
+Infinity Challenge 2 ("Dimensional Sacrifice happens automatically every 400 ms";
+goal `1e10500`). At horizon 1000 antimatter has reached the goal exactly, so
+production is frozen — but Rust kept sacrificing, zeroing the frozen dimensions,
+while JS left them.
+
+Root cause: `Sacrifice.canSacrifice` requires `Currency.antimatter.lt(Player
+.infinityLimit)`, which `can_sacrifice` omitted. Inside an antimatter challenge
+`infinityLimit` is the challenge goal (= `infinity_goal` there), so once
+antimatter hits the goal both production *and* sacrifice must freeze. Added
+`antimatter >= infinity_limit() ⇒ can't sacrifice`.
+
+The ~295-order gap is one tick of production: with production frozen at the goal,
+the last pre-freeze sacrifice set `sacrificed` and the dimensions never regrew, so
+a single extra sacrifice on the final tick fully accounts for the divergence.
+
+**1186 → 1187 (+1).**
+
 ## Tests
 - `cargo test -p ad-core --features serde` — all pass (578 + 22 + 29).
 - Fidelity grid re-run after each fix; deltas recorded above.

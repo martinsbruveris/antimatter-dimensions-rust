@@ -18,6 +18,14 @@ impl GameState {
         if self.ec_running(3) {
             return false;
         }
+        // Refused once antimatter reaches the run's ceiling
+        // (`Currency.antimatter.lt(Player.infinityLimit)`). Inside an antimatter
+        // challenge (e.g. Infinity Challenge 2, goal `1e10500`) production freezes
+        // at the goal, so a sacrifice past it must be blocked too — otherwise the
+        // frozen dimensions keep getting reset while the original leaves them.
+        if self.antimatter >= self.infinity_limit() {
+            return false;
+        }
         self.dim_boosts >= 5
             && self.dimensions[7].amount > Decimal::ZERO
             && self.next_sacrifice_boost() > Decimal::ONE
