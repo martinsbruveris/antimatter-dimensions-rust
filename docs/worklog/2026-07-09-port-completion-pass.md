@@ -302,3 +302,66 @@ fixtures are fresh coverage to chase in a follow-up.
 **Tests:** four new unit tests (requirement latching + persistence, the iU13
 cap multiplier, iU12's free boosts incl. the Ra-run zeroing and dimension
 unlocks, the weight adjustment identity/change).
+
+## Closing state — what remains after this pass
+
+All eleven requested features (1.3, 2.2, 2.4, 4.2, 4.4, 5.2, 6.2–6.5, 6.7)
+are done and committed. The audit rows are ticked; what follows is the
+remaining-work picture at the end of the session, grouped by weight.
+
+### Game mechanics still missing
+
+**The interconnected "Tesseract cluster" (7.3 / 7.6 / 4.5):**
+
+- **Tesseracts** (Enslaved) — the ID-cap currency. Also blocks the
+  tesseract-linked Imaginary-Upgrade/singularity effects in Lai'tela and
+  IU23's real formula.
+- **Enslaved real-time storage + `boostReality`** (the amplified-Reality
+  mechanic) and auto-release/store. Also why IU13's "projected RM" check
+  assumes an amplification count of 0.
+- **EC1 Enslaved goal-1000** — needs widening EC completions beyond the
+  `u8` / ×5-cap logic.
+
+**Celestial polish (each self-contained, mostly late-game):**
+
+- **Effarig (7.2):** the Replicanti-cap multiplier / `bonusRG` rewards.
+- **V (7.4):** the Perk-Point goal reduction, `autoAutoClean`; the hard
+  achievements 6–8 work once entered but need Ra's flip (state exists).
+- **Ra (7.5):** the charged-Infinity-Upgrade *effect variants* (charging
+  state exists, the altered formulas don't), `uncountability` passive
+  reality generation, `boundless`/`multiversal` alchemy targets.
+- **Lai'tela (7.6):** the Continuum super-exponential branch, and the
+  DMD/annihilation/condense autobuyers.
+- **Pelle (7.7):** the biggest real gap — the full **`isDisabled` sweep**
+  (Pelle should disable dozens of mechanics while Doomed; only a subset of
+  sites consult it, so a Doomed run is currently easier than the original),
+  plus keep-on-Armageddon gates, deep rift-milestone effects, and the
+  special Pelle glyph.
+- **Glyphs (6.2):** cursed glyphs (V's content — also what keeps
+  Achievement 171 and IU22 reachable), glyph set saves, cosmetics.
+
+### Presentation & QoL (phase 8)
+
+Not started: News ticker (8.1, also blocks Achievement 22), themes,
+Statistics tab (data exists, presentation only), records/history tabs,
+secret achievements, speedrun mode, changelog modal. Partial: 14 cosmetic
+notations, the options long tail (confirmations sub-menu, the offline on/off
+toggle — which several offline awards currently ignore), full hotkey
+coverage, credits modal.
+
+### Long-term
+
+- **`break_eternity` (0.2)** — only needed for the Endgame mod; nothing in
+  the base game requires it.
+
+### Suggested next steps, in order of leverage
+
+1. **The new fidelity fixtures** — the 82 late-game saves added on
+   2026-07-10 pass only 51 of 328 cells. Best available signal for real
+   engine divergences in the Eternity/Reality era, and they exercise much
+   of what this session added.
+2. **The Pelle `isDisabled` sweep** — the largest correctness gap for
+   anyone actually reaching the endgame.
+3. **The Tesseract cluster** — unblocks four features across three audit
+   rows at once.
+4. **Statistics tab** — cheap win; the engine data is already there.
