@@ -9,10 +9,10 @@
 //!
 //! This module owns the upgrade vocabulary + data, the purchase logic, and the
 //! effect readers the rest of the engine calls (`break_infinity_upgrade_common_mult`,
-//! `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`). A few effects
-//! still depend on inputs we don't model yet (IP/min, the cost-scaling knobs); those
-//! upgrades are purchasable/persisted but their effect is neutral until their inputs
-//! exist. See `docs/design/2026-07-03-break-infinity.md`.
+//! `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`). Every effect
+//! is wired: the cost-scaling rebuyables feed `dimension_mult_decrease` /
+//! `tickspeed_mult_decrease`, `ipGen` and `infinitiedGeneration` run in the
+//! passive-generation tick. See `docs/design/2026-07-03-break-infinity.md`.
 
 use break_infinity::Decimal;
 
@@ -35,7 +35,7 @@ pub enum BreakInfinityUpgrade {
     AchievementMult,
     /// AD ×`clampMin(50 / worstChallengeMinutes, 1)` (capped at 3e4).
     SlowestChallengeMult,
-    /// Passively generate Infinities (deferred — generation loop).
+    /// Passively generate Infinities (`generate_passive_infinities`).
     InfinitiedGen,
     /// Unlock the buy-max Dimension Boost autobuyer mode
     /// ([`is_buy_max_dimboosts_unlocked`](crate::GameState::is_buy_max_dimboosts_unlocked)).
@@ -115,11 +115,12 @@ impl BreakInfinityUpgrade {
 /// The 3 rebuyable Break Infinity Upgrades (indices into `infinity_rebuyables`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BreakInfinityRebuyable {
-    /// Reduce post-infinity Tickspeed cost scaling (deferred effect).
+    /// Reduce post-infinity Tickspeed cost scaling (`tickspeed_mult_decrease`).
     TickspeedCostMult,
-    /// Reduce post-infinity Antimatter Dimension cost scaling (deferred effect).
+    /// Reduce post-infinity Antimatter Dimension cost scaling
+    /// (`dimension_mult_decrease`).
     DimCostMult,
-    /// Passive IP generation from best IP/min (deferred effect).
+    /// Passive IP generation from best IP/min (`generate_passive_ip`).
     IpGen,
 }
 
@@ -234,9 +235,9 @@ impl GameState {
     }
 
     /// The all-tier AD multiplier from the owned Break Infinity Upgrades
-    /// (`totalAMMult`, `currentAMMult`, `infinitiedMult`, `achievementMult`). The
-    /// other AD-affecting upgrades are deferred and contribute ×1. Applied in
-    /// `dimension_multiplier` alongside the Infinity-Upgrade common multiplier.
+    /// (`totalAMMult`, `currentAMMult`, `infinitiedMult`, `achievementMult`,
+    /// `slowestChallengeMult`). Applied in `dimension_multiplier` alongside the
+    /// Infinity-Upgrade common multiplier.
     pub fn break_infinity_upgrade_common_mult(&self) -> Decimal {
         let mut mult = Decimal::ONE;
         if self.break_infinity_upgrade_bought(BreakInfinityUpgrade::TotalAmMult) {

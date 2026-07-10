@@ -70,7 +70,9 @@ not the current state).
   `infinityUpgrades`) + `BreakInfinityRebuyable` (3, in `infinityRebuyables`) types,
   purchase logic, and the effect readers (`break_infinity_upgrade_common_mult`,
   `break_infinity_galaxy_boost`, `break_infinity_autobuyer_speedup`,
-  `is_buy_max_dimboosts_unlocked`); four effects are deferred (neutral). See
+  `is_buy_max_dimboosts_unlocked`); every effect is wired (the cost-scaling
+  rebuyables feed `dimension_mult_decrease`/`tickspeed_mult_decrease`, the
+  passive IP/Infinity generators tick in `tick.rs`). See
   `../../docs/design/2026-07-03-break-infinity.md`.
 - `src/replicanti.rs` — Replicanti (Feature 3.2): `ReplicantiState` on `GameState`,
   unlocked with IP (`unlock_replicanti`), grown each tick (`tick_replicanti`, the
@@ -106,8 +108,9 @@ not the current state).
 - `src/time_studies.rs` — Time Studies (Feature 4.4): Time Theorems (AM/IP/EP
   purchases gated on owning a TD), the 58-study pre-dilation catalogue with the
   original structural rules (Dimension split + TS201, exclusive Pace columns,
-  Light/Dark pairs, EC-gated specials), respec. ~40 study effects live at
-  their engine sites (each site names its study).
+  Light/Dark pairs, EC-gated specials), respec, and the preset slots + study
+  import strings. All 58 study effects live at their engine sites (each site
+  names its study); Triad studies (Ra) are out of frontier.
 - `src/eternity_challenges.rs` — Eternity Challenges (Feature 4.5): EC study
   slots (TT cost + secondary requirements + requirementBits waivers),
   start/exit/complete flow through the Eternity reset, scaled goals (×5

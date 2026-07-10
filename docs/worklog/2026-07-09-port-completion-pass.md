@@ -124,3 +124,18 @@ autobuyer interval ignores the `autobuyerFasterID` perk for now (task 6.3).
 **Tests:** five new unit tests (ID autobuyer fire + milestone gate, RG
 autobuyer, Replicanti-upgrade bulk, offline generator priority, galaxy
 buy-max with and without a limit).
+
+## 4.4 — Time Studies: audit verification (no code gap found)
+
+**What happened:** the audit's 4.4 note ("some effects await Break-Infinity
+cost knobs") turned out to be stale. All 58 pre-dilation study effects are
+consulted at engine sites (verified by sweeping `time_study_bought` call
+sites and spot-checking formulas — TS111's 285 divisor, TS227/228 sacrifice
+terms, TS231 boost power — against the original), the cost-scale knobs
+(`dimensionMultDecrease`/`tickSpeedMultDecrease` with the Break-Infinity
+rebuyables and EC6/EC11 rewards) landed during the fidelity push, and the
+preset slots + import strings are modelled. This session only corrected the
+stale docs: the "deferred/neutral" comments in `break_infinity_upgrades.rs`,
+the ad-core ARCHITECTURE entries, and the audit rows 2.3 / 4.4 / 4.5 (whose
+EC6/EC11/EC8 items are likewise long since wired). Triad studies stay out of
+frontier (Ra content).

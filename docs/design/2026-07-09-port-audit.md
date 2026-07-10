@@ -69,7 +69,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 |---|---|---|---|
 | 2.1 | Big Crunch (Infinity prestige) | ✅ | IP, infinities, records, save round-trip |
 | 2.2 | Infinity Upgrades (16-grid) | ✅ | all 16 + the Ach-41 bottom row (`ipMult` rebuyable with two-regime costs + buy-max + autobuyer, `ipOffline` offline IP award) |
-| 2.3 | Break Infinity + 12 upgrades | 🟡 | post-break IP formula + all 12 purchasable; **4 upgrade effects neutral/deferred** (post-infinity cost scaling ×2, passive IP gen) |
+| 2.3 | Break Infinity + 12 upgrades | ✅ | post-break IP formula + all 12 upgrades with effects (cost-scaling rebuyables feed `dimensionMultDecrease`/`tickSpeedMultDecrease`; passive IP/Infinity generation ticks) |
 | 2.4 | Achievements (normal, 144) | 🟡 | **rows 1–18 wired** (conditions + effects), including the former deferred tail (35/61/62/65/74/111/117/156/165/172 + effects 126/133/138/168/171/175/183/187) and row 18 (Pelle). Remaining: 22 (News, needs 8.1); 165's weight-equality and 171's Effarig/Reality sac types await 6.2/7.2; 172's `noTriads` carried but unclearable. Secret achievements → 8.6 |
 | 2.5 | Normal Challenges (12) | ✅ | all 12 modifiers + reward→autobuyer wiring |
 | 2.6 | Autobuyers | ✅ | all AD/tickspeed + prestige autobuyers, modes, interval upgrades |
@@ -89,8 +89,8 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | 4.1 | Eternity prestige | ✅ | EP formula, records, header/hotkey |
 | 4.2 | Eternity Milestones (27) | ✅ | all 27 wired: keeps, autoIC/autoUnlockID, the milestone autobuyers (IP-mult, RG, buy-max Galaxies, ID 1–8, Replicanti upgrades), and the offline generators (autoEP/autoEternities/autoInfinities) |
 | 4.3 | Time Dimensions (8) | ✅ | TD5–8 via dilation studies; free-tickspeed curve + softcap |
-| 4.4 | Time Studies (tree) | 🟡 | 58-study pre-dilation catalogue + tree UI; **some effects await Break-Infinity cost knobs** |
-| 4.5 | Eternity Challenges (12) | 🟡 | all 12 restrictions, 10/12 rewards. Deferred: **EC6/EC11 cost-growth rewards**, **EC8 budget**, EC1 Enslaved goal-1000 (needs `u16` widening) |
+| 4.4 | Time Studies (tree) | ✅ | 58-study pre-dilation catalogue, all effects at their sites, tree UI, presets/import strings (Triad studies remain out of frontier — Ra content) |
+| 4.5 | Eternity Challenges (12) | 🟡 | all 12 restrictions + rewards (EC6/EC11 feed the cost-scale knobs; EC8's ID/Replicanti budgets enforced). Remaining: EC1 Enslaved goal-1000 (needs `u16` widening, → 7.3) |
 | 4.6 | Eternity Upgrades | ✅ | 3 ID + 3 TD mults + rebuyable `epMult` |
 
 ## Phase 5 — Dilation 🟡
