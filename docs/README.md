@@ -127,5 +127,6 @@ In [`analysis/`](analysis/). Background reference, not tied to our build state.
 | Reference | [`2026-06-24-vis-analysis.md`](analysis/2026-06-24-vis-analysis.md) | Analysis of the AD "Vis" variant codebase |
 | Reference | [`2026-06-25-redemption-analysis.md`](analysis/2026-06-25-redemption-analysis.md) | Analysis of the AD "Redemption" variant codebase |
 | Reference | [`2026-06-28-endgame-1.0-analysis.md`](analysis/2026-06-28-endgame-1.0-analysis.md) | Content analysis of Endgame v1.0 |
+| Reference | [`2026-07-10-structural-fidelity-simplification.md`](analysis/2026-07-10-structural-fidelity-simplification.md) | Speculative study: how much simpler the code could be under structural-only (not bit-exact) fidelity |
 
 Raw research material lives in [`research/`](research/).
