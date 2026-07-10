@@ -213,6 +213,26 @@ impl GameState {
     /// `RaUnlockState.isEffectActive` — the bit is set and Pelle isn't disabling
     /// it (Pelle unbuilt, so identical to `ra_has_unlock`).
     pub fn ra_unlock_active(&self, id: u8) -> bool {
+        // `disabledByPelle`: most Ra unlock rewards switch off while Doomed
+        // (ids from `secret-formula/celestials/ra.js`).
+        const RA_PELLE_DISABLED: u32 = (1 << 0)
+            | (1 << 1)
+            | (1 << 2)
+            | (1 << 3)
+            | (1 << 13)
+            | (1 << 14)
+            | (1 << 15)
+            | (1 << 16)
+            | (1 << 17)
+            | (1 << 18)
+            | (1 << 19)
+            | (1 << 21)
+            | (1 << 24)
+            | (1 << 26)
+            | (1 << 27);
+        if self.is_doomed() && (RA_PELLE_DISABLED >> id) & 1 == 1 {
+            return false;
+        }
         self.ra_has_unlock(id)
     }
 

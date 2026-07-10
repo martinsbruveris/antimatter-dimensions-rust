@@ -100,7 +100,15 @@ impl GameState {
         if !(1..=INFINITY_CHALLENGE_COUNT).contains(&id) {
             return false;
         }
-        if self.achievement_unlocked(133) && !self.is_doomed() {
+        if self.achievement_applies(133) {
+            return true;
+        }
+        // Pelle upgrade 10 (`keepInfinityChallenges`): while Doomed, the doomed
+        // run's peak total antimatter re-unlocks ICs.
+        if self.pelle_upgrade_applies(10)
+            && self.celestials.pelle.records.total_antimatter
+                >= IC_UNLOCK_AM[(id - 1) as usize]
+        {
             return true;
         }
         self.records.this_eternity.max_am >= IC_UNLOCK_AM[(id - 1) as usize]
@@ -246,6 +254,17 @@ impl GameState {
 mod tests {
     use super::*;
     use crate::data::constants::BIG_CRUNCH_THRESHOLD;
+
+    #[test]
+    fn pelle_upgrade_10_reunlocks_ics_from_doomed_records() {
+        let mut game = GameState::new();
+        game.celestials.pelle.doomed = true;
+        assert!(!game.infinity_challenge_unlocked(1));
+        game.celestials.pelle.upgrades |= 1 << 10;
+        game.celestials.pelle.records.total_antimatter = Decimal::new(1.0, 2100);
+        assert!(game.infinity_challenge_unlocked(1)); // unlockAM 1e2050
+        assert!(!game.infinity_challenge_unlocked(3)); // unlockAM higher
+    }
 
     #[test]
     fn ic_unlocks_at_max_am_this_eternity() {

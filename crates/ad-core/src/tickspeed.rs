@@ -203,6 +203,15 @@ impl GameState {
         if self.time_study_bought(232) {
             effects *= (1.0 + self.galaxies as f64 / 1000.0).powf(0.2);
         }
+        // Pelle terms in the `effects` product: the `galaxyPower` rebuyable
+        // (`1 + x/50`) and the decay rift's second milestone (Galaxies 10%
+        // stronger while Replicanti exceeds 1e1300).
+        effects *= self.pelle_galaxy_power_mult();
+        if self.pelle_rift_milestone(crate::celestials::pelle::RIFT_DECAY, 1)
+            && self.replicanti.amount > Decimal::new(1.0, 1300)
+        {
+            effects *= 1.1;
+        }
 
         // Normal Challenge 5 lowers the base multiplier (the tickspeed purchase
         // multiplier starts at ×1.080 instead of ×1.1245).
@@ -215,6 +224,13 @@ impl GameState {
                 TICKSPEED_BASE_MULTIPLIERS[self.galaxies as usize]
             };
             // perGalaxy = 0.02 * effects; reduction = galaxies * perGalaxy.
+            // While Doomed the galaxy count is halved, then scaled by the
+            // power-glyph special Pelle effect.
+            let mut galaxies = galaxies;
+            if self.is_doomed() {
+                galaxies *= 0.5;
+            }
+            galaxies *= self.pelle_special_glyph_power();
             let reduction = galaxies * GALAXY_TICKSPEED_REDUCTION * effects;
             (base - reduction).max(TICKSPEED_MULTIPLIER_MIN)
         } else {
@@ -229,8 +245,16 @@ impl GameState {
             };
             // `realitygalaxies` scales the effective galaxy count in this
             // branch (`galaxies *= getAdjustedGlyphEffect("realitygalaxies")`).
-            let adjusted =
+            // (`cursedgalaxies` would divide here too — cursed glyphs are a
+            // later feature.)
+            let mut adjusted =
                 (galaxies - 2.0) * effects * self.glyph_effect_realitygalaxies();
+            // Imaginary Upgrade 9 (Cosmic Filament): `1 + 0.03 × count`.
+            adjusted *= 1.0 + self.imaginary_rebuyable_effect(9);
+            if self.is_doomed() {
+                adjusted *= 0.5;
+            }
+            adjusted *= self.pelle_special_glyph_power();
             galaxy_base * TICKSPEED_GALAXY_DECAY.powf(adjusted - 2.0)
         }
     }

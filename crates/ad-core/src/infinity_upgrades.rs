@@ -399,7 +399,7 @@ impl GameState {
         }
         // EC3's reward adds +0.72/completion to the base before the ×1.1;
         // Achievement 141 adds a further +0.1 (`plusEffectsOf`).
-        let ach141 = if self.achievement_unlocked(141) {
+        let ach141 = if self.achievement_applies(141) {
             0.1
         } else {
             0.0
@@ -464,15 +464,24 @@ impl GameState {
                 .max(&Decimal::ONE);
         }
         // Achievement 117: the Dimension-Boost → AD multiplier is 1% higher.
-        if self.achievement_unlocked(117) {
+        if self.achievement_applies(117) {
             boost *= Decimal::from_float(1.01);
         }
         // Achievement 142 (unlock the Automator): Dimension Boosts ×1.5.
-        if self.achievement_unlocked(142) {
+        if self.achievement_applies(142) {
             boost *= Decimal::from_float(1.5);
         }
         // The `powerdimboost` glyph effect (`GlyphEffect.dimBoostPower`).
         boost *= Decimal::from_float(self.glyph_effect_powerdimboost());
+        // Recursion rift milestone 0: Dimension Boosts more powerful from EC
+        // completions (`max(100·c², 1) × max(1e4^(c − 40), 1)`).
+        if self.pelle_rift_milestone(crate::celestials::pelle::RIFT_RECURSION, 0) {
+            let c = self.total_ec_completions() as f64;
+            boost *= Decimal::from_float((100.0 * c * c).max(1.0));
+            if c > 40.0 {
+                boost *= Decimal::pow10(4.0 * (c - 40.0));
+            }
+        }
         boost
     }
 

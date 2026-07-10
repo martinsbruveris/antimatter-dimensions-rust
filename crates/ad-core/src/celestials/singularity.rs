@@ -188,7 +188,9 @@ impl GameState {
         id: usize,
         default: f64,
     ) -> f64 {
-        if !self.singularity_milestone_unlocked(id) {
+        if !self.singularity_milestone_unlocked(id)
+            || self.pelle_is_disabled("singularity")
+        {
             return default;
         }
         let c = self.singularity_milestone_completions(id) as f64;

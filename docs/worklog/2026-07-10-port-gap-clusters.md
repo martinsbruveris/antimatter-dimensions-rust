@@ -88,3 +88,94 @@ The remaining Enslaved mechanics:
 Tests: storing-tick freeze/banking/cap-stop, offline banking remainder,
 5-tick auto-release cadence, amplified-Reality reward multiplication +
 consumption. Fidelity: 1469/1476 (unchanged). **Cluster 1 complete.**
+
+## Cluster 2 — the Pelle `isDisabled` sweep (7.7)
+
+The audit's biggest single gap: `pelle_is_disabled` existed as a query but only
+a handful of sites consulted it. This session ported the full
+`disabledMechanicUnlocks` table and every consumer the original has, plus the
+Pelle upgrade keep/re-enable gates and the rift-milestone effects that were
+documented cuts.
+
+### 2a. The `isDisabled` table + consumer sweep
+
+- `pelle_is_disabled` now covers the full JS key set, including the autobuyer
+  keys re-enabled by Pelle Upgrades (`pelle_ad_autobuyer_disabled(tier)` per
+  AD-tier via upgrades 0/3, dimboost 1, galaxy 4, tickspeed 5, ID autobuyers 9,
+  replicanti upgrades 12, TD autobuyers 18) and `pelle_upgrade_applies(id)`
+  (= bought && Doomed, the JS `canBeApplied`).
+- ~25 consumer sites gained their doomed branches, each mirrored from the JS
+  original: IP/infinities gain (crunch), EP mult/gained eternities (eternity),
+  achievements (`achievement_applies` + the 32-id Pelle-disabled list,
+  `achievement_power` → 1, starting AM → 100), perks (`perk_applies` + the
+  uselessPerks list, starting IP/EP → 0), V unlock effects, Ra unlocks (the
+  `disabledByPelle` bitmask), Imaginary Upgrades (`isDisabledInDoomed` set),
+  Continuum, Singularity milestones, Alchemy (amounts → 0), Black Holes,
+  glyph sacrifice (→ 0) and the doomed equip rules, tachyon gain → ×1,
+  replicanti speed (decay rift × special glyph only), the galaxy-strength
+  `effects` product, and the doomed galaxy halving in both tickspeed branches.
+- Keep-on-reset gates: Armageddon/Eternity/Infinity resets honour
+  `keepInfinityUpgrades`/`keepBreakInfinityUpgrades` (6/8),
+  `dimBoostResetsNothing`/`galaxyNoResetDimboost` (7/11),
+  `replicantiStayUnlocked`/`replicantiGalaxyNoReset` (16/13/22),
+  `eternitiesNoReset`/`timeStudiesNoReset` (14/15), `keepEternityUpgrades`
+  (17), `keepEternityChallenges` (19), `dilationUpgradesNoReset`/
+  `tachyonParticlesNoReset` (20/21), `keepAutobuyers` (2) and
+  `keepInfinityChallenges` (10 — ICs also re-unlock from the doomed run's
+  peak antimatter, `infinity_challenge_unlocked`).
+- EC1 in Enslaved: `ec_max_completions` (1000 vs 5), goal scaling and the u16
+  completions threading, with the save clamp per-id.
+
+### 2b. `specialGlyphEffect` (chaos milestone 1)
+
+The five single-glyph Pelle bonuses (`pelle_special_glyph_*`): infinity
+(IP+1)^0.2 outside EC>8 → IP gain; time (EP+1)^0.3 → EP gain; replication
+10^(53^vacuumFill) → replicanti speed; dilation TG^1.5 (min ×1) → the doomed
+DT formula; power ×1.02 → the effective galaxy count in both tickspeed
+branches.
+
+### 2c. Rift-milestone effects + remaining rebuyables
+
+All previously-cut milestone effects, each at its original site:
+
+- **Vacuum** m1: Replicanti uncap without TS192, and the unlock/upgrade costs
+  ÷1e130 — divided on *read* while the stored cost steps undivided, as the
+  original (`replicanti_chance_cost`/`replicanti_interval_cost`/galaxy cost/
+  unlock). m0 already gated glyph equips; it now also drives
+  `glyph_active_slot_count` (Doomed: 1 with the milestone, else 0).
+- **Decay** m0: the first Pelle rebuyable also multiplies ID1
+  (`1e50^(x−9)` — a penalty below 9 purchases, as the original); m1: galaxies
+  10% stronger while Replicanti > 1e1300 (tickspeed `effects` product);
+  m2: max RG `+ totalMilestones² − 2·totalMilestones`
+  (`pelle_total_rift_milestones`).
+- **Chaos** m2: +10% of the Eternity EP gain per real second
+  (`applyAutoprestige`; the description says 1%, the code says ×0.1 — we
+  follow the code).
+- **Recursion** m0: Dimboost power `max(100·c²,1) × max(1e4^(c−40),1)` from
+  total EC completions (`total_ec_completions`); m1: IDs
+  ×`1e1500^(((c−25)/20)^1.7)`.
+- **Paradox** m0: TDs 5–8 cost `(cost/1e2250)^0.5` — in the plain-geometric
+  and past-1e6000 branches but *not* the threshold walk, as the original
+  (`time_dimension_cost_pelle`); the flip rebuilds stored costs via the
+  original's `onStateChange` → `updateTimeDimensionCosts` hook
+  (`pelle_check_milestone_states` after a successful rift fill, tracked in a
+  non-persisted `paradox_m0_last`). m0 also reveals (gates) the Pelle-only
+  Dilation upgrades 11–15. m1: the doomed DT formula becomes TP^1.4.
+  m2: Infinity-Power conversion ×`min(1.1075^(Σ dilation rebuyables − 60),
+  712)`.
+- Remaining Pelle rebuyable effects: `glyphLevels` caps the effective glyph
+  level while Doomed (`getAdjustedGlyphLevel`), `infConversion` adds
+  `(x·3.5)^0.37` to the conversion exponent, `galaxyPower` multiplies the
+  galaxy-strength product (`1 + x/50`). Imaginary Upgrade 9 (Cosmic Filament,
+  `1 + 0.03·count`) also landed in the ≥3-galaxy tickspeed branch while
+  wiring that formula.
+
+Deferred to their feature homes: the `"V"` key (ST-cost study purchases are
+not modelled yet — Cluster 3/V), the `"effarig"` key (gates the Effarig
+Replicanti cap/bonus-RG effects — Cluster 3/Effarig), and `cursedgalaxies`
+in the tickspeed formula (Cluster 4, cursed glyphs).
+
+Tests: rebuyable-effect formulas, milestone counting, doomed glyph slots,
+paradox TD cheapening, vacuum cost discounts + uncap, decay max-RG, IC
+re-unlock via upgrade 10, the paradox gate on Dilation upgrades 11–15.
+Fidelity: 1469/1476 (unchanged). **Cluster 2 complete.**

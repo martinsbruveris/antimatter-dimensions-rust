@@ -173,9 +173,12 @@ impl GameState {
 
     // --- Effect readers (wired at engine sites) ---------------------------------
 
-    /// The raw stored amount used for an effect (0 when Pelle disables alchemy —
-    /// Pelle unbuilt, so always the amount).
+    /// The raw stored amount used for an effect: 0 while Doomed
+    /// (`Pelle.isDisabled("alchemy")` — every alchemy effect reads as empty).
     fn amt(&self, id: usize) -> f64 {
+        if self.pelle_is_disabled("alchemy") {
+            return 0.0;
+        }
         self.celestials.ra.alchemy[id].amount
     }
 

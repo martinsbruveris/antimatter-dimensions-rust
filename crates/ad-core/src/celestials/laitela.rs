@@ -448,7 +448,7 @@ impl GameState {
             self.celestials.laitela.dark_matter / Decimal::from_float(ANNIHILATION_DM);
         let base = (ratio.pos_log10() + 1.0).max(0.0).powf(1.5);
         // Imaginary Upgrade 21: improved by iM.
-        let iu21 = if self.imaginary_upgrade_bought(21) {
+        let iu21 = if self.imaginary_upgrade_applies(21) {
             ((self.reality.imaginary_machines.pos_log10() - 10.0).powi(3)).max(1.0)
         } else {
             1.0
@@ -490,7 +490,7 @@ impl GameState {
     // --- Continuum --------------------------------------------------------------
 
     pub fn continuum_unlocked(&self) -> bool {
-        self.imaginary_upgrade_bought(15)
+        self.imaginary_upgrade_bought(15) && !self.pelle_is_disabled("continuum")
     }
 
     pub fn continuum_active(&self) -> bool {

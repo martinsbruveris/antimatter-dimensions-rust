@@ -83,6 +83,13 @@ impl GameState {
         self.generate_ts181_ip(dt_ms);
         // Teresa's `epGen` unlock: passive EP from the peak EP/min.
         self.generate_teresa_ep(dt_ms);
+        // Chaos rift milestone 2: 10% of the Eternity EP gain per (real)
+        // second (`applyAutoprestige`'s Pelle branch).
+        if self.pelle_rift_milestone(crate::celestials::pelle::RIFT_CHAOS, 2) {
+            self.eternity_points += self.gained_eternity_points()
+                * Decimal::from_float(0.1)
+                * Decimal::from_float(real_dt_ms / 1000.0);
+        }
 
         // Advance the time records *before* production, matching the original game
         // loop (`records.thisInfinity.time += diff`, etc. run before the Dimension

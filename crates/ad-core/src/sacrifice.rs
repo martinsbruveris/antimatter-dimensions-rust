@@ -217,7 +217,7 @@ impl GameState {
 
         // Achievement 118 stops a Sacrifice from resetting the Antimatter
         // Dimensions (`isAch118Unlocked`).
-        let keep_dimensions = self.achievement_unlocked(118);
+        let keep_dimensions = self.achievement_applies(118);
         if self.challenge_running(8) {
             // NC8 fully resets every dimension (and antimatter) for a much
             // stronger boost.

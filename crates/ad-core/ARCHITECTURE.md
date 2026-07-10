@@ -272,11 +272,16 @@ not the current state).
   eternity/galaxy/dilate + the 115-TT check), Pelle Upgrades (5 rebuyable + 23
   one-time), the Galaxy Generator (`galaxy_generator_loop`, phases + sacrifice),
   and the antimatter game-end (`game_end_state` → `is_game_end`). Effects wired:
-  the doomed `antimatterDimensionMult` + `timeSpeedMult` rebuyables, the Infinity-
-  Strike AD `^0.5` penalty, and the Paradox all-dim power. **The full `isDisabled`
-  disable-everything sweep is a documented cut** (`pelle_is_disabled` is a query;
-  only a subset of sites consult it); the credits/song/`zalgo` finale is cut. See
-  `../../docs/design/2026-07-07-pelle.md`.
+  all 5 doomed rebuyables (`antimatterDimensionMult`, `timeSpeedMult`,
+  `glyphLevels` glyph-level cap, `infConversion`, `galaxyPower`), the Infinity-
+  Strike AD `^0.5` penalty, the Paradox all-dim power, the full `isDisabled`
+  sweep (`pelle_is_disabled` + the per-site doomed branches/keep-gates across
+  crunch/eternity/reality/autobuyers/achievements/perks/celestials), every rift
+  milestone effect (vacuum uncap+discounts, decay ID1/galaxy/max-RG, chaos
+  forced-decay + EP trickle, recursion Dimboost/ID from EC completions +
+  Galaxy Generator, paradox TD-cheapen/TP-pow/conversion), and the
+  `specialGlyphEffect` chaos-milestone glyph bonuses. Cut: the
+  credits/song/`zalgo` finale. See `../../docs/design/2026-07-07-pelle.md`.
 - `src/achievements.rs` — Normal achievements: `achievement_bits` bitmask helpers
   (`achievement_unlocked`/`unlock_achievement`), the global `achievement_power`
   multiplier, `starting_antimatter`, and the `achievement_ad_common_mult` term.

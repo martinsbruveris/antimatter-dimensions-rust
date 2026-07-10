@@ -462,14 +462,18 @@ impl GameState {
     /// (`Currency.infinityPoints.startingValue = Effects.max(0, Perk.startIP1,
     /// Perk.startIP2, Achievement(104) = 5e25)`).
     pub(crate) fn starting_ip(&self) -> Decimal {
+        // Doomed: starting IP is always 0 (`Pelle.isDisabled()`).
+        if self.is_doomed() {
+            return Decimal::ZERO;
+        }
         let mut value = Decimal::ZERO;
-        if self.perk_bought(12) {
+        if self.perk_applies(12) {
             value = value.max(&Decimal::new(5.0, 15));
         }
-        if self.perk_bought(13) {
+        if self.perk_applies(13) {
             value = value.max(&Decimal::new(5.0, 130));
         }
-        if self.achievement_unlocked(104) {
+        if self.achievement_applies(104) {
             value = value.max(&Decimal::new(5.0, 25));
         }
         value
@@ -478,14 +482,18 @@ impl GameState {
     /// The starting Eternity Points after a Reality
     /// (`Currency.eternityPoints.startingValue`).
     pub(crate) fn starting_ep(&self) -> Decimal {
+        // Doomed: starting EP is always 0 (`Pelle.isDisabled()`).
+        if self.is_doomed() {
+            return Decimal::ZERO;
+        }
         let mut value = Decimal::ZERO;
-        if self.perk_bought(14) {
+        if self.perk_applies(14) {
             value = value.max(&Decimal::from_float(10.0));
         }
-        if self.perk_bought(15) {
+        if self.perk_applies(15) {
             value = value.max(&Decimal::from_float(5000.0));
         }
-        if self.perk_bought(16) {
+        if self.perk_applies(16) {
             value = value.max(&Decimal::new(5.0, 9));
         }
         value
@@ -494,7 +502,7 @@ impl GameState {
     /// `applyEU1`: the EU1 perk grants the first Eternity Upgrade row for
     /// free once you have Eternities.
     pub(crate) fn apply_eu1(&mut self) {
-        if !self.perk_bought(40) || self.eternities == Decimal::ZERO {
+        if !self.perk_applies(40) || self.eternities == Decimal::ZERO {
             return;
         }
         for upgrade in crate::ALL_ETERNITY_UPGRADES.iter().take(3) {
@@ -505,7 +513,7 @@ impl GameState {
     /// `applyEU2`: with the EU2 perk the second row auto-purchases at 1e10×
     /// less than list price.
     pub(crate) fn apply_eu2(&mut self) {
-        if !self.perk_bought(41) {
+        if !self.perk_applies(41) {
             return;
         }
         for upgrade in crate::ALL_ETERNITY_UPGRADES.iter().skip(3) {
@@ -524,7 +532,7 @@ impl GameState {
     /// `autobuyerFasterReplicanti`, 103 `autobuyerFasterDilation`): the
     /// interval factor 1/3 when bought, else 1.
     pub(crate) fn perk_autobuyer_faster(&self, id: u8) -> f64 {
-        if self.perk_bought(id) {
+        if self.perk_applies(id) {
             1.0 / 3.0
         } else {
             1.0
@@ -538,11 +546,11 @@ impl GameState {
         self.apply_eu1();
         self.apply_eu2();
         // ATT (44): auto-purchase the TT-generation Dilation Upgrade.
-        if self.perk_bought(44) && self.can_buy_dilation_upgrade(10) {
+        if self.perk_applies(44) && self.can_buy_dilation_upgrade(10) {
             self.buy_dilation_upgrade(10);
         }
         // ATD (45): auto-unlock TD5–8 once affordable.
-        if self.perk_bought(45) {
+        if self.perk_applies(45) {
             for id in 2..=5u8 {
                 if self.can_buy_dilation_study(id) {
                     self.buy_dilation_study(id);
@@ -550,7 +558,7 @@ impl GameState {
             }
         }
         // REAL (46): auto-unlock the Reality study.
-        if self.perk_bought(46) && self.can_buy_dilation_study(6) {
+        if self.perk_applies(46) && self.can_buy_dilation_study(6) {
             self.buy_dilation_study(6);
         }
     }

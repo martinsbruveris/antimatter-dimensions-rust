@@ -144,7 +144,7 @@ impl GameState {
                     .iter()
                     .any(|&s| self.time_study_bought(s));
                 // The DILR perk (53) waives the EC and total-TT requirements.
-                if self.perk_bought(53) {
+                if self.perk_applies(53) {
                     return ts;
                 }
                 let ecs = self.eternity_challenge_completions(11)
@@ -175,17 +175,17 @@ impl GameState {
         if id == 1 {
             // The DU1/DU2 perks auto-unlock Dilation Upgrade rows 2/3, and
             // STP grants 10 starting Tachyon Particles.
-            if self.perk_bought(42) {
+            if self.perk_applies(42) {
                 for upgrade in [4u8, 5, 6] {
                     self.dilation.upgrades |= 1 << upgrade;
                 }
             }
-            if self.perk_bought(43) {
+            if self.perk_applies(43) {
                 for upgrade in [7u8, 8, 9] {
                     self.dilation.upgrades |= 1 << upgrade;
                 }
             }
-            if self.perk_bought(17) {
+            if self.perk_applies(17) {
                 self.dilation.tachyon_particles = self
                     .dilation
                     .tachyon_particles
@@ -260,6 +260,10 @@ impl GameState {
     /// `tachyonGainMultiplier`: ×3 per `tachyonGain` purchase, times the
     /// dilation-glyph sacrifice effect and Reality Upgrades 4/8/15.
     pub fn tachyon_gain_multiplier(&self) -> Decimal {
+        // Doomed (`Pelle.isDisabled("tpMults")`): no TP multipliers.
+        if self.is_doomed() {
+            return Decimal::ONE;
+        }
         let mut mult = Decimal::from_float(3.0)
             .pow(&Decimal::from(self.dilation.rebuyables[2] as u64));
         mult *= Decimal::from_float(self.glyph_sac_dilation_effect());
@@ -284,7 +288,7 @@ impl GameState {
 
     /// Achievement 132's shared TP/DT multiplier (`1.22 × max(galaxies^0.04, 1)`).
     fn achievement_132_dilation_mult(&self) -> Decimal {
-        if self.achievement_unlocked(132) {
+        if self.achievement_applies(132) {
             Decimal::from_float(1.22 * (self.galaxies as f64).powf(0.04).max(1.0))
         } else {
             Decimal::ONE
@@ -329,16 +333,26 @@ impl GameState {
             .pow(&Decimal::from(self.dilation.rebuyables[0] as u64));
 
         // While Doomed the formula is replaced wholesale
-        // (`getDilationGainPerSecond`'s Pelle branch): `TP × dtGain ×
-        // dtGainPelle × flatDilationMult / 1e5`. The Paradox-rift TP power and
-        // the special Pelle glyph term are documented 7.7 cuts (both 1).
+        // (`getDilationGainPerSecond`'s Pelle branch): `TP^paradoxM1 × dtGain ×
+        // dtGainPelle × flatDilationMult × specialGlyphEffect.dilation / 1e5`.
         if self.is_doomed() {
-            let mut rate = self.dilation.tachyon_particles * dt_gain_mult;
+            // Paradox rift milestone 1: DT gain becomes TP^1.4.
+            let tp = if self
+                .pelle_rift_milestone(crate::celestials::pelle::RIFT_PARADOX, 1)
+            {
+                self.dilation
+                    .tachyon_particles
+                    .pow(&Decimal::from_float(1.4))
+            } else {
+                self.dilation.tachyon_particles
+            };
+            let mut rate = tp * dt_gain_mult;
             rate *= Decimal::from_float(5.0)
                 .pow(&Decimal::from(self.dilation.pelle_rebuyables[0] as u64));
             if self.dilation_upgrade_bought(15) {
                 rate *= self.pelle_flat_dilation_mult();
             }
+            rate *= self.pelle_special_glyph_dilation();
             return rate / Decimal::from_float(1e5);
         }
 
@@ -348,7 +362,7 @@ impl GameState {
         // Achievement 132: DT rate multiplier from Antimatter Galaxies.
         rate *= self.achievement_132_dilation_mult();
         // Achievement 137: ×2 Dilated Time while Dilated.
-        if self.achievement_unlocked(137) && self.dilation.active {
+        if self.achievement_applies(137) && self.dilation.active {
             rate *= Decimal::from_float(2.0);
         }
         // Ra: Alchemy `dilation`, `continuousTTBoost.dilatedTime`, and
@@ -413,10 +427,10 @@ impl GameState {
         // `achievementTTMult` (Achievements.power), Achievement 137 (×2 while
         // Dilated), and Achievement 156 (×2.5 generated TT).
         let mut tt_boost = self.ra_tt_boost_tt_gen() * self.ra_achievement_tt_mult();
-        if self.achievement_unlocked(137) && self.dilation.active {
+        if self.achievement_applies(137) && self.dilation.active {
             tt_boost *= Decimal::from_float(2.0);
         }
-        if self.achievement_unlocked(156) {
+        if self.achievement_applies(156) {
             tt_boost *= Decimal::from_float(2.5);
         }
         // `ttGenerator` (upgrade 10): TT += TP/20000 per second.
@@ -516,12 +530,16 @@ impl GameState {
     }
 
     /// Whether Dilation Upgrade `id` can be bought now. The Pelle-only
-    /// upgrades (11–15) additionally require being Doomed.
+    /// upgrades (11–15) additionally require being Doomed and the paradox
+    /// rift's first milestone (which reveals them).
     pub fn can_buy_dilation_upgrade(&self, id: u8) -> bool {
         if !self.dilation_unlocked() || !(1..=15).contains(&id) {
             return false;
         }
-        if (11..=15).contains(&id) && !self.is_doomed() {
+        if (11..=15).contains(&id)
+            && !(self.is_doomed()
+                && self.pelle_rift_milestone(crate::celestials::pelle::RIFT_PARADOX, 0))
+        {
             return false;
         }
         if ((4..=10).contains(&id) || (14..=15).contains(&id))
@@ -551,7 +569,7 @@ impl GameState {
                 self.dilation.rebuyables[(id - 1) as usize] += 1;
                 if id == 2 {
                     // The TGR perk (52) keeps Dilated Time on the reset.
-                    if !self.perk_bought(52) {
+                    if !self.perk_applies(52) {
                         self.dilation.dilated_time = Decimal::ZERO;
                     }
                     self.dilation.next_threshold =
@@ -564,7 +582,7 @@ impl GameState {
                     // ×3-TP purchase (`Effects.max` of the owned perks).
                     let factor = [(83u8, 3.0), (82, 2.5), (81, 2.0), (80, 1.5)]
                         .iter()
-                        .find(|&&(perk, _)| self.perk_bought(perk))
+                        .find(|&&(perk, _)| self.perk_applies(perk))
                         .map(|&(_, f)| f)
                         .unwrap_or(1.0);
                     self.dilation.tachyon_particles *= Decimal::from_float(factor);
@@ -635,6 +653,13 @@ mod tests {
             assert!(!game.can_buy_dilation_upgrade(id), "id {id}");
         }
         game.celestials.pelle.doomed = true;
+        // Still hidden until the paradox rift's first milestone (15%).
+        for id in 11..=15 {
+            assert!(!game.can_buy_dilation_upgrade(id), "id {id}");
+        }
+        game.celestials.pelle.progress_bits |= 1 << 5; // dilation strike
+        game.celestials.pelle.rifts[crate::celestials::pelle::RIFT_PARADOX].fill =
+            Decimal::new(1.0, 15); // 15% (percentage = log10(fill+1)/100)
         for id in 11..=15 {
             assert!(game.can_buy_dilation_upgrade(id), "id {id}");
         }

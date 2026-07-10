@@ -150,6 +150,10 @@ impl GameState {
     /// Whether the hole is *effectively* active (its own charge and every
     /// lower hole active; pause overrides).
     pub fn black_hole_is_active(&self, index: usize) -> bool {
+        // Doomed (`Pelle.isDisabled("blackhole")`): the holes are disabled.
+        if self.pelle_is_disabled("blackhole") {
+            return false;
+        }
         if self.black_holes.paused {
             return false;
         }

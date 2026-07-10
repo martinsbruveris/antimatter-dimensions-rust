@@ -138,6 +138,13 @@ impl GameState {
         self.eternity_challenge_completions(id) > 0
     }
 
+    /// `EternityChallenges.completions` — total completions across EC1–12.
+    pub fn total_ec_completions(&self) -> u32 {
+        (1..=12)
+            .map(|id| self.eternity_challenge_completions(id) as u32)
+            .sum()
+    }
+
     /// The IP goal of EC `id` at `completions` (`goalAtCompletions`).
     pub fn ec_goal_at(&self, id: u8, completions: u16) -> Decimal {
         let i = (id - 1) as usize;
@@ -225,7 +232,7 @@ impl GameState {
             _ => {
                 // The ECR perk (72) waives non-TT requirements outright;
                 // otherwise they are waived once previously met.
-                if self.perk_bought(72) {
+                if self.perk_applies(72) {
                     return true;
                 }
                 if self.ec_requirement_bits & (1 << id) != 0 {
@@ -340,7 +347,7 @@ impl GameState {
             && self.records.this_eternity.max_ip >= self.ec_goal_at(id, total)
         {
             total += 1;
-            if !self.perk_bought(73) {
+            if !self.perk_applies(73) {
                 break;
             }
         }
@@ -360,7 +367,7 @@ impl GameState {
         self.eternity_challenges[i] = (self.eternity_challenges[i] + 1).min(max);
         // The ECB perk (73): keep banking completions while the higher
         // tiers' scaled goals are already met.
-        if self.perk_bought(73) {
+        if self.perk_applies(73) {
             while self.eternity_challenges[i] < max
                 && self.records.this_eternity.max_ip >= self.ec_current_goal(id)
             {
@@ -416,12 +423,14 @@ impl GameState {
     /// of frontier (armed req-locks are not modelled).
     pub(crate) fn ec_auto_complete_tick(&mut self, real_dt_ms: f64) {
         // `game.js`: the accumulator only advances with the first PEC perk.
-        if !self.perk_bought(60) {
+        if !self.perk_applies(60) {
             return;
         }
         self.reality.last_auto_ec += real_dt_ms;
         let interval = self.ec_auto_complete_interval_ms();
-        if !self.reality.auto_ec {
+        // Doomed (`Pelle.isDisabled("autoec")`) or toggled off: hold the
+        // accumulator at one interval, complete nothing.
+        if !self.reality.auto_ec || self.pelle_is_disabled("autoec") {
             self.reality.last_auto_ec = self.reality.last_auto_ec.min(interval);
             return;
         }
@@ -444,14 +453,14 @@ impl GameState {
     /// The EC auto-completion interval: the best PEC perk (60/40/20 minutes),
     /// divided by V's `fastAutoEC` reward (the achievement multiplier).
     pub fn ec_auto_complete_interval_ms(&self) -> f64 {
-        if !self.perk_bought(60) {
+        if !self.perk_applies(60) {
             return f64::INFINITY;
         }
         let mut minutes = 60.0;
-        if self.perk_bought(61) {
+        if self.perk_applies(61) {
             minutes = 40.0;
         }
-        if self.perk_bought(62) {
+        if self.perk_applies(62) {
             minutes = 20.0;
         }
         minutes /= self.v_fast_auto_ec_effect();

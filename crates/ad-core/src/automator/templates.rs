@@ -140,7 +140,7 @@ impl GameState {
     fn template_metadata_warnings(&self, name: &str) -> Vec<String> {
         let mut list = Vec::new();
         let ru = |id: u8| self.reality_upgrade_bought(id);
-        let perk = |id: u8| self.perk_bought(id);
+        let perk = |id: u8| self.perk_applies(id);
         match name {
             "Climb EP" => {
                 if !ru(10) {

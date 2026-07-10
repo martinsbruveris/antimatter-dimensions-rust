@@ -86,6 +86,19 @@ impl GameState {
         self.achievement_bits[row] & mask != 0
     }
 
+    /// Whether achievement `id`'s *reward* applies (`Achievement.canBeApplied`):
+    /// unlocked, and not one of Pelle's `disabledAchievements` while Doomed.
+    pub fn achievement_applies(&self, id: u16) -> bool {
+        const PELLE_DISABLED: &[u16] = &[
+            164, 156, 143, 142, 141, 137, 134, 133, 132, 131, 126, 125, 118, 117, 116,
+            113, 111, 104, 103, 95, 93, 92, 91, 87, 85, 78, 76, 74, 65, 55, 54, 37,
+        ];
+        if self.is_doomed() && PELLE_DISABLED.contains(&id) {
+            return false;
+        }
+        self.achievement_unlocked(id)
+    }
+
     /// Unlock achievement `id`. Idempotent; achievements never re-lock,
     /// including across a Big Crunch. Call sites guard their own condition with
     /// a plain `if`, then call this — there is no separate `try_unlock` because,
@@ -123,6 +136,10 @@ impl GameState {
     /// Dimension: `1.25^(completed rows) × 1.03^(total unlocked)`. Mirrors
     /// `Achievements.power` pre-Reality, where the glyph/Ra exponent is 1.
     pub fn achievement_power(&self) -> Decimal {
+        // Doomed (`Pelle.isDisabled("achievementMult")`): no achievement power.
+        if self.is_doomed() {
+            return Decimal::ONE;
+        }
         let mut completed_rows = 0u32;
         let mut total_unlocked = 0u32;
         for &row_bits in &self.achievement_bits {
@@ -146,25 +163,30 @@ impl GameState {
     /// Achievement(21) = 100, Achievement(37) = 5000, Achievement(54) = 5e5,
     /// Achievement(55) = 5e10, Achievement(78) = 5e25)`.
     pub fn starting_antimatter(&self) -> Decimal {
+        // Doomed (`Pelle.isDisabled()` on `Currency.antimatter.startingValue`):
+        // always 100.
+        if self.is_doomed() {
+            return Decimal::from_float(100.0);
+        }
         // The SAM perk (`Perk.startAM`): start every reset with 5e130 — larger
         // than every achievement term, so it dominates the `Effects.max`.
-        if self.perk_bought(10) {
+        if self.perk_applies(10) {
             return Decimal::new(5.0, 130);
         }
         let mut value = Decimal::from_float(INITIAL_ANTIMATTER);
         if self.achievement_unlocked(21) {
             value = value.max(&Decimal::from_float(100.0));
         }
-        if self.achievement_unlocked(37) {
+        if self.achievement_applies(37) {
             value = value.max(&Decimal::from_float(5000.0));
         }
-        if self.achievement_unlocked(54) {
+        if self.achievement_applies(54) {
             value = value.max(&Decimal::new(5.0, 5));
         }
-        if self.achievement_unlocked(55) {
+        if self.achievement_applies(55) {
             value = value.max(&Decimal::new(5.0, 10));
         }
-        if self.achievement_unlocked(78) {
+        if self.achievement_applies(78) {
             value = value.max(&Decimal::new(5.0, 25));
         }
         value
@@ -197,7 +219,7 @@ impl GameState {
             }
         }
         // 65: like 56 but only inside a challenge (max(4/(min+1), 1)).
-        if self.achievement_unlocked(65) && self.is_in_any_challenge() {
+        if self.achievement_applies(65) && self.is_in_any_challenge() {
             let minutes = self.records.this_infinity.time_ms / 60_000.0;
             if minutes < 3.0 {
                 mult *= Decimal::from_float((4.0 / (minutes + 1.0)).max(1.0));
@@ -212,11 +234,11 @@ impl GameState {
             mult *= self.antimatter.pow(&Decimal::from_float(0.00002)) + Decimal::ONE;
         }
         // 74: all ADs ×1.4, but only inside a challenge.
-        if self.achievement_unlocked(74) && self.is_in_any_challenge() {
+        if self.achievement_applies(74) && self.is_in_any_challenge() {
             mult *= Decimal::from_float(1.4);
         }
         // 76: tiny multiplier based on time played (`max((days/2)^0.05, 1)`).
-        if self.achievement_unlocked(76) {
+        if self.achievement_applies(76) {
             let days = self.records.total_time_played_ms / 86_400_000.0;
             mult *= Decimal::from_float((days / 2.0).powf(0.05).max(1.0));
         }
@@ -226,7 +248,7 @@ impl GameState {
         }
         // 91: strong boost in the first 5 seconds of an Infinity
         // (`max((5 - sec) × 60, 1)`).
-        if self.achievement_unlocked(91) {
+        if self.achievement_applies(91) {
             let seconds = self.records.this_infinity.time_ms / 1000.0;
             if seconds < 5.0 {
                 mult *= Decimal::from_float(((5.0 - seconds) * 60.0).max(1.0));
@@ -234,7 +256,7 @@ impl GameState {
         }
         // 92: strong boost in the first 60 seconds of an Infinity
         // (`max((1 - min) × 100, 1)`).
-        if self.achievement_unlocked(92) {
+        if self.achievement_applies(92) {
             let minutes = self.records.this_infinity.time_ms / 60_000.0;
             if minutes < 1.0 {
                 mult *= Decimal::from_float(((1.0 - minutes) * 100.0).max(1.0));

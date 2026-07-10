@@ -217,11 +217,11 @@ impl GameState {
     /// Lai'tela's Reality, Doomed, or (for the auto release) inside Enslaved's
     /// own Reality.
     pub fn enslaved_can_release(&self, auto: bool) -> bool {
-        !self.is_storing_real_time()
-            && !self.ec_running(12)
-            && !self.celestials.laitela.run
-            && !(self.celestials.enslaved.run && auto)
-            && !self.is_doomed()
+        !(self.is_storing_real_time()
+            || self.ec_running(12)
+            || self.celestials.laitela.run
+            || (self.celestials.enslaved.run && auto)
+            || self.is_doomed())
     }
 
     /// `Enslaved.useStoredTime(autoRelease)`: release stored game time as a

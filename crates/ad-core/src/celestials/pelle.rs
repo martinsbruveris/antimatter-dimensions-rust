@@ -123,6 +123,10 @@ pub struct PelleState {
     pub progress_bits: u32,
     #[cfg_attr(feature = "serde", serde(default))]
     pub galaxy_generator: GalaxyGenerator,
+    /// Last observed paradox-milestone-0 state (`RiftMilestoneState.lastChecked`
+    /// for the one milestone with an `onStateChange`); not persisted.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub paradox_m0_last: bool,
 }
 
 fn one_f64() -> f64 {
@@ -148,6 +152,7 @@ impl PelleState {
             rifts: Default::default(),
             progress_bits: 0,
             galaxy_generator: GalaxyGenerator::default(),
+            paradox_m0_last: false,
         }
     }
 }
@@ -169,13 +174,20 @@ impl GameState {
         self.celestials.pelle.progress_bits & (1u32 << id) != 0
     }
 
+    /// `PelleUpgrade.X.canBeApplied`: bought *and* Doomed (Pelle upgrades only
+    /// function inside the doom).
+    pub fn pelle_upgrade_applies(&self, id: u32) -> bool {
+        self.is_doomed() && self.pelle_upgrade_bought(id)
+    }
+
     /// A one-time Pelle Upgrade (id 0–22) is bought.
     pub fn pelle_upgrade_bought(&self, id: u32) -> bool {
         self.celestials.pelle.upgrades & (1u32 << id) != 0
     }
 
-    /// Whether a mechanic is disabled by the doom (`Pelle.isDisabled`). Only a
-    /// subset of engine sites consult this in-frontier (documented).
+    /// Whether a mechanic is disabled by the doom (`Pelle.isDisabled` /
+    /// `disabledMechanicUnlocks`). Most keys are unconditionally disabled while
+    /// Doomed; a few come back via Pelle Upgrades or rift milestones.
     pub fn pelle_is_disabled(&self, mechanic: &str) -> bool {
         if !self.is_doomed() {
             return false;
@@ -183,7 +195,92 @@ impl GameState {
         match mechanic {
             // Glyphs come back with the vacuum rift's first milestone.
             "glyphs" => !self.pelle_rift_milestone(RIFT_VACUUM, 0),
+            // Autobuyers come back via Pelle Upgrades (AD 1–4 = upgrade 0,
+            // AD 5–8 = 3, Dim Boost = 1, Galaxy = 4, Tickspeed = 5).
+            "antimatterDimAutobuyer1"
+            | "antimatterDimAutobuyer2"
+            | "antimatterDimAutobuyer3"
+            | "antimatterDimAutobuyer4" => !self.pelle_upgrade_bought(0),
+            "antimatterDimAutobuyer5"
+            | "antimatterDimAutobuyer6"
+            | "antimatterDimAutobuyer7"
+            | "antimatterDimAutobuyer8" => !self.pelle_upgrade_bought(3),
+            "dimBoostAutobuyer" => !self.pelle_upgrade_bought(1),
+            "galaxyAutobuyer" => !self.pelle_upgrade_bought(4),
+            "tickspeedAutobuyer" => !self.pelle_upgrade_bought(5),
             _ => true,
+        }
+    }
+
+    /// The AD-tier autobuyer disable (`antimatterDimAutobuyer{tier}`), 0-indexed.
+    pub fn pelle_ad_autobuyer_disabled(&self, tier: usize) -> bool {
+        if !self.is_doomed() {
+            return false;
+        }
+        !self.pelle_upgrade_bought(if tier < 4 { 0 } else { 3 })
+    }
+
+    // --- The special (single) glyph's effect --------------------------------------
+
+    /// The type of the one glyph equippable while Doomed, if the special effect
+    /// is unlocked (chaos rift milestone 1).
+    fn pelle_active_glyph_type(&self) -> Option<crate::glyphs::GlyphType> {
+        if !self.is_doomed() || !self.pelle_rift_milestone(RIFT_CHAOS, 1) {
+            return None;
+        }
+        self.reality.glyphs.active.first().map(|g| g.kind)
+    }
+
+    /// `Pelle.specialGlyphEffect.infinity`: IP gain ×`(IP+1)^0.2` with an
+    /// Infinity glyph equipped (outside EC9–12).
+    pub(crate) fn pelle_special_glyph_infinity(&self) -> Decimal {
+        if self.pelle_active_glyph_type() == Some(crate::glyphs::GlyphType::Infinity)
+            && self.eternity_challenge_current <= 8
+        {
+            (self.infinity_points + Decimal::ONE).pow(&Decimal::from_float(0.2))
+        } else {
+            Decimal::ONE
+        }
+    }
+
+    /// `Pelle.specialGlyphEffect.time`: EP gain ×`(EP+1)^0.3` with a Time glyph.
+    pub(crate) fn pelle_special_glyph_time(&self) -> Decimal {
+        if self.pelle_active_glyph_type() == Some(crate::glyphs::GlyphType::Time) {
+            (self.eternity_points + Decimal::ONE).pow(&Decimal::from_float(0.3))
+        } else {
+            Decimal::ONE
+        }
+    }
+
+    /// `Pelle.specialGlyphEffect.replication`: Replicanti speed
+    /// ×`10^(53^vacuumFill)` with a Replication glyph.
+    pub(crate) fn pelle_special_glyph_replication(&self) -> f64 {
+        if self.pelle_active_glyph_type() == Some(crate::glyphs::GlyphType::Replication)
+        {
+            10f64.powf(53f64.powf(self.pelle_rift_percentage(RIFT_VACUUM)))
+        } else {
+            1.0
+        }
+    }
+
+    /// `Pelle.specialGlyphEffect.dilation`: DT gain ×`TG^1.5` with a Dilation
+    /// glyph.
+    pub(crate) fn pelle_special_glyph_dilation(&self) -> Decimal {
+        if self.pelle_active_glyph_type() == Some(crate::glyphs::GlyphType::Dilation) {
+            Decimal::from_float(self.dilation.total_tachyon_galaxies)
+                .pow(&Decimal::from_float(1.5))
+                .max(&Decimal::ONE)
+        } else {
+            Decimal::ONE
+        }
+    }
+
+    /// `Pelle.specialGlyphEffect.power`: Galaxies 2% stronger with a Power glyph.
+    pub(crate) fn pelle_special_glyph_power(&self) -> f64 {
+        if self.pelle_active_glyph_type() == Some(crate::glyphs::GlyphType::Power) {
+            1.02
+        } else {
+            1.0
         }
     }
 
@@ -239,6 +336,14 @@ impl GameState {
             self.celestials.pelle.remnants += self.remnants_gain();
         }
         self.reset_reality();
+        // `disChargeAll()` + the real-time storage shutdowns + the dilation
+        // strike's forced dilation (`Pelle.armageddon`'s tail).
+        self.celestials.ra.charged = 0;
+        self.celestials.enslaved.is_storing_real = false;
+        self.celestials.enslaved.auto_store_real = false;
+        if self.pelle_has_strike(5) {
+            self.dilation.active = true;
+        }
         true
     }
 
@@ -343,6 +448,35 @@ impl GameState {
             && self.pelle_rift_percentage(RIFT_CHAOS) >= RIFT_MILESTONES[RIFT_CHAOS][0]
     }
 
+    /// `PelleRifts.totalMilestones()` — how many rift milestones apply.
+    pub(crate) fn pelle_total_rift_milestones(&self) -> u32 {
+        (0..RIFT_COUNT)
+            .map(|i| (0..3).filter(|&m| self.pelle_rift_milestone(i, m)).count())
+            .sum::<usize>() as u32
+    }
+
+    /// Paradox milestone 2: Dilation-rebuyable purchases boost the
+    /// Infinity-Power conversion rate (`min(1.1075^(sum − 60), 712)`).
+    pub(crate) fn pelle_paradox_conversion_mult(&self) -> f64 {
+        if !self.pelle_rift_milestone(RIFT_PARADOX, 2) {
+            return 1.0;
+        }
+        let sum = self.dilation.rebuyables.iter().sum::<u32>()
+            + self.dilation.pelle_rebuyables.iter().sum::<u32>();
+        1.1075f64.powf(sum as f64 - 60.0).min(712.0)
+    }
+
+    /// `checkMilestoneStates` (run after a successful rift fill): the paradox
+    /// rift's first milestone rebuilds the Time-Dimension costs when its state
+    /// flips (`onStateChange` → `updateTimeDimensionCosts`).
+    fn pelle_check_milestone_states(&mut self) {
+        let now = self.pelle_rift_milestone(RIFT_PARADOX, 0);
+        if now != self.celestials.pelle.paradox_m0_last {
+            self.update_time_dimension_costs();
+        }
+        self.celestials.pelle.paradox_m0_last = now;
+    }
+
     /// Toggle a rift active (max 2 active).
     pub fn pelle_toggle_rift(&mut self, i: usize) -> bool {
         if !self.pelle_rift_unlocked(i) {
@@ -406,6 +540,7 @@ impl GameState {
                 self.celestials.pelle.rifts[i].fill = new_fill;
             }
         }
+        self.pelle_check_milestone_states();
     }
 
     fn pelle_fill_currency(&self, i: usize) -> Decimal {
@@ -473,6 +608,31 @@ impl GameState {
             return 1.0;
         }
         1.3f64.powi(self.celestials.pelle.rebuyables[1] as i32)
+    }
+
+    /// `PelleUpgrade.galaxyPower` — Galaxy-strength multiplier (`1 + x/50`).
+    pub(crate) fn pelle_galaxy_power_mult(&self) -> f64 {
+        if !self.is_doomed() {
+            return 1.0;
+        }
+        1.0 + self.celestials.pelle.rebuyables[4] as f64 / 50.0
+    }
+
+    /// `Pelle.glyphMaxLevel` — the `glyphLevels` rebuyable's level allowance
+    /// (`floor((3·(x+1) − 2)^1.6)`).
+    pub(crate) fn pelle_glyph_max_level(&self) -> u32 {
+        let x = self.celestials.pelle.rebuyables[2] as f64;
+        (3.0 * (x + 1.0) - 2.0).powf(1.6).floor() as u32
+    }
+
+    /// `PelleUpgrade.infConversion` — additive Infinity-Power conversion term
+    /// (`(x·3.5)^0.37`).
+    pub(crate) fn pelle_inf_conversion_effect(&self) -> f64 {
+        if !self.is_doomed() {
+            return 0.0;
+        }
+        let x = self.celestials.pelle.rebuyables[3] as f64;
+        (x * 3.5).powf(0.37)
     }
 
     /// The rebuyable cost `base1^x · max(base2^(x−incScale), 1) · coeff`.
@@ -671,6 +831,51 @@ mod tests {
         game.reality.realities = 1;
         game.reality.imaginary_upgrade_bits |= 1 << 25; // unlock Pelle
         game
+    }
+
+    #[test]
+    fn rebuyable_effects_match_the_formulas() {
+        let mut game = pelle_game();
+        game.celestials.pelle.doomed = true;
+        game.celestials.pelle.rebuyables = [0, 0, 5, 10, 4];
+        // galaxyPower: 1 + 4/50.
+        assert_eq!(game.pelle_galaxy_power_mult(), 1.08);
+        // infConversion: (10·3.5)^0.37.
+        assert_eq!(game.pelle_inf_conversion_effect(), 35f64.powf(0.37));
+        // glyphLevels: floor((3·6 − 2)^1.6) = floor(16^1.6) = 84.
+        assert_eq!(game.pelle_glyph_max_level(), 84);
+        // All are inert while not Doomed (glyph cap only *reads* while Doomed).
+        game.celestials.pelle.doomed = false;
+        assert_eq!(game.pelle_galaxy_power_mult(), 1.0);
+        assert_eq!(game.pelle_inf_conversion_effect(), 0.0);
+    }
+
+    #[test]
+    fn total_rift_milestones_counts_applied_ones() {
+        let mut game = pelle_game();
+        game.celestials.pelle.doomed = true;
+        assert_eq!(game.pelle_total_rift_milestones(), 0);
+        // Vacuum deep enough to clear all three thresholds (0.4 needs ~1e2320).
+        game.pelle_trigger_strike(1);
+        game.celestials.pelle.rifts[RIFT_VACUUM].fill = Decimal::new(1.0, 3000);
+        assert!(game.pelle_rift_percentage(RIFT_VACUUM) >= 0.4);
+        assert_eq!(game.pelle_total_rift_milestones(), 3);
+        // Chaos milestone 0 forces all three decay milestones.
+        game.pelle_trigger_strike(3);
+        game.celestials.pelle.rifts[RIFT_CHAOS].fill = Decimal::from_float(0.9);
+        assert_eq!(game.pelle_total_rift_milestones(), 7);
+    }
+
+    #[test]
+    fn doomed_glyph_slots_need_the_vacuum_milestone() {
+        let mut game = pelle_game();
+        assert_eq!(game.glyph_active_slot_count(), 3);
+        game.celestials.pelle.doomed = true;
+        assert_eq!(game.glyph_active_slot_count(), 0);
+        game.pelle_trigger_strike(1);
+        game.celestials.pelle.rifts[RIFT_VACUUM].fill = Decimal::new(1.0, 10);
+        assert!(game.pelle_rift_percentage(RIFT_VACUUM) >= 0.04);
+        assert_eq!(game.glyph_active_slot_count(), 1);
     }
 
     #[test]

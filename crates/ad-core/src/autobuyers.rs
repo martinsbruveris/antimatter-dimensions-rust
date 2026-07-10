@@ -862,6 +862,7 @@ impl GameState {
         for tier in 0..8 {
             let ready = self.autobuyers.dimensions[tier].is_active
                 && ad_group_ok
+                && !self.pelle_ad_autobuyer_disabled(tier)
                 && self.autobuyer_is_unlocked(AutobuyerTarget::AdTier(tier))
                 && self.dim_available_for_purchase(tier)
                 && self.dim_single_affordable(tier);
@@ -894,9 +895,13 @@ impl GameState {
             * self.perk_autobuyer_faster(101)
             / self.perk_shop_auto_speed_effect();
         for tier in 0..8 {
+            // While Doomed, Pelle upgrade 9 (`IDAutobuyers`) replaces the
+            // milestone unlock.
+            let unlocked = self.eternity_milestone_reached(11 + tier as u64)
+                || self.pelle_upgrade_applies(9);
             let ready = self.autobuyers.infinity_dims_group_active
                 && self.autobuyers.infinity_dims[tier].is_active
-                && self.eternity_milestone_reached(11 + tier as u64)
+                && unlocked
                 && id_can_autobuy
                 && self.id_available_for_purchase(tier);
             if self.autobuyers.infinity_dims[tier].advance(dt_ms, id_interval, ready) {
@@ -906,6 +911,7 @@ impl GameState {
 
         // Tickspeed autobuyer: `isAvailableForPurchase && isAffordable`.
         let ready = self.autobuyers.tickspeed.is_active
+            && !self.pelle_is_disabled("tickspeedAutobuyer")
             && self.autobuyer_is_unlocked(AutobuyerTarget::Tickspeed)
             && self.tickspeed_available()
             && self.tickspeed_affordable();
@@ -938,6 +944,7 @@ impl GameState {
         // phase (`lastTick`) resets on every ready tick even at the cap; only the
         // galaxy count stops growing.
         let ready = self.autobuyers.galaxy.is_active
+            && !self.pelle_is_disabled("galaxyAutobuyer")
             && self.autobuyer_is_unlocked(AutobuyerTarget::Galaxy)
             && self.can_buy_galaxy();
         // The `autobuyMaxGalaxies` milestone (9 Eternities) switches the
@@ -984,6 +991,7 @@ impl GameState {
                 || (self.galaxies as f64) >= db_cfg.until_galaxies;
             let gate = self.can_unlock_new_dimension() || galaxy_condition;
             let ready = self.autobuyers.dim_boost.is_active
+                && !self.pelle_is_disabled("dimBoostAutobuyer")
                 && self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost)
                 && self.can_dim_boost()
                 && gate;
@@ -1006,6 +1014,7 @@ impl GameState {
             let galaxy_condition = db_cfg.limit_until_galaxies
                 && (self.galaxies as f64) >= db_cfg.until_galaxies;
             let ready = self.autobuyers.dim_boost.is_active
+                && !self.pelle_is_disabled("dimBoostAutobuyer")
                 && self.autobuyer_is_unlocked(AutobuyerTarget::DimBoost)
                 && self.can_dim_boost()
                 && (limit_condition || galaxy_condition);
@@ -1069,9 +1078,12 @@ impl GameState {
                 * self.perk_autobuyer_faster(102)
                 / self.perk_shop_auto_speed_effect();
             for (id, milestone) in [50u64, 60, 80].into_iter().enumerate() {
+                // Pelle upgrade 12 (`replicantiAutobuyers`) replaces the
+                // milestone unlock while Doomed.
                 let ready = self.autobuyers.replicanti_upgrades_group_active
                     && self.autobuyers.replicanti_upgrades[id].is_active
-                    && self.eternity_milestone_reached(milestone);
+                    && (self.eternity_milestone_reached(milestone)
+                        || self.pelle_upgrade_applies(12));
                 if self.autobuyers.replicanti_upgrades[id].advance(
                     dt_ms,
                     repl_interval,
@@ -1115,10 +1127,12 @@ impl GameState {
         let td_interval =
             MILESTONE_AUTOBUYER_INTERVAL_MS / self.perk_shop_auto_speed_effect();
         for tier in 0..8 {
+            // `RU13 && (!Pelle.isDoomed || PelleUpgrade.TDAutobuyers)` — Pelle
+            // upgrade 18 re-enables the TD autobuyers while Doomed.
             let ready = self.autobuyers.time_dims_group_active
                 && self.autobuyers.time_dims[tier].is_active
                 && self.reality_upgrade_bought(13)
-                && !self.is_doomed()
+                && (!self.is_doomed() || self.pelle_upgrade_applies(18))
                 && self.td_available_for_purchase(tier);
             if self.autobuyers.time_dims[tier].advance(dt_ms, td_interval, ready) {
                 if self.eternity_points.exponent() >= 10 {
@@ -1158,7 +1172,7 @@ impl GameState {
                 .autobuyers
                 .sacrifice_multiplier
                 .max(&Decimal::from_float(1.01));
-            if self.achievement_unlocked(118) || self.next_sacrifice_boost() >= threshold
+            if self.achievement_applies(118) || self.next_sacrifice_boost() >= threshold
             {
                 self.sacrifice();
             }
@@ -1285,7 +1299,7 @@ impl GameState {
     /// since `eternity()` itself gates on the goal).
     pub(crate) fn will_auto_eternity(&self) -> bool {
         if self.any_ec_running() {
-            if !self.perk_bought(73) {
+            if !self.perk_applies(73) {
                 return true;
             }
             let id = self.eternity_challenge_current;

@@ -66,7 +66,7 @@ impl GameState {
     /// Imaginary Upgrade 13's cap multiplier:
     /// `1 + totalRebuyables/20 + totalSinglePurchase/2`.
     fn imaginary_upgrade_13_effect(&self) -> f64 {
-        if !self.imaginary_upgrade_bought(13) {
+        if !self.imaginary_upgrade_applies(13) {
             return 1.0;
         }
         let rebuyables: u32 = self.reality.imaginary_rebuyables.iter().sum();
@@ -87,7 +87,7 @@ impl GameState {
         }
         // scaleTime = 60 / iU20 effect (iU20 → ×10 speed).
         let scale = 60.0
-            / if self.imaginary_upgrade_bought(20) {
+            / if self.imaginary_upgrade_applies(20) {
                 10.0
             } else {
                 1.0
@@ -106,6 +106,23 @@ impl GameState {
     /// Whether one-time Imaginary Upgrade `id` (11–25) is bought.
     pub fn imaginary_upgrade_bought(&self, id: u8) -> bool {
         self.reality.imaginary_upgrade_bits & (1u32 << id) != 0
+    }
+
+    /// Whether upgrade `id`'s *effect* applies: bought, and not one of the
+    /// `isDisabledInDoomed` upgrades (11–14, 20–23) while Doomed.
+    pub fn imaginary_upgrade_applies(&self, id: u8) -> bool {
+        const DISABLED_IN_DOOMED: u32 = (1 << 11)
+            | (1 << 12)
+            | (1 << 13)
+            | (1 << 14)
+            | (1 << 20)
+            | (1 << 21)
+            | (1 << 22)
+            | (1 << 23);
+        if self.is_doomed() && (DISABLED_IN_DOOMED >> id) & 1 == 1 {
+            return false;
+        }
+        self.imaginary_upgrade_bought(id)
     }
 
     pub fn imaginary_rebuyable_count(&self, id: u8) -> u32 {
@@ -304,7 +321,7 @@ impl GameState {
     /// Imaginary Upgrade 11's Time-Dimension power:
     /// `1 + log10(log10(totalAntimatter)) / 100`.
     pub(crate) fn imaginary_upgrade_11_td_pow(&self) -> f64 {
-        if !self.imaginary_upgrade_bought(11) {
+        if !self.imaginary_upgrade_applies(11) {
             return 1.0;
         }
         1.0 + self.total_antimatter.pos_log10().max(1.0).log10().max(0.0) / 100.0
@@ -313,7 +330,7 @@ impl GameState {
     /// Imaginary Upgrade 14's per-purchase-multiplier power (^1.5 on the
     /// AD buy-ten, ID, and TD per-purchase multipliers).
     pub(crate) fn imaginary_upgrade_14_pow(&self) -> f64 {
-        if self.imaginary_upgrade_bought(14) {
+        if self.imaginary_upgrade_applies(14) {
             1.5
         } else {
             1.0
@@ -325,11 +342,11 @@ impl GameState {
     /// effect (`floor(0.25 × Tesseracts.effectiveCount²)`; ×1 while IU23 is
     /// unbought, the original's `effectOrDefault(1)`). Zero inside Ra's Reality.
     pub(crate) fn imaginary_dim_boosts(&self) -> f64 {
-        if self.celestials.ra.run || !self.imaginary_upgrade_bought(12) {
+        if self.celestials.ra.run || !self.imaginary_upgrade_applies(12) {
             return 0.0;
         }
         let rebuyables: u32 = self.reality.imaginary_rebuyables.iter().sum();
-        let iu23 = if self.imaginary_upgrade_bought(23) {
+        let iu23 = if self.imaginary_upgrade_applies(23) {
             (0.25 * self.tesseract_effective_count().powi(2)).floor()
         } else {
             1.0

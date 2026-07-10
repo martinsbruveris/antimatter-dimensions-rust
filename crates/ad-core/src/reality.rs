@@ -312,7 +312,7 @@ impl GameState {
     /// unlocked. Our engine awards a subset of the original's achievements,
     /// so the check runs over the implemented ones (see the design doc).
     pub(crate) fn reality_study_achievements_ok(&self) -> bool {
-        if self.perk_bought(0) {
+        if self.perk_applies(0) {
             return true;
         }
         IMPLEMENTED_ACHIEVEMENTS
@@ -325,6 +325,19 @@ impl GameState {
     /// membership check is needed earlier (Reality study, achievements).
     pub fn perk_bought(&self, id: u8) -> bool {
         self.reality.perks.contains(&id)
+    }
+
+    /// Whether perk `id`'s *effect* applies: bought, and not one of Pelle's
+    /// `uselessPerks` while Doomed (their effects are suspended, not lost).
+    pub fn perk_applies(&self, id: u8) -> bool {
+        const USELESS_PERKS: &[u8] = &[
+            10, 12, 13, 14, 15, 16, 17, 30, 40, 41, 42, 43, 44, 45, 46, 51, 52, 53, 60,
+            61, 62, 80, 81, 82, 83, 100, 103, 104, 105, 106, 201, 202, 203, 204,
+        ];
+        if self.is_doomed() && USELESS_PERKS.contains(&id) {
+            return false;
+        }
+        self.perk_bought(id)
     }
 
     // --- Reality Machines (machines.js) -----------------------------------------
@@ -731,17 +744,29 @@ impl GameState {
         self.epmult_upgrades = 0;
         self.ip_mult_purchases = 0;
         self.part_infinitied = 0.0;
-        self.eternities = Decimal::ZERO;
+        // Pelle upgrade 14 (`eternitiesNoReset`) keeps Eternities on Armageddon.
+        if !self.pelle_upgrade_applies(14) {
+            self.eternities = Decimal::ZERO;
+        }
         self.records.this_eternity = ThisEternity::new();
         self.records.best_eternity = crate::records::BestEternity {
             time_ms: BEST_INFINITY_RESET_MS,
             real_time_ms: BEST_INFINITY_RESET_MS,
             best_ep_min_reality: Decimal::ZERO,
         };
-        self.eternity_upgrades = 0;
+        // Pelle upgrades 17/19 (`keepEternityUpgrades`/`keepEternityChallenges`)
+        // keep their targets on Armageddon; 15 (`timeStudiesNoReset`) keeps the
+        // held EC study slot.
+        if !self.pelle_upgrade_applies(17) {
+            self.eternity_upgrades = 0;
+        }
         self.total_tick_gained = 0;
-        self.eternity_challenges = [0; 12];
-        self.eternity_challenge_unlocked = 0;
+        if !self.pelle_upgrade_applies(19) {
+            self.eternity_challenges = [0; 12];
+        }
+        if !self.pelle_upgrade_applies(15) {
+            self.eternity_challenge_unlocked = 0;
+        }
         // `player.reality.lastAutoEC = 0` (the EC auto-completion accumulator).
         self.reality.last_auto_ec = 0.0;
         self.eternity_challenge_current = 0;
@@ -766,16 +791,36 @@ impl GameState {
         self.records.this_eternity.max_ip = self.infinity_points;
         self.records.this_reality.max_ep = self.eternity_points;
 
-        // `Currency.timeTheorems.reset()`: respec + TT/max/purchases cleared.
-        self.studies = Vec::new();
-        self.time_theorems = Decimal::ZERO;
-        self.max_theorem = Decimal::ZERO;
-        self.tt_am_bought = 0;
-        self.tt_ip_bought = 0;
-        self.tt_ep_bought = 0;
+        // `Currency.timeTheorems.reset()`: respec + TT/max/purchases cleared —
+        // kept by Pelle upgrade 15 (`timeStudiesNoReset`), studies included.
+        if !self.pelle_upgrade_applies(15) {
+            self.studies = Vec::new();
+            self.time_theorems = Decimal::ZERO;
+            self.max_theorem = Decimal::ZERO;
+            self.tt_am_bought = 0;
+            self.tt_ip_bought = 0;
+            self.tt_ep_bought = 0;
+        }
 
-        // Dilation: studies, run, upgrades, TP/DT/TGs all reset.
+        // Dilation: studies/run kept by Pelle upgrade 15, upgrades/rebuyables
+        // by 20 (`dilationUpgradesNoReset`), Tachyon Particles by 21
+        // (`tachyonParticlesNoReset`); DT/threshold/TGs always reset.
+        let keep_dilation_studies = self.pelle_upgrade_applies(15);
+        let keep_dilation_upgrades = self.pelle_upgrade_applies(20);
+        let keep_tp = self.pelle_upgrade_applies(21);
+        let old_dilation = std::mem::take(&mut self.dilation);
         self.dilation = crate::DilationState::new();
+        if keep_dilation_studies {
+            self.dilation.studies = old_dilation.studies;
+            self.dilation.active = old_dilation.active;
+        }
+        if keep_dilation_upgrades {
+            self.dilation.upgrades = old_dilation.upgrades;
+            self.dilation.rebuyables = old_dilation.rebuyables;
+        }
+        if keep_tp {
+            self.dilation.tachyon_particles = old_dilation.tachyon_particles;
+        }
 
         self.records.this_infinity.max_am = Decimal::ZERO;
         self.records.this_eternity.max_am = Decimal::ZERO;
@@ -807,8 +852,17 @@ impl GameState {
         self.dimensions = std::array::from_fn(|_| DimensionTier::new());
         self.tickspeed = TickspeedState::new();
 
-        // Autobuyer reset (eternities are 0 → no milestone keeps).
-        self.reset_autobuyers_on_reality();
+        // Autobuyer reset (eternities are 0 → no milestone keeps) — unless
+        // Pelle upgrade 2 (`keepAutobuyers`) holds them through Armageddon;
+        // with a maxed Big-Crunch autobuyer that also keeps Infinity broken
+        // (`finishProcessReality`'s doomed branch).
+        if self.pelle_upgrade_applies(2) {
+            if self.autobuyers.big_crunch.has_maxed_interval() {
+                self.broke_infinity = true;
+            }
+        } else {
+            self.reset_autobuyers_on_reality();
+        }
 
         // Post-reset upgrades/perks kick in (RU10 package etc., Feature 6.4).
         self.apply_post_reality_upgrades();
@@ -850,7 +904,7 @@ impl GameState {
     /// `lockAchievementsOnReality`: without the ACHNR perk (id 205) all
     /// pre-Reality achievements re-lock and the auto-grant timer restarts.
     fn lock_achievements_on_reality(&mut self) {
-        if self.perk_bought(205) {
+        if self.perk_applies(205) {
             return;
         }
         for row in 0..PRE_REALITY_ACHIEVEMENT_ROWS {
@@ -864,7 +918,7 @@ impl GameState {
     pub fn achievement_period_ms(&self) -> f64 {
         let mut minutes = 30.0;
         for (perk, reduction) in [(201u8, 10.0), (202, 8.0), (203, 6.0), (204, 4.0)] {
-            if self.perk_bought(perk) {
+            if self.perk_applies(perk) {
                 minutes -= reduction;
             }
         }

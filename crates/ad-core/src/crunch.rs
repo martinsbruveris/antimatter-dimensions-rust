@@ -43,7 +43,7 @@ impl GameState {
     fn ip_gain_divisor(&self) -> f64 {
         // `Effects.min(308, Achievement(103) = 307.8, TimeStudy(111) = 285)`.
         let mut div: f64 = 308.0;
-        if self.achievement_unlocked(103) {
+        if self.achievement_applies(103) {
             div = div.min(307.8);
         }
         if self.time_study_bought(111) {
@@ -80,20 +80,20 @@ impl GameState {
         }
         let mut mult = Decimal::ONE;
         // Achievements 85 and 93 each multiply IP gain ×4.
-        if self.achievement_unlocked(85) {
+        if self.achievement_applies(85) {
             mult *= Decimal::from_float(4.0);
         }
-        if self.achievement_unlocked(93) {
+        if self.achievement_applies(93) {
             mult *= Decimal::from_float(4.0);
         }
         // Achievement 141 (make a Reality): ×4 IP gain.
-        if self.achievement_unlocked(141) {
+        if self.achievement_applies(141) {
             mult *= Decimal::from_float(4.0);
         }
         // Achievement 116: IP multiplier from total Infinities
         // (`infinitiesTotal^(log10(2)/4)`, powered by TS31, capped by Effarig's
         // Eternity stage).
-        if self.achievement_unlocked(116) {
+        if self.achievement_applies(116) {
             let base = self
                 .infinities_total()
                 .max(&Decimal::ONE)
@@ -107,7 +107,7 @@ impl GameState {
         }
         // Achievement 125: IP multiplier from time spent this Infinity
         // (`2^(ln(t) × min(t^0.11, 500))`, `t = 10·seconds + 1`), same cap.
-        if self.achievement_unlocked(125) {
+        if self.achievement_applies(125) {
             let t = self.records.this_infinity.time_ms / 1000.0 * 10.0 + 1.0;
             let exponent = t.ln() * t.powf(0.11).min(500.0);
             let mut value = Decimal::from_float(2.0).pow(&Decimal::from_float(exponent));
@@ -129,7 +129,7 @@ impl GameState {
         let infinity_secs = self.records.this_infinity.time_ms / 1000.0;
         if self.time_study_bought(141) {
             // The ACT perk (70) maximizes the Active path (no decay).
-            let value = if self.perk_bought(70) {
+            let value = if self.perk_applies(70) {
                 Decimal::new_unchecked(1.0, 45)
             } else {
                 let decay = Self::this_infinity_mult(infinity_secs);
@@ -139,7 +139,7 @@ impl GameState {
         }
         if self.time_study_bought(142) {
             // The PASS perk (31) improves TS142 to ×1e50.
-            mult *= if self.perk_bought(31) {
+            mult *= if self.perk_applies(31) {
                 Decimal::new_unchecked(1.0, 50)
             } else {
                 Decimal::new_unchecked(1.0, 25)
@@ -147,7 +147,7 @@ impl GameState {
         }
         if self.time_study_bought(143) {
             // The IDL perk (71): the Idle path starts 15 minutes in.
-            let secs = infinity_secs + if self.perk_bought(71) { 900.0 } else { 0.0 };
+            let secs = infinity_secs + if self.perk_applies(71) { 900.0 } else { 0.0 };
             mult *= Self::this_infinity_mult(secs);
         }
         // The `ipMultDT` Dilation Upgrade: ×DT^1000.
@@ -200,6 +200,16 @@ impl GameState {
     /// floored.
     pub fn gained_infinity_points(&self) -> Decimal {
         let div = self.ip_gain_divisor();
+        // Doomed (`Pelle.isDisabled("IPMults")`): the raw scaling formula only,
+        // times the vacuum rift's IP effect and the special glyph's Infinity
+        // effect — every other multiplier is disabled.
+        if self.is_doomed() {
+            let exponent = self.records.this_infinity.max_am.log10() / div - 0.75;
+            return (Decimal::pow10(exponent)
+                * self.pelle_rift_effect(crate::celestials::pelle::RIFT_VACUUM)
+                * self.pelle_special_glyph_infinity())
+            .floor();
+        }
         let mut base = if self.broke_infinity {
             let exponent = self.records.this_infinity.max_am.log10() / div - 0.75;
             Decimal::pow10(exponent)
@@ -238,14 +248,15 @@ impl GameState {
     /// base 1 (Achievement 87 is post-Reality) times TS32's Dimension-Boost
     /// multiplier.
     pub fn gained_infinities(&self) -> Decimal {
-        // EC4 disables the Infinity generators (`gainedInfinities` returns 1).
-        if self.ec_running(4) {
+        // EC4 (and the doom — `Pelle.isDisabled("InfinitiedMults")`) fixes the
+        // gain at 1.
+        if self.ec_running(4) || self.is_doomed() {
             return Decimal::ONE;
         }
         // Base `Effects.max(1, Achievement(87) = 250)`: achievement 87 raises the
         // base gain to 250, but only for Infinities longer than 5 seconds.
         let mut gain = Decimal::ONE;
-        if self.achievement_unlocked(87) && self.records.this_infinity.time_ms > 5000.0 {
+        if self.achievement_applies(87) && self.records.this_infinity.time_ms > 5000.0 {
             gain = gain.max(&Decimal::from_float(250.0));
         }
         if self.time_study_bought(32) {
@@ -259,11 +270,11 @@ impl GameState {
             gain *= Decimal::from_float(1.0 + self.galaxies as f64 / 30.0);
         }
         // Achievement 131: ×2 Infinities.
-        if self.achievement_unlocked(131) {
+        if self.achievement_applies(131) {
             gain *= Decimal::from_float(2.0);
         }
         // Achievement 164: ×1024 Infinities.
-        if self.achievement_unlocked(164) {
+        if self.achievement_applies(164) {
             gain *= Decimal::from_float(1024.0);
         }
         gain
@@ -466,12 +477,17 @@ impl GameState {
             self.replicanti.amount = Decimal::ONE;
         }
         let mut remaining_rgs = 0;
-        if self.achievement_unlocked(95) {
+        if self.achievement_applies(95) {
             self.replicanti.amount = current_replicanti;
             remaining_rgs += current_rgs.min(1);
         }
-        if self.time_study_bought(33) {
+        // TS33's half-keep is disabled while Doomed (`!Pelle.isDoomed`).
+        if self.time_study_bought(33) && !self.is_doomed() {
             remaining_rgs += current_rgs / 2;
+        }
+        // Pelle upgrade 13 (`replicantiGalaxyNoReset`): keep every RG.
+        if self.pelle_upgrade_applies(13) {
+            remaining_rgs = current_rgs;
         }
         self.replicanti.galaxies = remaining_rgs.min(current_rgs);
         // Re-apply skip-reset Infinity Upgrades (original `secondSoftReset` →

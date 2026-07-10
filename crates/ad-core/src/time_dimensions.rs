@@ -88,13 +88,29 @@ impl TimeDimension {
 /// The EP cost of the `bought+1`-th purchase of tier `t` (0-indexed). Mirrors
 /// `TimeDimensionState.nextCost` (pre-Pelle).
 pub fn time_dimension_cost(tier: usize, bought: u64) -> Decimal {
+    time_dimension_cost_pelle(tier, bought, false)
+}
+
+/// Paradox rift milestone 0: Time Dimensions 5–8 are much cheaper
+/// (`cost.div(1e2250).pow(0.5)`) — applied in the plain-geometric branch and
+/// the past-1e6000 branch, but *not* in the threshold walk (as the original).
+fn td_paradox_cheapen(cost: Decimal) -> Decimal {
+    (cost / Decimal::new(1.0, 2250)).pow(&Decimal::from_float(0.5))
+}
+
+/// `TimeDimensionState.nextCost`, with the paradox-milestone flag threaded.
+pub fn time_dimension_cost_pelle(tier: usize, bought: u64, paradox_m0: bool) -> Decimal {
     let base = TD_BASE_COST[tier];
     let mult = TD_COST_MULT[tier];
     let scaling_amount = TD_E6000_SCALING_AMOUNT[tier];
 
     // Tiers 5–8 below their scaling amount: plain geometric cost.
     if tier >= 4 && bought < scaling_amount {
-        return Decimal::from_float(mult).pow(&Decimal::from(bought)) * base;
+        let cost = Decimal::from_float(mult).pow(&Decimal::from(bought)) * base;
+        if paradox_m0 {
+            return td_paradox_cheapen(cost);
+        }
+        return cost;
     }
 
     // Walk the thresholds with the bumped multipliers; the first fit wins.
@@ -113,7 +129,11 @@ pub fn time_dimension_cost(tier: usize, bought: u64) -> Decimal {
         stepped *= 2.2;
     }
     let exponent = scaling_amount + (bought - scaling_amount) * TD_SCALING_PAST_E6000;
-    Decimal::from_float(stepped).pow(&Decimal::from(exponent)) * base
+    let cost = Decimal::from_float(stepped).pow(&Decimal::from(exponent)) * base;
+    if paradox_m0 && tier >= 4 {
+        return td_paradox_cheapen(cost);
+    }
+    cost
 }
 
 impl GameState {
@@ -133,6 +153,23 @@ impl GameState {
             && self.eternity_points >= self.time_dimensions[tier].cost
     }
 
+    /// `nextCost(bought)` with the current paradox-milestone state.
+    fn td_next_cost(&self, tier: usize, bought: u64) -> Decimal {
+        time_dimension_cost_pelle(
+            tier,
+            bought,
+            self.pelle_rift_milestone(crate::celestials::pelle::RIFT_PARADOX, 0),
+        )
+    }
+
+    /// `updateTimeDimensionCosts` — rebuild every tier's stored cost.
+    pub(crate) fn update_time_dimension_costs(&mut self) {
+        for tier in 0..TIME_DIMENSION_COUNT {
+            self.time_dimensions[tier].cost =
+                self.td_next_cost(tier, self.time_dimensions[tier].bought);
+        }
+    }
+
     /// Buy a single Time Dimension of tier `t` (`buySingleTimeDimension`).
     pub fn buy_time_dimension(&mut self, tier: usize) -> bool {
         if !self.td_available_for_purchase(tier) {
@@ -140,10 +177,10 @@ impl GameState {
         }
         let cost = self.time_dimensions[tier].cost;
         self.eternity_points -= cost;
-        let d = &mut self.time_dimensions[tier];
-        d.amount += Decimal::ONE;
-        d.bought += 1;
-        d.cost = time_dimension_cost(tier, d.bought);
+        self.time_dimensions[tier].amount += Decimal::ONE;
+        self.time_dimensions[tier].bought += 1;
+        self.time_dimensions[tier].cost =
+            self.td_next_cost(tier, self.time_dimensions[tier].bought);
         true
     }
 
@@ -423,10 +460,10 @@ impl GameState {
     /// purchases persist.
     pub(crate) fn reset_time_dimension_amounts(&mut self) {
         for tier in 0..TIME_DIMENSION_COUNT {
-            let d = &mut self.time_dimensions[tier];
-            d.amount = Decimal::from(d.bought);
-            d.cost = time_dimension_cost(tier, d.bought);
+            self.time_dimensions[tier].amount =
+                Decimal::from(self.time_dimensions[tier].bought);
         }
+        self.update_time_dimension_costs();
     }
 }
 
@@ -495,6 +532,18 @@ fn free_tickspeed_from_shards(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn paradox_milestone_cheapens_high_time_dimensions() {
+        // TD5 base cost 1e2350: (1e2350 / 1e2250)^0.5 = 1e50.
+        assert_eq!(
+            time_dimension_cost_pelle(4, 0, false),
+            Decimal::new(1.0, 2350)
+        );
+        assert_eq!(time_dimension_cost_pelle(4, 0, true), Decimal::new(1.0, 50));
+        // Tiers 1-4 are untouched.
+        assert_eq!(time_dimension_cost_pelle(0, 0, true), Decimal::ONE);
+    }
 
     #[test]
     fn time_dimension_production_compounds_within_a_tick() {

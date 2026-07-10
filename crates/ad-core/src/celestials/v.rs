@@ -186,7 +186,7 @@ impl GameState {
     /// `VUnlocks.adPow`: the Antimatter-Dimension power `1 + √ST/100` (1 if the
     /// reward is not unlocked).
     pub(crate) fn v_ad_pow(&self) -> f64 {
-        if self.celestials.v.unlock_bought(V_UNLOCK_AD_POW) {
+        if !self.is_doomed() && self.celestials.v.unlock_bought(V_UNLOCK_AD_POW) {
             1.0 + (self.v_space_theorems() as f64).sqrt() / 100.0
         } else {
             1.0
@@ -196,7 +196,7 @@ impl GameState {
     /// `VUnlocks.fastAutoEC`: the achievement multiplier divides the EC
     /// auto-completion interval (1 until the reward is unlocked).
     pub(crate) fn v_fast_auto_ec_effect(&self) -> f64 {
-        if self.celestials.v.unlock_bought(V_UNLOCK_FAST_AUTO_EC) {
+        if !self.is_doomed() && self.celestials.v.unlock_bought(V_UNLOCK_FAST_AUTO_EC) {
             self.achievement_power().to_f64()
         } else {
             1.0
@@ -206,7 +206,8 @@ impl GameState {
     /// `VUnlocks.achievementBH`: the achievement multiplier boosts Black Hole
     /// power (1 until the reward is unlocked).
     pub(crate) fn v_achievement_bh_effect(&self) -> f64 {
-        if self.celestials.v.unlock_bought(V_UNLOCK_ACHIEVEMENT_BH) {
+        if !self.is_doomed() && self.celestials.v.unlock_bought(V_UNLOCK_ACHIEVEMENT_BH)
+        {
             self.achievement_power().to_f64()
         } else {
             1.0

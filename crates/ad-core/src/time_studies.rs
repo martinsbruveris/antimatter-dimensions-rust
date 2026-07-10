@@ -326,7 +326,7 @@ impl GameState {
             return false;
         }
         // The TTF perk (105): purchases no longer spend the currency.
-        if !self.perk_bought(105) {
+        if !self.perk_applies(105) {
             self.antimatter -= cost;
         }
         self.tt_am_bought += 1;
@@ -343,7 +343,7 @@ impl GameState {
         if !self.can_buy_time_theorems() || self.infinity_points < cost {
             return false;
         }
-        if !self.perk_bought(105) {
+        if !self.perk_applies(105) {
             self.infinity_points -= cost;
         }
         self.tt_ip_bought += 1;
@@ -358,7 +358,7 @@ impl GameState {
         if !self.can_buy_time_theorems() || self.eternity_points < cost {
             return false;
         }
-        if !self.perk_bought(105) {
+        if !self.perk_applies(105) {
             self.eternity_points -= cost;
         }
         self.tt_ep_bought += 1;
@@ -454,7 +454,7 @@ impl GameState {
         match id {
             // EC5 completion unlocks 62.
             // The EC5R perk waives TS62's EC5 requirement.
-            62 => self.perk_bought(57) || self.eternity_challenge_completions(5) > 0,
+            62 => self.perk_applies(57) || self.eternity_challenge_completions(5) > 0,
             // The dimension paths are excluded by holding the EC11/EC12 study
             // (their `forbiddenStudies` counterpart).
             71 => self.eternity_challenge_unlocked != 12,
@@ -466,7 +466,7 @@ impl GameState {
             // 181 needs EC1–3 completed at least once (each waivable by the
             // EC1R/EC2R/EC3R perks 54/55/56).
             181 => [(1u8, 54u8), (2, 55), (3, 56)].iter().all(|&(ec, perk)| {
-                self.perk_bought(perk) || self.eternity_challenge_completions(ec) > 0
+                self.perk_applies(perk) || self.eternity_challenge_completions(ec) > 0
             }),
             // 191/192/193 need an EC10 completion.
             191..=193 => self.eternity_challenge_completions(10) > 0,
@@ -669,7 +669,7 @@ impl GameState {
     /// eternity (last 10), 1, 50)`.
     pub(crate) fn ts121_effect(&self) -> f64 {
         // The ACT perk (studyActiveEP): Active path multipliers maximized.
-        if self.perk_bought(70) {
+        if self.perk_applies(70) {
             return 50.0;
         }
         let avg_secs = self

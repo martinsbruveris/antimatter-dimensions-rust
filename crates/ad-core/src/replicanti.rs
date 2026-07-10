@@ -88,9 +88,15 @@ impl Default for ReplicantiState {
 }
 
 impl GameState {
+    /// The Replicanti unlock cost (1e140, ÷1e130 with the vacuum milestone).
+    fn replicanti_unlock_cost(&self) -> Decimal {
+        self.replicanti_vacuum_discount(REPLICANTI_UNLOCK_COST)
+    }
+
     /// Whether Replicanti can be unlocked now (not yet unlocked, enough IP).
     pub fn can_unlock_replicanti(&self) -> bool {
-        !self.replicanti.unlocked && self.infinity_points >= REPLICANTI_UNLOCK_COST
+        !self.replicanti.unlocked
+            && self.infinity_points >= self.replicanti_unlock_cost()
     }
 
     /// Unlock Replicanti, spending the IP cost. Returns whether unlocked afterwards.
@@ -98,10 +104,11 @@ impl GameState {
         if self.replicanti.unlocked {
             return true;
         }
-        if self.infinity_points < REPLICANTI_UNLOCK_COST {
+        let cost = self.replicanti_unlock_cost();
+        if self.infinity_points < cost {
             return false;
         }
-        self.infinity_points -= REPLICANTI_UNLOCK_COST;
+        self.infinity_points -= cost;
         self.replicanti.unlocked = true;
         self.replicanti.timer_ms = 0.0;
         self.replicanti.amount = Decimal::ONE;
@@ -109,15 +116,46 @@ impl GameState {
     }
 
     /// Whether Replicanti may exceed the 1.8e308 cap (`Replicanti.isUncapped`,
-    /// TS192). Enslaved's Reality locks TS192.
+    /// TS192 or the vacuum rift's second milestone). Enslaved's Reality locks
+    /// TS192.
     pub fn replicanti_uncapped(&self) -> bool {
-        self.time_study_bought(192) && !self.celestials.enslaved.run
+        (self.time_study_bought(192) && !self.celestials.enslaved.run)
+            || self.pelle_rift_milestone(crate::celestials::pelle::RIFT_VACUUM, 1)
+    }
+
+    /// Vacuum rift milestone 1: the Replicanti unlock and upgrades are ×1e130
+    /// cheaper (costs are divided on *read*; the stored cost still advances by
+    /// the undivided step, as the original).
+    fn replicanti_vacuum_discount(&self, cost: Decimal) -> Decimal {
+        if self.pelle_rift_milestone(crate::celestials::pelle::RIFT_VACUUM, 1) {
+            cost / Decimal::new(1.0, 130)
+        } else {
+            cost
+        }
+    }
+
+    /// The effective chance-upgrade cost (`ReplicantiUpgrade.chance.cost`).
+    pub fn replicanti_chance_cost(&self) -> Decimal {
+        self.replicanti_vacuum_discount(self.replicanti.chance_cost)
+    }
+
+    /// The effective interval-upgrade cost (`ReplicantiUpgrade.interval.cost`).
+    pub fn replicanti_interval_cost(&self) -> Decimal {
+        self.replicanti_vacuum_discount(self.replicanti.interval_cost)
     }
 
     /// The total Replicanti speed multiplier (`totalReplicantiSpeedMult`):
     /// TS62 (×3), TS213 (×20), and TS132's ×1.5 (Achievement 134's pre-cap ×2
     /// is a later feature).
     fn replicanti_speed_mult(&self) -> f64 {
+        // Doomed (`Pelle.isDisabled("replicantiIntervalMult")`): only the decay
+        // rift's effect and the special glyph's Replication effect apply.
+        if self.is_doomed() {
+            return self
+                .pelle_rift_effect(crate::celestials::pelle::RIFT_DECAY)
+                .to_f64()
+                * self.pelle_special_glyph_replication();
+        }
         let mut mult = 1.0;
         if self.time_study_bought(62) {
             mult *= 3.0;
@@ -127,7 +165,7 @@ impl GameState {
         }
         if self.time_study_bought(132) {
             // The PASS perk (31): TS132 also makes Replicanti ×3 faster.
-            mult *= if self.perk_bought(31) { 3.0 } else { 1.5 };
+            mult *= if self.perk_applies(31) { 3.0 } else { 1.5 };
         }
         // The `replicationspeed` glyph effect (a Decimal in the original;
         // frontier magnitudes fit f64).
@@ -167,7 +205,7 @@ impl GameState {
         }
         interval /= self.replicanti_speed_mult();
         // Achievement 134: Replicanti grow 2× faster while under the cap.
-        if !over_cap && self.achievement_unlocked(134) {
+        if !over_cap && self.achievement_applies(134) {
             interval /= 2.0;
         }
         // V's Reality squares the (post-speed) Replicanti interval.
@@ -285,11 +323,17 @@ impl GameState {
     /// Max purchasable Replicanti Galaxies (`Replicanti.galaxies.max`): the
     /// bought cap plus TS131's +50%.
     pub fn replicanti_galaxy_max(&self) -> u32 {
-        let mut max = self.replicanti.galaxy_cap;
+        let mut max = self.replicanti.galaxy_cap as i64;
         if self.time_study_bought(131) {
-            max += self.replicanti.galaxy_cap / 2;
+            max += (self.replicanti.galaxy_cap / 2) as i64;
         }
-        max
+        // Decay rift milestone 2: `+ totalMilestones² − 2·totalMilestones`
+        // (negative at exactly one milestone, as the original formula).
+        if self.pelle_rift_milestone(crate::celestials::pelle::RIFT_DECAY, 2) {
+            let x = self.pelle_total_rift_milestones() as i64;
+            max += x * x - 2 * x;
+        }
+        max.max(0) as u32
     }
 
     /// Replicanti's multiplier to all Infinity Dimensions: `log2(max(amount, 1))^2`,
@@ -336,7 +380,7 @@ impl GameState {
         if !self.can_buy_replicanti_galaxy() {
             return 0;
         }
-        if self.achievement_unlocked(126) {
+        if self.achievement_applies(126) {
             let max_gain = self.replicanti_galaxy_max() - self.replicanti.galaxies;
             let by_amount = (self.replicanti.amount.log10()
                 / crate::cost_scaling::LOG10_NUMBER_MAX_VALUE)
@@ -364,7 +408,7 @@ impl GameState {
         self.replicanti.timer_ms = 0.0;
         // Achievement 126: an RG divides Replicanti by 1.8e308 per galaxy gained
         // instead of resetting them to 1 (not while Doomed).
-        self.replicanti.amount = if self.achievement_unlocked(126) && !self.is_doomed() {
+        self.replicanti.amount = if self.achievement_applies(126) {
             Decimal::pow10(
                 self.replicanti.amount.log10()
                     - crate::cost_scaling::LOG10_NUMBER_MAX_VALUE * gain as f64,
@@ -376,9 +420,15 @@ impl GameState {
         // `player.requirementChecks.eternity.noRG = false` (spoils Reality
         // Upgrade 6's requirement for this eternity).
         self.requirement_checks.eternity_no_rg = false;
-        // replicantiNoReset milestone (40 eternities): the RG no longer wipes
+        // replicantiNoReset milestone (40 eternities) — or, while Doomed,
+        // Pelle upgrade 22 (`replicantiGalaxyEM40`): the RG no longer wipes
         // Dimension Boosts / dimensions / antimatter (`addReplicantiGalaxies`).
-        if !self.eternity_milestone_reached(40) {
+        let keep = if self.is_doomed() {
+            self.pelle_upgrade_applies(22)
+        } else {
+            self.eternity_milestone_reached(40)
+        };
+        if !keep {
             self.dim_boosts = 0;
             // `softReset(0, true, true)` — forced (ANR does not apply).
             self.dim_boost_reset_forced();
@@ -408,7 +458,7 @@ impl GameState {
     /// Whether the chance upgrade can be bought (not capped, affordable).
     pub fn can_buy_replicanti_chance(&self) -> bool {
         !self.replicanti_chance_capped()
-            && self.infinity_points >= self.replicanti.chance_cost
+            && self.infinity_points >= self.replicanti_chance_cost()
             && self.ec8_repl_budget_ok()
     }
 
@@ -417,7 +467,7 @@ impl GameState {
         if !self.can_buy_replicanti_chance() {
             return false;
         }
-        self.infinity_points -= self.replicanti.chance_cost;
+        self.infinity_points -= self.replicanti_chance_cost();
         self.replicanti.chance_cost *= Decimal::from_float(CHANCE_COST_MULT);
         // nearestPercent(value + 0.01).
         self.replicanti.chance =
@@ -444,7 +494,7 @@ impl GameState {
     /// Whether the interval upgrade can be bought (not capped, affordable).
     pub fn can_buy_replicanti_interval(&self) -> bool {
         !self.replicanti_interval_capped()
-            && self.infinity_points >= self.replicanti.interval_cost
+            && self.infinity_points >= self.replicanti_interval_cost()
             && self.ec8_repl_budget_ok()
     }
 
@@ -453,7 +503,7 @@ impl GameState {
         if !self.can_buy_replicanti_interval() {
             return false;
         }
-        self.infinity_points -= self.replicanti.interval_cost;
+        self.infinity_points -= self.replicanti_interval_cost();
         self.replicanti.interval_cost *= Decimal::from_float(INTERVAL_COST_MULT);
         self.replicanti.interval_ms =
             (self.replicanti.interval_ms * 0.9).max(self.replicanti_interval_floor());
@@ -482,7 +532,8 @@ impl GameState {
                 .max(&Decimal::ONE)
                 .pow(&Decimal::from_float(0.3));
         }
-        cost
+        // Vacuum rift milestone 1: ×1e130 cheaper.
+        self.replicanti_vacuum_discount(cost)
     }
 
     /// Whether the galaxy-cap upgrade can be bought (affordable).
@@ -508,6 +559,38 @@ impl GameState {
 mod tests {
     use super::*;
     use crate::data::constants::BIG_CRUNCH_THRESHOLD;
+
+    #[test]
+    fn vacuum_milestone_discounts_replicanti_costs_and_uncaps() {
+        let mut game = GameState::new();
+        game.celestials.pelle.doomed = true;
+        game.pelle_trigger_strike(1);
+        game.celestials.pelle.rifts[0].fill = Decimal::new(1.0, 100); // 100%
+        assert!(game.replicanti_uncapped());
+        // Unlock: 1e140 / 1e130 = 1e10.
+        game.infinity_points = Decimal::new(1.0, 10);
+        assert!(game.can_unlock_replicanti());
+        assert!(game.unlock_replicanti());
+        assert_eq!(game.infinity_points, Decimal::ZERO);
+        // Upgrade costs divide on read; the stored cost still steps undivided.
+        assert_eq!(game.replicanti_chance_cost(), Decimal::new(1.0, 20));
+        game.infinity_points = Decimal::new(1.0, 20);
+        assert!(game.buy_replicanti_chance());
+        assert_eq!(game.replicanti.chance_cost, Decimal::new(1.0, 165));
+        assert_eq!(game.replicanti_chance_cost(), Decimal::new(1.0, 35));
+    }
+
+    #[test]
+    fn decay_milestone_extends_the_galaxy_cap() {
+        let mut game = GameState::new();
+        game.replicanti.galaxy_cap = 10;
+        assert_eq!(game.replicanti_galaxy_max(), 10);
+        game.celestials.pelle.doomed = true;
+        game.pelle_trigger_strike(2);
+        game.celestials.pelle.rifts[1].fill = Decimal::new(1.0, 2000); // 100%
+                                                                       // Decay contributes its own 3 milestones: 3² − 2·3 = +3.
+        assert_eq!(game.replicanti_galaxy_max(), 13);
+    }
 
     #[test]
     fn replicanti_timer_carries_sub_interval_phase_across_a_load() {

@@ -115,7 +115,7 @@ impl GameState {
             return false;
         }
         // The IDR perk (51) removes the antimatter requirement.
-        let am_ok = self.perk_bought(51)
+        let am_ok = self.perk_applies(51)
             || self.records.this_eternity.max_am >= ID_UNLOCK_AM[tier];
         let ip_ok = tier != 0 || self.infinity_points >= ID1_IP_REQUIREMENT;
         am_ok && ip_ok
@@ -258,6 +258,14 @@ impl GameState {
         mult *= Decimal::pow10(self.alchemy_dimensionality_log10());
         // Imaginary Upgrade 8 (Hyperbolic Apeirogon): ×1e100000 per purchase.
         mult *= self.imaginary_upgrade_id_mult();
+        // Recursion rift milestone 1: IDs stronger from EC completions
+        // (`1e1500^(((completions − 25)/20)^1.7)`, min ×1).
+        if self.pelle_rift_milestone(crate::celestials::pelle::RIFT_RECURSION, 1) {
+            let c = self.total_ec_completions() as f64;
+            if c > 25.0 {
+                mult *= Decimal::pow10(1500.0 * ((c - 25.0) / 20.0).powf(1.7));
+            }
+        }
         mult
     }
 
@@ -278,6 +286,14 @@ impl GameState {
         // Power gain).
         if tier == 0 && self.achievement_unlocked(94) {
             mult *= Decimal::from_float(2.0);
+        }
+        // Decay rift milestone 0: the first Pelle rebuyable also multiplies
+        // ID1 (`1e50^(x − 9)` — a *penalty* below 9 purchases, as the original).
+        if tier == 0
+            && self.pelle_rift_milestone(crate::celestials::pelle::RIFT_DECAY, 0)
+        {
+            let x = self.celestials.pelle.rebuyables[0] as f64;
+            mult *= Decimal::pow10(50.0 * (x - 9.0));
         }
         // EC2's reward: 1st-ID multiplier from Infinity Power.
         if tier == 0 && self.ec_completed(2) {
@@ -353,7 +369,12 @@ impl GameState {
     /// `infinity_power ^ (7 + infinityrate glyph effect)`, clamped to ≥ 1.
     /// Read in `dimension_multiplier`.
     pub fn infinity_power_ad_multiplier(&self) -> Decimal {
-        let rate = POWER_CONVERSION_RATE + self.glyph_effect_infinityrate();
+        // `powerConversionRate`: `(7 + infinityrate glyph + Pelle infConversion)
+        // × paradox-milestone-2 multiplier`.
+        let rate = (POWER_CONVERSION_RATE
+            + self.glyph_effect_infinityrate()
+            + self.pelle_inf_conversion_effect())
+            * self.pelle_paradox_conversion_mult();
         self.infinity_power
             .pow(&Decimal::from_float(rate))
             .max(&Decimal::ONE)

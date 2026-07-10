@@ -29,7 +29,7 @@ impl GameState {
     pub fn automator_points_from_perks(&self) -> u32 {
         PERKS
             .iter()
-            .filter(|p| p.automator_points > 0 && self.perk_bought(p.id))
+            .filter(|p| p.automator_points > 0 && self.perk_applies(p.id))
             .map(|p| p.automator_points)
             .sum()
     }

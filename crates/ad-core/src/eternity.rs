@@ -50,6 +50,20 @@ impl GameState {
     /// The global Eternity-Point multiplier (`totalEPMult`): the rebuyable
     /// `epMult` Eternity Upgrade and Time Studies 61/121/122/123.
     pub(crate) fn total_ep_mult(&self) -> Decimal {
+        // Doomed (`Pelle.isDisabled("EPMults")`): only the special glyph's Time
+        // effect and the vacuum rift's third milestone
+        // (`4^(log10(fill)/2/308 + 3)`) apply.
+        if self.is_doomed() {
+            let mut mult = self.pelle_special_glyph_time();
+            if self.pelle_rift_milestone(crate::celestials::pelle::RIFT_VACUUM, 2) {
+                let fill = self.celestials.pelle.rifts
+                    [crate::celestials::pelle::RIFT_VACUUM]
+                    .fill;
+                mult *= Decimal::from_float(4.0)
+                    .pow(&Decimal::from_float(fill.pos_log10() / 2.0 / 308.0 + 3.0));
+            }
+            return mult;
+        }
         let mut mult = self.ep_mult_effect();
         if self.time_study_bought(61) {
             mult *= Decimal::from_float(15.0);
@@ -60,12 +74,12 @@ impl GameState {
         }
         if self.time_study_bought(122) {
             // The PASS perk (31) improves TS122 to ×50.
-            mult *= Decimal::from_float(if self.perk_bought(31) { 50.0 } else { 35.0 });
+            mult *= Decimal::from_float(if self.perk_applies(31) { 50.0 } else { 35.0 });
         }
         if self.time_study_bought(123) {
             // The IDL perk (71): the Idle path starts 15 minutes in.
             let secs = self.records.this_eternity.time_ms / 1000.0
-                + if self.perk_bought(71) { 900.0 } else { 0.0 };
+                + if self.perk_applies(71) { 900.0 } else { 0.0 };
             mult *= Decimal::from_float((1.39 * secs).sqrt());
         }
         // The `timeEP` glyph effect (`GlyphEffect.epMult`).
@@ -106,11 +120,15 @@ impl GameState {
     /// `timeetermult` glyph effect times Reality Upgrade 3 (Achievement 113
     /// is out of frontier).
     pub fn gained_eternities(&self) -> Decimal {
+        // Doomed (`Pelle.isDisabled("eternityMults")`): always 1.
+        if self.is_doomed() {
+            return Decimal::ONE;
+        }
         let mut gain = Decimal::from_float(self.glyph_effect_timeetermult());
         // RU3 (Eternal Amplifier): ×3 per purchase.
         gain *= self.reality_rebuyable_effect(3);
         // Achievement 113 (Eternity in ≤ 250 ms): ×2 Eternities.
-        if self.achievement_unlocked(113) {
+        if self.achievement_applies(113) {
             gain *= Decimal::from_float(2.0);
         }
         gain
@@ -124,7 +142,7 @@ impl GameState {
     pub fn banked_infinities_gain(&self) -> Decimal {
         let five_percent = (self.infinities * Decimal::from_float(0.05)).floor();
         let mut gain = Decimal::ZERO;
-        if self.achievement_unlocked(131) {
+        if self.achievement_applies(131) {
             gain += five_percent;
         }
         if self.time_study_bought(191) {
@@ -288,7 +306,11 @@ impl GameState {
         // keepAutobuyers milestone all Normal Challenges come back completed
         // (which re-grants the autobuyer rewards).
         self.challenge.completed = 0;
-        self.infinity_challenge.completed = 0;
+        // Pelle upgrade 10 (`keepInfinityChallenges`) keeps IC completions
+        // (`InfinityChallenges.clearCompletions` is skipped).
+        if !self.pelle_upgrade_applies(10) {
+            self.infinity_challenge.completed = 0;
+        }
         self.challenge.current = 0;
         self.infinity_challenge.current = 0;
         // (`challenge.eternity.current` is handled by the callers: cleared by a
@@ -300,7 +322,7 @@ impl GameState {
         }
         // Achievement 133: start with every Infinity Challenge completed
         // (`InfinityChallenges.completeAll`, not while Doomed).
-        if self.achievement_unlocked(133) && !self.is_doomed() {
+        if self.achievement_applies(133) {
             for id in 1..=crate::INFINITY_CHALLENGE_COUNT {
                 self.infinity_challenge.completed |= 1u16 << id;
             }
@@ -402,6 +424,13 @@ impl GameState {
             self.break_infinity_upgrades = 0;
             self.infinity_rebuyables = [0, 0, 0];
             self.ip_offline_bought = true;
+        } else if self.pelle_upgrade_applies(8) {
+            // Pelle upgrade 8 (`keepBreakInfinityUpgrades`): keep everything.
+        } else if self.pelle_upgrade_applies(6) {
+            // Pelle upgrade 6 (`keepInfinityUpgrades`): keep the 16 grid
+            // upgrades + `ipOffline`, drop the Break Infinity set.
+            self.break_infinity_upgrades = 0;
+            self.infinity_rebuyables = [0, 0, 0];
         } else {
             self.infinity_upgrades = 0;
             self.break_infinity_upgrades = 0;
@@ -415,7 +444,9 @@ impl GameState {
     /// unlock and every upgradeable autobuyer's interval/cost return to base
     /// (the tickspeed autobuyer's mode also resets to singles).
     fn reset_autobuyers_on_eternity(&mut self) {
-        if self.eternity_milestone_reached(2) {
+        // Kept by the milestone, or by Pelle upgrade 2 (`keepAutobuyers`)
+        // while Doomed (`Autobuyers.reset()`'s early return).
+        if self.eternity_milestone_reached(2) || self.pelle_upgrade_applies(2) {
             return;
         }
         self.reset_autobuyers_for_prestige();

@@ -342,6 +342,16 @@ impl GameState {
         for id in 1..=crate::NORMAL_CHALLENGE_COUNT {
             self.complete_challenge(id);
         }
+        // Pelle upgrade 16 (`replicantiStayUnlocked`): Replicanti stays
+        // unlocked with >= 1 replicanti (runs even while the rest is doomed).
+        if self.pelle_upgrade_bought(16) {
+            self.replicanti.amount = self.replicanti.amount.max(&Decimal::ONE);
+            self.replicanti.unlocked = true;
+        }
+        // Doomed (`Pelle.isDisabled("rupg10")`): everything below is skipped.
+        if self.is_doomed() {
+            return;
+        }
         // Maxed AD/Tickspeed autobuyers (interval 100 ms, unlocked).
         for ab in self.autobuyers.dimensions.iter_mut() {
             ab.is_bought = true;

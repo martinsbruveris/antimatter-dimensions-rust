@@ -748,7 +748,7 @@ impl GameState {
     /// How many glyph choices a Reality offers (`GlyphSelection.choiceCount`):
     /// 4 with the START perk, 1 before it.
     pub fn glyph_choice_count(&self) -> usize {
-        if self.perk_bought(0) {
+        if self.perk_applies(0) {
             4
         } else {
             1
@@ -765,7 +765,7 @@ impl GameState {
         }
         let mut rng = GlyphRng::new(self.reality.seed, self.reality.second_gaussian);
         let level = self.gained_glyph_level();
-        if self.perk_bought(0) {
+        if self.perk_applies(0) {
             self.glyph_list(self.glyph_choice_count(), level, &mut rng)
         } else {
             let group = self.glyph_list(4, level, &mut rng);
@@ -886,7 +886,7 @@ impl GameState {
 
         let mut rng = GlyphRng::new(self.reality.seed, self.reality.second_gaussian);
         let level = self.gained_glyph_level();
-        let (glyphs, index) = if self.perk_bought(0) {
+        let (glyphs, index) = if self.perk_applies(0) {
             let glyphs = self.glyph_list(self.glyph_choice_count(), level, &mut rng);
             let index = choice.unwrap_or(0).min(glyphs.len() - 1);
             (glyphs, index)
@@ -953,8 +953,14 @@ impl GameState {
     }
 
     /// Number of equipped glyph slots (`Glyphs.activeSlotCount`):
-    /// `3 + RU9 + RU24`.
+    /// `3 + RU9 + RU24`; while Doomed, 1 with the vacuum rift's first
+    /// milestone, else 0.
     pub fn glyph_active_slot_count(&self) -> usize {
+        if self.is_doomed() {
+            return usize::from(
+                self.pelle_rift_milestone(crate::celestials::pelle::RIFT_VACUUM, 0),
+            );
+        }
         3 + usize::from(self.reality_upgrade_bought(9))
             + usize::from(self.reality_upgrade_bought(24))
     }
@@ -994,6 +1000,16 @@ impl GameState {
         else {
             return false;
         };
+        // While Doomed, equipping is forbidden until the vacuum rift's first
+        // milestone, and Effarig/Reality (and cursed) glyphs never equip
+        // (`Glyphs.equip`'s `forbiddenByPelle` check).
+        if self.is_doomed() {
+            let kind = self.reality.glyphs.inventory[pos].kind;
+            let forbidden_type = matches!(kind, GlyphType::Effarig | GlyphType::Reality);
+            if self.pelle_is_disabled("glyphs") || forbidden_type {
+                return false;
+            }
+        }
         // At most one Effarig glyph may be equipped at a time
         // (`Glyphs.equip`'s type restriction).
         if self.reality.glyphs.inventory[pos].kind == GlyphType::Effarig
@@ -1166,8 +1182,14 @@ impl GameState {
         }
     }
 
-    /// The capped sacrifice total for a type's effect.
+    /// The capped sacrifice total for a type's effect. Reads 0 while Doomed
+    /// (`Pelle.isDisabled("glyphsac")`), which reproduces each effect's
+    /// original doomed return (power/replication → 0, infinity/time/dilation
+    /// → ×1).
     fn sac_capped(&self, kind: GlyphType) -> f64 {
+        if self.pelle_is_disabled("glyphsac") {
+            return 0.0;
+        }
         let index = kind.sacrifice_index().expect("sacrificable type");
         self.reality.glyphs.sac[index].min(MAX_SACRIFICE_FOR_EFFECTS)
     }
@@ -1204,6 +1226,9 @@ impl GameState {
     /// Effarig sacrifice: additional Glyph rarity (%). Capped earlier than the
     /// generic sacrifice cap (`+100%` at 1e70).
     pub fn glyph_sac_effarig_effect(&self) -> f64 {
+        if self.pelle_is_disabled("glyphsac") {
+            return 0.0;
+        }
         let index = GlyphType::Effarig.sacrifice_index().unwrap();
         let capped = self.reality.glyphs.sac[index].min(1e70);
         2.0 * (capped / 1e20 + 1.0).log10()
@@ -1212,6 +1237,9 @@ impl GameState {
     /// Reality sacrifice: Memory Chunk gain multiplier
     /// (`1 + √sac / 15`, capped ×100).
     pub fn glyph_sac_reality_effect(&self) -> f64 {
+        if self.pelle_is_disabled("glyphsac") {
+            return 0.0;
+        }
         let index = GlyphType::Reality.sacrifice_index().unwrap();
         let sac = self.reality.glyphs.sac[index];
         (1.0 + sac.sqrt() / 15.0).min(100.0)
@@ -1228,11 +1256,14 @@ impl GameState {
     // --- Effects (glyph-effects.js) --------------------------------------------------
 
     /// `getAdjustedGlyphLevel`: a glyph's *effective* level for effect
-    /// computation. Inside a celestial run the level is clamped — Enslaved
-    /// raises it to a 5000 minimum, Effarig caps it at the current stage's cap.
-    /// (Pelle's cap + the Reality-glyph level boost are out of frontier.)
+    /// computation. Inside a celestial run the level is clamped — Pelle caps
+    /// it at the `glyphLevels` rebuyable's allowance, Enslaved raises it to a
+    /// 5000 minimum, Effarig caps it at the current stage's cap.
     pub(crate) fn adjusted_glyph_level(&self, glyph: &Glyph) -> f64 {
         let level = glyph.level as f64;
+        if self.is_doomed() {
+            return level.min(self.pelle_glyph_max_level() as f64);
+        }
         if self.celestials.enslaved.run {
             return level.max(crate::celestials::enslaved::GLYPH_LEVEL_MIN as f64);
         }
@@ -1241,7 +1272,7 @@ impl GameState {
         }
         // `realityglyphlevel`: equipped Reality glyphs raise the effective
         // level of equipped *basic* glyphs (skipped inside celestial runs,
-        // which return above; the Pelle cap is out of frontier).
+        // which return above).
         if glyph.kind.basic_index().is_some() {
             level + self.reality_glyph_level_boost()
         } else {

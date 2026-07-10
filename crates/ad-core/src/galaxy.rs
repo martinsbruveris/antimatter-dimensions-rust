@@ -200,7 +200,13 @@ impl GameState {
     fn galaxy_reset(&mut self) {
         // Achievement 143 (`galaxyReset`): Antimatter Galaxies no longer reset
         // Dimension Boosts.
-        if !self.achievement_unlocked(143) {
+        // `if (!Achievement(143).isUnlocked || (Pelle.isDoomed &&
+        // !PelleUpgrade.galaxyNoResetDimboost.canBeApplied))` — the original
+        // checks 143's *unlock*; the doomed case is handled by Pelle
+        // upgrade 11 instead of the achievement's canBeApplied.
+        if !self.achievement_unlocked(143)
+            || (self.is_doomed() && !self.pelle_upgrade_applies(11))
+        {
             self.dim_boosts = 0;
         }
         self.soft_reset(false);
@@ -430,9 +436,17 @@ impl GameState {
         // keeps dimensions/tickspeed/sacrifice, while keeping *antimatter* also
         // accepts Achievement 111 (`Achievement(111).isUnlocked ||
         // Perk.antimatterNoReset`).
-        let keep_dimensions = !forced && self.perk_bought(30);
-        let keep_antimatter =
-            !forced && (self.perk_bought(30) || self.achievement_unlocked(111));
+        // While Doomed, both keeps route through Pelle upgrade 7
+        // (`dimBoostResetsNothing`) instead of the perk/achievement.
+        let (keep_dimensions, keep_antimatter) = if self.is_doomed() {
+            let keep = !forced && self.pelle_upgrade_applies(7);
+            (keep, keep)
+        } else {
+            (
+                !forced && self.perk_applies(30),
+                !forced && (self.perk_applies(30) || self.achievement_applies(111)),
+            )
+        };
         // `resetChallengeStuff` runs regardless.
         self.reset_challenge_stuff();
         if !keep_dimensions {
