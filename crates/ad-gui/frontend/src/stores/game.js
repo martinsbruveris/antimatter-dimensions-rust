@@ -272,6 +272,54 @@ export const useGameStore = defineStore("game", {
       await invoke("toggle_auto_release");
       this.snapshot = await this.getState();
     },
+    async chargeInfinityUpgrade(id) {
+      await invoke("charge_infinity_upgrade", { id });
+      this.snapshot = await this.getState();
+    },
+    async dischargeInfinityUpgrade(id) {
+      await invoke("discharge_infinity_upgrade", { id });
+      this.snapshot = await this.getState();
+    },
+    async toggleDischarge() {
+      await invoke("toggle_discharge");
+      this.snapshot = await this.getState();
+    },
+    async vReduceGoal(id) {
+      await invoke("v_reduce_goal", { id });
+      this.snapshot = await this.getState();
+    },
+    async toggleDmdAutobuyer() {
+      await invoke("toggle_dmd_autobuyer");
+      this.snapshot = await this.getState();
+    },
+    async toggleAscensionAutobuyer() {
+      await invoke("toggle_ascension_autobuyer");
+      this.snapshot = await this.getState();
+    },
+    async toggleAnnihilationAutobuyer() {
+      await invoke("toggle_annihilation_autobuyer");
+      this.snapshot = await this.getState();
+    },
+    async setAnnihilationMultiplier(value) {
+      await invoke("set_annihilation_multiplier", { value });
+      this.snapshot = await this.getState();
+    },
+    async toggleSingularityAutobuyer() {
+      await invoke("toggle_singularity_autobuyer");
+      this.snapshot = await this.getState();
+    },
+    async toggleAutoAutoClean() {
+      await invoke("toggle_auto_auto_clean");
+      this.snapshot = await this.getState();
+    },
+    async toggleApplyFilterToPurge() {
+      await invoke("toggle_apply_filter_to_purge");
+      this.snapshot = await this.getState();
+    },
+    async glyphPurge(threshold) {
+      await invoke("glyph_purge", { threshold });
+      this.snapshot = await this.getState();
+    },
     async vUnlockCelestial() {
       await invoke("v_unlock_celestial");
       this.snapshot = await this.getState();

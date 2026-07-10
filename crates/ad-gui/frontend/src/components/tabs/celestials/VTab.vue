@@ -3,7 +3,7 @@
 // progress bars + the "unlock V" button; after, the run button, the Space
 // Theorem count, the 9 V-achievement tiles with tier progress, and the ST-gated
 // reward list. Reads `snapshot.celestials.v`. The original's hexagonal layout is
-// simplified to a grid; the Perk-Point goal reduction is out of frontier.
+// simplified to a grid; the Perk-Point goal reduction spends Perk Points.
 import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
@@ -125,6 +125,15 @@ function startRun() {
             Next: {{ ach.completions < ach.tiers
               ? formatAchValue(ach.id, ach.next_goal) : "—" }}
           </div>
+          <button
+            v-if="v.shard_reduction_unlocked && ach.can_reduce"
+            class="c-v-reduce-btn"
+            :disabled="v.perk_points < ach.reduction_cost"
+            :title="`Spend ${Math.round(ach.reduction_cost)} Perk Points to reduce this goal`"
+            @click="game.vReduceGoal(ach.id)"
+          >
+            Reduce goal ({{ Math.round(ach.reduction_cost) }} PP)
+          </button>
         </div>
       </div>
 
@@ -224,5 +233,19 @@ function startRun() {
 }
 .c-v-reward--unlocked {
   opacity: 1;
+}
+.c-v-reduce-btn {
+  margin-top: 0.3rem;
+  font-size: 1rem;
+  background: transparent;
+  color: inherit;
+  border: 0.1rem solid currentcolor;
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+
+.c-v-reduce-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 </style>

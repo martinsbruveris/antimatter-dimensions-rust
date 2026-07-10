@@ -75,8 +75,7 @@ pub struct VState {
     /// Per-achievement tier completions (`runUnlocks`, 9 entries).
     #[cfg_attr(feature = "serde", serde(default))]
     pub run_unlocks: [u32; 9],
-    /// Per-achievement goal-reduction steps (`goalReductionSteps`). Stored for
-    /// round-trip; the reduction effect is deferred.
+    /// Per-achievement goal-reduction steps (`goalReductionSteps`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub goal_reduction_steps: [u32; 9],
     /// Space Theorems spent on goal reduction (`STSpent`).
@@ -214,6 +213,136 @@ impl GameState {
         }
     }
 
+    /// `VUnlocks.autoAutoClean.isUnlocked` — the 16-ST reward (UI gate).
+    pub fn v_auto_auto_clean_unlocked(&self) -> bool {
+        self.celestials.v.unlock_bought(V_UNLOCK_AUTO_AUTO_CLEAN)
+    }
+
+    /// `VUnlocks.autoAutoClean.canBeApplied`: the 16-ST reward, dead while
+    /// Doomed.
+    pub(crate) fn v_auto_auto_clean_applies(&self) -> bool {
+        !self.is_doomed() && self.v_auto_auto_clean_unlocked()
+    }
+
+    // --- Goal reduction (`VUnlocks.shardReduction`, Perk-Point spending) --------
+
+    /// `shardReduction(tiers)` — the per-achievement reduction curve.
+    fn v_shard_reduction(id: usize, tiers: f64) -> f64 {
+        match id {
+            1 => (300.0 * tiers).floor(),
+            2 => 1.2e5 * tiers,
+            3 => 50e6 * tiers,
+            4 => 600.0 * tiers,
+            5 => tiers.floor(),
+            7 => 50.0 * tiers,
+            8 => (500.0 * tiers).floor(),
+            _ => 0.0,
+        }
+    }
+
+    /// `maxShardReduction(goal)` — the reduction cap per achievement.
+    fn v_max_shard_reduction(id: usize, goal: f64) -> f64 {
+        match id {
+            1 => goal - 4000.0,
+            2 => goal - 6e5,
+            3 => goal - 400e6,
+            4 => goal - 7000.0,
+            5 => 5.0,
+            7 => goal - 50.0,
+            8 => 500.0,
+            _ => 0.0,
+        }
+    }
+
+    /// `reductionStepSize` (1 unless specified).
+    fn v_reduction_step_size(id: usize) -> u32 {
+        match id {
+            5 => 100,
+            7 => 2,
+            _ => 1,
+        }
+    }
+
+    /// `conditionBaseValue` — the current tier's unreduced goal.
+    fn v_condition_base_value(&self, id: usize) -> f64 {
+        let goals = V_ACHIEVEMENT_VALUES[id];
+        let completions = self.celestials.v.run_unlocks[id] as usize;
+        goals
+            .get(completions)
+            .copied()
+            .unwrap_or(goals[goals.len() - 1])
+    }
+
+    /// `reduction` — the clamped goal reduction for achievement `id`.
+    fn v_goal_reduction(&self, id: usize) -> f64 {
+        let tiers = self.celestials.v.goal_reduction_steps[id] as f64 / 100.0;
+        let max =
+            Self::v_max_shard_reduction(id, self.v_condition_base_value(id)).max(0.0);
+        Self::v_shard_reduction(id, tiers).clamp(0.0, max)
+    }
+
+    /// `conditionValue` — the effective (possibly reduced) goal.
+    fn v_condition_value(&self, id: usize) -> f64 {
+        let base = self.v_condition_base_value(id);
+        // `isReduced`: steps bought and the shardReduction unlock alive
+        // (its effect dies while Doomed).
+        if self.celestials.v.goal_reduction_steps[id] == 0
+            || self.is_doomed()
+            || !self.celestials.v.unlock_bought(V_UNLOCK_SHARD_REDUCTION)
+        {
+            return base;
+        }
+        let reduction = self.v_goal_reduction(id);
+        if reduction <= 0.0 {
+            return base;
+        }
+        base - reduction
+    }
+
+    /// `reductionCost` — Perk Points for the next reduction step(s): 1000 per
+    /// step normally; hard achievements scale ×1.15 per step already bought
+    /// (with the bulk-buy factor for multi-step purchases).
+    pub fn v_reduction_cost(&self, id: usize) -> f64 {
+        let step = Self::v_reduction_step_size(id) as f64;
+        if V_ACHIEVEMENT_HARD[id] {
+            let modified_step_count = (1.15f64.powf(step) - 1.0) / 0.15;
+            modified_step_count
+                * 1000.0
+                * 1.15f64.powi(self.celestials.v.goal_reduction_steps[id] as i32)
+        } else {
+            step * 1000.0
+        }
+    }
+
+    /// `canBeReduced`: mid-progress (some completions, not maxed) and the
+    /// reduction not yet at its cap.
+    pub fn v_can_be_reduced(&self, id: usize) -> bool {
+        let completions = self.celestials.v.run_unlocks[id] as usize;
+        completions < V_ACHIEVEMENT_VALUES[id].len()
+            && completions != 0
+            && self.v_goal_reduction(id)
+                != Self::v_max_shard_reduction(id, self.v_condition_base_value(id))
+    }
+
+    /// `reduceGoals` — spend Perk Points for one reduction purchase (the
+    /// original's only hard gate is affordability), then re-check completions.
+    pub fn v_reduce_goal(&mut self, id: usize) -> bool {
+        if id >= 9 {
+            return false;
+        }
+        let cost = self.v_reduction_cost(id);
+        if self.reality.perk_points < cost {
+            return false;
+        }
+        self.reality.perk_points -= cost;
+        self.celestials.v.goal_reduction_steps[id] += Self::v_reduction_step_size(id);
+        for i in 0..9 {
+            self.v_try_complete(i);
+        }
+        self.v_check_for_unlocks();
+        true
+    }
+
     /// Whether V's achievements are "flipped" (Ra's `unlockHardV`) — enables the
     /// hard achievements once Ra's V pet reaches level 6.
     fn v_is_flipped(&self) -> bool {
@@ -256,10 +385,11 @@ impl GameState {
         if V_ACHIEVEMENT_HARD[id] && !self.v_is_flipped() {
             return;
         }
+        // The goal may be reduced by Perk-Point spending (`conditionValue`);
+        // recomputed per tier as completions advance.
         let goals = V_ACHIEVEMENT_VALUES[id];
         while (self.celestials.v.run_unlocks[id] as usize) < goals.len()
-            && self.celestials.v.run_records[id]
-                >= goals[self.celestials.v.run_unlocks[id] as usize]
+            && self.celestials.v.run_records[id] >= self.v_condition_value(id)
         {
             self.celestials.v.run_unlocks[id] += 1;
         }
@@ -276,15 +406,12 @@ impl GameState {
     pub fn v_achievement_status(&self, id: usize) -> (u32, u32, f64, f64, bool, bool) {
         let goals = V_ACHIEVEMENT_VALUES[id];
         let completions = self.celestials.v.run_unlocks[id];
-        let next_goal = goals
-            .get(completions as usize)
-            .copied()
-            .unwrap_or_else(|| goals[goals.len() - 1]);
         (
             completions,
             goals.len() as u32,
             self.v_achievement_current_value(id),
-            next_goal,
+            // The displayed goal honours any Perk-Point reduction.
+            self.v_condition_value(id),
             self.v_achievement_condition(id),
             V_ACHIEVEMENT_HARD[id],
         )
@@ -341,6 +468,35 @@ mod tests {
         let mut game = GameState::new();
         game.reality.realities = 1;
         game
+    }
+
+    #[test]
+    fn perk_points_reduce_achievement_goals() {
+        let mut game = v_game();
+        game.celestials.v.unlock_bits |= 1 << V_UNLOCK_SHARD_REDUCTION;
+        // Achievement 4 (Eternal Sunshine): tier 1 done, goal 7600.
+        game.celestials.v.run_unlocks[4] = 1;
+        game.celestials.v.run_records[4] = 7300.0;
+        assert_eq!(game.v_reduction_cost(4), 1000.0);
+        assert!(game.v_can_be_reduced(4));
+        game.reality.perk_points = 50_000.0;
+        // 50 steps = 0.5 tiers → −300; goal 7600 → 7300.
+        for _ in 0..50 {
+            assert!(game.v_reduce_goal(4));
+        }
+        assert_eq!(game.reality.perk_points, 0.0);
+        // The record (7300) now clears the reduced goal.
+        assert_eq!(game.celestials.v.run_unlocks[4], 2);
+    }
+
+    #[test]
+    fn hard_reduction_costs_scale() {
+        let mut game = v_game();
+        // Achievement 7 (Post-destination, hard): step size 2, ×1.15/step.
+        let first = game.v_reduction_cost(7);
+        assert!((first - (1.15f64.powi(2) - 1.0) / 0.15 * 1000.0).abs() < 1e-9);
+        game.celestials.v.goal_reduction_steps[7] = 2;
+        assert!(game.v_reduction_cost(7) > first);
     }
 
     #[test]

@@ -119,7 +119,7 @@ impl GameState {
         }
         // Check total amount (floor) of the required-tier dimension.
         let tier = self.galaxy_required_tier();
-        let amount = self.dimensions[tier].amount.to_f64().floor() as u64;
+        let amount = self.ad_total_amount(tier).to_f64().floor() as u64;
         amount >= self.galaxy_requirement()
     }
 
@@ -158,7 +158,7 @@ impl GameState {
         }
         let tier = self.galaxy_required_tier();
         // The original rounds the dimension amount (`Math.round`).
-        let currency = self.dimensions[tier].amount.to_f64().round() as u64;
+        let currency = self.ad_total_amount(tier).to_f64().round() as u64;
         // Affordability of *reaching* `n` total galaxies: the last one costs
         // `requirementAt(n - 1)`. `can_buy_galaxy` guarantees `owned + 1`.
         let affordable =
@@ -266,9 +266,17 @@ impl GameState {
         }
         // The `resetBoost` Infinity Upgrade reduces the requirement by 9, and a
         // completed Infinity Challenge 5 by a further 1.
-        let amount = amount.saturating_sub(
+        let mut amount = amount.saturating_sub(
             self.reset_boost_reduction() + self.ic5_requirement_reduction(),
         );
+        // Charged `resetBoost` (which suppresses the −9): the requirement is
+        // instead multiplied by `1/(1 + √teresaLevel/10)` and rounded.
+        if self.infinity_upgrade_charged(
+            crate::infinity_upgrades::InfinityUpgrade::ResetBoost,
+        ) {
+            let level = self.ra_pet_level(crate::celestials::ra::PET_TERESA) as f64;
+            amount = (amount as f64 / (1.0 + level.sqrt() / 10.0)).round() as u64;
+        }
         (tier_1indexed as usize - 1, amount)
     }
 
@@ -300,7 +308,7 @@ impl GameState {
             return false;
         }
         // Check total amount (floor) of the required dimension
-        let amount = self.dimensions[tier].amount.to_f64().floor() as u64;
+        let amount = self.ad_total_amount(tier).to_f64().floor() as u64;
         amount >= required
     }
 
@@ -346,7 +354,8 @@ impl GameState {
         if !self.is_dimension_unlocked(tier) {
             return false;
         }
-        self.dimensions[tier].amount >= Decimal::from_float(required as f64)
+        // `totalAmount`: Continuum-derived amounts satisfy requirements too.
+        self.ad_total_amount(tier) >= Decimal::from_float(required as f64)
     }
 
     /// The autobuyer's "buy max" Dimension Boost action (`maxBuyDimBoosts`): buy as
@@ -372,7 +381,7 @@ impl GameState {
         let (tier1, amount1) = self.dim_boost_bulk_requirement(1);
         let (_, amount2) = self.dim_boost_bulk_requirement(2);
         let increase = (amount2 - amount1) as f64;
-        let have = self.dimensions[tier1].amount.to_f64();
+        let have = self.ad_total_amount(tier1).to_f64();
         let mut max_boosts =
             (1.0 + ((have - amount1 as f64) / increase).floor()).min(f64::MAX) as u32;
         if self.dim_boost_bulk_requirement_satisfied(max_boosts) {

@@ -183,11 +183,7 @@ impl GameState {
 
     /// The milestone's effect value (using `completions` for repeatables and the
     /// live formula for uniques), or `default` if it isn't unlocked.
-    pub(crate) fn singularity_milestone_effect_or(
-        &self,
-        id: usize,
-        default: f64,
-    ) -> f64 {
+    pub fn singularity_milestone_effect_or(&self, id: usize, default: f64) -> f64 {
         if !self.singularity_milestone_unlocked(id)
             || self.pelle_is_disabled("singularity")
         {

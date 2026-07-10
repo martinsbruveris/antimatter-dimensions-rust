@@ -179,3 +179,108 @@ Tests: rebuyable-effect formulas, milestone counting, doomed glyph slots,
 paradox TD cheapening, vacuum cost discounts + uncap, decay max-RG, IC
 re-unlock via upgrade 10, the paradox gate on Dilation upgrades 11–15.
 Fidelity: 1469/1476 (unchanged). **Cluster 2 complete.**
+
+## Cluster 3 — per-celestial polish (7.2 / 7.4 / 7.5 / 7.6)
+
+The remaining per-celestial gaps, one celestial at a time. Fidelity held at
+1469/1476 throughout.
+
+### 3a. Ra — charged Infinity Upgrades, passive generation, uncountability
+
+- **Charged Infinity Upgrades** (the audit's "charged-IU effect variants"):
+  all 11 charged formulas, each replacing its suppressed normal effect
+  (`isEffectActive = isBought && !isCharged`): the four `dimInfinityMult`
+  pairs / `totalTimeMult` / `thisInfinityTimeMult` become *powers* on the AD
+  multiplier (`charged_iu_ad_power` in `applyNDPowers`), `unspentIPMult`
+  swaps to `(IP/2)^(1.5·√level)+1`, `buy10Mult`/`dimboostMult` gain
+  `1 + level/200` powers, `galaxyBoost` becomes `2 + √level/100`,
+  `resetBoost` swaps its −9 for a `1/(1 + √level/10)` requirement multiplier
+  (rounded), and `ipGen` generates RM per real second
+  (`gainedRM × level² × autoPrestige boost`) while its IP stream keeps
+  running (the original reads `effectValue` directly). Charging actions
+  (`charge_infinity_upgrade` / `discharge_infinity_upgrade` /
+  `can_charge_infinity_upgrade` with the Doomed gate) + the armed
+  `disCharge`-on-Reality flag were already consumed on reset. The save's
+  `charged` Set holds *string* save-ids — the DTO/encode round-trip was
+  numeric and is now string-mapped.
+- **`passivePrestigeGen` restructure**: the old `generate_passive_infinities`
+  (BreakInfinity term only) and `tick_reality_upgrade_generation` (RU11/RU14,
+  wrongly Ra-boosted and un-floored) merged into the JS-shaped
+  `passive_prestige_gen`: the RU14 eternitied block (`Ach113 × RU3 ×
+  realities·RaBoost × timeetermult`, raised to the Alchemy `eternity` power,
+  floored through the new persisted `partEternitied` carry) and the infGen
+  block (skipped in EC4; BreakInfinity term × RU5 × RU7 × Ra ×
+  `infinityinfmult`; RU11 at 10%/s *without* the Ra term; Effarig's
+  Eternity-unlock term `gainedInfinities × (eternities − ⌊gain/2⌋) × dt`;
+  shared `partInfinitied` carry). Doomed skips the whole thing.
+- **Alchemy**: `uncountability` now generates Realities + Perk Points per
+  real second (integral Realities via a `realities_frac` carry that
+  round-trips into the save's fractional `player.realities`); `eternity`
+  (passive-gen power) and `cardinality` (over-cap Replicanti scale factor)
+  gained readers.
+- `ipGen`'s IP stream also picked up the missing Teresa/V/Doomed zero-gate.
+
+### 3b. Effarig — the persistent Infinity/Eternity rewards
+
+- `replicanti_cap()`: `max(1, infinitiesTotal^(TS31 ? 120 : 30)) × 1.8e308`
+  with the Infinity-stage unlock, dead while Doomed
+  (`Pelle.isDisabled("effarig")` — the audit's deferred `"effarig"` key).
+  `effarig_bonus_rg` feeds the extra-RG sum. The whole replicanti over-cap
+  path became cap-aware and picked up three sibling gaps: the
+  `ReplicantiGrowth.scaleFactor` variants (Alchemy `cardinality`, ×2 while
+  Doomed, ×10 past 1e2000 with the Eternity strike — including the
+  back-out term in the interval), V's doubled `postScale`, and the Doomed
+  e308-per-loop growth clamp.
+- The Eternity-stage unlock's passive-Infinity term landed in
+  `passive_prestige_gen` (above).
+
+### 3c. V — goal reduction + autoAutoClean
+
+- **Perk-Point goal reduction** (`VUnlocks.shardReduction`): per-achievement
+  `shardReduction`/`maxShardReduction` curves, step sizes (100 for
+  Matterception, 2 for Post-destination), `reductionCost` (1000 PP/step;
+  hard achievements ×1.15 per step with the bulk factor),
+  `v_reduce_goal` spending `reality.perk_points`, and `conditionValue`
+  threading into `tryComplete` + the status view. The doomed/unlock gates
+  mirror `isReduced`.
+- **autoAutoClean**: `glyph_auto_clean(threshold)` — the faithful
+  `Glyphs.autoClean` (top-down, delete-as-you-go) on top of the new
+  `isObjectivelyUseless` comparison (`biggerIsBetter` derived per effect as
+  `effect(100,2) > effect(1,1.01)`, superset-of-effects + level-or-strength
+  filter, Effarig/Reality compare-threshold 1) and the
+  `applyFilterToPurge` escape hatch. V's 16-ST unlock + the
+  `player.reality.autoAutoClean` flag auto-purge after each Reality
+  (`finish_process_reality`). New persisted flags: `autoAutoClean`,
+  `applyFilterToPurge`.
+
+### 3d. Lai'tela — exact Continuum + the four autobuyers
+
+- **Continuum**: `CostScale::get_continuum_value` (the original's
+  `getContinuumValue`, including the quadratic branch past 1.8e308) replaces
+  the linear approximation; AD values now use the tier's real cost scale +
+  `currencyAmount` (NC6) + the `isAvailableForPurchase` zero-gate.
+  `ad_total_amount` (`max(amount, ⌊10·continuumValue⌋)`) feeds production,
+  Dimboost/Galaxy requirement checks, and Sacrifice's AD8 gate.
+- **Autobuyers** (`autobuyers.rs`): DMD (interval `1000 ×
+  darkAutobuyerSpeed`, bulk via the faithful `maxAllDMDimensions` — 2%-of-DM
+  bulk pass + cheapest-first greedy against the snapshot balance, replacing
+  the old approximation), Ascension (same interval), Annihilation
+  (threshold-triggered, with the persisted `multiplier` input), and
+  Singularity condense (`DE ≥ cap × autoCondense`). Save round-trip for all
+  four (`player.auto.darkMatterDims/ascension/annihilation/singularity`).
+
+### GUI
+
+Infinity-Upgrades tab: charge/discharge on click + charged/chargeable tile
+styles; Ra tab: discharge-on-Reality toggle; V tab: per-achievement
+goal-reduction buttons (PP cost); Glyphs tab: purge / harsh purge /
+sacrifice-all buttons + filter-protects-purge and auto-purge-on-Reality
+toggles; Lai'tela tab: the four autobuyer toggles + annihilation threshold
+input. 13 new commands.
+
+Tests: charged-IU swaps (galaxy/dimboost/resetBoost/tier-pair/ipGen-RM),
+RU11/14 carries, Effarig cap/bonusRG/eternity-infinities, V reduction
+(cost scaling + completion at the reduced goal), auto-clean purge semantics,
+Continuum quadratic branch + effective amounts, maxAll bulk-buy,
+annihilation/condense autobuyers. ad-core suite: 604. Fidelity: 1469/1476
+(unchanged). **Cluster 3 complete.**

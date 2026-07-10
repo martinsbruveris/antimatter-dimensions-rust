@@ -27,7 +27,7 @@ impl GameState {
             return false;
         }
         self.dim_boosts >= 5
-            && self.dimensions[7].amount > Decimal::ZERO
+            && self.ad_total_amount(7) > Decimal::ZERO
             && self.next_sacrifice_boost() > Decimal::ONE
     }
 

@@ -146,6 +146,33 @@ function setWeight(index, valueIn) {
           </label>
         </div>
         <GlyphFilterPanel v-if="reality.filter_unlocked" />
+        <div v-if="reality.can_sacrifice" class="c-glyph-purge-panel">
+          <button class="c-glyph-purge-btn" @click="game.glyphPurge(5)">
+            Purge glyphs
+          </button>
+          <button class="c-glyph-purge-btn" @click="game.glyphPurge(1)">
+            Harsh purge
+          </button>
+          <button class="c-glyph-purge-btn" @click="game.glyphPurge(0)">
+            Sacrifice all
+          </button>
+          <label v-if="reality.filter_unlocked">
+            <input
+              type="checkbox"
+              :checked="reality.apply_filter_to_purge"
+              @change="game.toggleApplyFilterToPurge()"
+            >
+            Filter protects purge
+          </label>
+          <label v-if="reality.auto_auto_clean_unlocked">
+            <input
+              type="checkbox"
+              :checked="reality.auto_auto_clean"
+              @change="game.toggleAutoAutoClean()"
+            >
+            Auto-purge on Reality
+          </label>
+        </div>
         <GlyphInventory />
       </div>
     </div>
@@ -164,5 +191,22 @@ function setWeight(index, valueIn) {
 
 .c-glyph-weights-panel input {
   width: 5rem;
+}
+.c-glyph-purge-panel {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+  align-items: center;
+  margin: 0.4rem;
+  font-size: 1.2rem;
+}
+
+.c-glyph-purge-btn {
+  background: transparent;
+  color: inherit;
+  border: 0.1rem solid currentcolor;
+  border-radius: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
 }
 </style>

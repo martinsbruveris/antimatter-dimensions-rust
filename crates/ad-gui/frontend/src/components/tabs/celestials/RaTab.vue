@@ -84,7 +84,12 @@ function toggleReaction(id) {
       Ra, Celestial of the Memories. Enter Ra's Reality and gain Memories from
       real time; level up the Celestial Memories to unlock rewards.
       <span v-if="ra.total_charges > 0">
-        Charged Infinity Upgrades: {{ ra.charges_used }} / {{ ra.total_charges }}.
+        Charged Infinity Upgrades: {{ ra.charges_used }} / {{ ra.total_charges }}
+        (charge bought upgrades on the Infinity Upgrades tab).
+        <button class="c-ra-discharge-btn" @click="game.toggleDischarge()">
+          {{ ra.discharge_armed
+            ? "Will discharge on Reality" : "Discharge on next Reality" }}
+        </button>
       </span>
     </div>
 
@@ -444,5 +449,13 @@ function toggleReaction(id) {
 .c-alchemy-reaction--on {
   background: #5cb85c;
   color: black;
+}
+.c-ra-discharge-btn {
+  margin-left: 0.5rem;
+  background: transparent;
+  color: inherit;
+  border: 0.1rem solid currentcolor;
+  border-radius: 0.3rem;
+  cursor: pointer;
 }
 </style>

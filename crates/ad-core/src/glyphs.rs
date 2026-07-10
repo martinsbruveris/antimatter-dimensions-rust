@@ -1875,6 +1875,128 @@ impl GameState {
             .clone()
     }
 
+    /// `GlyphEffect.biggerIsBetter`: whether an effect's value grows with
+    /// level/rarity (`effect(100, 2) > effect(1, 1.01)`).
+    fn glyph_effect_bigger_is_better(bit: u8) -> bool {
+        let probe = |level: u32, strength: f64| {
+            let g = Glyph {
+                id: 0,
+                idx: 0,
+                kind: GlyphType::Power,
+                strength,
+                level,
+                raw_level: level,
+                effects: 0,
+            };
+            Self::glyph_single_effect_value(&g, bit)
+        };
+        probe(100, 2.0) > probe(1, 1.01)
+    }
+
+    /// `Glyphs.isObjectivelyUseless`: at least `threshold` other same-type
+    /// glyphs (inventory + equipped) with a superset of this glyph's effects
+    /// and at least its level *or* strength are no worse in every effect.
+    fn glyph_objectively_useless(&self, glyph: &Glyph, threshold: u32) -> bool {
+        // `applyFilterToPurge`: glyphs the filter would keep are never purged.
+        if self.reality.apply_filter_to_purge && self.glyph_would_keep(glyph) {
+            return false;
+        }
+        let to_compare: Vec<&Glyph> = self
+            .reality
+            .glyphs
+            .inventory
+            .iter()
+            .chain(self.reality.glyphs.active.iter())
+            .filter(|g| {
+                g.kind == glyph.kind
+                    && g.id != glyph.id
+                    && (g.level >= glyph.level || g.strength >= glyph.strength)
+                    && (g.effects & glyph.effects) == glyph.effects
+            })
+            .collect();
+        let base = if matches!(glyph.kind, GlyphType::Effarig | GlyphType::Reality) {
+            1
+        } else {
+            5
+        };
+        let compare_threshold = base.min(threshold);
+        if (to_compare.len() as u32) < compare_threshold {
+            return false;
+        }
+        let bits: Vec<u8> = (0..32u8)
+            .filter(|&b| glyph.effects & (1u32 << b) != 0)
+            .collect();
+        // A glyph "has some better effects" than another if any compared
+        // effect is strictly better; count the others where it does not.
+        let better_count = to_compare
+            .iter()
+            .filter(|other| {
+                !bits.iter().any(|&b| {
+                    let a = Self::glyph_single_effect_value(glyph, b);
+                    let o = Self::glyph_single_effect_value(other, b);
+                    if Self::glyph_effect_bigger_is_better(b) {
+                        a > o
+                    } else {
+                        a < o
+                    }
+                })
+            })
+            .count() as u32;
+        better_count >= compare_threshold
+    }
+
+    /// `Glyphs.autoClean(threshold)`: purge unprotected inventory glyphs made
+    /// objectively useless by `threshold` others (5 = purge, 1 = harsh purge,
+    /// 0 = sacrifice all). Deletes as it goes — top slots first — so earlier
+    /// removals feed later comparisons, as the original. Returns the count.
+    /// (Custom-cosmetic protection is not modelled; cursed glyphs land with
+    /// the cursed-glyph feature.)
+    pub fn glyph_auto_clean(&mut self, threshold: u32) -> u32 {
+        if !self.can_sacrifice_glyphs() {
+            return 0;
+        }
+        let protected = self.reality.glyphs.protected_rows * 10;
+        let mut slots: Vec<u32> = self
+            .reality
+            .glyphs
+            .inventory
+            .iter()
+            .filter(|g| g.idx >= protected)
+            .map(|g| g.idx)
+            .collect();
+        slots.sort_unstable_by(|a, b| b.cmp(a));
+        let mut deleted = 0;
+        for slot in slots {
+            let Some(glyph) = self
+                .reality
+                .glyphs
+                .inventory
+                .iter()
+                .find(|g| g.idx == slot)
+                .cloned()
+            else {
+                continue;
+            };
+            if glyph.kind == GlyphType::Companion {
+                continue;
+            }
+            if threshold == 0 || self.glyph_objectively_useless(&glyph, threshold) {
+                self.get_rid_of_glyph(&glyph);
+                if let Some(pos) = self
+                    .reality
+                    .glyphs
+                    .inventory
+                    .iter()
+                    .position(|g| g.id == glyph.id)
+                {
+                    self.reality.glyphs.inventory.remove(pos);
+                }
+                deleted += 1;
+            }
+        }
+        deleted
+    }
+
     /// `AutoGlyphProcessor.getRidOfGlyph` for a not-yet-added glyph: route by
     /// the rejection mode (sacrifice / refine / refine-to-cap).
     fn get_rid_of_glyph(&mut self, glyph: &Glyph) {
@@ -2001,6 +2123,44 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn auto_clean_purges_objectively_useless_glyphs() {
+        let mut game = GameState::new();
+        game.reality.upgrade_bits |= 1 << 19; // sacrifice unlocked
+        game.reality.glyphs.protected_rows = 0;
+        // Six identical strong glyphs and one strictly worse one: the weak
+        // glyph is worse-or-equal in every effect vs 5+ others.
+        for i in 0..6u32 {
+            game.reality.glyphs.inventory.push(Glyph {
+                id: i + 1,
+                idx: i,
+                kind: GlyphType::Power,
+                strength: 2.0,
+                level: 100,
+                raw_level: 100,
+                effects: (1 << 16) | (1 << 17),
+            });
+        }
+        game.reality.glyphs.inventory.push(Glyph {
+            id: 99,
+            idx: 6,
+            kind: GlyphType::Power,
+            strength: 1.5,
+            level: 50,
+            raw_level: 50,
+            effects: 1 << 16,
+        });
+        let deleted = game.glyph_auto_clean(5);
+        // The weak glyph goes, and (top-down, deleting as it goes — exactly
+        // like the original) one of the six identical ones is itself "worse
+        // than 5 others"; the survivors then fall under the compare threshold.
+        assert_eq!(deleted, 2);
+        assert!(!game.reality.glyphs.inventory.iter().any(|g| g.id == 99));
+        assert_eq!(game.reality.glyphs.inventory.len(), 5);
+        // The sacrifice total grew.
+        assert!(game.reality.glyphs.sac[0] > 0.0);
+    }
 
     fn game_with_reality() -> GameState {
         let mut game = GameState::new();

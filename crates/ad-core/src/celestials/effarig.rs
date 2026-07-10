@@ -6,10 +6,10 @@
 //! (Infinity → Eternity → Reality) with their prestige-hook unlocks + exits,
 //! the dilation-like nerfs (AD multiplier, tickspeed, glyph-level cap), and the
 //! infinity-stage IP handling. Relic Shards are gained on each Reality. The
-//! **persistent glyph rewards** — the Effarig glyph type, the `maxRarityBoost`
-//! into glyph generation, and the infinity-stage Replicanti-cap multiplier +
-//! `bonusRG` — are deferred (they need glyph/replicanti subsystem extensions;
-//! see the design doc), as are the glyph adjuster/filter/preset QoL unlocks.
+//! persistent rewards are wired: the Infinity stage's Replicanti-cap raise +
+//! `bonusRG` (`replicanti.rs`, dead while Doomed via `isDisabled("effarig")`)
+//! and the Eternity stage's Eternities-generate-Infinities term
+//! (`passive_prestige_gen`). Glyph set saves remain a QoL cut.
 
 use crate::state::GameState;
 use break_infinity::Decimal;
@@ -108,6 +108,24 @@ impl GameState {
         self.celestials
             .effarig
             .unlock_bought(EFFARIG_UNLOCK_REALITY)
+    }
+
+    /// `EffarigUnlock.infinity.canBeApplied`: the Infinity-stage reward
+    /// (Replicanti cap / max-RG from Infinities) — its effect dies while
+    /// Doomed (`Pelle.isDisabled("effarig")`).
+    pub fn effarig_infinity_unlock_applies(&self) -> bool {
+        self.celestials
+            .effarig
+            .unlock_bought(EFFARIG_UNLOCK_INFINITY)
+            && !self.is_doomed()
+    }
+
+    /// `EffarigUnlock.eternity.isUnlocked`: completing Effarig's Eternity
+    /// stage (Eternities generate Infinities; IP uncapped in the run).
+    pub fn effarig_eternity_unlocked(&self) -> bool {
+        self.celestials
+            .effarig
+            .unlock_bought(EFFARIG_UNLOCK_ETERNITY)
     }
 
     /// `Effarig.currentStage`: the lowest stage whose unlock bit is unset.
@@ -279,6 +297,34 @@ mod tests {
         // Teresa's effarig threshold (unlocks Effarig).
         game.celestials.teresa.unlock_bits |= 1 << 3;
         game
+    }
+
+    #[test]
+    fn infinity_unlock_raises_the_replicanti_cap() {
+        let mut game = effarig_game();
+        assert_eq!(game.replicanti_cap(), Decimal::NUMBER_MAX_VALUE);
+        assert_eq!(game.effarig_bonus_rg(), 0);
+        game.celestials.effarig.unlock_bits |= 1 << EFFARIG_UNLOCK_INFINITY;
+        game.infinities = Decimal::new(1.0, 10);
+        // cap = (1e10)^30 × 1.8e308 → bonusRG = floor(log10(cap)/308.25 − 1).
+        let cap = game.replicanti_cap();
+        assert!(cap > Decimal::NUMBER_MAX_VALUE);
+        assert_eq!(game.effarig_bonus_rg(), 0); // 608/308 − 1 < 1
+        game.infinities = Decimal::new(1.0, 40);
+        assert_eq!(game.effarig_bonus_rg(), 3); // (1200+308)/308.25 − 1 → 3
+                                                // Doomed kills the effect (`Pelle.isDisabled("effarig")`).
+        game.celestials.pelle.doomed = true;
+        assert_eq!(game.replicanti_cap(), Decimal::NUMBER_MAX_VALUE);
+    }
+
+    #[test]
+    fn eternity_unlock_generates_infinities_from_eternities() {
+        let mut game = effarig_game();
+        game.celestials.effarig.unlock_bits |= 1 << EFFARIG_UNLOCK_ETERNITY;
+        game.eternities = Decimal::from_float(100.0);
+        game.passive_prestige_gen(1000.0);
+        // gainedInfinities (1) × eternities (100) × 1 s.
+        assert_eq!(game.infinities, Decimal::from_float(100.0));
     }
 
     #[test]

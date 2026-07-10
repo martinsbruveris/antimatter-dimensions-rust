@@ -67,6 +67,57 @@ function startRun() {
       <button class="c-laitela-btn" @click="game.laitelaMaxAllDmd()">Max all DMD</button>
     </div>
 
+    <!-- Singularity-milestone autobuyers -->
+    <div
+      v-if="l.auto_dmd_unlocked || l.auto_ascension_unlocked ||
+        l.auto_annihilation_unlocked || l.auto_singularity_unlocked"
+      class="l-laitela-controls"
+    >
+      <button
+        v-if="l.auto_dmd_unlocked"
+        class="c-laitela-btn"
+        :class="{ 'c-laitela-btn--on': l.auto_dmd_active }"
+        @click="game.toggleDmdAutobuyer()"
+      >
+        Auto DMD: {{ l.auto_dmd_active ? "ON" : "OFF" }}
+      </button>
+      <button
+        v-if="l.auto_ascension_unlocked"
+        class="c-laitela-btn"
+        :class="{ 'c-laitela-btn--on': l.auto_ascension_active }"
+        @click="game.toggleAscensionAutobuyer()"
+      >
+        Auto Ascend: {{ l.auto_ascension_active ? "ON" : "OFF" }}
+      </button>
+      <button
+        v-if="l.auto_annihilation_unlocked"
+        class="c-laitela-btn"
+        :class="{ 'c-laitela-btn--on': l.auto_annihilation_active }"
+        @click="game.toggleAnnihilationAutobuyer()"
+      >
+        Auto Annihilate: {{ l.auto_annihilation_active ? "ON" : "OFF" }}
+      </button>
+      <label v-if="l.auto_annihilation_unlocked" class="c-laitela-cap">
+        at mult ≥
+        <input
+          class="c-laitela-input"
+          type="number"
+          step="0.01"
+          min="0.01"
+          :value="l.annihilation_multiplier"
+          @change="game.setAnnihilationMultiplier(Number($event.target.value))"
+        >
+      </label>
+      <button
+        v-if="l.auto_singularity_unlocked"
+        class="c-laitela-btn"
+        :class="{ 'c-laitela-btn--on': l.auto_singularity_active }"
+        @click="game.toggleSingularityAutobuyer()"
+      >
+        Auto Condense: {{ l.auto_singularity_active ? "ON" : "OFF" }}
+      </button>
+    </div>
+
     <!-- Run -->
     <div class="l-laitela-run">
       <button
@@ -325,5 +376,13 @@ function startRun() {
 }
 .c-milestone-comp {
   font-weight: bold;
+}
+.c-laitela-input {
+  width: 5rem;
+  background: transparent;
+  color: inherit;
+  border: 0.1rem solid currentcolor;
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.3rem;
 }
 </style>

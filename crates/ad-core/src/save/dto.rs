@@ -332,9 +332,9 @@ pub struct RaDTO {
     pub unlock_bits: u32,
     #[serde(default)]
     pub run: bool,
-    /// `charged` — a Set of Infinity-Upgrade ids.
+    /// `charged` — a Set of Infinity-Upgrade save-id strings (`"timeMult"`…).
     #[serde(default)]
-    pub charged: Vec<u32>,
+    pub charged: Vec<String>,
     #[serde(default, rename = "disCharge")]
     pub dis_charge: bool,
     #[serde(default = "f64_one")]
@@ -642,6 +642,13 @@ pub struct RealityDTO {
     pub imaginary_machines: f64,
     #[serde(rename = "iMCap", default)]
     pub i_m_cap: f64,
+    /// Fractional carry of passive Eternity generation (a Decimal string).
+    #[serde(default, with = "break_infinity::serde_string")]
+    pub part_eternitied: Decimal,
+    #[serde(default)]
+    pub auto_auto_clean: bool,
+    #[serde(default)]
+    pub apply_filter_to_purge: bool,
 }
 
 /// `player.reality.automator`.
@@ -1286,6 +1293,41 @@ pub struct AutoDTO {
     /// `player.auto.epMultBuyer` (the ×5-EP-upgrade autobuyer, RU13).
     #[serde(rename = "epMultBuyer", default)]
     pub ep_mult_buyer: IsActiveDTO,
+    /// `player.auto.darkMatterDims` / `.ascension` (Singularity-milestone
+    /// DMD autobuyers; `{ isActive, lastTick }`).
+    #[serde(default)]
+    pub dark_matter_dims: MilestoneAutobuyerEntryDTO,
+    #[serde(default)]
+    pub ascension: MilestoneAutobuyerEntryDTO,
+    /// `player.auto.annihilation` (`{ isActive, multiplier }`).
+    #[serde(default)]
+    pub annihilation: AnnihilationAutobuyerDTO,
+    /// `player.auto.singularity` (`{ isActive }`).
+    #[serde(default)]
+    pub singularity: IsActiveDTO,
+}
+
+/// `player.auto.annihilation`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnihilationAutobuyerDTO {
+    #[serde(default)]
+    pub is_active: bool,
+    #[serde(default = "annihilation_mult_default")]
+    pub multiplier: f64,
+}
+
+fn annihilation_mult_default() -> f64 {
+    1.05
+}
+
+impl Default for AnnihilationAutobuyerDTO {
+    fn default() -> Self {
+        Self {
+            is_active: false,
+            multiplier: 1.05,
+        }
+    }
 }
 
 /// `player.auto.infinityDims` / `.replicantiUpgrades` (and later `.timeDims`):
@@ -1309,7 +1351,7 @@ impl Default for MilestoneAutobuyerGroupDTO {
 }
 
 /// One milestone-autobuyer entry (`{ isActive, lastTick }`).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MilestoneAutobuyerEntryDTO {
     #[serde(default)]
@@ -2042,7 +2084,10 @@ impl GameState {
             crate::reality::RealityState {
                 machines: dto.reality.reality_machines,
                 max_rm: dto.reality.max_rm,
-                realities: dto.realities.max(0.0) as u32,
+                // `player.realities` goes fractional under Alchemy
+                // `uncountability`; split into the integral count + carry.
+                realities: dto.realities.max(0.0).floor() as u32,
+                realities_frac: dto.realities.max(0.0).fract(),
                 perk_points: dto.reality.perk_points,
                 perks: dto.reality.perks.iter().copied().collect(),
                 seed: dto.reality.seed,
@@ -2064,6 +2109,9 @@ impl GameState {
                     dto.reality.imaginary_machines.max(0.0),
                 ),
                 max_im: Decimal::from_float(dto.reality.imaginary_machines.max(0.0)),
+                part_eternitied: dto.reality.part_eternitied,
+                auto_auto_clean: dto.reality.auto_auto_clean,
+                apply_filter_to_purge: dto.reality.apply_filter_to_purge,
                 imaginary_upgrade_bits: dto.reality.imaginary_upgrade_bits,
                 imaginary_upg_reqs: dto.reality.imaginary_upg_reqs,
                 im_cap: dto.reality.i_m_cap.max(0.0),
@@ -2175,9 +2223,12 @@ impl GameState {
                 ra.dis_charge = r.dis_charge;
                 ra.peak_gamespeed = r.peak_gamespeed;
                 ra.momentum_time = r.momentum_time;
+                // Charged ids are the Infinity-Upgrade save-id strings.
                 for id in &r.charged {
-                    if *id < 16 {
-                        ra.charged |= 1u16 << *id;
+                    if let Some(u) =
+                        crate::infinity_upgrades::InfinityUpgrade::from_save_id(id)
+                    {
+                        ra.charged |= 1u16 << (u as u16);
                     }
                 }
                 ra.pet_with_remembrance = match r.pet_with_remembrance.as_str() {
@@ -2459,6 +2510,15 @@ impl GameState {
             autobuyers.time_dims[i].timer_ms = timer_from(src.last_tick);
         }
         autobuyers.ep_mult_buyer_active = dto.auto.ep_mult_buyer.is_active;
+        // Lai'tela autobuyers.
+        autobuyers.dark_matter_dims.is_active = dto.auto.dark_matter_dims.is_active;
+        autobuyers.dark_matter_dims.timer_ms =
+            timer_from(dto.auto.dark_matter_dims.last_tick);
+        autobuyers.ascension.is_active = dto.auto.ascension.is_active;
+        autobuyers.ascension.timer_ms = timer_from(dto.auto.ascension.last_tick);
+        autobuyers.annihilation_active = dto.auto.annihilation.is_active;
+        autobuyers.annihilation_multiplier = dto.auto.annihilation.multiplier;
+        autobuyers.singularity_active = dto.auto.singularity.is_active;
 
         // Options: numeric values must be in range — we reject rather than clamp.
         // Notation is the one intentional exception: a name we don't model (the

@@ -286,11 +286,15 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
 
     // Reality: the root realities count, `player.reality`, the reality
     // records, and the requirement-check flags.
-    player["realities"] = json!(state.reality.realities);
+    player["realities"] =
+        json!(state.reality.realities as f64 + state.reality.realities_frac);
     let reality = &mut player["reality"];
     reality["realityMachines"] = decimal(&state.reality.machines);
     reality["maxRM"] = decimal(&state.reality.max_rm);
     reality["perkPoints"] = json!(state.reality.perk_points);
+    reality["partEternitied"] = json!(state.reality.part_eternitied.to_string());
+    reality["autoAutoClean"] = json!(state.reality.auto_auto_clean);
+    reality["applyFilterToPurge"] = json!(state.reality.apply_filter_to_purge);
     reality["perks"] = json!(state.reality.perks.iter().collect::<Vec<_>>());
     reality["seed"] = json!(state.reality.seed);
     reality["initialSeed"] = json!(state.reality.initial_seed);
@@ -553,8 +557,11 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         ra_json["disCharge"] = json!(ra.dis_charge);
         ra_json["peakGamespeed"] = json!(ra.peak_gamespeed);
         ra_json["momentumTime"] = json!(ra.momentum_time);
-        ra_json["charged"] = json!((0..16u32)
-            .filter(|id| ra.charged & (1u16 << id) != 0)
+        // Charged is a Set of Infinity-Upgrade save-id strings in the original.
+        ra_json["charged"] = json!(crate::infinity_upgrades::ALL_INFINITY_UPGRADES
+            .iter()
+            .filter(|u| ra.charged & (1u16 << (**u as u16)) != 0)
+            .map(|u| u.save_id())
             .collect::<Vec<_>>());
         ra_json["petWithRemembrance"] = json!(match ra.pet_with_remembrance {
             0 => "teresa",
@@ -926,6 +933,21 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     }
     player["auto"]["epMultBuyer"]["isActive"] =
         json!(state.autobuyers.ep_mult_buyer_active);
+    // Lai'tela autobuyers.
+    player["auto"]["darkMatterDims"]["isActive"] =
+        json!(state.autobuyers.dark_matter_dims.is_active);
+    player["auto"]["darkMatterDims"]["lastTick"] =
+        last_tick(state.autobuyers.dark_matter_dims.timer_ms);
+    player["auto"]["ascension"]["isActive"] =
+        json!(state.autobuyers.ascension.is_active);
+    player["auto"]["ascension"]["lastTick"] =
+        last_tick(state.autobuyers.ascension.timer_ms);
+    player["auto"]["annihilation"]["isActive"] =
+        json!(state.autobuyers.annihilation_active);
+    player["auto"]["annihilation"]["multiplier"] =
+        json!(state.autobuyers.annihilation_multiplier);
+    player["auto"]["singularity"]["isActive"] =
+        json!(state.autobuyers.singularity_active);
 }
 
 /// A `Decimal` as the JSON string the original stores (`Decimal::toJSON =

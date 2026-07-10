@@ -136,6 +136,24 @@ pub struct RealityState {
     /// Rebuyable Imaginary Upgrade counts, ids 1–10 (`imaginaryRebuyables`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub imaginary_rebuyables: [u32; 10],
+    /// Auto-purge glyphs on Reality (`player.reality.autoAutoClean`; V's
+    /// 16-ST unlock gates the effect).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub auto_auto_clean: bool,
+    /// Whether the glyph filter also protects glyphs from purges
+    /// (`player.reality.applyFilterToPurge`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub apply_filter_to_purge: bool,
+    /// Fractional carry of passively-generated Eternities
+    /// (`player.reality.partEternitied`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub part_eternitied: Decimal,
+    /// Fractional part of the Reality count (the original keeps
+    /// `player.realities` fractional under Alchemy `uncountability`; our count
+    /// is integral, so the fraction carries here and round-trips into the
+    /// stored number).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub realities_frac: f64,
 }
 
 impl RealityState {
@@ -170,6 +188,10 @@ impl RealityState {
             imaginary_upg_reqs: 0,
             im_cap: 0.0,
             imaginary_rebuyables: [0; 10],
+            auto_auto_clean: false,
+            apply_filter_to_purge: false,
+            part_eternitied: Decimal::ZERO,
+            realities_frac: 0.0,
         }
     }
 }
@@ -685,6 +707,12 @@ impl GameState {
         }
         if self.automator_unlocked() && self.automator.state.force_restart {
             self.automator_restart();
+        }
+
+        // `processSortingAfterReality`: V's `autoAutoClean` unlock (outside
+        // the doom) auto-purges the inventory after each Reality.
+        if self.v_auto_auto_clean_applies() && self.reality.auto_auto_clean {
+            self.glyph_auto_clean(5);
         }
     }
 

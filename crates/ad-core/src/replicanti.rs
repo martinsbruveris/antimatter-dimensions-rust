@@ -36,10 +36,6 @@ const INTERVAL_CAP_MS: f64 = 50.0;
 const INITIAL_CHANCE: f64 = 0.01;
 const INITIAL_INTERVAL_MS: f64 = 1000.0;
 
-/// Interval scale factor per `1.8e308` of Replicanti above the cap
-/// (`ReplicantiGrowth.scaleFactor`, the pre-alchemy 1.2 default).
-const OVER_CAP_SCALE_FACTOR: f64 = 1.2;
-
 /// Replicanti state (`player.replicanti`). Persists across a Big Crunch.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -123,6 +119,49 @@ impl GameState {
             || self.pelle_rift_milestone(crate::celestials::pelle::RIFT_VACUUM, 1)
     }
 
+    /// `replicantiCap()`: 1.8e308, raised by Effarig's Infinity unlock
+    /// (outside the doom — `Pelle.isDisabled("effarig")` kills the effect) to
+    /// `max(1, infinitiesTotal^(TS31 ? 120 : 30)) × 1.8e308`.
+    pub fn replicanti_cap(&self) -> Decimal {
+        if self.effarig_infinity_unlock_applies() {
+            let pow = if self.time_study_bought(31) {
+                120.0
+            } else {
+                30.0
+            };
+            self.infinities_total()
+                .pow(&Decimal::from_float(pow))
+                .max(&Decimal::ONE)
+                * REPLICANTI_CAP
+        } else {
+            REPLICANTI_CAP
+        }
+    }
+
+    /// `Effarig.bonusRG`: extra Replicanti Galaxies from the raised cap —
+    /// `floor(log10(cap)/308.25 − 1)` (0 while the cap is unraised).
+    pub fn effarig_bonus_rg(&self) -> u32 {
+        (self.replicanti_cap().pos_log10() / crate::cost_scaling::LOG10_NUMBER_MAX_VALUE
+            - 1.0)
+            .floor()
+            .max(0.0) as u32
+    }
+
+    /// `ReplicantiGrowth.scaleFactor` — the over-cap interval base: 10 past
+    /// 1e2000 once Pelle's Eternity strike hits, 2 while Doomed, else the
+    /// Alchemy `cardinality` effect (1.2 at zero amount).
+    fn replicanti_scale_factor(&self) -> f64 {
+        if self.pelle_has_strike(3)
+            && self.replicanti.amount >= Decimal::new_unchecked(1.0, 2000)
+        {
+            return 10.0;
+        }
+        if self.is_doomed() {
+            return 2.0;
+        }
+        self.alchemy_cardinality()
+    }
+
     /// Vacuum rift milestone 1: the Replicanti unlock and upgrades are ×1e130
     /// cheaper (costs are divided on *read*; the stored cost still advances by
     /// the undivided step, as the original).
@@ -199,9 +238,21 @@ impl GameState {
             interval *= 10.0;
         }
         if over_cap {
-            let increases = (self.replicanti.amount.log10() - REPLICANTI_CAP.log10())
-                / REPLICANTI_CAP.log10();
-            interval *= OVER_CAP_SCALE_FACTOR.powf(increases);
+            // `increases = (log10(amount) − log10(cap)) / scaleLog10` with
+            // `scaleLog10 = log10(1.8e308)` (a constant, not the raised cap).
+            let scale_log10 = crate::cost_scaling::LOG10_NUMBER_MAX_VALUE;
+            let mut increases = (self.replicanti.amount.log10()
+                - self.replicanti_cap().log10())
+                / scale_log10;
+            // Pelle's Eternity strike swaps to 10× scaling past 1e2000; before
+            // that it was only 2×, which this term backs out.
+            if self.pelle_has_strike(3)
+                && self.replicanti.amount >= Decimal::new_unchecked(1.0, 2000)
+            {
+                increases -= 5f64.log10() * (2000.0 - self.replicanti_cap().log10())
+                    / scale_log10;
+            }
+            interval *= self.replicanti_scale_factor().powf(increases);
         }
         interval /= self.replicanti_speed_mult();
         // Achievement 134: Replicanti grow 2× faster while under the cap.
@@ -224,8 +275,9 @@ impl GameState {
         if !self.replicanti.unlocked {
             return;
         }
-        let over_cap =
-            self.replicanti_uncapped() && self.replicanti.amount > REPLICANTI_CAP;
+        let cap = self.replicanti_cap();
+        let amount_before = self.replicanti.amount;
+        let over_cap = self.replicanti_uncapped() && self.replicanti.amount > cap;
         let interval = self.replicanti_effective_interval(over_cap);
         if interval <= 0.0 {
             return;
@@ -257,28 +309,43 @@ impl GameState {
         if !self.replicanti_uncapped() {
             let growth = Decimal::from_float(1.0 + self.replicanti.chance)
                 .pow(&Decimal::from_float(whole));
-            self.replicanti.amount =
-                (self.replicanti.amount * growth).min(&REPLICANTI_CAP);
+            self.replicanti.amount = (self.replicanti.amount * growth).min(&cap);
+            self.replicanti_doomed_gain_clamp(amount_before);
             return;
         }
 
-        // Uncapped (TS192): spend gain up to the cap at full rate first.
-        if self.replicanti.amount < REPLICANTI_CAP {
-            let to_cap_ln =
-                (REPLICANTI_CAP / self.replicanti.amount.max(&Decimal::ONE)).ln();
+        // Uncapped (TS192 / the vacuum milestone): spend gain up to the cap at
+        // full rate first.
+        if self.replicanti.amount < cap {
+            let to_cap_ln = (cap / self.replicanti.amount.max(&Decimal::ONE)).ln();
             if gain_ln <= to_cap_ln {
                 let growth = Decimal::from_float(gain_ln).exp();
                 self.replicanti.amount *= growth;
+                self.replicanti_doomed_gain_clamp(amount_before);
                 return;
             }
-            self.replicanti.amount = REPLICANTI_CAP;
+            self.replicanti.amount = cap;
             gain_ln -= to_cap_ln;
         }
-        // Over the cap growth slows: post-scale per the original's formula.
-        let post_scale = OVER_CAP_SCALE_FACTOR.log10() / REPLICANTI_CAP.log10();
+        // Over the cap growth slows: post-scale per the original's formula
+        // (`log10(scaleFactor)/scaleLog10`, doubled inside V's Reality).
+        let mut post_scale = self.replicanti_scale_factor().log10()
+            / crate::cost_scaling::LOG10_NUMBER_MAX_VALUE;
+        if self.celestials.v.run {
+            post_scale *= 2.0;
+        }
         let new_ln =
             (1.0 + gain_ln * post_scale).ln() / post_scale + self.replicanti.amount.ln();
         self.replicanti.amount = Decimal::from_float(new_ln).exp();
+        self.replicanti_doomed_gain_clamp(amount_before);
+    }
+
+    /// While Doomed a single loop may not grow Replicanti by more than e308
+    /// (`replicantiLoop`'s trailing clamp).
+    fn replicanti_doomed_gain_clamp(&mut self, before: Decimal) {
+        if self.is_doomed() && self.replicanti.amount.log10() - before.log10() > 308.0 {
+            self.replicanti.amount = before * Decimal::new_unchecked(1.0, 308);
+        }
     }
 
     /// Total galaxies feeding the tickspeed formula (`effectiveBaseGalaxies`):
@@ -308,7 +375,9 @@ impl GameState {
     }
 
     /// The "extra" Replicanti Galaxies (`Replicanti.galaxies.extra`): TS225
-    /// (from the Replicanti amount's exponent) + TS226 (from the bought cap).
+    /// (from the Replicanti amount's exponent) + TS226 (from the bought cap)
+    /// + Effarig's `bonusRG` (the TS303 triad multiplier stays out of
+    ///   frontier).
     pub fn extra_replicanti_galaxies(&self) -> u32 {
         let mut extra = 0;
         if self.time_study_bought(225) {
@@ -317,7 +386,7 @@ impl GameState {
         if self.time_study_bought(226) {
             extra += self.replicanti.galaxy_cap / 15;
         }
-        extra
+        extra + self.effarig_bonus_rg()
     }
 
     /// Max purchasable Replicanti Galaxies (`Replicanti.galaxies.max`): the

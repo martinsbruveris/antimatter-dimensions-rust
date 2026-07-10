@@ -127,6 +127,9 @@ struct InfinityUpgradeView {
     /// Numeric effect value (for the tiles whose effect shows a `×value`); the
     /// frontend ignores it for constant/description-only tiles.
     effect: Num,
+    /// Ra's charging: whether this upgrade is charged / can be charged now.
+    is_charged: bool,
+    can_charge: bool,
 }
 
 /// Serializable view of the Infinity Upgrades bottom row — the `ipMult`
@@ -907,6 +910,11 @@ struct RealityView {
     /// The glyph filter (Effarig unlock): unlocked flag + settings.
     filter_unlocked: bool,
     filter: GlyphFilterView,
+    /// Auto-purge on Reality (V's 16-ST unlock) + the filter-protects-purge
+    /// option.
+    auto_auto_clean_unlocked: bool,
+    auto_auto_clean: bool,
+    apply_filter_to_purge: bool,
     /// Glyph undo (Teresa unlock): availability + stack depth.
     undo_unlocked: bool,
     can_undo: bool,
@@ -1233,6 +1241,17 @@ struct LaitelaView {
     im_cap: Num,
     imaginary_upgrades: Vec<ImaginaryUpgradeView>,
     imaginary_rebuyables: Vec<ImaginaryRebuyableView>,
+    /// The Singularity-milestone autobuyers: unlock + toggle state (and the
+    /// annihilation threshold).
+    auto_dmd_unlocked: bool,
+    auto_dmd_active: bool,
+    auto_ascension_unlocked: bool,
+    auto_ascension_active: bool,
+    auto_annihilation_unlocked: bool,
+    auto_annihilation_active: bool,
+    annihilation_multiplier: f64,
+    auto_singularity_unlocked: bool,
+    auto_singularity_active: bool,
 }
 
 #[derive(Serialize)]
@@ -1283,6 +1302,8 @@ struct RaView {
     remembrance_unlocked: bool,
     total_charges: u32,
     charges_used: u32,
+    /// Whether the next Reality discharges all charged Infinity Upgrades.
+    discharge_armed: bool,
     alchemy_unlocked: bool,
     pets: Vec<RaPetView>,
     unlocks: Vec<RaUnlockView>,
@@ -1338,6 +1359,10 @@ struct VView {
     can_start_run: bool,
     space_theorems: u32,
     available_st: u32,
+    /// Unspent Perk Points (goal-reduction currency) + whether the
+    /// shard-reduction unlock is owned.
+    perk_points: f64,
+    shard_reduction_unlocked: bool,
     achievements: Vec<VAchievementView>,
     rewards: Vec<VRewardView>,
 }
@@ -1351,6 +1376,9 @@ struct VAchievementView {
     next_goal: f64,
     condition_met: bool,
     is_hard: bool,
+    /// Perk-Point goal reduction (V's 2-ST unlock).
+    can_reduce: bool,
+    reduction_cost: f64,
 }
 
 #[derive(Serialize)]
@@ -1587,6 +1615,7 @@ fn build_pelle_view(game: &GameState) -> PelleView {
 
 /// Build the Lai'tela subtab view.
 fn build_laitela_view(game: &GameState) -> LaitelaView {
+    use ad_core::celestials::singularity as sing_ids;
     let f = |x: f64| num(&Decimal::from_float(x.min(1e300)));
     let l = &game.celestials.laitela;
     let dimensions = (0..4)
@@ -1655,6 +1684,23 @@ fn build_laitela_view(game: &GameState) -> LaitelaView {
         im_cap: f(game.imaginary_machine_cap()),
         imaginary_upgrades,
         imaginary_rebuyables,
+        auto_dmd_unlocked: game
+            .singularity_milestone_effect_or(sing_ids::DARK_DIM_AUTOBUYERS, 0.0)
+            > 0.0,
+        auto_dmd_active: game.autobuyers.dark_matter_dims.is_active,
+        auto_ascension_unlocked: game
+            .singularity_milestone_effect_or(sing_ids::ASCENSION_AUTOBUYERS, 0.0)
+            > 0.0,
+        auto_ascension_active: game.autobuyers.ascension.is_active,
+        auto_annihilation_unlocked: game
+            .singularity_milestone_effect_or(sing_ids::ANNIHILATION_AUTOBUYER, 0.0)
+            > 0.0,
+        auto_annihilation_active: game.autobuyers.annihilation_active,
+        annihilation_multiplier: game.autobuyers.annihilation_multiplier,
+        auto_singularity_unlocked: game
+            .singularity_milestone_effect_or(sing_ids::AUTO_CONDENSE, f64::INFINITY)
+            .is_finite(),
+        auto_singularity_active: game.autobuyers.singularity_active,
     }
 }
 
@@ -1710,6 +1756,7 @@ fn build_ra_view(game: &GameState) -> RaView {
         remembrance_unlocked: game.ra_remembrance_unlocked(),
         total_charges: game.ra_total_charges(),
         charges_used: game.ra_charges_used(),
+        discharge_armed: game.celestials.ra.dis_charge,
         alchemy_unlocked: game.alchemy_unlocked(),
         pets,
         unlocks,
@@ -1732,6 +1779,8 @@ fn build_v_view(game: &GameState) -> VView {
                 next_goal,
                 condition_met,
                 is_hard,
+                can_reduce: game.v_can_be_reduced(id),
+                reduction_cost: game.v_reduction_cost(id),
             }
         })
         .collect();
@@ -1752,6 +1801,11 @@ fn build_v_view(game: &GameState) -> VView {
         can_start_run: game.can_start_celestial_reality(ad_core::Celestial::V),
         space_theorems: game.v_space_theorems(),
         available_st: game.v_available_space_theorems(),
+        perk_points: game.reality.perk_points,
+        shard_reduction_unlocked: game
+            .celestials
+            .v
+            .unlock_bought(ad_core::celestials::v::V_UNLOCK_SHARD_REDUCTION),
         achievements,
         rewards,
     }
@@ -2044,6 +2098,8 @@ fn build_infinity_upgrades_view(game: &GameState) -> Vec<InfinityUpgradeView> {
             can_be_bought: game.can_buy_infinity_upgrade(upgrade),
             cost: num(&upgrade.cost()),
             effect: num(&game.infinity_upgrade_effect(upgrade)),
+            is_charged: game.infinity_upgrade_charged(upgrade),
+            can_charge: game.can_charge_infinity_upgrade(upgrade),
         })
         .collect()
 }
@@ -2476,6 +2532,9 @@ fn build_reality_view(game: &GameState) -> RealityView {
                     .collect(),
             }
         },
+        auto_auto_clean_unlocked: game.v_auto_auto_clean_unlocked(),
+        auto_auto_clean: game.reality.auto_auto_clean,
+        apply_filter_to_purge: game.reality.apply_filter_to_purge,
         undo_unlocked: game.glyph_undo_unlocked(),
         can_undo: game.can_undo_glyph(),
         undo_depth: game.reality.glyphs.undo.len(),

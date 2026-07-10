@@ -8,11 +8,13 @@
 //! **Scope.** The pet/memory/level/upgrade system, all 28 unlocks (state +
 //! effect readers), Remembrance, the theorem-boost + achievement unlocks,
 //! momentum, peak-game-speed tracking, and Ra's Reality are ported. The charged
-//! Infinity-Upgrade *state* (count gate + charge/discharge) is modelled; the
-//! per-upgrade charged *effect variants* are deferred (documented). Glyph
-//! Alteration thresholds live in `alteration` below. Deferred QoL/automation
-//! unlocks (`allGamespeedGlyphs`, `autoPulseTime`, `blackHolePowerAutobuyers`,
-//! `instantEC…`, `autoUnlockDilation`) store their bit but are neutral.
+//! Infinity Upgrades are complete: the count gate + charge/discharge state
+//! here, the per-upgrade charged *effect variants* at their consumer sites
+//! (`infinity_upgrades.rs`, `dimensions.rs`, `galaxy.rs`, the tick's RM
+//! generation). Glyph Alteration thresholds live in `alteration` below.
+//! Deferred QoL/automation unlocks (`allGamespeedGlyphs`, `autoPulseTime`,
+//! `blackHolePowerAutobuyers`, `instantEC…`, `autoUnlockDilation`) store
+//! their bit but are neutral.
 
 use crate::state::GameState;
 use break_infinity::Decimal;

@@ -17,7 +17,7 @@ impl GameState {
     }
 
     /// The Tickspeed purchase-cost curve (`Tickspeed.costScale`).
-    fn tickspeed_cost_scale(&self) -> crate::cost_scaling::CostScale {
+    pub(crate) fn tickspeed_cost_scale(&self) -> crate::cost_scaling::CostScale {
         crate::cost_scaling::CostScale::new(
             1000.0,
             10.0,

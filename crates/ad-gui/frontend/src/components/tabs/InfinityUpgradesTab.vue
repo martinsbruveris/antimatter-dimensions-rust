@@ -51,6 +51,10 @@ const columns = computed(() =>
 );
 
 function stateClass(view) {
+  if (view?.is_charged) return "o-infinity-upgrade-btn--charged";
+  if (view?.is_bought && view?.can_charge) {
+    return "o-infinity-upgrade-btn--chargeable";
+  }
   if (view?.is_bought) return "o-infinity-upgrade-btn--bought";
   if (view?.can_be_bought) return "o-infinity-upgrade-btn--available";
   return "o-infinity-upgrade-btn--unavailable";
@@ -68,7 +72,15 @@ function effectLine(cell) {
 }
 
 function buy(cell) {
-  if (cell.view?.can_be_bought) game.buyInfinityUpgrade(cell.meta.id);
+  if (cell.view?.can_be_bought) {
+    game.buyInfinityUpgrade(cell.meta.id);
+  } else if (cell.view?.can_charge) {
+    // The original's purchase() falls through to charging (Ra's Teresa
+    // unlock); a charged upgrade swaps to its charged variant.
+    game.chargeInfinityUpgrade(cell.meta.id);
+  } else if (cell.view?.is_charged) {
+    game.dischargeInfinityUpgrade(cell.meta.id);
+  }
 }
 
 // The Achievement-41 bottom row (ipMult rebuyable + ipOffline).
@@ -225,5 +237,14 @@ const ipOfflineClass = computed(() => ({
 .l-infinity-upgrades-bottom-row .l-infinity-upgrade-grid__cell,
 .l-infinity-upgrades-bottom-row .l-infinity-upgrades-tab__mult-btn {
   margin: 0.5rem 1.1rem;
+}
+.o-infinity-upgrade-btn--charged {
+  border-color: var(--color-ra--base, #9575cd);
+  box-shadow: inset 0 0 0.6rem var(--color-ra--base, #9575cd);
+}
+
+.o-infinity-upgrade-btn--chargeable {
+  border-style: dashed;
+  border-color: var(--color-ra--base, #9575cd);
 }
 </style>

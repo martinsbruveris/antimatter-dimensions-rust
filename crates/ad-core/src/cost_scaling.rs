@@ -69,6 +69,28 @@ impl CostScale {
         Decimal::pow10(log_cost)
     }
 
+    /// `getContinuumValue(rawMoney, numberPerSet)`: the fractional purchase
+    /// count Continuum grants, including the quadratic branch past the
+    /// scaling threshold.
+    pub fn get_continuum_value(&self, raw_money: Decimal, number_per_set: f64) -> f64 {
+        let money = raw_money / Decimal::from_float(number_per_set);
+        let log_money = money.log10();
+        // `1 +` because the multiplier isn't applied to the first purchase.
+        let mut cont_value =
+            1.0 + (log_money - self.log_base_cost) / self.log_base_increase;
+        // The linear method is valid up to one purchase past the threshold.
+        if cont_value > self.purchases_before_scaling {
+            let discrim =
+                self.precalc_discriminant + 8.0 * self.log_cost_scale * log_money;
+            if discrim < 0.0 {
+                return 0.0;
+            }
+            cont_value =
+                self.precalc_center + discrim.sqrt() / (2.0 * self.log_cost_scale);
+        }
+        cont_value.max(0.0)
+    }
+
     /// `getMaxBought(currentPurchases, rawMoney, numberPerSet)`: the maximum new
     /// total affordable and the `log10` price of the top purchase, or `None` when
     /// nothing more can be bought. NOTE: like the original, this charges only for

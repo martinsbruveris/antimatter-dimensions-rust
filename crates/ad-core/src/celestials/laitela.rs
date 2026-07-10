@@ -5,11 +5,12 @@
 //! See `docs/design/2026-07-07-laitela.md`. Original:
 //! `celestials/laitela/{laitela,dark-matter-dimension}.js`.
 //!
-//! **Scope.** The DMD economy (production/upgrades/ascension), annihilation,
-//! Singularities + the 30 milestones (`singularity.rs`), Continuum (linear-branch
-//! approximation of `getContinuumValue`), and the entropy/destabilization run are
-//! ported. Deferred: the DMD/ascension/annihilation/condense autobuyers, the
-//! Continuum super-exponential cost branch, and the tesseract-linked effects.
+//! **Scope.** The DMD economy (production/upgrades/ascension + the faithful
+//! `maxAllDMDimensions` bulk-buy), annihilation, Singularities + the 30
+//! milestones (`singularity.rs`), the exact Continuum (`getContinuumValue`
+//! including the super-exponential branch and the `totalAmount` effective
+//! amounts), the DMD/ascension/annihilation/condense autobuyers
+//! (`autobuyers.rs`), and the entropy/destabilization run are ported.
 
 use crate::celestials::singularity as sing;
 use crate::state::GameState;
@@ -337,6 +338,143 @@ impl GameState {
         true
     }
 
+    /// `rawIntervalCost` — the unfloored working cost the bulk-buy math uses.
+    fn dmd_raw_interval_cost(&self, tier: usize) -> Decimal {
+        let d = &self.celestials.laitela.dimensions[tier];
+        Decimal::from_float(self.dmd_interval_cost_increase())
+            .pow(&Decimal::from(d.interval_upgrades as u64))
+            * self.dmd_adjusted_starting_cost(tier)
+            * Decimal::from_float(10.0)
+    }
+
+    fn dmd_raw_power_dm_cost(&self, tier: usize) -> Decimal {
+        let d = &self.celestials.laitela.dimensions[tier];
+        Decimal::from_float(10.0).pow(&Decimal::from(d.power_dm_upgrades as u64))
+            * self.dmd_adjusted_starting_cost(tier)
+            * Decimal::from_float(10.0)
+    }
+
+    fn dmd_raw_power_de_cost(&self, tier: usize) -> Decimal {
+        let d = &self.celestials.laitela.dimensions[tier];
+        Decimal::from_float(POWER_DE_COST_MULTS[tier])
+            .pow(&Decimal::from(d.power_de_upgrades as u64))
+            * self.dmd_adjusted_starting_cost(tier)
+            * Decimal::from_float(10.0)
+    }
+
+    /// `maxIntervalPurchases`: how many more interval upgrades fit before the
+    /// 10 ms cap.
+    fn dmd_max_interval_purchases(&self, tier: usize) -> f64 {
+        (INTERVAL_CAP_MS / self.dmd_interval(tier)).ln() / INTERVAL_PER_UPGRADE.ln()
+    }
+
+    /// `buyManyInterval(x)`: cumulative-geometric bulk purchase.
+    fn dmd_buy_many_interval(&mut self, tier: usize, x: f64) -> bool {
+        if x > self.dmd_max_interval_purchases(tier).ceil() {
+            return false;
+        }
+        let increase = self.dmd_interval_cost_increase();
+        let cost = (self.dmd_raw_interval_cost(tier)
+            * (Decimal::from_float(increase).pow(&Decimal::from_float(x))
+                - Decimal::ONE)
+            / Decimal::from_float(increase - 1.0))
+        .floor();
+        if self.celestials.laitela.dark_matter < cost {
+            return false;
+        }
+        self.celestials.laitela.dark_matter -= cost;
+        self.celestials.laitela.dimensions[tier].interval_upgrades += x as u32;
+        true
+    }
+
+    fn dmd_buy_many_power_dm(&mut self, tier: usize, x: f64) -> bool {
+        let cost = (self.dmd_raw_power_dm_cost(tier)
+            * (Decimal::from_float(10.0).pow(&Decimal::from_float(x)) - Decimal::ONE)
+            / Decimal::from_float(9.0))
+        .floor();
+        if self.celestials.laitela.dark_matter < cost {
+            return false;
+        }
+        self.celestials.laitela.dark_matter -= cost;
+        self.celestials.laitela.dimensions[tier].power_dm_upgrades += x as u32;
+        true
+    }
+
+    fn dmd_buy_many_power_de(&mut self, tier: usize, x: f64) -> bool {
+        let increase = POWER_DE_COST_MULTS[tier];
+        let cost = (self.dmd_raw_power_de_cost(tier)
+            * (Decimal::from_float(increase).pow(&Decimal::from_float(x))
+                - Decimal::ONE)
+            / Decimal::from_float(increase - 1.0))
+        .floor();
+        if self.celestials.laitela.dark_matter < cost {
+            return false;
+        }
+        self.celestials.laitela.dark_matter -= cost;
+        self.celestials.laitela.dimensions[tier].power_de_upgrades += x as u32;
+        true
+    }
+
+    /// `Laitela.maxAllDMDimensions(maxTier)`: for each unlocked DMD up to
+    /// `max_tier` (1-indexed count), bulk-buy every upgrade type up to 2% of
+    /// the *initial* Dark Matter, then greedily buy the cheapest single
+    /// upgrades while the (initial-snapshot) balance still covers them — as
+    /// the original, whose working list keeps advancing its cost/remaining
+    /// entries even when the live purchase fails.
+    pub fn laitela_max_all_dm_dimensions(&mut self, max_tier: u32) {
+        // Working entries: (tier, kind 0/1/2, cost, cost increase, remaining).
+        let mut upgrades: Vec<(usize, u8, Decimal, f64, f64)> = Vec::new();
+        #[allow(clippy::needless_range_loop)]
+        for tier in 0..(max_tier as usize).min(4) {
+            if !self.dmd_unlocked(tier) {
+                continue;
+            }
+            upgrades.push((
+                tier,
+                0,
+                self.dmd_raw_interval_cost(tier),
+                self.dmd_interval_cost_increase(),
+                self.dmd_max_interval_purchases(tier).ceil(),
+            ));
+            upgrades.push((tier, 1, self.dmd_raw_power_dm_cost(tier), 10.0, f64::MAX));
+            upgrades.push((
+                tier,
+                2,
+                self.dmd_raw_power_de_cost(tier),
+                POWER_DE_COST_MULTS[tier],
+                f64::MAX,
+            ));
+        }
+        let dark_matter = self.celestials.laitela.dark_matter;
+        let buy = |game: &mut Self, u: &mut (usize, u8, Decimal, f64, f64), x: f64| {
+            match u.1 {
+                0 => game.dmd_buy_many_interval(u.0, x),
+                1 => game.dmd_buy_many_power_dm(u.0, x),
+                _ => game.dmd_buy_many_power_de(u.0, x),
+            };
+            u.2 *= Decimal::from_float(u.3).pow(&Decimal::from_float(x));
+            u.4 -= x;
+        };
+        // Bulk pass: everything costing less than 2% of the snapshot.
+        for u in upgrades.iter_mut() {
+            let affordable = (dark_matter * Decimal::from_float(0.02) / u.2)
+                .max(&Decimal::ONE)
+                .ln()
+                / u.3.ln();
+            let purchases = affordable.floor().clamp(0.0, u.4);
+            buy(self, u, purchases);
+        }
+        // Greedy pass against the snapshot balance.
+        while upgrades.iter().any(|u| u.2 <= dark_matter && u.4 > 0.0) {
+            let cheapest = upgrades
+                .iter_mut()
+                .filter(|u| u.4 > 0.0)
+                .min_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
+                .expect("non-empty by the while condition");
+            buy(self, cheapest, 1.0);
+        }
+    }
+
     /// `ascend()`: only when the interval is maxed; bumps ascension and re-buys
     /// interval upgrades to bring the (now-jumped) interval back down.
     pub fn dmd_ascend(&mut self, tier: usize) -> bool {
@@ -348,47 +486,10 @@ impl GameState {
         true
     }
 
-    /// Greedy "max all" — buy the cheapest affordable DMD upgrade repeatedly
-    /// (bounded), matching `maxAllDMDimensions` in spirit.
+    /// The "Max all" button: the faithful `maxAllDMDimensions` over every
+    /// tier.
     pub fn laitela_max_all_dmd(&mut self) {
-        for _ in 0..2000 {
-            let mut best: Option<(usize, u8, Decimal)> = None;
-            for tier in 0..4 {
-                if !self.dmd_unlocked(tier) {
-                    continue;
-                }
-                let candidates = [
-                    (
-                        0u8,
-                        self.dmd_can_buy_interval(tier)
-                            .then(|| self.dmd_interval_cost(tier)),
-                    ),
-                    (1u8, Some(self.dmd_power_dm_cost(tier))),
-                    (2u8, Some(self.dmd_power_de_cost(tier))),
-                ];
-                for (kind, cost) in candidates {
-                    if let Some(cost) = cost {
-                        if cost <= self.celestials.laitela.dark_matter
-                            && best.as_ref().map(|(_, _, c)| cost < *c).unwrap_or(true)
-                        {
-                            best = Some((tier, kind, cost));
-                        }
-                    }
-                }
-            }
-            match best {
-                Some((tier, 0, _)) => {
-                    self.dmd_buy_interval(tier);
-                }
-                Some((tier, 1, _)) => {
-                    self.dmd_buy_power_dm(tier);
-                }
-                Some((tier, 2, _)) => {
-                    self.dmd_buy_power_de(tier);
-                }
-                _ => break,
-            }
-        }
+        self.laitela_max_all_dm_dimensions(4);
     }
 
     /// `DarkMatterDimensions.tick(realDiff)` — top-down DM/DE production.
@@ -514,34 +615,28 @@ impl GameState {
             * (1.0 + self.singularity_milestone_effect_or(sing::CONTINUUM_MULT, 0.0))
     }
 
-    /// The continuum buy-10 value for AD `tier` (0-indexed). Uses the linear
-    /// branch of `getContinuumValue` (the super-exponential branch is
-    /// approximated). `money` is the current antimatter.
+    /// The continuum buy-10 value for AD `tier` (0-indexed):
+    /// `costScale.getContinuumValue(currencyAmount, 10) ×
+    /// matterExtraPurchaseFactor` — including the super-exponential branch
+    /// past 1.8e308 (`get_continuum_value`'s quadratic).
     pub(crate) fn ad_continuum_value(&self, tier: usize) -> f64 {
+        if !self.dim_available_for_purchase(tier) {
+            return 0.0;
+        }
         // Enslaved limits dim 8 to 1 purchase; Continuum mirrors that.
         if tier == 7 && self.celestials.enslaved.run {
             return 1.0;
         }
-        use crate::data::constants::{
-            AD_BASE_COSTS, AD_COST_MULTIPLIERS, C6_AD_BASE_COSTS, C6_AD_COST_MULTIPLIERS,
-        };
-        let (base_cost, cost_mult) = if self.challenge_running(6) {
-            (C6_AD_BASE_COSTS[tier], C6_AD_COST_MULTIPLIERS[tier])
-        } else {
-            (AD_BASE_COSTS[tier], AD_COST_MULTIPLIERS[tier])
-        };
-        let money = self.antimatter.pos_log10() - 1.0; // log10(money / 10)
-        let cont = 1.0 + (money - base_cost.log10()) / cost_mult.log10();
-        cont.max(0.0) * self.matter_extra_purchase_factor()
+        self.ad_cost_scale_for_tier(tier)
+            .get_continuum_value(self.dim_currency_amount(tier), 10.0)
+            * self.matter_extra_purchase_factor()
     }
 
     /// The continuum value for Tickspeed (perSet = 1, base 1000).
     pub(crate) fn tickspeed_continuum_value(&self) -> f64 {
-        let base = crate::data::constants::TICKSPEED_BASE_COST;
-        let mult = crate::data::constants::TICKSPEED_COST_MULTIPLIER;
-        let money = self.antimatter.pos_log10();
-        let cont = 1.0 + (money - base.log10()) / mult.log10();
-        cont.max(0.0) * self.matter_extra_purchase_factor()
+        self.tickspeed_cost_scale()
+            .get_continuum_value(self.antimatter, 1.0)
+            * self.matter_extra_purchase_factor()
     }
 
     // --- Entropy / run ----------------------------------------------------------
@@ -598,6 +693,65 @@ mod tests {
             game.celestials.laitela.dimensions[id - 15].amount = Decimal::ONE;
         }
         game
+    }
+
+    #[test]
+    fn continuum_uses_the_quadratic_branch_past_the_threshold() {
+        let mut game = laitela_game();
+        game.reality.imaginary_upgrade_bits |= 1 << 15; // continuum unlock... (iU15)
+        game.celestials.laitela.max_dark_matter = Decimal::new(1.0, 100);
+        // Below the scaling threshold the linear branch applies.
+        game.antimatter = Decimal::new(1.0, 100);
+        let linear = game.ad_continuum_value(0);
+        assert!(linear > 0.0);
+        // Far past 1.8e308 the quadratic branch flattens growth: the value is
+        // well below the linear extrapolation.
+        game.antimatter = Decimal::new(1.0, 1000);
+        let quad = game.ad_continuum_value(0);
+        let factor = game.matter_extra_purchase_factor();
+        let linear_extrapolation =
+            (1.0 + (1000.0 - 1.0 - 10f64.log10()) / 1e3f64.log10()) * factor;
+        assert!(quad > linear);
+        assert!(quad < linear_extrapolation);
+        // The effective amount follows the continuum purchases.
+        assert!(game.continuum_active());
+        assert_eq!(
+            game.ad_total_amount(0),
+            Decimal::from_float((10.0 * quad).floor())
+        );
+    }
+
+    #[test]
+    fn max_all_buys_the_cheap_upgrades() {
+        let mut game = laitela_game();
+        game.celestials.laitela.dark_matter = Decimal::from_float(1e7);
+        game.laitela_max_all_dm_dimensions(4);
+        let d = &game.celestials.laitela.dimensions[0];
+        assert!(d.interval_upgrades > 0);
+        assert!(d.power_dm_upgrades > 0);
+        assert!(d.power_de_upgrades > 0);
+        assert!(game.celestials.laitela.dark_matter < Decimal::from_float(1e7));
+    }
+
+    #[test]
+    fn annihilation_and_condense_autobuyers_fire() {
+        let mut game = laitela_game();
+        game.autobuyers.enabled = true;
+        // Annihilation: milestone 4e18 singularities + iU19 + gain over 1.05.
+        game.celestials.laitela.singularities = 4e18;
+        game.reality.imaginary_upgrade_bits |= 1 << 19;
+        game.celestials.laitela.dark_matter = Decimal::new(1.0, 70);
+        game.autobuyers.annihilation_active = true;
+        let mult_before = game.celestials.laitela.dark_matter_mult;
+        game.tick_autobuyers(50.0);
+        assert!(game.celestials.laitela.dark_matter_mult > mult_before);
+        // Condense: dark energy over cap × autoCondense factor. (The gained
+        // singularities vanish in f64 precision next to 4e18, so the Dark
+        // Energy reset is the observable.)
+        game.autobuyers.singularity_active = true;
+        game.celestials.laitela.dark_energy = game.singularity_cap() * 2.0;
+        game.tick_autobuyers(50.0);
+        assert_eq!(game.celestials.laitela.dark_energy, 0.0);
     }
 
     #[test]

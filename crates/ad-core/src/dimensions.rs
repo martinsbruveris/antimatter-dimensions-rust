@@ -30,6 +30,19 @@ impl GameState {
             - self.eternity_challenge_completions(6) as f64 * 0.2
     }
 
+    /// A tier's purchase-cost curve, honouring Normal Challenge 6's table.
+    pub(crate) fn ad_cost_scale_for_tier(
+        &self,
+        tier: usize,
+    ) -> crate::cost_scaling::CostScale {
+        let (base, mult) = if self.challenge_running(6) {
+            (C6_AD_BASE_COSTS[tier], C6_AD_COST_MULTIPLIERS[tier])
+        } else {
+            (AD_BASE_COSTS[tier], AD_COST_MULTIPLIERS[tier])
+        };
+        self.ad_cost_scale(base, mult)
+    }
+
     /// The Antimatter Dimension purchase-cost curve for a tier's `(base, mult)`.
     fn ad_cost_scale(&self, base: f64, mult: f64) -> crate::cost_scaling::CostScale {
         crate::cost_scaling::CostScale::new(
@@ -43,7 +56,7 @@ impl GameState {
     /// The currency a dimension purchase spends. Normal Challenge 6 pays for the
     /// 3rd and higher dimensions with the dimension 2 tiers below (`currencyAmount`);
     /// otherwise it is antimatter.
-    fn dim_currency_amount(&self, tier: usize) -> Decimal {
+    pub(crate) fn dim_currency_amount(&self, tier: usize) -> Decimal {
         if tier >= 2 && self.challenge_running(6) {
             self.dimensions[tier - 2].amount
         } else {
@@ -526,6 +539,13 @@ impl GameState {
         if glyph_pow != 1.0 {
             mult = mult.pow(&Decimal::from_float(glyph_pow));
         }
+        // Charged Infinity Upgrades: the tier pair's / `totalTimeMult`'s /
+        // `thisInfinityTimeMult`'s charged variants are power effects
+        // (`applyNDPowers`' `powEffectsOf`).
+        let charged_pow = self.charged_iu_ad_power(tier);
+        if charged_pow != 1.0 {
+            mult = mult.pow(&Decimal::from_float(charged_pow));
+        }
         // Ra Alchemy `power`: AD multiplier `^(1 + amount/200000)`.
         let alch_power = self.alchemy_dimension_power(crate::celestials::alchemy::POWER);
         if alch_power != 1.0 {
@@ -597,6 +617,20 @@ impl GameState {
     /// Each dimension produces the tier below it (AD8 produces
     /// AD7, ..., AD1 produces antimatter).
     /// Production = amount * multiplier * tickspeed_effect
+    /// `AntimatterDimension.totalAmount`: the stored amount, or under
+    /// Continuum the continuum-derived amount (`floor(10 × continuumValue)`)
+    /// if larger. Production and Dimboost/Galaxy requirement checks read
+    /// this; achievements read the raw amount.
+    pub fn ad_total_amount(&self, tier: usize) -> Decimal {
+        let amount = self.dimensions[tier].amount;
+        if !self.continuum_active() {
+            return amount;
+        }
+        amount.max(&Decimal::from_float(
+            (10.0 * self.ad_continuum_value(tier)).floor(),
+        ))
+    }
+
     pub fn dimension_production_per_second(&self, tier: usize) -> Decimal {
         if tier >= 8 || !self.is_dimension_unlocked(tier) {
             return Decimal::ZERO;
@@ -610,7 +644,9 @@ impl GameState {
             return Decimal::ZERO;
         }
 
-        let mut amount = self.dimensions[tier].amount;
+        // `totalAmount`: under Continuum the effective amount is at least the
+        // continuum purchase count (`max(amount, continuumAmount)`).
+        let mut amount = self.ad_total_amount(tier);
         // Normal Challenge 12 strengthens the even dimensions (2nd/4th/6th) to
         // compensate for producing 2 tiers below (tiers are 0-indexed here).
         if self.challenge_running(12) {

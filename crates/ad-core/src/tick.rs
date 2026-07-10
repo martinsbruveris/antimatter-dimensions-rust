@@ -83,6 +83,17 @@ impl GameState {
         self.generate_ts181_ip(dt_ms);
         // Teresa's `epGen` unlock: passive EP from the peak EP/min.
         self.generate_teresa_ep(dt_ms);
+        // Charged `ipGen`: Reality Machines each real-time second proportional
+        // to the pending Reality's RM gain (`applyAutoprestige`):
+        // `gainedRM × teresaLevel² × continuousTTBoost.autoPrestige`.
+        if self
+            .infinity_upgrade_charged(crate::infinity_upgrades::InfinityUpgrade::IpGen)
+        {
+            let level = self.ra_pet_level(crate::celestials::ra::PET_TERESA) as f64;
+            self.reality.machines += self.gained_reality_machines()
+                * Decimal::from_float(level * level * self.ra_tt_boost_auto_prestige())
+                * Decimal::from_float(real_dt_ms / 1000.0);
+        }
         // Chaos rift milestone 2: 10% of the Eternity EP gain per (real)
         // second (`applyAutoprestige`'s Pelle branch).
         if self.pelle_rift_milestone(crate::celestials::pelle::RIFT_CHAOS, 2) {
@@ -225,9 +236,10 @@ impl GameState {
         // upgrade's TT stream.
         self.tick_dilation(dt_ms);
 
-        // Passive Infinity generation (`infinitiedGen` Break Infinity Upgrade),
-        // banking whole Infinities and carrying the fraction in `part_infinitied`.
-        self.generate_passive_infinities(dt_ms);
+        // `passivePrestigeGen`: continuous Eternities (RU14) and Infinities
+        // (`infinitiedGen` / RU11 / Effarig's Eternity unlock), with the
+        // `partEternitied` / `partInfinitied` carries.
+        self.passive_prestige_gen(dt_ms);
 
         // Track the peak Infinity Points this eternity (the original updates
         // `thisEternity.maxIP` in the `Currency.infinityPoints` setter; the
@@ -276,12 +288,23 @@ impl GameState {
         // EC auto-completion (the PEC perks; real time).
         self.ec_auto_complete_tick(real_dt_ms);
 
-        // Reality Upgrades: per-tick requirement checks (RU11/14/20/21/22)
-        // and the continuous RU11/RU14 generation.
+        // Reality Upgrades: per-tick requirement checks (RU11/14/20/21/22).
+        // (Their continuous generation lives in `passive_prestige_gen`.)
         self.check_reality_upgrade_reqs_on_tick();
         // Imaginary Upgrades: the deep requirement latches (13/14/22/23/24).
         self.check_imaginary_upgrade_reqs_on_tick();
-        self.tick_reality_upgrade_generation(dt_ms);
+
+        // Alchemy `uncountability`: passive Realities and Perk Points per
+        // (real) second; whole Realities bank via the fractional carry.
+        let uncountability = self.alchemy_uncountability();
+        if uncountability > 0.0 {
+            let gain = uncountability * real_dt_ms / 1000.0;
+            self.reality.perk_points += gain;
+            self.reality.realities_frac += gain;
+            let whole = self.reality.realities_frac.floor();
+            self.reality.realities += whole as u32;
+            self.reality.realities_frac -= whole;
+        }
 
         // The Automator executes on real time, after production and
         // automation like the original game loop (`AutomatorBackend

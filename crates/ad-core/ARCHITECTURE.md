@@ -207,30 +207,35 @@ not the current state).
   dilation-like nerfs — `effarig_multiplier` (AD final mult, `dimensions.rs`),
   `effarig_tickspeed` (`tickspeed.rs`), the glyph-level cap via
   `adjusted_glyph_level` (`glyphs.rs`) — and the Infinity-stage IP handling
-  (`total_ip_mult` → 1 + base cap 1e200, `crunch.rs`); the persistent glyph/
-  replicanti rewards (Effarig glyph type, `maxRarityBoost`, cap mult/`bonusRG`)
-  are deferred. `enslaved.rs` (Feature 7.3): game-time storage (bank the
+  (`total_ip_mult` → 1 + base cap 1e200, `crunch.rs`); the persistent
+  rewards — the Infinity stage's Replicanti-cap raise + `bonusRG`
+  (`replicanti.rs`, dead while Doomed) and the Eternity stage's
+  Eternities-generate-Infinities term (`passive_prestige_gen`). `enslaved.rs` (Feature 7.3): game-time storage (bank the
   Black-Hole boost via `enslaved_apply_time_flow` at the top of `tick`) + release
   burst, the 2 stored-time unlocks (softcap → `free_tickspeed_softcap`; run,
   glyph-gated), and the run restrictions — glyph-level min (`adjusted_glyph_level`),
   always-dilated AD (`dimensions.rs`), 8th-AD/ID/TD purchase caps
   (`state.rs`/`infinity_dimensions.rs`/`time_dimensions.rs`), TS192 lock
   (`replicanti.rs`), disabled Black Hole + Effarig game-speed nerf
-  (`game_speed_factor`), TP/DT nerfs (`dilation.rs`), the discharge nerf; EC1
-  goal-1000 (needs a u16 completion widening), real-time storage/amplification,
-  and Tesseracts' effect are deferred. `v.rs` (Feature 7.4): the six main-unlock
+  (`game_speed_factor`), TP/DT nerfs (`dilation.rs`), the discharge nerf, EC1's
+  1000-completion goal (`ec_max_completions`), real-time storage +
+  amplified Realities, and Tesseracts (`enslaved.rs`, raising the ID
+  purchase caps). `v.rs` (Feature 7.4): the six main-unlock
   conditions + `v_unlock_celestial`, V's Reality run modifiers (AD/EP/IP/DT `^0.5`
   across `dimensions.rs`/`crunch.rs`/`eternity.rs`/`dilation.rs`, squared
   Replicanti interval in `replicanti.rs`), the 9 V-achievements
   (`v_check_for_unlocks` in `tick.rs` runs `tryComplete`; hard ids 6–8 need Ra's
-  flip so never complete), Space Theorems, and the `adPow` AD power
-  (`dimensions.rs`). The Perk-Point goal reduction and the fastAutoEC/
-  autoAutoClean/achievementBH/raUnlock reward effects are deferred. See
+  flip so never complete), Space Theorems, the `adPow` AD power
+  (`dimensions.rs`), the Perk-Point goal reduction (`v_reduce_goal` +
+  `v_condition_value` into `tryComplete`), and the fastAutoEC /
+  autoAutoClean (`glyph_auto_clean` on Reality) / achievementBH / raUnlock
+  reward effects. See
   `../../docs/design/2026-07-06-celestials.md`. `ra.rs` + `alchemy.rs`
   (Feature 7.5): Ra's four Celestial-Memory pets (memories/chunks/levels/
   upgrades, `ra_memory_tick` from real time in `tick.rs`), the 28 unlocks +
-  effect readers, Remembrance, the charged-Infinity-Upgrade count gate +
-  discharge (state only; the charged effect *variants* deferred), momentum +
+  effect readers, Remembrance, the charged Infinity Upgrades (count gate +
+  charge/discharge plus all 11 charged effect variants at their sites),
+  momentum +
   peak-game-speed tracking, and Ra's Reality. Effects wired at their sites:
   `continuousTTBoost` (replicanti/dilated-time/TT-gen/infinities/eternities),
   `achievementPower` (`^1.5` in `achievements.rs`), `achievementTTMult`,
@@ -240,16 +245,21 @@ not the current state).
   *refinement* wired into `glyphs.rs::sacrifice_glyph`, and the effect readers
   (power/infinity/time → AD/ID/TD power; replication; dilation; dimensionality;
   effarig; momentum; force; exponential IP; inflation; synergism/
-  unpredictability/decoherence internal to reactions). Deferred: the `reality`
-  resource's Reality Glyph, `uncountability` passive generation (u32 realities),
-  `boundless`/`multiversal` (inert targets), and the QoL/automation unlocks. See
+  unpredictability/decoherence internal to reactions). `uncountability` generates
+  Realities/Perk Points in the tick (fraction carried in `realities_frac`);
+  `cardinality` scales the over-cap Replicanti slowdown; `eternity` powers the
+  passive Eternity gen; `boundless`/`multiversal` feed Tesseracts/amplified
+  Realities. Deferred: the `reality` resource's Reality Glyph and the
+  QoL/automation unlocks. See
   `../../docs/design/2026-07-07-ra.md`. `laitela.rs` + `singularity.rs` +
   `imaginary_upgrades.rs` (Feature 7.6): Lai'tela's `LaitelaState` — the 4 Dark
   Matter Dimensions (`dmd_tick` real-time DM/DE production in `tick.rs`,
   interval/powerDM/powerDE upgrades, ascension), annihilation, Dark Energy →
   Singularities (`singularity.rs`, the 30-milestone catalogue + `completions`/
-  effect readers), Continuum (`ad_continuum_value`/`tickspeed_continuum_value`
-  into the buy-10 seams — linear-branch approximation), and the entropy
+  effect readers), the exact Continuum (`ad_continuum_value`/
+  `tickspeed_continuum_value` via `CostScale::get_continuum_value`, including
+  the super-exponential branch, plus `ad_total_amount` effective amounts into
+  production/requirement checks), and the entropy
   destabilization run (`laitela_reality_tick`, `maxAllowedDimension` disabling
   top AD/ID/TD tiers). Milestone effects wired: DMD-internal (dark mult/interval/
   cost/ascension), plus `gamespeedFromSingularities` (`game_speed_factor`),
@@ -262,9 +272,10 @@ not the current state).
   Dimboosts via `total_dim_boosts`, iU13 cap mult, iU14 per-purchase `^1.5`,
   iU15/19/21 Lai'tela wiring, iU22 sacrifice fill). Effarig's glyph-weight
   adjuster (`glyph_weights` in `getGlyphLevelInputs`) landed with iU12's
-  requirement. Deferred: the Continuum super-exponential branch, the
-  DMD/annihilation/condense autobuyers, and the tesseract-linked effects.
-  iU25 (Pelle unlock) lands with 7.7. See `../../docs/design/2026-07-07-laitela.md`. `pelle.rs` (Feature 7.7):
+  requirement. The DMD / ascension / annihilation / condense
+  autobuyers live in `autobuyers.rs` (Singularity-milestone gated), with the
+  faithful `maxAllDMDimensions` bulk-buy here. iU25 (Pelle unlock) lands
+  with 7.7. See `../../docs/design/2026-07-07-laitela.md`. `pelle.rs` (Feature 7.7):
   Pelle's `PelleState` — dooming (`doom_reality`, gated on Imaginary Upgrade 25) +
   Armageddon, Remnants (`remnants_gain` from the doomed records) → Reality Shards
   (`pelle_tick` in `tick.rs`), the 5 Rifts (fill/percentage/effect/milestones,

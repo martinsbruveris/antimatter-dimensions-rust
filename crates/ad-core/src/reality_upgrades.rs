@@ -317,24 +317,6 @@ impl GameState {
         self.try_unlock_reality_upgrade(22, self.time_shards.exponent() >= 28_000);
     }
 
-    /// Per-tick continuous generation from RU11 (10%/s of the crunch Infinity
-    /// gain) and RU14 (Eternities equal to the Reality count per second).
-    pub(crate) fn tick_reality_upgrade_generation(&mut self, dt_ms: f64) {
-        let dt_s = dt_ms / 1000.0;
-        if self.reality_upgrade_bought(11) {
-            // Ra's `continuousTTBoost.infinity` boosts continuous Infinity gen.
-            let gain = self.gained_infinities()
-                * Decimal::from_float(0.1 * dt_s)
-                * self.ra_tt_boost_infinities();
-            self.infinities += gain;
-        }
-        if self.reality_upgrade_bought(14) && self.reality.realities > 0 {
-            // Ra's `continuousTTBoost.eternity` boosts continuous Eternity gen.
-            self.eternities += Decimal::from_float(self.reality.realities as f64 * dt_s)
-                * self.ra_tt_boost_eternities();
-        }
-    }
-
     /// `applyRUPG10`: the start-of-reality package. Also run when the upgrade
     /// is first purchased.
     pub(crate) fn apply_rupg10_impl(&mut self) {
@@ -456,11 +438,17 @@ mod tests {
         let mut game = realitied_game();
         game.reality.upgrade_bits |= (1 << 11) | (1 << 14);
         game.reality.realities = 3;
-        game.tick_reality_upgrade_generation(1000.0);
-        // RU11: 10% of gained_infinities (1) per second.
-        assert_eq!(game.infinities, Decimal::from_float(0.1));
-        // RU14: +realities eternities per second.
+        game.passive_prestige_gen(1000.0);
+        // RU11: 10% of gained_infinities (1) per second — whole units bank,
+        // the fraction carries in `part_infinitied`.
+        assert_eq!(game.infinities, Decimal::ZERO);
+        assert!((game.part_infinitied - 0.1).abs() < 1e-12);
+        // RU14: +realities eternities per second (floored, fraction carried).
         assert_eq!(game.eternities, Decimal::from_float(3.0));
+        assert_eq!(game.reality.part_eternitied, Decimal::ZERO);
+        // A second half-tick banks the fraction across the whole boundary.
+        game.passive_prestige_gen(500.0);
+        assert_eq!(game.eternities, Decimal::from_float(4.0));
     }
 
     #[test]

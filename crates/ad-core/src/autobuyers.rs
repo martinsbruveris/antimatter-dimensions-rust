@@ -410,6 +410,10 @@ fn default_milestone_autobuyers<const N: usize>() -> [MilestoneAutobuyer; N] {
 }
 
 /// Collection of all autobuyer state.
+fn default_annihilation_mult() -> f64 {
+    1.05
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AutobuyerState {
@@ -491,6 +495,24 @@ pub struct AutobuyerState {
     /// (`player.auto.sacrifice.isActive`).
     #[cfg_attr(feature = "serde", serde(default = "default_true"))]
     pub sacrifice_active: bool,
+    /// The Dark-Matter-Dimension autobuyer (`player.auto.darkMatterDims`,
+    /// Singularity milestone `darkDimensionAutobuyers`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub dark_matter_dims: MilestoneAutobuyer,
+    /// The DMD-Ascension autobuyer (`player.auto.ascension`, Singularity
+    /// milestone `ascensionAutobuyers`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub ascension: MilestoneAutobuyer,
+    /// The Annihilation autobuyer (`player.auto.annihilation`): fires when the
+    /// pending Dark-Matter multiplier gain reaches `annihilation_multiplier`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub annihilation_active: bool,
+    #[cfg_attr(feature = "serde", serde(default = "default_annihilation_mult"))]
+    pub annihilation_multiplier: f64,
+    /// The Singularity condense autobuyer (`player.auto.singularity`,
+    /// Singularity milestone `autoCondense`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub singularity_active: bool,
     /// The Sacrifice autobuyer's boost-ratio threshold
     /// (`player.auto.sacrifice.multiplier`): it sacrifices once the next boost
     /// reaches `max(this, 1.01)` (or unconditionally under Achievement 118).
@@ -562,6 +584,11 @@ impl AutobuyerState {
             time_dims_group_active: true,
             ep_mult_buyer_active: false,
             sacrifice_active: true,
+            dark_matter_dims: MilestoneAutobuyer::new(),
+            ascension: MilestoneAutobuyer::new(),
+            annihilation_active: false,
+            annihilation_multiplier: 1.05,
+            singularity_active: false,
             sacrifice_multiplier: Decimal::from_float(2.0),
         }
     }
@@ -840,6 +867,8 @@ impl GameState {
             for ab in &mut self.autobuyers.time_dims {
                 ab.timer_ms += dt_ms;
             }
+            self.autobuyers.dark_matter_dims.timer_ms += dt_ms;
+            self.autobuyers.ascension.timer_ms += dt_ms;
             return;
         }
 
@@ -1176,6 +1205,53 @@ impl GameState {
             {
                 self.sacrifice();
             }
+        }
+
+        // Lai'tela autobuyers (Singularity-milestone gated). The two DMD ones
+        // share the `darkAutobuyerSpeed` interval (`1000 × effect` ms, 0 =
+        // every tick); Annihilation and Singularity have no interval.
+        use crate::celestials::singularity as sing;
+        let dark_interval = 1000.0
+            * self.singularity_milestone_effect_or(sing::DARK_AUTOBUYER_SPEED, 30.0);
+        let dmd_tiers =
+            self.singularity_milestone_effect_or(sing::DARK_DIM_AUTOBUYERS, 0.0) as u32;
+        let ready = self.autobuyers.dark_matter_dims.is_active && dmd_tiers > 0;
+        if self.autobuyers.dark_matter_dims.advance(
+            dt_ms,
+            dark_interval.max(f64::MIN_POSITIVE),
+            ready,
+        ) {
+            self.laitela_max_all_dm_dimensions(dmd_tiers);
+        }
+        let ascend_tiers =
+            self.singularity_milestone_effect_or(sing::ASCENSION_AUTOBUYERS, 0.0) as u32;
+        let ready = self.autobuyers.ascension.is_active && ascend_tiers > 0;
+        if self.autobuyers.ascension.advance(
+            dt_ms,
+            dark_interval.max(f64::MIN_POSITIVE),
+            ready,
+        ) {
+            for tier in 0..(ascend_tiers as usize).min(4) {
+                self.dmd_ascend(tier);
+            }
+        }
+        // Annihilation: fire once the pending multiplier gain reaches the
+        // configured threshold.
+        if self.autobuyers.annihilation_active
+            && self.singularity_milestone_effect_or(sing::ANNIHILATION_AUTOBUYER, 0.0)
+                >= 1.0
+            && self.dark_matter_mult_gain() >= self.autobuyers.annihilation_multiplier
+        {
+            self.annihilate(false);
+        }
+        // Singularity: condense once Dark Energy reaches `cap × autoCondense`.
+        let condense_factor =
+            self.singularity_milestone_effect_or(sing::AUTO_CONDENSE, f64::INFINITY);
+        if self.autobuyers.singularity_active
+            && self.celestials.laitela.dark_energy
+                >= self.singularity_cap() * condense_factor
+        {
+            self.condense_singularity();
         }
     }
 

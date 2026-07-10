@@ -212,6 +212,21 @@ impl GameState {
         }
     }
 
+    /// `cardinality`: the over-cap Replicanti slowdown base,
+    /// `1 + 0.2/(1 + amount/20000)` (1.2 at zero).
+    pub(crate) fn alchemy_cardinality(&self) -> f64 {
+        1.0 + 0.2 / (1.0 + self.amt(CARDINALITY) / 20000.0)
+    }
+
+    /// `eternity`: passive Eternity generation is raised `^(1 + amount/15000)`.
+    pub(crate) fn alchemy_eternity_pow(&self) -> f64 {
+        if self.alchemy_resource_unlocked(ETERNITY) {
+            1.0 + self.amt(ETERNITY) / 15000.0
+        } else {
+            1.0
+        }
+    }
+
     /// `replication`: replicanti-speed ×`10^(amount/1000)`.
     pub(crate) fn alchemy_replication_speed(&self) -> f64 {
         if self.alchemy_resource_unlocked(REPLICATION) {
@@ -292,10 +307,8 @@ impl GameState {
     }
 
     /// `uncountability`: passive Realities & Perk Points per second,
-    /// `160·√(amount/25000)`. Deferred: `realities` is a `u32` in our engine, so
-    /// fractional passive Reality generation needs an accumulator (out of
-    /// frontier — Effarig level 19 + huge alchemy is well past reach).
-    #[allow(dead_code)]
+    /// `160·√(amount/25000)` (consumed in the tick; whole Realities bank via
+    /// `realities_frac`).
     pub(crate) fn alchemy_uncountability(&self) -> f64 {
         if self.alchemy_resource_unlocked(UNCOUNTABILITY) {
             160.0 * (self.amt(UNCOUNTABILITY) / 25000.0).sqrt()

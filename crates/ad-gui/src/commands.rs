@@ -719,6 +719,96 @@ pub fn buy_infinity_upgrade(id: String, state: State<'_, Mutex<GameState>>) {
     }
 }
 
+/// Charge a bought Infinity Upgrade with one of Ra's charges (the original's
+/// `purchase()` fall-through). An unrecognized id is a no-op.
+#[tauri::command]
+pub fn charge_infinity_upgrade(id: String, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    if let Some(upgrade) = InfinityUpgrade::from_save_id(&id) {
+        game.charge_infinity_upgrade(upgrade);
+    }
+}
+
+/// Discharge a charged Infinity Upgrade (refunds the charge).
+#[tauri::command]
+pub fn discharge_infinity_upgrade(id: String, state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    if let Some(upgrade) = InfinityUpgrade::from_save_id(&id) {
+        game.discharge_infinity_upgrade(upgrade);
+    }
+}
+
+/// Arm/disarm discharging all charged Infinity Upgrades on the next Reality.
+#[tauri::command]
+pub fn toggle_discharge(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.celestials.ra.dis_charge = !game.celestials.ra.dis_charge;
+}
+
+/// Spend Perk Points on one goal-reduction step for V-achievement `id`.
+#[tauri::command]
+pub fn v_reduce_goal(id: usize, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().v_reduce_goal(id);
+}
+
+/// Toggle the Dark-Matter-Dimension autobuyer.
+#[tauri::command]
+pub fn toggle_dmd_autobuyer(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.autobuyers.dark_matter_dims.is_active =
+        !game.autobuyers.dark_matter_dims.is_active;
+}
+
+/// Toggle the DMD-Ascension autobuyer.
+#[tauri::command]
+pub fn toggle_ascension_autobuyer(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.autobuyers.ascension.is_active = !game.autobuyers.ascension.is_active;
+}
+
+/// Toggle the Annihilation autobuyer.
+#[tauri::command]
+pub fn toggle_annihilation_autobuyer(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.autobuyers.annihilation_active = !game.autobuyers.annihilation_active;
+}
+
+/// Set the Annihilation autobuyer's multiplier threshold.
+#[tauri::command]
+pub fn set_annihilation_multiplier(value: f64, state: State<'_, Mutex<GameState>>) {
+    if value.is_finite() && value > 0.0 {
+        state.lock().unwrap().autobuyers.annihilation_multiplier = value;
+    }
+}
+
+/// Toggle the Singularity condense autobuyer.
+#[tauri::command]
+pub fn toggle_singularity_autobuyer(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.autobuyers.singularity_active = !game.autobuyers.singularity_active;
+}
+
+/// Toggle auto-purge on Reality (V's `autoAutoClean` unlock).
+#[tauri::command]
+pub fn toggle_auto_auto_clean(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.reality.auto_auto_clean = !game.reality.auto_auto_clean;
+}
+
+/// Toggle whether the glyph filter protects glyphs from purges.
+#[tauri::command]
+pub fn toggle_apply_filter_to_purge(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.reality.apply_filter_to_purge = !game.reality.apply_filter_to_purge;
+}
+
+/// Purge the inventory (`Glyphs.autoClean`): threshold 5 = purge, 1 = harsh,
+/// 0 = sacrifice all.
+#[tauri::command]
+pub fn glyph_purge(threshold: u32, state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().glyph_auto_clean(threshold.min(5));
+}
+
 /// Buy a single ×2 IP-multiplier (`ipMult`) purchase.
 #[tauri::command]
 pub fn buy_ip_mult(state: State<'_, Mutex<GameState>>) {

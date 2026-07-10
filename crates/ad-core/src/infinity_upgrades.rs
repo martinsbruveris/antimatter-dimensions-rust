@@ -406,7 +406,9 @@ impl GameState {
         };
         let mut mult =
             Decimal::from_float(BUY_TEN_MULTIPLIER + self.ec3_buy_ten_bonus() + ach141);
-        if self.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult) {
+        if self.infinity_upgrade_bought(InfinityUpgrade::Buy10Mult)
+            && !self.ra_is_charged(InfinityUpgrade::Buy10Mult as u8)
+        {
             mult *= Decimal::from_float(1.1);
         }
         // Achievement 58 (NC9 in ≤ 3 min): +1% to the buy-10 multiplier.
@@ -419,6 +421,13 @@ impl GameState {
         let forgotten = self.glyph_effect_effarigforgotten();
         if forgotten != 1.0 {
             mult = mult.pow(&Decimal::from_float(forgotten));
+        }
+        // Charged `buy10Mult`: the whole multiplier gains a power
+        // `1 + teresaLevel/200`.
+        if self.infinity_upgrade_charged(InfinityUpgrade::Buy10Mult) {
+            mult = mult.pow(&Decimal::from_float(
+                1.0 + self.charged_teresa_level() / 200.0,
+            ));
         }
         // Imaginary Upgrade 14: per-purchase multipliers ^1.5.
         let iu14 = self.imaginary_upgrade_14_pow();
@@ -437,7 +446,9 @@ impl GameState {
             return Decimal::ONE;
         }
         let mut power = DIM_BOOST_MULTIPLIER;
-        if self.infinity_upgrade_bought(InfinityUpgrade::DimboostMult) {
+        if self.infinity_upgrade_bought(InfinityUpgrade::DimboostMult)
+            && !self.ra_is_charged(InfinityUpgrade::DimboostMult as u8)
+        {
             power = power.max(2.5);
         }
         if self.infinity_challenge_completed(7) {
@@ -482,6 +493,13 @@ impl GameState {
                 boost *= Decimal::pow10(4.0 * (c - 40.0));
             }
         }
+        // Charged `dimboostMult`: the boost gains a power `1 + teresaLevel/200`
+        // (`powEffectsOf(InfinityUpgrade.dimboostMult.chargedEffect)`).
+        if self.infinity_upgrade_charged(InfinityUpgrade::DimboostMult) {
+            boost = boost.pow(&Decimal::from_float(
+                1.0 + self.charged_teresa_level() / 200.0,
+            ));
+        }
         boost
     }
 
@@ -489,8 +507,11 @@ impl GameState {
     /// term — the original's `effects` product: `×2` from the Infinity Upgrade
     /// `galaxyBoost` and `×1.5` from the Break Infinity Upgrade `postGalaxy`.
     pub fn galaxy_strength_effect(&self) -> f64 {
+        // Charged `galaxyBoost`: `2 + √teresaLevel/100` replaces the ×2.
         let infinity_boost =
-            if self.infinity_upgrade_bought(InfinityUpgrade::GalaxyBoost) {
+            if self.infinity_upgrade_charged(InfinityUpgrade::GalaxyBoost) {
+                2.0 + self.charged_teresa_level().sqrt() / 100.0
+            } else if self.infinity_upgrade_bought(InfinityUpgrade::GalaxyBoost) {
                 2.0
             } else {
                 1.0
@@ -518,7 +539,9 @@ impl GameState {
     /// Amount subtracted from the Dimension-Boost and Antimatter-Galaxy
     /// requirements: `9` once `resetBoost` is owned, else `0`.
     pub fn reset_boost_reduction(&self) -> u64 {
-        if self.infinity_upgrade_bought(InfinityUpgrade::ResetBoost) {
+        if self.infinity_upgrade_bought(InfinityUpgrade::ResetBoost)
+            && !self.ra_is_charged(InfinityUpgrade::ResetBoost as u8)
+        {
             9
         } else {
             0
@@ -549,15 +572,64 @@ impl GameState {
         base.pow(&Decimal::from_float(1.5)) + Decimal::ONE
     }
 
+    /// Whether `u` is bought *and* charged — the charged variant applies and
+    /// the normal effect is suppressed (`isEffectActive = isBought &&
+    /// !isCharged`).
+    pub fn infinity_upgrade_charged(&self, u: InfinityUpgrade) -> bool {
+        self.infinity_upgrade_bought(u) && self.ra_is_charged(u as u8)
+    }
+
+    /// The Teresa memory level the charged formulas key off.
+    fn charged_teresa_level(&self) -> f64 {
+        self.ra_pet_level(crate::celestials::ra::PET_TERESA) as f64
+    }
+
+    /// The combined charged-Infinity-Upgrade power on a tier's AD multiplier
+    /// (`applyNDPowers`' `powEffectsOf`): the tier pair's charged variant,
+    /// `totalTimeMult`'s, and `thisInfinityTimeMult`'s.
+    pub(crate) fn charged_iu_ad_power(&self, tier: usize) -> f64 {
+        let mut pow = 1.0;
+        let level = self.charged_teresa_level();
+        if let Some(u) = dim_pair_upgrade(tier) {
+            if self.infinity_upgrade_charged(u) {
+                // `1 + log10(max(1, pLog10(infinitiesTotal))) · √level / 150`.
+                pow *= 1.0
+                    + self.infinities_total().pos_log10().max(1.0).log10()
+                        * level.sqrt()
+                        / 150.0;
+            }
+        }
+        if self.infinity_upgrade_charged(InfinityUpgrade::TotalTimeMult) {
+            // `1 + log10(log10(totalTimePlayed_ms)) · level^0.5 / 150`.
+            pow *= 1.0
+                + self.records.total_time_played_ms.log10().log10() * level.powf(0.5)
+                    / 150.0;
+        }
+        if self.infinity_upgrade_charged(InfinityUpgrade::ThisInfinityTimeMult) {
+            // `1 + log10(log10(thisInfinity_ms + 100)) · √level / 150`.
+            pow *= 1.0
+                + (self.records.this_infinity.time_ms + 100.0).log10().log10()
+                    * level.sqrt()
+                    / 150.0;
+        }
+        pow
+    }
+
     /// The Infinity-Upgrade multiplier applied to **every** Antimatter Dimension
     /// (the `totalTimeMult` / `thisInfinityTimeMult` terms of the original's
     /// `antimatterDimensionCommonMultiplier`).
     pub fn infinity_upgrade_common_mult(&self) -> Decimal {
         let mut mult = Decimal::ONE;
-        if self.infinity_upgrade_bought(InfinityUpgrade::TotalTimeMult) {
+        // A charged upgrade suppresses its normal effect (the charged variant
+        // is a *power*, applied in `charged_iu_ad_power`).
+        if self.infinity_upgrade_bought(InfinityUpgrade::TotalTimeMult)
+            && !self.ra_is_charged(InfinityUpgrade::TotalTimeMult as u8)
+        {
             mult *= self.total_time_mult_effect();
         }
-        if self.infinity_upgrade_bought(InfinityUpgrade::ThisInfinityTimeMult) {
+        if self.infinity_upgrade_bought(InfinityUpgrade::ThisInfinityTimeMult)
+            && !self.ra_is_charged(InfinityUpgrade::ThisInfinityTimeMult as u8)
+        {
             mult *= self.this_infinity_time_mult_effect();
         }
         mult
@@ -569,7 +641,8 @@ impl GameState {
         let mut mult = Decimal::ONE;
 
         if let Some(u) = dim_pair_upgrade(tier) {
-            if self.infinity_upgrade_bought(u) {
+            // Charged: the multiplier is replaced by a power (`charged_iu_ad_power`).
+            if self.infinity_upgrade_bought(u) && !self.ra_is_charged(u as u8) {
                 // The `dim{18,27,36,45}mult` effect is part of the same
                 // `infinitiedMult` that Time Study 31 raises to the 4th power
                 // (`infinitiedMult.pow(TimeStudy(31).effectOrDefault(1))` in
@@ -584,12 +657,52 @@ impl GameState {
             }
         }
 
-        // unspentIPMult: 1st dimension only.
+        // unspentIPMult: 1st dimension only. The charged variant is still a
+        // multiplier — `(IP/2)^(1.5·√teresaLevel) + 1`.
         if tier == 0 && self.infinity_upgrade_bought(InfinityUpgrade::UnspentIpMult) {
-            mult *= self.unspent_ip_mult_effect();
+            if self.ra_is_charged(InfinityUpgrade::UnspentIpMult as u8) {
+                let base = self.infinity_points / Decimal::from_float(2.0);
+                let exp = self.charged_teresa_level().sqrt() * 1.5;
+                mult *= base.pow(&Decimal::from_float(exp)) + Decimal::ONE;
+            } else {
+                mult *= self.unspent_ip_mult_effect();
+            }
         }
 
         mult
+    }
+
+    /// Whether `upgrade` can be charged now (`canCharge`): bought, has a
+    /// charged variant (the skip-resets do not), not already charged, charges
+    /// left, and not Doomed (`Pelle.isDisabled("chargedInfinityUpgrades")`).
+    pub fn can_charge_infinity_upgrade(&self, upgrade: InfinityUpgrade) -> bool {
+        let has_charge_effect = !matches!(
+            upgrade,
+            InfinityUpgrade::SkipReset1
+                | InfinityUpgrade::SkipReset2
+                | InfinityUpgrade::SkipReset3
+                | InfinityUpgrade::SkipResetGalaxy
+        );
+        self.infinity_upgrade_bought(upgrade)
+            && has_charge_effect
+            && !self.ra_is_charged(upgrade as u8)
+            && self.ra_charges_left() != 0
+            && !self.is_doomed()
+    }
+
+    /// Charge `upgrade` (`InfinityUpgradeState.charge`). Returns whether it
+    /// happened.
+    pub fn charge_infinity_upgrade(&mut self, upgrade: InfinityUpgrade) -> bool {
+        if !self.can_charge_infinity_upgrade(upgrade) {
+            return false;
+        }
+        self.celestials.ra.charged |= 1u16 << (upgrade as u16);
+        true
+    }
+
+    /// Discharge `upgrade` (`disCharge`), refunding its charge.
+    pub fn discharge_infinity_upgrade(&mut self, upgrade: InfinityUpgrade) {
+        self.celestials.ra.charged &= !(1u16 << (upgrade as u16));
     }
 
     /// The numeric effect value of `upgrade` for **display** (the number the
@@ -669,8 +782,12 @@ impl GameState {
                 if whole >= 1.0 {
                     self.part_infinity_point -= whole;
                     // `gainedPerGen`: 0 once the best infinity is too slow (or never
-                    // happened), else `totalIPMult`.
-                    if best < IP_GEN_TOO_SLOW_MS {
+                    // happened), else `totalIPMult`. The upgrade's effect is 0
+                    // inside Teresa's or V's Reality and while Doomed.
+                    let celestial_zero = self.celestials.teresa.run
+                        || self.celestials.v.run
+                        || self.is_doomed();
+                    if best < IP_GEN_TOO_SLOW_MS && !celestial_zero {
                         self.infinity_points +=
                             Decimal::from_float(whole) * self.total_ip_mult();
                     }
@@ -688,26 +805,74 @@ impl GameState {
         }
     }
 
-    /// Passive Infinity generation (`game.js`, the `!EternityChallenge(4)` block):
-    /// the `infinitiedGen` Break Infinity Upgrade grants `0.5 × dt / max(50,
-    /// bestInfinity.time)` Infinities per tick; the whole part is banked and the
-    /// fraction carried in `part_infinitied`. The RealityUpgrade-5/7, Ra, glyph,
-    /// RU11, and Effarig terms are 1/absent for the pre-Reality saves this covers.
-    pub(crate) fn generate_passive_infinities(&mut self, dt_ms: f64) {
-        // The whole block (including the `part_infinitied` carry) is skipped in EC4.
+    /// `passivePrestigeGen` (game.js): continuous Eternity generation from
+    /// RU14 and continuous Infinity generation from the `infinitiedGen` Break
+    /// Infinity Upgrade / RU11 / Effarig's Eternity unlock, each banking whole
+    /// units and carrying fractions (`partEternitied` / `partInfinitied`).
+    /// Skipped entirely while Doomed.
+    pub(crate) fn passive_prestige_gen(&mut self, dt_ms: f64) {
+        if self.is_doomed() {
+            return;
+        }
+        let dt_s = dt_ms / 1000.0;
+
+        // Eternitied gain (RU14): `1 × Ach113 × RU3 × (realities × Ra boost)
+        // × timeetermult`, raised to the Alchemy `eternity` power, × dt.
+        let mut eternitied_gain = Decimal::ZERO;
+        if self.reality_upgrade_bought(14) {
+            let mut gain = Decimal::ONE;
+            if self.achievement_applies(113) {
+                gain *= Decimal::from_float(2.0);
+            }
+            gain *= self.reality_rebuyable_effect(3);
+            gain *= Decimal::from_float(self.reality.realities as f64)
+                * self.ra_tt_boost_eternities();
+            gain *= Decimal::from_float(self.glyph_effect_timeetermult());
+            eternitied_gain = Decimal::from_float(dt_s)
+                * gain.pow(&Decimal::from_float(self.alchemy_eternity_pow()));
+            self.reality.part_eternitied += eternitied_gain;
+            let whole = self.reality.part_eternitied.floor();
+            self.eternities += whole;
+            self.reality.part_eternitied -= whole;
+        }
+
+        // Infinity gain — the whole block (including the carry) skips in EC4.
         if self.ec_running(4) {
             return;
         }
-        let mut inf_gen = 0.0;
+        let mut inf_gen = Decimal::ZERO;
         if self.break_infinity_upgrade_bought(BreakInfinityUpgrade::InfinitiedGen) {
-            inf_gen += 0.5 * dt_ms / self.records.best_infinity.time_ms.max(50.0);
+            // `0.5 × dt / max(50 ms, bestInfinity.time)` — explicitly excluding
+            // Achievement 87 and TS32 — × RU5 × RU7 × Ra × `infinityinfmult`.
+            let mut gen = Decimal::from_float(
+                0.5 * dt_ms / self.records.best_infinity.time_ms.max(50.0),
+            );
+            gen *= self.reality_rebuyable_effect(5);
+            if self.reality_upgrade_bought(7) {
+                gen *= Decimal::from_float(1.0 + self.galaxies as f64 / 30.0);
+            }
+            gen *= self.ra_tt_boost_infinities();
+            gen *= self.glyph_effect_infinityinfmult();
+            inf_gen += gen;
         }
-        inf_gen += self.part_infinitied;
+        if self.reality_upgrade_bought(11) {
+            // RU11: 10% of the crunch Infinity gain per second (no Ra term —
+            // `continuousTTBoost.infinity` only scales the `infinitiedGen`
+            // sub-block above).
+            inf_gen += self.gained_infinities() * Decimal::from_float(0.1 * dt_s);
+        }
+        if self.effarig_eternity_unlocked() {
+            // Effarig's Eternity unlock: Eternities generate Infinities. Half
+            // of this tick's generated Eternities count as gained *after* the
+            // Infinities, so two ticks match one tick of twice the length.
+            let eternities =
+                self.eternities - (eternitied_gain / Decimal::from_float(2.0)).floor();
+            inf_gen += self.gained_infinities() * eternities * Decimal::from_float(dt_s);
+        }
+        inf_gen += Decimal::from_float(self.part_infinitied);
         let whole = inf_gen.floor();
-        if whole > 0.0 {
-            self.infinities += Decimal::from_float(whole);
-        }
-        self.part_infinitied = inf_gen - whole;
+        self.infinities += whole;
+        self.part_infinitied = (inf_gen - whole).to_f64();
     }
 }
 
@@ -728,6 +893,43 @@ mod tests {
 
     fn maxed_ip(game: &mut GameState) {
         game.infinity_points = Decimal::from_float(1e9);
+    }
+
+    #[test]
+    fn charged_upgrades_swap_multipliers_for_powers() {
+        let mut game = GameState::new();
+        game.infinity_upgrades = u32::MAX; // everything bought
+        game.celestials.ra.pets[crate::celestials::ra::PET_TERESA].level = 16;
+        // galaxyBoost: ×2 normally; charged → 2 + √16/100.
+        assert_eq!(game.galaxy_strength_effect(), 2.0);
+        game.celestials.ra.charged |= 1 << (InfinityUpgrade::GalaxyBoost as u16);
+        assert_eq!(game.galaxy_strength_effect(), 2.04);
+        // resetBoost: −9 normally; charged → ×1/(1 + √16/10) instead.
+        assert_eq!(game.reset_boost_reduction(), 9);
+        game.celestials.ra.charged |= 1 << (InfinityUpgrade::ResetBoost as u16);
+        assert_eq!(game.reset_boost_reduction(), 0);
+        // dimboostMult: base drops to 2 (suppressed) and gains ^1.08.
+        game.celestials.ra.charged |= 1 << (InfinityUpgrade::DimboostMult as u16);
+        let boost = game.dim_boost_power();
+        assert_eq!(boost, Decimal::from_float(2f64.powf(1.0 + 16.0 / 200.0)));
+        // The tier-pair charged variant folds into the AD power, not the mult.
+        game.celestials.ra.charged |= 1 << (InfinityUpgrade::Dim18Mult as u16);
+        game.infinities = Decimal::new(1.0, 100);
+        assert_eq!(game.infinity_upgrade_tier_mult(0), Decimal::ONE);
+        // `1 + log10(100) × √16/150 = 1 + 2·4/150`.
+        assert!((game.charged_iu_ad_power(0) - (1.0 + 8.0 / 150.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn charged_ip_gen_makes_reality_machines() {
+        let mut game = GameState::new();
+        game.infinity_upgrades = u32::MAX;
+        game.celestials.ra.pets[crate::celestials::ra::PET_TERESA].level = 5;
+        game.celestials.ra.charged |= 1 << (InfinityUpgrade::IpGen as u16);
+        game.records.this_reality.max_ep = Decimal::new(1.0, 4000); // RM gain > 0
+        let before = game.reality.machines;
+        game.tick(1000.0);
+        assert!(game.reality.machines > before);
     }
 
     #[test]
