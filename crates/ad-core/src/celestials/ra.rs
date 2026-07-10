@@ -581,9 +581,8 @@ impl GameState {
     }
 
     /// `improvedStoredTime.gameTimeAmplification` — `20^min(level,25)` (1 if
-    /// not unlocked). Amplifies Enslaved stored game time. Deferred: the
-    /// Enslaved amplification hook is out of frontier.
-    #[allow(dead_code)]
+    /// not unlocked). Amplifies the Enslaved game-time storage gain
+    /// (`enslaved_apply_time_flow`).
     pub(crate) fn ra_stored_time_amplification(&self) -> f64 {
         if self.ra_unlock_active(RA_UNLOCK_IMPROVED_STORED_TIME) {
             20f64.powi(self.ra_pet_level(PET_ENSLAVED).min(RA_LEVEL_CAP) as i32)

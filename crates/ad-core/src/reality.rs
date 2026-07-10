@@ -354,6 +354,22 @@ impl GameState {
     }
 
     /// `MachineHandler.gainedRealityMachines`: hardcapped at `1e1000`.
+    /// `simulatedRealityCount` (raw, fraction included): the extra Realities
+    /// from the amplify flag (`Enslaved.boostReality`) and the `multiversal`
+    /// alchemy effect, plus the carried fraction. The rewards path floors this
+    /// and stores the remainder in `part_simulated_reality`; projections
+    /// (IU13, the Reality-button display) floor it without advancing.
+    pub fn simulated_reality_count_raw(&self) -> f64 {
+        let amplified_sim = if self.celestials.enslaved.boost_reality {
+            self.reality_boost_ratio() - 1.0
+        } else {
+            0.0
+        };
+        (self.alchemy_multiversal() + 1.0) * (amplified_sim + 1.0)
+            + self.part_simulated_reality
+            - 1.0
+    }
+
     pub fn gained_reality_machines(&self) -> Decimal {
         let mut rm = self.uncapped_rm();
         // The `effarigrm` glyph effect multiplies the RM gain.
@@ -547,6 +563,13 @@ impl GameState {
     /// a Perk Point, update the reality records, then reset everything from
     /// the Eternity layer down.
     pub(crate) fn finish_process_reality(&mut self) {
+        // `simulatedRealityCount(true)`: the extra Realities from amplified
+        // stored real time and the `multiversal` alchemy effect, with the
+        // fraction carried in `partSimulatedReality`.
+        let sim_count = self.simulated_reality_count_raw();
+        self.part_simulated_reality = sim_count - sim_count.floor();
+        let multiplier = sim_count.floor() + 1.0;
+
         // REALITY_RESET_BEFORE requirement checks (RU16–19/23/24).
         self.check_reality_upgrade_reqs_on_reality();
         // REALITY_RESET_BEFORE achievements (141, 148, 153, 154).
@@ -594,25 +617,40 @@ impl GameState {
             RecentReality {
                 time_ms: self.records.this_reality.time_ms,
                 real_time_ms: self.records.this_reality.real_time_ms,
-                rm: gained_rm,
-                reality_count: 1.0,
+                rm: gained_rm * Decimal::from_float(multiplier),
+                reality_count: multiplier,
             },
         );
 
-        self.reality.machines += gained_rm;
+        self.reality.machines += gained_rm * Decimal::from_float(multiplier);
         self.reality.max_rm = self.reality.max_rm.max(&self.reality.machines);
-        self.reality.realities += 1;
-        self.reality.perk_points += 1.0;
+        // `realityAndPPMultiplier` (the Achievement-154 binomial extra is
+        // unmodelled — the engine avoids unseeded randomness).
+        self.reality.realities += multiplier as u32;
+        self.reality.perk_points += multiplier;
 
         // Relic Shards + the per-celestial run-completion hooks (Teresa best AM,
         // Effarig stage unlock, Enslaved completion). Read the pre-reset run
         // flags, before `reality_reset_internal` clears them.
-        self.effarig_gain_relic_shards();
+        self.effarig_gain_relic_shards(multiplier);
         self.celestial_reality_completion_hooks();
 
         // Ra: run the Glyph-Alchemy reactions once per rewarded Reality
         // (`Ra.applyAlchemyReactions`, gated on Effarig's Memories).
         self.apply_alchemy_reactions();
+
+        // An amplified Reality consumes the stored real time (all of it, or a
+        // proportional part when the run took under 1 real second) and clears
+        // the amplify flag.
+        if multiplier > 1.0 && self.celestials.enslaved.boost_reality {
+            let seconds = self.records.this_reality.real_time_ms / 1000.0;
+            if seconds < 1.0 {
+                self.celestials.enslaved.stored_real *= 1.0 - seconds;
+            } else {
+                self.celestials.enslaved.stored_real = 0.0;
+            }
+            self.celestials.enslaved.boost_reality = false;
+        }
 
         self.reality_reset_internal();
 

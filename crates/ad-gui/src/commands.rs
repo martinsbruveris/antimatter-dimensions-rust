@@ -434,6 +434,32 @@ pub fn buy_tesseract(state: State<'_, Mutex<GameState>>) {
     state.lock().unwrap().buy_tesseract();
 }
 
+/// Toggle Enslaved real-time storage (mutually exclusive with game-time).
+#[tauri::command]
+pub fn toggle_store_real_time(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().toggle_store_real();
+}
+
+/// Toggle banking offline time into the real-time store (`autoStoreReal`).
+#[tauri::command]
+pub fn toggle_auto_store_real(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().toggle_auto_store_real();
+}
+
+/// Arm/disarm the amplified next Reality (`Enslaved.boostReality`).
+#[tauri::command]
+pub fn toggle_boost_reality(state: State<'_, Mutex<GameState>>) {
+    state.lock().unwrap().toggle_boost_reality();
+}
+
+/// Toggle the Ra auto-release (1% discharge every 5th tick).
+#[tauri::command]
+pub fn toggle_auto_release(state: State<'_, Mutex<GameState>>) {
+    let mut game = state.lock().unwrap();
+    game.celestials.enslaved.is_auto_releasing =
+        !game.celestials.enslaved.is_auto_releasing;
+}
+
 /// Unlock V (the celestial) once all six main conditions are met.
 #[tauri::command]
 pub fn v_unlock_celestial(state: State<'_, Mutex<GameState>>) {

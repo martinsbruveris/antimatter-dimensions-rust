@@ -160,10 +160,15 @@ impl GameState {
     /// (`checkRequirement` on GAME_TICK_AFTER → `imaginaryUpgReqs`). The
     /// reset-event checks (11/12) run from the Reality reset hooks.
     pub(crate) fn check_imaginary_upgrade_reqs_on_tick(&mut self) {
-        // 13: ≥ Number.MAX_VALUE projected RM inside Enslaved's Reality (the
-        // stored-real-time amplification is a 7.3 cut → count 0).
+        // 13: ≥ Number.MAX_VALUE *projected* RM inside Enslaved's Reality —
+        // `uncappedRM × (simulatedRealityCount(false) + 1)`, matching the
+        // amplified value the Reality button displays.
+        let projected_mult = break_infinity::Decimal::from_float(
+            self.simulated_reality_count_raw().floor() + 1.0,
+        );
         if self.celestials.enslaved.run
-            && self.uncapped_rm() >= break_infinity::Decimal::NUMBER_MAX_VALUE
+            && self.uncapped_rm() * projected_mult
+                >= break_infinity::Decimal::NUMBER_MAX_VALUE
         {
             self.reality.imaginary_upg_reqs |= 1 << 13;
         }

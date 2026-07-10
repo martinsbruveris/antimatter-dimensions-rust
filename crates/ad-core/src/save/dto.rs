@@ -121,6 +121,9 @@ pub struct PlayerDTO {
     /// `player.partInfinitied` — fractional carry of passive Infinity generation.
     #[serde(default)]
     pub part_infinitied: f64,
+    /// `player.partSimulatedReality` — fractional carry of simulated Realities.
+    #[serde(default)]
+    pub part_simulated_reality: f64,
     /// `player.ic2Count` — the IC2 auto-sacrifice timer (ms).
     #[serde(rename = "ic2Count", default)]
     pub ic2_count: f64,
@@ -286,6 +289,12 @@ pub struct EnslavedDTO {
     pub completed: bool,
     #[serde(default)]
     pub tesseracts: u32,
+    /// `autoStoreReal` — bank offline time into `storedReal`.
+    #[serde(default)]
+    pub auto_store_real: bool,
+    /// `isAutoReleasing` — the Ra auto-release toggle.
+    #[serde(default)]
+    pub is_auto_releasing: bool,
 }
 
 /// `player.celestials.v`.
@@ -2123,6 +2132,8 @@ impl GameState {
             enslaved.run = cel.enslaved.run;
             enslaved.completed = cel.enslaved.completed;
             enslaved.tesseracts = cel.enslaved.tesseracts;
+            enslaved.auto_store_real = cel.enslaved.auto_store_real;
+            enslaved.is_auto_releasing = cel.enslaved.is_auto_releasing;
             // The original stores `unlocks` as an array of ids; we pack it into
             // a bitset.
             for id in &cel.enslaved.unlocks {
@@ -2656,6 +2667,7 @@ impl GameState {
             ip_mult_purchases: dto.ip_mult_purchases,
             ip_offline_bought,
             part_infinitied: dto.part_infinitied,
+            part_simulated_reality: dto.part_simulated_reality,
             ic_best_times_ms: {
                 let mut times = [f64::MAX; 8];
                 for (i, t) in

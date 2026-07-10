@@ -18,6 +18,19 @@ const ui = useUiStore();
 const reality = computed(() => game.snapshot?.reality);
 
 const showInstability = computed(() => (reality.value?.best_glyph_level ?? 0) > 800);
+
+// The Reality-amplify button (RealityAmplifyButton.vue): visible once
+// Enslaved is unlocked; arms Enslaved.boostReality for the next Reality.
+const enslaved = computed(() => game.snapshot?.celestials?.enslaved);
+const amplifyTooltip = computed(() => {
+  if (!enslaved.value?.can_amplify && !enslaved.value?.boost_reality) {
+    return "Store more real time or complete the Reality faster to amplify";
+  }
+  return null;
+});
+function toggleAmplify() {
+  game.toggleBoostReality();
+}
 const sacrificeDisplayed = ref(false);
 
 // Effarig's glyph-level weight adjuster (4 factors summing 100). Adjusting
@@ -47,6 +60,27 @@ function setWeight(index, valueIn) {
           @click="ui.showModal('resetReality')"
         >
           Start this Reality over
+        </button>
+        <br>
+        <button
+          v-if="enslaved?.unlocked"
+          class="l-reality-amplify-button"
+          :class="{
+            'l-reality-amplify-button--clickable': enslaved.can_amplify,
+            'o-enslaved-mechanic-button--storing-time': enslaved.boost_reality,
+          }"
+          :ach-tooltip="amplifyTooltip"
+          @click="toggleAmplify"
+        >
+          <div v-if="enslaved.can_amplify || enslaved.boost_reality">
+            <span v-if="enslaved.boost_reality">Will be amplified:</span>
+            <span v-else>Amplify this Reality:</span>
+            <br>
+            All rewards ×{{ Math.floor(enslaved.reality_boost_ratio) }}
+          </div>
+          <div v-else>
+            Not enough stored real time to amplify.
+          </div>
         </button>
         <br>
         <div v-if="showInstability">

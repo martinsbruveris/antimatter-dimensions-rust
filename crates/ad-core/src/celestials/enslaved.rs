@@ -6,11 +6,11 @@
 //! burst), the two unlocks (softcap, run — with the level-5000/rarity-100 glyph
 //! gate), and the full set of run restrictions (glyph-level minimum, always-
 //! dilated AD, 8th-AD/ID/TD purchase limits, uncapped-Replicanti lock, disabled
-//! Black Hole, TP/DT nerfs, the discharge nerf, EC1 goal 1000) are ported. The
-//! **real-time storage + Reality amplification** (Ra-era `boostReality`),
-//! auto-release/auto-store, Tesseracts' cap effect (its cost is unreachable in
-//! frontier), and the hints/progress/`feelEternity`/secret-study flavor are
-//! deferred (see the design doc).
+//! Black Hole, TP/DT nerfs, the discharge nerf, EC1 goal 1000) are ported, as
+//! are **real-time storage + Reality amplification** (`boostReality`), the Ra
+//! auto-release / offline auto-store, and **Tesseracts** (the ID-cap currency
+//! plus its milestone/IU23 hooks). The hints/progress/`feelEternity`/
+//! secret-study flavor stays deferred (see the design doc).
 
 use break_infinity::Decimal;
 
@@ -33,6 +33,11 @@ pub const RUN_UNLOCK_PRICE_MS: f64 = 1e40 * MS_PER_YEAR;
 
 /// `Enslaved.timeCap` — the stored-game-time cap.
 pub const TIME_CAP_MS: f64 = 1e300;
+/// `storedRealTimeEfficiency` — the fraction of real time banked.
+pub const STORED_REAL_EFFICIENCY: f64 = 0.7;
+/// The base stored-real-time cap: 8 hours (Ra's `improvedStoredTime` adds
+/// 1 hour per Nameless level).
+pub const STORED_REAL_BASE_CAP_MS: f64 = 1000.0 * 3600.0 * 8.0;
 /// `Enslaved.tachyonNerf` — the TP/DT nerf exponent inside the run.
 pub const TACHYON_NERF: f64 = 0.3;
 
@@ -63,13 +68,27 @@ pub struct EnslavedState {
     /// Stored game time in ms (`stored`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub stored: f64,
-    /// Whether real-time storage is active (`isStoringReal`). Modelled for
-    /// round-trip; the amplification payoff is deferred.
+    /// Whether real-time storage is active (`isStoringReal`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub is_storing_real: bool,
     /// Stored real time in ms (`storedReal`).
     #[cfg_attr(feature = "serde", serde(default))]
     pub stored_real: f64,
+    /// Whether offline time is banked into `storedReal` (`autoStoreReal`).
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub auto_store_real: bool,
+    /// Whether the Ra auto-release is on (`isAutoReleasing`): every 5th tick
+    /// discharges 1% of the stored game time.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub is_auto_releasing: bool,
+    /// The auto-release 5-tick counter (`autoReleaseTick`). Runtime-only.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub auto_release_tick: u8,
+    /// Whether the next Reality is amplified by stored real time
+    /// (`Enslaved.boostReality`). A module flag in the original — deliberately
+    /// **not** part of the save; cleared on load like a reload clears it there.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub boost_reality: bool,
     /// Unlock bits (ids 0/1, packed from the original's `unlocks` array).
     #[cfg_attr(feature = "serde", serde(default))]
     pub unlock_bits: u32,
@@ -194,23 +213,154 @@ impl GameState {
         }
     }
 
-    /// `Enslaved.useStoredTime`: release the stored game time as a burst
-    /// consumed by the next tick. Returns whether it happened.
-    pub fn enslaved_release_stored_time(&mut self) -> bool {
-        // `canRelease`: not in EC12 (Pelle/Lai'tela/real-time-storage guards are
-        // out of frontier).
-        if self.ec_running(12) || self.celestials.enslaved.stored <= 0.0 {
+    /// `Enslaved.canRelease(auto)`: not while storing real time, in EC12, in
+    /// Lai'tela's Reality, Doomed, or (for the auto release) inside Enslaved's
+    /// own Reality.
+    pub fn enslaved_can_release(&self, auto: bool) -> bool {
+        !self.is_storing_real_time()
+            && !self.ec_running(12)
+            && !self.celestials.laitela.run
+            && !(self.celestials.enslaved.run && auto)
+            && !self.is_doomed()
+    }
+
+    /// `Enslaved.useStoredTime(autoRelease)`: release stored game time as a
+    /// burst consumed by the next tick — all of it manually, 1% on the Ra
+    /// auto-release (which keeps 99% banked). Returns whether it happened.
+    pub fn enslaved_use_stored_time(&mut self, auto: bool) -> bool {
+        if !self.enslaved_can_release(auto) || self.celestials.enslaved.stored <= 0.0 {
             return false;
         }
+        // (The original also refuses under IU24's requirement *lock* inside
+        // Ra's Reality; the deliberate lock system (`isLockingMechanics`) is
+        // out of frontier.)
         // A discharge resets the slowest-inversion tracker (IU24's gate).
         self.requirement_checks.reality_slowest_bh = 1.0;
         let mut release = self.celestials.enslaved.stored;
         if self.celestials.enslaved.run {
             release = Self::stored_time_inside_enslaved(release);
         }
+        if auto {
+            release *= 0.01;
+        }
         self.celestials.enslaved.release_ms = release.min(TIME_CAP_MS);
-        self.celestials.enslaved.stored = 0.0;
+        // `peakGamespeed` assumes a 50 ms update rate for consistency.
+        self.celestials.ra.peak_gamespeed =
+            self.celestials.ra.peak_gamespeed.max(release / 50.0);
+        self.celestials.enslaved.stored *= if auto { 0.99 } else { 0.0 };
         true
+    }
+
+    /// The manual discharge (`useStoredTime(false)`).
+    pub fn enslaved_release_stored_time(&mut self) -> bool {
+        self.enslaved_use_stored_time(false)
+    }
+
+    // --- Real-time storage --------------------------------------------------------
+
+    /// `Enslaved.canModifyRealTimeStorage`: unlocked and not Doomed.
+    pub fn can_modify_real_time_storage(&self) -> bool {
+        self.enslaved_unlocked() && !self.is_doomed()
+    }
+
+    /// `Enslaved.storedRealTimeCap`: 8 hours plus Ra's `improvedStoredTime`
+    /// bonus (1 hour per Nameless level).
+    pub fn stored_real_time_cap(&self) -> f64 {
+        let added = if self
+            .ra_unlock_active(crate::celestials::ra::RA_UNLOCK_IMPROVED_STORED_TIME)
+        {
+            1000.0
+                * 3600.0
+                * self.ra_pet_level(crate::celestials::ra::PET_ENSLAVED) as f64
+        } else {
+            0.0
+        };
+        STORED_REAL_BASE_CAP_MS + added
+    }
+
+    /// `Enslaved.isStoringRealTime`.
+    pub fn is_storing_real_time(&self) -> bool {
+        self.can_modify_real_time_storage() && self.celestials.enslaved.is_storing_real
+    }
+
+    /// `Enslaved.toggleStoreReal`. Refused only when the storage can't be
+    /// modified *and* the store is already full (the original's
+    /// `!canModify && !isStoredRealTimeCapped` early return —
+    /// `isStoredRealTimeCapped` is true while under the cap).
+    pub fn toggle_store_real(&mut self) {
+        let under_cap =
+            self.celestials.enslaved.stored_real < self.stored_real_time_cap();
+        if !self.can_modify_real_time_storage() && !under_cap {
+            return;
+        }
+        self.celestials.enslaved.is_storing_real =
+            !self.celestials.enslaved.is_storing_real;
+        self.celestials.enslaved.is_storing = false;
+    }
+
+    /// `Enslaved.toggleAutoStoreReal` (bank offline time into `storedReal`).
+    pub fn toggle_auto_store_real(&mut self) {
+        if !self.can_modify_real_time_storage() {
+            return;
+        }
+        self.celestials.enslaved.auto_store_real =
+            !self.celestials.enslaved.auto_store_real;
+    }
+
+    /// `Enslaved.storeRealTime`: bank a live interval at 70% efficiency; at the
+    /// cap the toggle switches itself off.
+    pub(crate) fn enslaved_store_real_time(&mut self, real_dt_ms: f64) {
+        if self.is_doomed() {
+            return;
+        }
+        let cap = self.stored_real_time_cap();
+        let e = &mut self.celestials.enslaved;
+        e.stored_real += real_dt_ms * STORED_REAL_EFFICIENCY;
+        if e.stored_real > cap {
+            e.is_storing_real = false;
+            e.stored_real = cap;
+        }
+    }
+
+    /// `Enslaved.autoStoreRealTime(diffMs)`: bank as much of an *offline* gap
+    /// as fits under the cap (at 70% efficiency) and return the remainder to
+    /// be simulated normally.
+    pub(crate) fn enslaved_auto_store_real_time(&mut self, diff_ms: f64) -> f64 {
+        let cap = self.stored_real_time_cap();
+        let max_gain = cap - self.celestials.enslaved.stored_real;
+        let used = diff_ms.min((max_gain / STORED_REAL_EFFICIENCY).max(0.0));
+        self.celestials.enslaved.stored_real += used * STORED_REAL_EFFICIENCY;
+        diff_ms - used
+    }
+
+    // --- Amplified Realities --------------------------------------------------------
+
+    /// `Enslaved.realityBoostRatio`: how many Realities the stored real time
+    /// would simulate — `max(1, floor(storedReal / max(1000, thisReality
+    /// realTime)))`.
+    pub fn reality_boost_ratio(&self) -> f64 {
+        (self.celestials.enslaved.stored_real
+            / self.records.this_reality.real_time_ms.max(1000.0))
+        .floor()
+        .max(1.0)
+    }
+
+    /// `Enslaved.canAmplify`: a ratio above 1, not Doomed, and not inside a
+    /// celestial Reality.
+    pub fn can_amplify_reality(&self) -> bool {
+        self.reality_boost_ratio() > 1.0
+            && !self.is_doomed()
+            && !self.is_in_celestial_reality()
+    }
+
+    /// Toggle the amplify-next-Reality flag (the Enslaved tab's button). Can
+    /// always be switched off; switching on requires `canAmplify`.
+    pub fn toggle_boost_reality(&mut self) {
+        if self.celestials.enslaved.boost_reality {
+            self.celestials.enslaved.boost_reality = false;
+        } else if self.can_amplify_reality() {
+            self.celestials.enslaved.boost_reality = true;
+        }
     }
 
     /// Game-time storage step, run at the top of [`tick`](Self::tick). Given the
@@ -226,8 +376,9 @@ impl GameState {
         let mut speed = speed;
         if self.is_storing_game_time() {
             // Bank the difference between the boosted speed and 1× (the game
-            // runs at 1× while storing).
-            let gain = real_dt_ms * (speed - 1.0);
+            // runs at 1× while storing), amplified by Ra's `improvedStoredTime`
+            // (`20^Nameless-level`).
+            let gain = real_dt_ms * (speed - 1.0) * self.ra_stored_time_amplification();
             if gain > 0.0 {
                 self.celestials.enslaved.stored =
                     (self.celestials.enslaved.stored + gain).min(TIME_CAP_MS);
@@ -417,6 +568,85 @@ mod tests {
         assert!(!game.id_is_capped(0));
         game.infinity_dimensions[0].base_amount = 2_500_000 * 10;
         assert!(game.id_is_capped(0));
+    }
+
+    /// Storing real time banks 70% of the interval, freezes game time and
+    /// production, and switches itself off at the cap.
+    #[test]
+    fn storing_real_time_banks_and_freezes_the_game() {
+        let mut game = enslaved_game();
+        game.celestials.enslaved.is_storing_real = true;
+        assert!(game.is_storing_real_time());
+
+        let am_before = game.antimatter;
+        let game_time_before = game.records.total_time_played_ms;
+        game.tick(1000.0);
+        // 700 ms banked, real time advanced, game time/production frozen.
+        assert_eq!(game.celestials.enslaved.stored_real, 700.0);
+        assert_eq!(game.records.real_time_played_ms, 1000.0);
+        assert_eq!(game.records.total_time_played_ms, game_time_before);
+        assert_eq!(game.antimatter, am_before);
+
+        // At the cap (8 h base) the toggle switches itself off.
+        game.celestials.enslaved.stored_real = game.stored_real_time_cap() - 100.0;
+        game.tick(1000.0);
+        assert_eq!(
+            game.celestials.enslaved.stored_real,
+            game.stored_real_time_cap()
+        );
+        assert!(!game.celestials.enslaved.is_storing_real);
+    }
+
+    /// The offline auto-store banks what fits under the cap and returns the
+    /// remainder to simulate.
+    #[test]
+    fn auto_store_real_time_banks_offline_gaps() {
+        let mut game = enslaved_game();
+        // Room for 700 ms of banked time = 1000 ms of gap.
+        game.celestials.enslaved.stored_real = game.stored_real_time_cap() - 700.0;
+        let remainder = game.enslaved_auto_store_real_time(5000.0);
+        assert_eq!(remainder, 4000.0);
+        assert_eq!(
+            game.celestials.enslaved.stored_real,
+            game.stored_real_time_cap()
+        );
+    }
+
+    /// The Ra auto-release discharges 1% of the stored time every 5th tick,
+    /// keeping 99% banked.
+    #[test]
+    fn auto_release_discharges_every_fifth_tick() {
+        let mut game = enslaved_game();
+        game.celestials.enslaved.stored = 1e6;
+        game.celestials.enslaved.is_auto_releasing = true;
+        for _ in 0..4 {
+            game.tick(50.0);
+        }
+        assert_eq!(game.celestials.enslaved.stored, 1e6);
+        game.tick(50.0);
+        assert_eq!(game.celestials.enslaved.stored, 1e6 * 0.99);
+    }
+
+    /// An amplified Reality multiplies the rewards by the boost ratio and
+    /// consumes the stored real time.
+    #[test]
+    fn amplified_reality_multiplies_rewards() {
+        let mut game = crate::reality::tests::game_at_reality_goal();
+        game.celestials.effarig.unlock_bits |=
+            1 << crate::celestials::effarig::EFFARIG_UNLOCK_ETERNITY;
+        // 10 s of run time, 50 s stored → ratio 5.
+        game.records.this_reality.real_time_ms = 10_000.0;
+        game.celestials.enslaved.stored_real = 50_000.0;
+        assert_eq!(game.reality_boost_ratio(), 5.0);
+        assert!(game.can_amplify_reality());
+        game.toggle_boost_reality();
+
+        assert!(game.reality());
+        // ×5 Realities and Perk Points; stored real time consumed; flag off.
+        assert_eq!(game.reality.realities, 5);
+        assert_eq!(game.reality.perk_points, 5.0);
+        assert_eq!(game.celestials.enslaved.stored_real, 0.0);
+        assert!(!game.celestials.enslaved.boost_reality);
     }
 
     /// IU23 multiplies the imaginary free Dim Boosts by

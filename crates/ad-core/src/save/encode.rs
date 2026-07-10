@@ -254,6 +254,7 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     player["epmultUpgrades"] = json!(state.epmult_upgrades);
     player["IPMultPurchases"] = json!(state.ip_mult_purchases);
     player["partInfinitied"] = json!(state.part_infinitied);
+    player["partSimulatedReality"] = json!(state.part_simulated_reality);
     player["ic2Count"] = json!(state.ic2_count);
     // Infinity Challenge record times.
     player["challenge"]["infinity"]["bestTimes"] = json!(state.ic_best_times_ms);
@@ -514,6 +515,8 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
         enslaved["run"] = json!(cel.enslaved.run);
         enslaved["completed"] = json!(cel.enslaved.completed);
         enslaved["tesseracts"] = json!(cel.enslaved.tesseracts);
+        enslaved["autoStoreReal"] = json!(cel.enslaved.auto_store_real);
+        enslaved["isAutoReleasing"] = json!(cel.enslaved.is_auto_releasing);
         // Pack the unlock bitset back into the `unlocks` id array.
         let unlocks: Vec<u8> = (0..2u8)
             .filter(|id| cel.enslaved.unlock_bits & (1u32 << id) != 0)

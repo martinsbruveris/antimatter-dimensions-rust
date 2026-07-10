@@ -242,6 +242,10 @@ pub struct GameState {
     /// from the `infinitiedGen` Break Infinity Upgrade. Reset on Eternity/Reality.
     #[cfg_attr(feature = "serde", serde(default))]
     pub part_infinitied: f64,
+    /// Fractional carry of simulated Realities (`player.partSimulatedReality`),
+    /// from the amplified-Reality / `multiversal` extra-Reality machinery.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub part_simulated_reality: f64,
     /// Current Eternity Points (`Currency.eternityPoints`): gained on an
     /// Eternity, cumulative, spent on Time Dimensions / Eternity Upgrades /
     /// Time Theorems. Reset only on Reality (out of frontier). See `eternity.rs`.
@@ -562,6 +566,7 @@ impl GameState {
             ip_mult_purchases: 0,
             ip_offline_bought: false,
             part_infinitied: 0.0,
+            part_simulated_reality: 0.0,
             ic_best_times_ms: [f64::MAX; 8],
             nc_best_times_ms: [f64::MAX; 11],
             dilation: DilationState::new(),

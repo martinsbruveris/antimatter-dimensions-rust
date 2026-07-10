@@ -215,11 +215,14 @@ impl GameState {
     }
 
     /// `giveRealityRewards`: add the run's Relic Shards on a rewarded Reality.
-    pub(crate) fn effarig_gain_relic_shards(&mut self) {
+    pub(crate) fn effarig_gain_relic_shards(&mut self, multiplier: f64) {
         if !self.effarig_unlocked() {
             return;
         }
-        self.celestials.effarig.relic_shards += self.effarig_shards_gained();
+        // An amplified Reality multiplies the shard payout (`gainedShards ×
+        // multiplier` in `giveRealityRewards`).
+        self.celestials.effarig.relic_shards +=
+            self.effarig_shards_gained() * multiplier;
     }
 
     // --- Stage completion hooks -------------------------------------------------

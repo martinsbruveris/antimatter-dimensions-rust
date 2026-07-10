@@ -53,3 +53,38 @@ completed), `buy_tesseract` command + store action.
 
 Tests: cost table/threshold semantics, cap raise on `id_is_capped`, IU23
 scaling. Fidelity: 1469/1476 (unchanged).
+
+### 1c. Real-time storage, amplified Realities, auto-release/auto-store
+
+The remaining Enslaved mechanics:
+
+- **Real-time storage** (`isStoringReal`): a storing tick now mirrors
+  `realTimeMechanics` — only Ra memories/momentum + Dark Matter Dimensions run,
+  real-time records advance, the interval banks at 70% into `storedReal`
+  (cap 8 h + 1 h/Nameless level via Ra's `improvedStoredTime`, self-stopping at
+  the cap), autobuyers still tick, everything else freezes. The offline path
+  (`autoStoreReal`) banks what fits under the cap in `simulate_offline` and
+  simulates the remainder.
+- **Amplified Realities** (`boostReality` — a module flag in the original, so
+  deliberately `serde(skip)`): `realityBoostRatio`/`canAmplify`, the
+  `simulatedRealityCount` machinery with the `partSimulatedReality` fractional
+  carry (new save passthrough) and the `multiversal` alchemy effect accessor
+  (`32·(amount/25000)²`), threading the multiplier through RM / Realities /
+  Perk Points / Relic Shards / the recent-Realities ring, and consuming
+  `storedReal` (proportionally under 1 real second). The Achievement-154
+  binomial extra stays unmodelled (the engine avoids unseeded randomness).
+  IU13's projected-RM requirement now includes the amplification factor.
+- **Ra auto-release** (`isAutoReleasing`, persisted): every 5th tick discharges
+  1% (`useStoredTime(true)`), keeping 99% banked; the release path also gained
+  the full `canRelease` guard set (real-time storing / EC12 / Lai'tela / Doomed
+  / auto-inside-run) and the `peakGamespeed` update. Game-time storage now
+  applies Ra's `20^level` amplification (previously a dead accessor).
+- GUI: EnslavedTab grew the real-time-storage half (store/auto-store buttons,
+  efficiency/cap lines) and the auto-release toggle (Ra `autoPulseTime`-gated);
+  the Glyphs tab gained the original's `RealityAmplifyButton`. Commands:
+  `toggle_store_real_time`, `toggle_auto_store_real`, `toggle_boost_reality`,
+  `toggle_auto_release`.
+
+Tests: storing-tick freeze/banking/cap-stop, offline banking remainder,
+5-tick auto-release cadence, amplified-Reality reward multiplication +
+consumption. Fidelity: 1469/1476 (unchanged). **Cluster 1 complete.**

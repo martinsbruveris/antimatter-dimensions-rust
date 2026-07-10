@@ -17,6 +17,36 @@ impl GameState {
         // slower. Production, currencies, and game-time records use the scaled
         // interval; autobuyer timers and real-time records stay on real time.
         let real_dt_ms = dt_ms;
+
+        // Storing real time skips the whole game loop (`realTimeMechanics`):
+        // only Ra memories/momentum and the Dark Matter Dimensions run, the
+        // real-time records advance, the interval is banked at 70% efficiency,
+        // and the autobuyers still tick. Black-hole phases, production, and
+        // game-time records all freeze.
+        if self.is_storing_real_time() {
+            self.ra_memory_tick(real_dt_ms, false);
+            self.ra_tick(real_dt_ms);
+            self.dmd_tick(real_dt_ms);
+            self.records.real_time_played_ms += real_dt_ms;
+            self.records.this_infinity.real_time_ms += real_dt_ms;
+            self.records.this_eternity.real_time_ms += real_dt_ms;
+            self.records.this_reality.real_time_ms += real_dt_ms;
+            self.enslaved_store_real_time(real_dt_ms);
+            self.tick_autobuyers(real_dt_ms);
+            return;
+        }
+
+        // The Ra auto-release: every 5th tick, discharge 1% of the stored game
+        // time (keeping 99% banked) as a burst folded in below.
+        if self.celestials.enslaved.is_auto_releasing && !self.black_holes_are_negative()
+        {
+            self.celestials.enslaved.auto_release_tick += 1;
+            if self.celestials.enslaved.auto_release_tick >= 5 {
+                self.celestials.enslaved.auto_release_tick = 0;
+                self.enslaved_use_stored_time(true);
+            }
+        }
+
         // Black-hole phases advance on real time, before the speed factor is
         // read (`BlackHoles.updatePhases`).
         self.tick_black_holes(real_dt_ms);
@@ -368,6 +398,16 @@ impl GameState {
     /// `game_ms` is a no-op. See
     /// `docs/design/2026-06-30-offline-progress.md`.
     pub fn simulate_offline(&mut self, game_ms: f64, offline_ticks: u32) {
+        // `Enslaved.autoStoreRealTime`: with the toggle on, offline time is
+        // banked into the real-time store (70% efficiency, up to the cap)
+        // before the remainder is simulated.
+        let game_ms = if self.can_modify_real_time_storage()
+            && self.celestials.enslaved.auto_store_real
+        {
+            self.enslaved_auto_store_real_time(game_ms)
+        } else {
+            game_ms
+        };
         let (ticks, tick_size) = offline_plan(game_ms, offline_ticks);
         if ticks == 0 {
             return;

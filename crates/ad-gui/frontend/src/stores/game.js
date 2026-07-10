@@ -255,6 +255,23 @@ export const useGameStore = defineStore("game", {
       await invoke("buy_tesseract");
       this.snapshot = await this.getState();
     },
+    async toggleStoreRealTime() {
+      await invoke("toggle_store_real_time");
+      this.snapshot = await this.getState();
+    },
+    async toggleAutoStoreReal() {
+      await invoke("toggle_auto_store_real");
+      this.snapshot = await this.getState();
+    },
+    // Arm/disarm the amplified next Reality (Enslaved.boostReality).
+    async toggleBoostReality() {
+      await invoke("toggle_boost_reality");
+      this.snapshot = await this.getState();
+    },
+    async toggleAutoRelease() {
+      await invoke("toggle_auto_release");
+      this.snapshot = await this.getState();
+    },
     async vUnlockCelestial() {
       await invoke("v_unlock_celestial");
       this.snapshot = await this.getState();

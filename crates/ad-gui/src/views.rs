@@ -1383,6 +1383,19 @@ struct EnslavedView {
     run_requirement_met: bool,
     /// The two unlocks (softcap id 0, run id 1).
     unlocks: Vec<EnslavedUnlockView>,
+    /// Real-time storage: active flag, toggleability, cap, offline auto-store.
+    is_storing_real_time: bool,
+    can_modify_real_time_storage: bool,
+    stored_real_cap: f64,
+    auto_store_real: bool,
+    /// Amplified Realities: the boost ratio, whether amplification is possible,
+    /// and the armed flag.
+    reality_boost_ratio: f64,
+    can_amplify: bool,
+    boost_reality: bool,
+    /// The Ra auto-release: available (Ra unlock) + toggled on.
+    auto_release_available: bool,
+    is_auto_releasing: bool,
 }
 
 #[derive(Serialize)]
@@ -1762,13 +1775,24 @@ fn build_enslaved_view(game: &GameState) -> EnslavedView {
         stored_real: game.celestials.enslaved.stored_real,
         is_storing_game_time: game.is_storing_game_time(),
         can_modify_game_time_storage: game.can_modify_game_time_storage(),
-        can_release: game.celestials.enslaved.stored > 0.0 && !game.ec_running(12),
+        can_release: game.celestials.enslaved.stored > 0.0
+            && game.enslaved_can_release(false),
         run_unlocked: game.enslaved_run_unlocked(),
         is_running: game.celestials.enslaved.run,
         can_start_run: game.can_start_celestial_reality(ad_core::Celestial::Enslaved),
         completed: game.celestials.enslaved.completed,
         run_requirement_met: game.enslaved_run_requirement_met(),
         unlocks,
+        is_storing_real_time: game.is_storing_real_time(),
+        can_modify_real_time_storage: game.can_modify_real_time_storage(),
+        stored_real_cap: game.stored_real_time_cap(),
+        auto_store_real: game.celestials.enslaved.auto_store_real,
+        reality_boost_ratio: game.reality_boost_ratio(),
+        can_amplify: game.can_amplify_reality(),
+        boost_reality: game.celestials.enslaved.boost_reality,
+        auto_release_available: game
+            .ra_unlock_active(ad_core::celestials::ra::RA_UNLOCK_AUTO_PULSE),
+        is_auto_releasing: game.celestials.enslaved.is_auto_releasing,
     }
 }
 
@@ -2098,8 +2122,7 @@ fn build_infinity_dimensions_view(game: &GameState) -> InfinityDimensionsView {
         can_buy_tesseract: game.can_buy_tesseract(),
         tesseract_cost: num(&game.next_tesseract_cost()),
         tesseracts: bought_tesseracts,
-        extra_tesseracts: game.tesseract_effective_count()
-            - bought_tesseracts as f64,
+        extra_tesseracts: game.tesseract_effective_count() - bought_tesseracts as f64,
         next_dim_cap_increase: game
             .tesseract_cap_increase_at(bought_tesseracts as f64 + 1.0)
             - game.tesseract_cap_increase(),

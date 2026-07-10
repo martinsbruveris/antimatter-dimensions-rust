@@ -199,6 +199,16 @@ impl GameState {
         }
     }
 
+    /// `multiversal`: `32 × (amount/25000)²` extra simulated Realities per
+    /// Reality (feeds `simulatedRealityCount`).
+    pub(crate) fn alchemy_multiversal(&self) -> f64 {
+        if self.alchemy_resource_unlocked(MULTIVERSAL) {
+            32.0 * (self.amt(MULTIVERSAL) / 25_000.0).powi(2)
+        } else {
+            0.0
+        }
+    }
+
     /// `replication`: replicanti-speed ×`10^(amount/1000)`.
     pub(crate) fn alchemy_replication_speed(&self) -> f64 {
         if self.alchemy_resource_unlocked(REPLICATION) {

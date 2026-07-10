@@ -1,8 +1,10 @@
 <script setup>
-// The Nameless Ones subtab (Feature 7.3), a faithful rebuild of EnslavedTab.vue
-// covering game-time storage: the charge/discharge Black-Hole buttons, the two
-// stored-time unlocks, and the run button. Real-time storage + amplification,
-// the auto-release slider, hints, and the charging sliders are out of frontier.
+// The Nameless Ones subtab (Feature 7.3), a faithful rebuild of EnslavedTab.vue:
+// game-time storage (charge/discharge + the Ra auto-release toggle), real-time
+// storage (store/auto-store, feeding Reality amplification — the amplify button
+// itself sits on the Glyphs tab like the original), the two stored-time
+// unlocks, and the run button. Hints and the charging sliders are out of
+// frontier.
 import { computed } from "vue";
 
 import { useGameStore } from "../../../stores/game";
@@ -33,6 +35,15 @@ function buyUnlock(id) {
 }
 function startRun() {
   game.startCelestialReality("enslaved");
+}
+function toggleStoreReal() {
+  game.toggleStoreRealTime();
+}
+function toggleAutoStoreReal() {
+  game.toggleAutoStoreReal();
+}
+function toggleAutoRelease() {
+  game.toggleAutoRelease();
 }
 </script>
 
@@ -82,6 +93,39 @@ function startRun() {
             >
               <span>Discharge Black Hole</span>
             </button>
+            <button
+              v-if="enslaved.auto_release_available"
+              class="o-enslaved-mechanic-button"
+              :class="{ 'o-enslaved-mechanic-button--storing-time': enslaved.is_auto_releasing }"
+              @click="toggleAutoRelease"
+            >
+              {{ enslaved.is_auto_releasing ? "Auto-releasing stored time" : "Auto-release stored time" }}
+            </button>
+          </div>
+          <div class="l-enslaved-top-container__half">
+            Storing real time completely halts all production, setting game speed to 0.
+            You can use stored real time to "amplify" a Reality, simulating repeated
+            runs of it (see the Glyphs tab). Amplified Realities give all the rewards
+            that normal Realities do.
+            <button
+              class="o-enslaved-mechanic-button"
+              :class="{ 'o-enslaved-mechanic-button--storing-time': enslaved.is_storing_real_time }"
+              :disabled="!enslaved.can_modify_real_time_storage"
+              @click="toggleStoreReal"
+            >
+              <div class="o-enslaved-stored-time">{{ timeDisplayShort(enslaved.stored_real) }}</div>
+              <div>{{ enslaved.is_storing_real_time ? "Storing real time" : "Store real time" }}</div>
+            </button>
+            <button
+              class="o-enslaved-mechanic-button"
+              :class="{ 'o-enslaved-mechanic-button--storing-time': enslaved.auto_store_real }"
+              :disabled="!enslaved.can_modify_real_time_storage"
+              @click="toggleAutoStoreReal"
+            >
+              {{ enslaved.auto_store_real ? "Offline time stored" : "Offline time used for production" }}
+            </button>
+            <div>Efficiency: 70%</div>
+            <div>Maximum stored real time: {{ timeDisplayShort(enslaved.stored_real_cap) }}</div>
           </div>
         </div>
 
