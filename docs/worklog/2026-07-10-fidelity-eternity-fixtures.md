@@ -159,7 +159,24 @@ it in the encoder (alongside `maxGlyphs`). The engine already maintained
 **1199 → 1371 (+172).** The single most impactful fix of the session — it cleared
 the bulk of the new Eternity-batch failures.
 
+### 7. Passive-IP `partInfinityPoint` frozen after an Eternity
+
+*Fixtures 344+ @ all horizons.* `partInfinityPoint` was constant in Rust but grew
+~5e-12/tick in JS. With the `ipGen` Infinity Upgrade bought,
+`preProductionGenerateIP` does `partInfinityPoint += diff / (bestInfinity.time·10)`
+**unconditionally**; the "too slow / never happened" cutoff
+(`bestInfinity.time >= 999999999999`) only zeroes `gainedPerGen` (the IP granted
+per whole gen), not the fractional accumulation. Rust gated the *whole* block on
+`best < IP_GEN_TOO_SLOW_MS`, so a fresh Eternity — whose `bestInfinity.time` is the
+`999999999999` reset sentinel — froze the fraction.
+
+Reordered to always accumulate `part_infinity_point` (guarded only by
+`gen_period > 0`) and to grant IP on a whole gen only when
+`best < IP_GEN_TOO_SLOW_MS`.
+
+**1371 → 1395 (+24).**
+
 ## Tests
 - `cargo test -p ad-core --features serde` — all pass (578 + 22 + 29).
 - Fidelity grid re-run after each fix; deltas recorded above.
-- Final grid: **1371 / 1476**.
+- Final grid: **1395 / 1476**.

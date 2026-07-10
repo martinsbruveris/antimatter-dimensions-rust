@@ -640,13 +640,21 @@ impl GameState {
         if self.infinity_upgrade_bought(InfinityUpgrade::IpGen) {
             let best = self.records.best_infinity.time_ms;
             let gen_period = best * 10.0;
-            if best < IP_GEN_TOO_SLOW_MS && gen_period > 0.0 {
+            if gen_period > 0.0 {
+                // `partInfinityPoint` accumulates *regardless* of how slow the best
+                // infinity is (the original only gates the IP *granted per gen*, not
+                // the accumulation) — so a fresh Eternity, whose `bestInfinity.time`
+                // is the "never happened" sentinel, still ticks this fraction up.
                 self.part_infinity_point += dt_ms / gen_period;
                 let whole = self.part_infinity_point.floor();
                 if whole >= 1.0 {
                     self.part_infinity_point -= whole;
-                    self.infinity_points +=
-                        Decimal::from_float(whole) * self.total_ip_mult();
+                    // `gainedPerGen`: 0 once the best infinity is too slow (or never
+                    // happened), else `totalIPMult`.
+                    if best < IP_GEN_TOO_SLOW_MS {
+                        self.infinity_points +=
+                            Decimal::from_float(whole) * self.total_ip_mult();
+                    }
                 }
             }
         }
