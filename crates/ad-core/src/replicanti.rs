@@ -192,19 +192,21 @@ impl GameState {
         if interval <= 0.0 {
             return;
         }
-        let total = dt_ms + self.replicanti.timer_ms;
-        let ticks = total / interval;
-        let whole = ticks.floor();
-        // Roll leftover sub-interval time back into the timer (JS drops it above 100
-        // ticks/loop to avoid round-off). Subtract the consumed whole intervals
-        // directly (`total - whole·interval`) rather than round-tripping through
-        // `(ticks - whole)·interval`: the latter's `(total/interval)·interval`
-        // accrues f64 error every non-growth tick, so the timer drifts a hair below
-        // the exact integer and eventually misses an interval boundary by one game
-        // tick. The original computes this in `Decimal`, which stays on the clean
-        // value; the subtraction form matches it.
-        self.replicanti.timer_ms = if ticks < 100.0 {
-            total - whole * interval
+        // Mirror the original's `Decimal` rollover exactly. It computes
+        // `tickCount = Decimal.divide(diff + timer, interval)` (with `interval` a
+        // Decimal), then `timer = (tickCount - floor(tickCount)) * interval`. Doing
+        // this in `Decimal` — rather than raw f64 — reproduces the original's
+        // rounding *bit for bit*, so the sub-interval timer drifts (or stays clean)
+        // exactly as it does in JS and interval boundaries are crossed on the same
+        // game tick. A pure-f64 form drifts differently and misses boundaries by a
+        // tick on slow (small-amount, long-interval) Replicanti.
+        let interval_dec = Decimal::from_float(interval);
+        let total_dec = Decimal::from_float(dt_ms + self.replicanti.timer_ms);
+        let tick_count = total_dec / interval_dec;
+        let whole_dec = tick_count.floor();
+        let whole = whole_dec.to_f64();
+        self.replicanti.timer_ms = if tick_count < Decimal::from_float(100.0) {
+            ((tick_count - whole_dec) * interval_dec).to_f64()
         } else {
             0.0
         };

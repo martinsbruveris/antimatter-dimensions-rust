@@ -111,6 +111,38 @@ AD production block in `tick`. Time Dimension production already ran before it
 
 **1188 → 1198 (+10).** (Fixture 284 still fails — a further cause remains.)
 
+### 5. Replicanti timer rollover — do it in Decimal, mirroring JS (refines #3)
+
+*Fixture 284 @ 100/1000* (trace: first divergence tick 16, `replicanti.amount`).
+Another slow-Replicanti timing mismatch, but the *opposite* of #3: here JS grows a
+tick *later* than Rust. Fix #3's exact `total − whole·interval` form matched #222
+(where JS's timer stays on clean integers) but not #284 (where JS's timer drifts a
+hair below the integer). The two aren't reconcilable with a single f64 formula.
+
+The faithful port is to mirror the original's rollover *in Decimal*:
+`tickCount = Decimal.divide(diff + timer, interval)`, then
+`timer = (tickCount − floor(tickCount)) · interval`. Doing this with the `Decimal`
+type reproduces JS's rounding, so the timer drifts (or stays clean) as JS's does.
+This fixes the #284 class.
+
+Residual: `00222` regresses. Rust's `break_infinity` `Decimal` divide/multiply
+accumulates a rounding drift that JS's `Decimal` does not for interval 729, so its
+timer lands a tick late there. That's a `break_infinity`-vs-JS `Decimal` precision
+gap, not a Replicanti-logic bug — out of scope here.
+
+**1198 → 1199 (+1 net; fixes the 284 class, `00222` regresses to a Decimal-port
+precision residual).**
+
+### Not fixed: pre-break "wall" unfreeze timing (`00258`–`00261`)
+
+At the pre-break antimatter ceiling (`NUMBER_MAX_VALUE`, `1.7976931348623157e308`)
+with the Big-Crunch autobuyer off, production freezes while the Tickspeed autobuyer
+slowly drains antimatter (~`1e293`/purchase) until it dips back below the ceiling
+and unfreezes for one explosive tick. The exact unfreeze tick depends on sub-ULP
+`Decimal` arithmetic right at `1e308`, which differs between Rust's (i64-exponent)
+and JS's (f64-exponent) `Decimal`. Rust unfreezes ~2 ticks early. Not cleanly
+fixable without bit-matching `Decimal` at the boundary; left as a known residual.
+
 ## Tests
 - `cargo test -p ad-core --features serde` — all pass (578 + 22 + 29).
 - Fidelity grid re-run after each fix; deltas recorded above.
