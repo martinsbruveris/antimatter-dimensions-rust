@@ -98,7 +98,7 @@ by ticking status markers over time. IDs are stable across future snapshots.
 | ID | Feature | Status | Notes |
 |---|---|---|---|
 | 5.1 | Time Dilation | ✅ | dilation studies 1–5, dilated run, TP/DT, Tachyon Galaxies |
-| 5.2 | Dilation Upgrades | 🟡 | 3 rebuyables + 7 one-time. **Pelle-only upgrades 11–15 deferred** |
+| 5.2 | Dilation Upgrades | ✅ | 3 rebuyables + 7 one-time + the Pelle-only 11–15 (Doomed DT formula, TG multiplier, tickspeed power, threshold cube root, EP-based DT) |
 
 ## Phase 6 — Reality 🟡
 

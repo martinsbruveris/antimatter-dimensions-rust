@@ -38,6 +38,15 @@ const GALAXY_THRESHOLD_CAP: u32 = 38;
 /// One-time Dilation Upgrade DT costs, ids 4–10 (`cost` per id − 4).
 const DIL_UPGRADE_COSTS: [f64; 7] = [5e6, 1e9, 5e7, 2e12, 1e10, 1e11, 1e15];
 
+/// The Pelle-only rebuyables (ids 11–13: `dtGainPelle` / `galaxyMultiplier` /
+/// `tickspeedPower`): initial DT costs and per-purchase increments.
+const PELLE_REBUYABLE_BASE_COST: [f64; 3] = [1e14, 1e15, 1e16];
+const PELLE_REBUYABLE_INCREMENT: [f64; 3] = [100.0, 1000.0, 1e4];
+
+/// The Pelle-only one-time upgrades (ids 14–15: `galaxyThresholdPelle` /
+/// `flatDilationMult`): DT costs.
+const PELLE_UPGRADE_COSTS: [f64; 2] = [1e45, 1e55];
+
 /// Dilation state (`player.dilation`). Persists across Eternities; reset only
 /// on Reality (out of frontier).
 #[derive(Debug, Clone)]
@@ -59,11 +68,15 @@ pub struct DilationState {
     /// Total Tachyon Galaxies (base × doubling, softcapped past 1000 — can be
     /// fractional there, hence `f64`).
     pub total_tachyon_galaxies: f64,
-    /// One-time upgrades (ids 4–10), bit `1 << id`.
+    /// One-time upgrades (ids 4–10 and the Pelle-only 14–15), bit `1 << id`.
     pub upgrades: u32,
     /// Rebuyable purchase counts (ids 1–3: dtGain / galaxyThreshold /
     /// tachyonGain).
     pub rebuyables: [u32; 3],
+    /// Pelle-only rebuyable purchase counts (ids 11–13: dtGainPelle /
+    /// galaxyMultiplier / tickspeedPower). Purchasable only while Doomed.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub pelle_rebuyables: [u32; 3],
     /// EP held when TP were last rewarded (`dilation.lastEP`, a display
     /// record).
     pub last_ep: Decimal,
@@ -81,6 +94,7 @@ impl DilationState {
             total_tachyon_galaxies: 0.0,
             upgrades: 0,
             rebuyables: [0; 3],
+            pelle_rebuyables: [0; 3],
             last_ep: Decimal::ZERO,
         }
     }
@@ -311,9 +325,24 @@ impl GameState {
         if self.achievement_unlocked(187) {
             dt_gain_base *= 1.35;
         }
-        let mut rate = self.dilation.tachyon_particles
-            * Decimal::from_float(dt_gain_base)
-                .pow(&Decimal::from(self.dilation.rebuyables[0] as u64));
+        let dt_gain_mult = Decimal::from_float(dt_gain_base)
+            .pow(&Decimal::from(self.dilation.rebuyables[0] as u64));
+
+        // While Doomed the formula is replaced wholesale
+        // (`getDilationGainPerSecond`'s Pelle branch): `TP × dtGain ×
+        // dtGainPelle × flatDilationMult / 1e5`. The Paradox-rift TP power and
+        // the special Pelle glyph term are documented 7.7 cuts (both 1).
+        if self.is_doomed() {
+            let mut rate = self.dilation.tachyon_particles * dt_gain_mult;
+            rate *= Decimal::from_float(5.0)
+                .pow(&Decimal::from(self.dilation.pelle_rebuyables[0] as u64));
+            if self.dilation_upgrade_bought(15) {
+                rate *= self.pelle_flat_dilation_mult();
+            }
+            return rate / Decimal::from_float(1e5);
+        }
+
+        let mut rate = self.dilation.tachyon_particles * dt_gain_mult;
         // RU1 (Temporal Amplifier): ×3 per purchase.
         rate *= self.reality_rebuyable_effect(1);
         // Achievement 132: DT rate multiplier from Antimatter Galaxies.
@@ -357,7 +386,14 @@ impl GameState {
             0.0
         };
         let glyph_reduction = self.glyph_effect_dilation_galaxy_threshold();
-        1.0 + (3.65 * factor + 0.35) * glyph_reduction
+        let mult = 1.0 + (3.65 * factor + 0.35) * glyph_reduction;
+        // `galaxyThresholdPelle` (id 14): a cube root on the threshold mult
+        // (`canBeApplied` requires being Doomed).
+        if self.dilation_upgrade_bought(14) && self.is_doomed() {
+            mult.powf(1.0 / 3.0)
+        } else {
+            mult
+        }
     }
 
     /// Advance Dilated Time, Tachyon Galaxies, and the `ttGenerator` upgrade's
@@ -430,21 +466,26 @@ impl GameState {
         let doubled = self.dilation.base_tachyon_galaxies as f64 * double;
         self.dilation.total_tachyon_galaxies =
             doubled.min(1000.0) + (doubled - 1000.0).max(0.0) / double;
+        // `galaxyMultiplier` (Pelle rebuyable 12): ×(bought + 1) Tachyon
+        // Galaxies, applied after the doubling (purchases only exist Doomed).
+        self.dilation.total_tachyon_galaxies *=
+            (self.dilation.pelle_rebuyables[1] + 1) as f64;
     }
 
     // --- Dilation Upgrades (Feature 5.2) ----------------------------------------
 
-    /// Whether one-time Dilation Upgrade `id` (4–10) is owned.
+    /// Whether one-time Dilation Upgrade `id` (4–10, or the Pelle-only 14–15)
+    /// is owned.
     pub fn dilation_upgrade_bought(&self, id: u8) -> bool {
         self.dilation.upgrades & (1 << id) != 0
     }
 
-    /// Purchase count of rebuyable `id` (1–3).
+    /// Purchase count of rebuyable `id` (1–3, or the Pelle-only 11–13).
     pub fn dilation_rebuyable_count(&self, id: u8) -> u32 {
-        if (1..=3).contains(&id) {
-            self.dilation.rebuyables[(id - 1) as usize]
-        } else {
-            0
+        match id {
+            1..=3 => self.dilation.rebuyables[(id - 1) as usize],
+            11..=13 => self.dilation.pelle_rebuyables[(id - 11) as usize],
+            _ => 0,
         }
     }
 
@@ -458,6 +499,13 @@ impl GameState {
                         .pow(&Decimal::from(self.dilation.rebuyables[i] as u64))
             }
             4..=10 => Decimal::from_float(DIL_UPGRADE_COSTS[(id - 4) as usize]),
+            11..=13 => {
+                let i = (id - 11) as usize;
+                Decimal::from_float(PELLE_REBUYABLE_BASE_COST[i])
+                    * Decimal::from_float(PELLE_REBUYABLE_INCREMENT[i])
+                        .pow(&Decimal::from(self.dilation.pelle_rebuyables[i] as u64))
+            }
+            14..=15 => Decimal::from_float(PELLE_UPGRADE_COSTS[(id - 14) as usize]),
             _ => Decimal::MAX_VALUE,
         }
     }
@@ -467,12 +515,18 @@ impl GameState {
         id == 2 && self.dilation.rebuyables[1] >= GALAXY_THRESHOLD_CAP
     }
 
-    /// Whether Dilation Upgrade `id` can be bought now.
+    /// Whether Dilation Upgrade `id` can be bought now. The Pelle-only
+    /// upgrades (11–15) additionally require being Doomed.
     pub fn can_buy_dilation_upgrade(&self, id: u8) -> bool {
-        if !self.dilation_unlocked() || !(1..=10).contains(&id) {
+        if !self.dilation_unlocked() || !(1..=15).contains(&id) {
             return false;
         }
-        if (4..=10).contains(&id) && self.dilation_upgrade_bought(id) {
+        if (11..=15).contains(&id) && !self.is_doomed() {
+            return false;
+        }
+        if ((4..=10).contains(&id) || (14..=15).contains(&id))
+            && self.dilation_upgrade_bought(id)
+        {
             return false;
         }
         if self.dilation_rebuyable_capped(id) {
@@ -490,6 +544,9 @@ impl GameState {
         let cost = self.dilation_upgrade_cost(id);
         self.dilation.dilated_time -= cost;
         match id {
+            11..=13 => {
+                self.dilation.pelle_rebuyables[(id - 11) as usize] += 1;
+            }
             1..=3 => {
                 self.dilation.rebuyables[(id - 1) as usize] += 1;
                 if id == 2 {
@@ -524,6 +581,15 @@ impl GameState {
         true
     }
 
+    /// The `flatDilationMult` upgrade's effect (id 15):
+    /// `1e9 ^ min((max(log10(EP) − 1500, 0) / 2500)^1.2, 1)`.
+    fn pelle_flat_dilation_mult(&self) -> Decimal {
+        let exp = ((self.eternity_points.pos_log10() - 1500.0).max(0.0) / 2500.0)
+            .powf(1.2)
+            .min(1.0);
+        Decimal::pow10(9.0 * exp)
+    }
+
     /// The `tdMultReplicanti` upgrade's TD multiplier:
     /// `10^(0.1·log10(replicantiMult))`, the excess past 1e9000 halved.
     pub(crate) fn dilation_td_mult_replicanti(&self) -> Decimal {
@@ -552,6 +618,77 @@ mod tests {
         let mut game = GameState::new();
         game.dilation.studies.push(1);
         game
+    }
+
+    /// A dilation-unlocked, Doomed state (the Pelle-upgrade gate).
+    fn doomed_dilation_game() -> GameState {
+        let mut game = dilation_game();
+        game.celestials.pelle.doomed = true;
+        game
+    }
+
+    #[test]
+    fn pelle_dilation_upgrades_require_doom() {
+        let mut game = dilation_game();
+        game.dilation.dilated_time = Decimal::new(1.0, 60);
+        for id in 11..=15 {
+            assert!(!game.can_buy_dilation_upgrade(id), "id {id}");
+        }
+        game.celestials.pelle.doomed = true;
+        for id in 11..=15 {
+            assert!(game.can_buy_dilation_upgrade(id), "id {id}");
+        }
+        // Rebuyable 11 (1e14 base, ×100/buy) and one-time 14 (1e45).
+        assert!(game.buy_dilation_upgrade(11));
+        assert_eq!(game.dilation_rebuyable_count(11), 1);
+        assert_eq!(game.dilation_upgrade_cost(11), Decimal::from_float(1e16));
+        assert!(game.buy_dilation_upgrade(14));
+        assert!(game.dilation_upgrade_bought(14));
+        assert!(!game.can_buy_dilation_upgrade(14)); // one-time
+    }
+
+    #[test]
+    fn doomed_dt_rate_uses_the_pelle_formula() {
+        let mut game = doomed_dilation_game();
+        game.dilation.tachyon_particles = Decimal::from_float(1e7);
+        // Base doomed rate: TP / 1e5 = 100/s.
+        assert_eq!(game.dilation_gain_per_second(), Decimal::from_float(100.0));
+        // dtGainPelle (11): ×5 per purchase.
+        game.dilation.pelle_rebuyables[0] = 2;
+        assert_eq!(game.dilation_gain_per_second(), Decimal::from_float(2500.0));
+    }
+
+    #[test]
+    fn pelle_galaxy_multiplier_scales_total_tgs() {
+        let mut game = doomed_dilation_game();
+        game.dilation.base_tachyon_galaxies = 4;
+        game.dilation.pelle_rebuyables[1] = 2; // galaxyMultiplier ×3
+        game.update_tachyon_galaxies();
+        assert_eq!(game.dilation.total_tachyon_galaxies, 12.0);
+    }
+
+    #[test]
+    fn pelle_galaxy_threshold_cube_root() {
+        let mut game = doomed_dilation_game();
+        let before = game.tachyon_galaxy_threshold_mult();
+        game.dilation.upgrades |= 1 << 14;
+        let after = game.tachyon_galaxy_threshold_mult();
+        assert!((after - before.powf(1.0 / 3.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn pelle_tickspeed_power_applies_while_doomed() {
+        let mut game = doomed_dilation_game();
+        game.dimensions[1].bought = 1;
+        game.tickspeed.bought = 10;
+        let before = game.current_tickspeed_ms();
+        game.dilation.pelle_rebuyables[2] = 1; // ^1.03
+        let after = game.current_tickspeed_ms();
+        let expected = before.pow(&Decimal::from_float(1.03));
+        assert!(
+            (after.log10() - expected.log10()).abs() < 1e-9,
+            "after={after} expected={expected}"
+        );
     }
 
     #[test]

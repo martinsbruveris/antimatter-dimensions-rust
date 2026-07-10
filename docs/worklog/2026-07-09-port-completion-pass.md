@@ -139,3 +139,25 @@ stale docs: the "deferred/neutral" comments in `break_infinity_upgrades.rs`,
 the ad-core ARCHITECTURE entries, and the audit rows 2.3 / 4.4 / 4.5 (whose
 EC6/EC11/EC8 items are likewise long since wired). Triad studies stay out of
 frontier (Ra content).
+
+## 5.2 — Pelle-only Dilation Upgrades 11–15
+
+**What shipped:** the five Doomed-only Dilation Upgrades. State:
+`pelle_rebuyables: [u32; 3]` (11 `dtGainPelle` ×5/purchase, 12
+`galaxyMultiplier`, 13 `tickspeedPower`) plus one-time bits 14
+(`galaxyThresholdPelle`, cube-rooting the TG threshold mult) and 15
+(`flatDilationMult`, `1e9^min(((log10 EP − 1500)/2500)^1.2, 1)`), all costed
+per the original (1e14/1e15/1e16 rebuyable bases ×100/×1000/×1e4; 1e45/1e55
+one-time). `dilation_gain_per_second` now has the Doomed branch
+(`TP × dtGain × dtGainPelle × flatDilationMult / 1e5`) — the Paradox-rift TP
+power and the special Pelle glyph terms are existing 7.7 cuts (×1). The
+tickspeed power lands in `current_tickspeed_ms` before the Effarig override,
+matching `Tickspeed.current`. Save round-trip via the existing dilation
+rebuyables id-map (now 1–3 + 11–13) and the upgrades id list (now 4–10 +
+14–15). GUI: the Pelle rows appear on the Dilation tab once Doomed with the
+Paradox rift's first milestone, mirroring the original's
+allRebuyables/allSingleUpgrades layout.
+
+**Tests:** five new unit tests (doom gating + costs, the Doomed DT formula,
+TG multiplier, threshold cube root, tickspeed power). Fidelity steady at
+1121/1148.

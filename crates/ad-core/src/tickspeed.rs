@@ -141,9 +141,15 @@ impl GameState {
         } else {
             self.total_tickspeed_upgrades() as f64
         };
-        let base = Decimal::from_float(INITIAL_TICKSPEED_MS)
+        let mut base = Decimal::from_float(INITIAL_TICKSPEED_MS)
             * Decimal::from_float(self.starting_tickspeed_mult())
             * Decimal::from_float(multiplier).pow(&Decimal::from_float(upgrades));
+        // The Pelle-only `tickspeedPower` Dilation rebuyable (id 13):
+        // `baseValue^(1 + 0.03·bought)` (`Tickspeed.current`, Doomed only).
+        let ts_power = 1.0 + 0.03 * self.dilation_rebuyable_count(13) as f64;
+        if ts_power != 1.0 && self.is_doomed() {
+            base = base.pow(&Decimal::from_float(ts_power));
+        }
         // Effarig's Reality replaces the tickspeed value with a compressed one
         // (`Tickspeed.current`: `Effarig.isRunning ? Effarig.tickspeed : base`).
         let tickspeed = if self.celestials.effarig.run {

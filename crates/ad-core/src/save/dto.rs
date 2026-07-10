@@ -802,7 +802,7 @@ pub struct ReplicantiDTO {
 }
 
 /// `player.dilation` (modelled subset). `rebuyables` is an id-keyed object map
-/// (ids 1–3 in frontier; the Pelle ids 11–13 are ignored/written as 0).
+/// (ids 1–3 plus the Pelle-only 11–13).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DilationDTO {
@@ -819,7 +819,8 @@ pub struct DilationDTO {
     /// Plain numbers in the save (total may be fractional past 1000 TGs).
     pub base_tachyon_galaxies: f64,
     pub total_tachyon_galaxies: f64,
-    /// One-time upgrade ids (a Set serialized as an array).
+    /// One-time upgrade ids (a Set serialized as an array; 4–10 and the
+    /// Pelle-only 14–15).
     pub upgrades: Vec<u8>,
     /// Rebuyable purchase counts, keyed by id string.
     pub rebuyables: std::collections::HashMap<String, u32>,
@@ -2332,16 +2333,19 @@ impl GameState {
             },
             dilation: {
                 let mut rebuyables = [0u32; 3];
+                let mut pelle_rebuyables = [0u32; 3];
                 for (key, count) in &dto.dilation.rebuyables {
                     if let Ok(id) = key.parse::<usize>() {
                         if (1..=3).contains(&id) {
                             rebuyables[id - 1] = *count;
+                        } else if (11..=13).contains(&id) {
+                            pelle_rebuyables[id - 11] = *count;
                         }
                     }
                 }
                 let mut upgrades = 0u32;
                 for id in &dto.dilation.upgrades {
-                    if (4..=10).contains(id) {
+                    if (4..=10).contains(id) || (14..=15).contains(id) {
                         upgrades |= 1 << id;
                     }
                 }
@@ -2356,6 +2360,7 @@ impl GameState {
                     total_tachyon_galaxies: dto.dilation.total_tachyon_galaxies,
                     upgrades,
                     rebuyables,
+                    pelle_rebuyables,
                     last_ep: dto.dilation.last_ep,
                 }
             },

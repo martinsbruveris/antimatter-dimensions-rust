@@ -728,8 +728,11 @@ struct DilationView {
     tachyon_galaxy_gain: u32,
     /// TP an exit right now would leave the player with vs. gain.
     tachyon_gain: Num,
-    /// The 3 rebuyables + 7 one-time upgrades.
+    /// The 3 rebuyables + 7 one-time upgrades, plus the Pelle-only 11–15.
     upgrades: Vec<DilationUpgradeView>,
+    /// Whether the Pelle-only upgrades (11–15) are shown (Doomed + the Paradox
+    /// rift's first milestone).
+    pelle_upgrades_unlocked: bool,
     /// The 5 dilation studies (tree nodes): per-study state.
     studies: Vec<DilationStudyView>,
 }
@@ -737,7 +740,7 @@ struct DilationView {
 /// Serializable view of one Dilation Upgrade tile.
 #[derive(Serialize)]
 struct DilationUpgradeView {
-    /// Original id (1–10; 1–3 rebuyable).
+    /// Original id (1–15; 1–3 and 11–13 rebuyable).
     id: u8,
     cost: Num,
     is_rebuyable: bool,
@@ -2113,17 +2116,20 @@ fn build_dilation_view(game: &GameState) -> DilationView {
         total_tachyon_galaxies: game.dilation.total_tachyon_galaxies,
         tachyon_galaxy_gain,
         tachyon_gain: num(&game.tachyon_gain()),
-        upgrades: (1u8..=10)
+        upgrades: (1u8..=15)
             .map(|id| DilationUpgradeView {
                 id,
                 cost: num(&game.dilation_upgrade_cost(id)),
-                is_rebuyable: id <= 3,
+                is_rebuyable: id <= 3 || (11..=13).contains(&id),
                 count: game.dilation_rebuyable_count(id),
-                is_bought: id > 3 && game.dilation_upgrade_bought(id),
+                is_bought: ((4..=10).contains(&id) || id >= 14)
+                    && game.dilation_upgrade_bought(id),
                 is_capped: game.dilation_rebuyable_capped(id),
                 can_buy: game.can_buy_dilation_upgrade(id),
             })
             .collect(),
+        pelle_upgrades_unlocked: game.is_doomed()
+            && game.pelle_rift_milestone(ad_core::celestials::pelle::RIFT_PARADOX, 0),
         studies: (1u8..=5)
             .map(|id| DilationStudyView {
                 id,

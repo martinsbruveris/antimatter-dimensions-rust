@@ -25,21 +25,38 @@ const DESCRIPTIONS = {
   8: "You can buy all three Time Study paths from the Dimension Split",
   9: "Reduce the Dilation penalty (^0.79 after reduction)",
   10: "Generate Time Theorems based on Tachyon Particles",
+  11: "×5 Dilated Time gain",
+  12: "Multiply Tachyon Galaxies gained, applies after TG doubling upgrade",
+  13: "Gain a power to Tickspeed",
+  14: "Apply a cube root to the Tachyon Galaxy threshold",
+  15: "Gain more Dilated Time based on current EP",
 };
 
 const upgradeById = computed(
   () => new Map((d.value?.upgrades ?? []).map((u) => [u.id, u]))
 );
 
-// Grid rows: rebuyables, then the 2×3 one-time upgrades, then the TT generator.
-const rebuyableRow = computed(() =>
-  [1, 2, 3].map((id) => upgradeById.value.get(id)).filter(Boolean)
-);
-const upgradeRows = computed(() => [
-  [4, 5, 6].map((id) => upgradeById.value.get(id)).filter(Boolean),
-  [7, 8, 9].map((id) => upgradeById.value.get(id)).filter(Boolean),
-  [10].map((id) => upgradeById.value.get(id)).filter(Boolean),
-]);
+// Grid rows: rebuyables (plus the Pelle-only 11–13 while unlocked), then the
+// 2×3 one-time upgrades, the Pelle-only 14–15, and the TT generator — the
+// original's allRebuyables / allSingleUpgrades layout.
+const rebuyableRows = computed(() => {
+  const rows = [[1, 2, 3]];
+  if (d.value?.pelle_upgrades_unlocked) rows.push([11, 12, 13]);
+  return rows.map((row) =>
+    row.map((id) => upgradeById.value.get(id)).filter(Boolean),
+  );
+});
+const upgradeRows = computed(() => {
+  const rows = [
+    [4, 5, 6],
+    [7, 8, 9],
+  ];
+  if (d.value?.pelle_upgrades_unlocked) rows.push([14, 15]);
+  rows.push([10]);
+  return rows.map((row) =>
+    row.map((id) => upgradeById.value.get(id)).filter(Boolean),
+  );
+});
 
 function classObject(u) {
   return {
@@ -105,9 +122,13 @@ const tpIsOne = computed(
       ({{ d.base_tachyon_galaxies }} Base)
     </span>
     <div class="l-dilation-upgrades-grid">
-      <div class="l-dilation-upgrades-grid__row">
+      <div
+        v-for="(row, i) in rebuyableRows"
+        :key="'rebuyable' + i"
+        class="l-dilation-upgrades-grid__row"
+      >
         <button
-          v-for="u in rebuyableRow"
+          v-for="u in row"
           :key="u.id"
           :class="classObject(u)"
           class="l-dilation-upgrades-grid__cell"

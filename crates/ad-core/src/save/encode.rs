@@ -228,10 +228,14 @@ fn overlay(player: &mut Value, state: &GameState, now_ms: i64) {
     dilation["baseTachyonGalaxies"] = json!(state.dilation.base_tachyon_galaxies);
     dilation["totalTachyonGalaxies"] = json!(state.dilation.total_tachyon_galaxies);
     dilation["upgrades"] = json!((4u8..=10)
+        .chain(14..=15)
         .filter(|&id| state.dilation_upgrade_bought(id))
         .collect::<Vec<_>>());
     for (i, count) in state.dilation.rebuyables.iter().enumerate() {
         dilation["rebuyables"][(i + 1).to_string()] = json!(count);
+    }
+    for (i, count) in state.dilation.pelle_rebuyables.iter().enumerate() {
+        dilation["rebuyables"][(i + 11).to_string()] = json!(count);
     }
     dilation["lastEP"] = decimal(&state.dilation.last_ep);
 

@@ -121,7 +121,10 @@ not the current state).
   reset (`dilatedValueOf` compression applied to the final AD/ID/TD
   multipliers and the tickspeed interval), Tachyon Particles / Dilated Time /
   Tachyon Galaxies (threshold crossings, free galaxies), and the Dilation
-  Upgrades (3 rebuyables + 7 one-time) with their effects at the usual sites.
+  Upgrades — 3 rebuyables + 7 one-time plus the Pelle-only 11–15
+  (`pelle_rebuyables`; the Doomed branch of `dilation_gain_per_second`, the
+  TG multiplier in `update_tachyon_galaxies`, the tickspeed power in
+  tickspeed.rs, the threshold cube root) — with effects at the usual sites.
 - `src/eternity_upgrades.rs` — Eternity Upgrades (Feature 4.6): the 6 one-time
   EP upgrades (ID mults from EP/eternities/IC record times — with per-IC
   best-time records written on completion in crunch.rs — TD mults from
